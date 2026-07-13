@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">FrameNest</string>
     <string name="home_placeholder">栖影 · 工程骨架就绪</string>
+    <string name="smb_spike_label">FrameNest SMB Spike</string>
 </resources>

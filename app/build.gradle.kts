@@ -1,7 +1,23 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+// Optional local NAS settings for the FN-02 SMB spike harness.
+// File is gitignored — never commit real hosts or passwords.
+val smbLocalProps = Properties().apply {
+    val file = rootProject.file("smb.local.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+
+fun smbProp(key: String, default: String = ""): String =
+    smbLocalProps.getProperty(key, default)
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
 
 android {
     namespace = "com.framenest"
@@ -12,7 +28,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = "0.1.0-skeleton"
+        versionName = "0.1.0-wave1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -20,10 +36,20 @@ android {
         }
 
         // libVLC multi-ABI inflates APK (~200MB all ABIs). Keep common device +
-        // emulator ABIs for the spike; widen in release packaging if needed.
+        // emulator ABIs for debug; widen in release packaging if needed.
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
+
+        // Pre-fill SMB spike UI only; empty defaults keep CI / clean builds safe.
+        buildConfigField("String", "SMB_HOST", "\"${smbProp("smb.host")}\"")
+        buildConfigField("int", "SMB_PORT", smbProp("smb.port", "445").ifBlank { "445" })
+        buildConfigField("String", "SMB_USERNAME", "\"${smbProp("smb.username")}\"")
+        buildConfigField("String", "SMB_PASSWORD", "\"${smbProp("smb.password")}\"")
+        buildConfigField("String", "SMB_DOMAIN", "\"${smbProp("smb.domain")}\"")
+        buildConfigField("String", "SMB_SHARE", "\"${smbProp("smb.share")}\"")
+        buildConfigField("String", "SMB_PATH", "\"${smbProp("smb.path", "/")}\"")
+        buildConfigField("String", "SMB_TEST_FILE", "\"${smbProp("smb.testFile")}\"")
     }
 
     buildTypes {
@@ -43,11 +69,13 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/versions/9/previous-compilation-data.bin"
         }
         // libVLC ships multi-ABI .so; keep default merge, avoid stripping debug symbols needed by some OEMs.
         jniLibs {
@@ -75,6 +103,11 @@ dependencies {
 
     // FN-01: libVLC playback kernel spike
     implementation(libs.libvlc.all)
+
+    // FN-02: SMBJ client + coroutines for IO
+    implementation(libs.smbj)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.core)
 
     testImplementation(libs.junit)
 

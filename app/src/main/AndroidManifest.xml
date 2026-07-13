@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- SMB / remote playback (FN-01 direct smb:// spike; also needed later for FN-02). -->
+    <!-- SMB / remote playback (FN-01 direct smb://; FN-02 SMBJ client). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".FrameNestApplication"
@@ -25,6 +26,12 @@
         <activity
             android:name=".feature.player.PlayerSpikeActivity"
             android:exported="true"
+            android:theme="@style/Theme.FrameNest" />
+        <!-- FN-02 isolated harness; not part of product navigation (FN-03). -->
+        <activity
+            android:name=".smb.spike.SmbSpikeActivity"
+            android:exported="true"
+            android:label="@string/smb_spike_label"
             android:theme="@style/Theme.FrameNest" />
     </application>
 

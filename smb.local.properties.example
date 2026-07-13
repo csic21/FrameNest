@@ -1,0 +1,12 @@
+# Copy to smb.local.properties (gitignored) and fill in for device/NAS harness runs.
+# NEVER commit real hosts or passwords.
+
+smb.host=192.168.1.50
+smb.port=445
+smb.username=media
+smb.password=change-me
+smb.domain=
+smb.share=media
+smb.path=/
+# Optional relative path under the share for random-access / throughput benchmarks
+smb.testFile=sample/video.mp4
