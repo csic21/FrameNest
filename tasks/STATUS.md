@@ -7,7 +7,7 @@
 | FN-00 工程骨架 | 已完成 | agent | agent/FN-00-android-skeleton | 无 | [FN-00](handoffs/FN-00.md) |
 | FN-01 播放内核 spike | 未开始 |  |  | FN-00 |  |
 | FN-02 SMB 数据路径 spike | 未开始 |  |  | FN-00 |  |
-| FN-03 自适应 App 外壳 | 未开始 |  |  | FN-00 |  |
+| FN-03 自适应 App 外壳 | 待集成 | agent | agent/FN-03-adaptive-shell | FN-00 | [FN-03](handoffs/FN-03.md) |
 | FN-04 服务器与 SMB 浏览 | 未开始 |  |  | FN-02, FN-03 |  |
 | FN-05 SMB 播放与历史 | 未开始 |  |  | FN-01, FN-02, FN-03 |  |
 | FN-06 字幕 | 未开始 |  |  | FN-04, FN-05 |  |

@@ -2,12 +2,12 @@ package com.framenest
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import org.junit.Rule
 import org.junit.Test
 
 /**
- * Compose smoke test: launches MainActivity and verifies the empty home screen.
+ * Smoke test: launches MainActivity and verifies the adaptive shell is present.
  */
 class HomeScreenSmokeTest {
 
@@ -15,8 +15,10 @@ class HomeScreenSmokeTest {
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun homeScreen_showsAppNameAndPlaceholder() {
-        composeRule.onNodeWithText("FrameNest").assertIsDisplayed()
-        composeRule.onNodeWithText("栖影 · 工程骨架就绪").assertIsDisplayed()
+    fun mainActivity_showsAdaptiveShellAndServers() {
+        composeRule.onNodeWithTag("nav_servers").assertIsDisplayed()
+        composeRule.onNodeWithTag("nav_recent").assertIsDisplayed()
+        composeRule.onNodeWithTag("nav_settings").assertIsDisplayed()
+        composeRule.onNodeWithTag("servers_title").assertIsDisplayed()
     }
 }

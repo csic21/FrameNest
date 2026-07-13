@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Minimal unit test for the FN-00 skeleton — keeps JVM test pipeline green.
+ * Minimal unit test for app identity — keeps JVM test pipeline green.
  */
 class AppIdentityTest {
     @Test
@@ -14,9 +14,9 @@ class AppIdentityTest {
     }
 
     @Test
-    fun versionName_isSkeleton() {
-        val versionName = "0.1.0-skeleton"
+    fun versionName_isShellMilestone() {
+        val versionName = "0.1.0-fn03-shell"
         assertTrue(versionName.startsWith("0.1.0"))
-        assertTrue(versionName.contains("skeleton"))
+        assertTrue(versionName.contains("fn03"))
     }
 }

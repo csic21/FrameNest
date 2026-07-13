@@ -1,5 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">FrameNest</string>
-    <string name="home_placeholder">栖影 · 工程骨架就绪</string>
+
+    <!-- Top-level navigation -->
+    <string name="nav_servers">服务器</string>
+    <string name="nav_recent">最近播放</string>
+    <string name="nav_settings">设置</string>
+    <string name="action_back">返回</string>
+
+    <!-- Servers -->
+    <string name="servers_title">服务器</string>
+    <string name="servers_subtitle_fake">假数据 · 后续由 FN-04 接入真实 SMB</string>
+    <string name="servers_share_count">%d 个共享</string>
+    <string name="servers_select_prompt">选择左侧服务器以查看详情</string>
+    <string name="servers_detail_host">主机：%1$s</string>
+    <string name="servers_detail_placeholder">详情/浏览占位。连接与凭证管理在后续任务实现。</string>
+    <string name="servers_open_browse">浏览共享</string>
+    <string name="servers_open_sample_player">打开示例播放页</string>
+
+    <!-- Browse -->
+    <string name="browse_path_label">路径：%1$s</string>
+    <string name="browse_fake_hint">目录内容为假数据，仅用于导航演示</string>
+    <string name="browse_type_folder">文件夹</string>
+    <string name="browse_type_file">文件</string>
+
+    <!-- Player placeholder -->
+    <string name="player_placeholder_title">播放页占位</string>
+    <string name="player_placeholder_body">「%1$s」· 来自 %2$s\n真实播放由 FN-01 / FN-05 接入</string>
+
+    <!-- Recent -->
+    <string name="recent_title">最近播放</string>
+    <string name="recent_subtitle_fake">假历史记录 · 进度仅用于展示</string>
+
+    <!-- Settings -->
+    <string name="settings_title">设置</string>
+    <string name="settings_placeholder_body">缓存、字幕默认语言等选项将在后续任务实现。此处为导航占位。</string>
+    <string name="settings_cache_row">缩略图缓存</string>
+    <string name="settings_cache_value_fake">未启用（占位）</string>
+    <string name="settings_subtitle_lang_row">默认字幕语言</string>
+    <string name="settings_subtitle_lang_value_fake">中文（占位）</string>
 </resources>
