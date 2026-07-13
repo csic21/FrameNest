@@ -14,3 +14,6 @@ captures/
 *.aab
 *.log
 
+
+# Local NAS credentials for FN-02 SMB spike (never commit)
+smb.local.properties
