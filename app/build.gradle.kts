@@ -18,6 +18,12 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        // libVLC multi-ABI inflates APK (~200MB all ABIs). Keep common device +
+        // emulator ABIs for the spike; widen in release packaging if needed.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
     }
 
     buildTypes {
@@ -43,6 +49,10 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        // libVLC ships multi-ABI .so; keep default merge, avoid stripping debug symbols needed by some OEMs.
+        jniLibs {
+            keepDebugSymbols += "**/*.so"
+        }
     }
 }
 
@@ -62,6 +72,9 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+
+    // FN-01: libVLC playback kernel spike
+    implementation(libs.libvlc.all)
 
     testImplementation(libs.junit)
 

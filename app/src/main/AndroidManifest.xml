@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- SMB / remote playback (FN-01 direct smb:// spike; also needed later for FN-02). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:name=".FrameNestApplication"
         android:allowBackup="true"
@@ -18,6 +21,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- FN-01 dedicated spike entry; launch via adb (see PlayerSpikeActivity KDoc). -->
+        <activity
+            android:name=".feature.player.PlayerSpikeActivity"
+            android:exported="true"
+            android:theme="@style/Theme.FrameNest" />
     </application>
 
 </manifest>
