@@ -4,7 +4,7 @@
 
 | 任务 | 状态 | Owner | 分支/Worktree | 依赖 | 交接链接 |
 |---|---|---|---|---|---|
-| FN-00 工程骨架 | 未开始 |  |  | 无 |  |
+| FN-00 工程骨架 | 已完成 | agent | agent/FN-00-android-skeleton | 无 | [FN-00](handoffs/FN-00.md) |
 | FN-01 播放内核 spike | 未开始 |  |  | FN-00 |  |
 | FN-02 SMB 数据路径 spike | 未开始 |  |  | FN-00 |  |
 | FN-03 自适应 App 外壳 | 未开始 |  |  | FN-00 |  |
@@ -17,4 +17,3 @@
 
 分配任务时只编辑本表的 Owner、状态和分支列。具体范围与验收标准以
 `tasks/TASKS.md` 为准。
-

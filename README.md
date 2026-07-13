@@ -2,9 +2,8 @@
 
 FrameNest（栖影）是面向 Android 手机和平板的 NAS/SMB 视频播放器。
 
-当前仓库处于 **规划完成、尚未生成 Android 代码** 的阶段。这样可以先用两个
-短技术验证确定播放器和 SMB 数据路径，再由其他 Agent 按稳定边界实现，避免把
-未经验证的选型固化进项目骨架。
+当前仓库已完成 **FN-00 工程骨架**：单 module 可编译 Android 项目（Kotlin +
+Compose + Material 3），尚未实现产品功能。后续由技术验证与功能任务推进。
 
 ## MVP 一句话
 
@@ -20,6 +19,66 @@ FrameNest（栖影）是面向 Android 手机和平板的 NAS/SMB 视频播放�
 - Android Keystore 保护凭证；不在 Room 中保存明文密码
 - 列表缩略图与播放页首帧预渲染是两个独立能力
 
+## 构建要求
+
+| 工具 | 要求 |
+|---|---|
+| JDK | **17**（`JAVA_HOME` 指向 JDK 17） |
+| Android SDK | Platform **36**（`compileSdk` / `targetSdk`）、Build-Tools 36.x |
+| Gradle | Wrapper 自带 **9.6.1**（AGP 9.2.1 最低要求 9.4.1） |
+| minSdk | 26 |
+
+在仓库根目录创建 `local.properties`（已在 `.gitignore` 中）：
+
+```properties
+sdk.dir=/path/to/Android/sdk
+```
+
+macOS 常见路径：`sdk.dir=/Users/<you>/Library/Android/sdk`。
+
+### 版本目录（当前骨架）
+
+见 `gradle/libs.versions.toml`：
+
+- Android Gradle Plugin **9.2.1**（内置 Kotlin，无需 `kotlin-android` 插件）
+- Compose Compiler 插件 Kotlin **2.4.0**
+- Compose BOM **2026.06.01**
+- `core-ktx` 1.18.0 / Lifecycle 2.10.0（与 compileSdk 36 对齐；更高 AndroidX 需 SDK 37）
+
+**未引入** VLC、SMB、Room 等产品依赖。
+
+## 常用命令
+
+```bash
+# Debug APK
+./gradlew assembleDebug
+
+# 单元测试
+./gradlew testDebugUnitTest
+
+# Lint
+./gradlew lintDebug
+
+# 仪器测试（需模拟器/设备；Compose smoke）
+./gradlew connectedDebugAndroidTest
+
+# 一键：assemble + 单测 + lint
+./gradlew assembleDebug testDebugUnitTest lintDebug
+```
+
+产物路径：
+
+```text
+app/build/outputs/apk/debug/app-debug.apk
+```
+
+安装到已连接设备：
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n com.framenest/.MainActivity
+```
+
 ## 从这里开始
 
 1. 阅读 [产品范围](docs/PRODUCT.md)。
@@ -28,5 +87,4 @@ FrameNest（栖影）是面向 Android 手机和平板的 NAS/SMB 视频播放�
 4. 将 [任务卡](tasks/TASKS.md) 中对应的 `FN-XX` 段落直接交给 Agent。
 5. 要求每个 Agent 按 [交接模板](tasks/HANDOFF.md) 回报。
 
-首个实现任务是 `FN-00`。完成后可并行执行 `FN-01`、`FN-02`、`FN-03`。
-
+`FN-00` 完成后可并行执行 `FN-01`、`FN-02`、`FN-03`。

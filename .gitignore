@@ -8,4 +8,9 @@ build/
 captures/
 *.jks
 *.keystore
+.cxx/
+*.apk
+*.ap_
+*.aab
+*.log
 
