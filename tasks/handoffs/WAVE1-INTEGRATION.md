@@ -1,0 +1,25 @@
+## Wave 1 集成交接
+
+- 状态：完成（FN-01/02 验收仍含「无真实 NAS」缺口）
+- 分支与提交：`main`（集成后 HEAD 见 git log）
+- 合并顺序：FN-01 → FN-02 → FN-03
+- 改动路径（集成合并）：
+  - `gradle/libs.versions.toml` — libVLC + SMBJ + coroutines + Navigation adaptive
+  - `app/build.gradle.kts` — 上述依赖、ndk abiFilters、SMB BuildConfig
+  - `AndroidManifest.xml` — INTERNET / ACCESS_NETWORK_STATE；`PlayerSpikeActivity` + `SmbSpikeActivity`
+  - FN-01：`player/**`、`feature/player/**`、`docs/decisions/0001-player-engine.md`
+  - FN-02：`smb/**`、`docs/decisions/0002-smb-data-path.md`、`smb.local.properties.example`
+  - FN-03：`navigation/**`、`ui/screens/**`、`MainActivity` → `FrameNestApp`
+- 验收结果：
+  - `./gradlew assembleDebug testDebugUnitTest lintDebug` → **BUILD SUCCESSFUL**
+- 决策记录：
+  - `docs/decisions/0001-player-engine.md`（libVLC）
+  - `docs/decisions/0002-smb-data-path.md`（SMBJ + seekable path）
+- 未解决问题：
+  - 真实 NAS：libVLC 直接 SMB 与 SMBJ 随机读墙钟指标未采
+  - Spike 活动仍 exported，正式导航未挂到产品入口（仅 adb）
+- 后续任务可依赖：
+  - UI 外壳：`FrameNestApp` 假数据导航
+  - 播放：`PlayerController` / `VlcPlayerController`
+  - SMB：`SmbjClient` / `SmbRandomAccess` / `SmbError`
+  - Wave 2 入口：`FN-04`（服务器+浏览）、`FN-05`（播放纵切面）可开始（依赖已满足）

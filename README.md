@@ -2,8 +2,9 @@
 
 FrameNest（栖影）是面向 Android 手机和平板的 NAS/SMB 视频播放器。
 
-当前仓库已完成 **FN-00 工程骨架**：单 module 可编译 Android 项目（Kotlin +
-Compose + Material 3），尚未实现产品功能。后续由技术验证与功能任务推进。
+当前仓库已完成 **Wave 1（FN-00～FN-03）集成**：单 module Android 项目，含
+自适应导航外壳、libVLC 播放 spike、SMBJ 数据路径 spike 与两份决策记录。
+产品级 SMB 浏览/续播仍待 Wave 2（FN-04 / FN-05）。
 
 ## MVP 一句话
 
@@ -36,16 +37,27 @@ sdk.dir=/path/to/Android/sdk
 
 macOS 常见路径：`sdk.dir=/Users/<you>/Library/Android/sdk`。
 
-### 版本目录（当前骨架）
+### 版本目录（Wave 1）
 
 见 `gradle/libs.versions.toml`：
 
 - Android Gradle Plugin **9.2.1**（内置 Kotlin，无需 `kotlin-android` 插件）
 - Compose Compiler 插件 Kotlin **2.4.0**
-- Compose BOM **2026.06.01**
+- Compose BOM **2026.06.01**；Navigation Compose **2.9.8**
 - `core-ktx` 1.18.0 / Lifecycle 2.10.0（与 compileSdk 36 对齐；更高 AndroidX 需 SDK 37）
+- **libVLC** 3.6.5（FN-01）；**SMBJ** 0.14.0 + Coroutines 1.10.2（FN-02）
 
-**未引入** VLC、SMB、Room 等产品依赖。
+**尚未引入** Room 等持久化（FN-04+）。决策记录：
+
+- [0001 播放内核](docs/decisions/0001-player-engine.md)
+- [0002 SMB 数据路径](docs/decisions/0002-smb-data-path.md)
+
+Spike 入口（可选，adb）：
+
+```bash
+adb shell am start -n com.framenest/.feature.player.PlayerSpikeActivity
+adb shell am start -n com.framenest/.smb.spike.SmbSpikeActivity
+```
 
 ## 常用命令
 
@@ -87,4 +99,4 @@ adb shell am start -n com.framenest/.MainActivity
 4. 将 [任务卡](tasks/TASKS.md) 中对应的 `FN-XX` 段落直接交给 Agent。
 5. 要求每个 Agent 按 [交接模板](tasks/HANDOFF.md) 回报。
 
-`FN-00` 完成后可并行执行 `FN-01`、`FN-02`、`FN-03`。
+Wave 1 已集成。下一波可并行：`FN-04`（服务器与浏览）、`FN-05`（SMB 播放与历史）。
