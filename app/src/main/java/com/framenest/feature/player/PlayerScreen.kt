@@ -2,11 +2,16 @@ package com.framenest.feature.player
 
 import android.app.Activity
 import android.app.Application
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.res.Configuration
+import android.media.AudioManager
+import android.provider.Settings
+import android.view.View
+import android.view.Window
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,9 +23,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.BrightnessMedium
 import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -49,6 +58,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -66,6 +77,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlin.math.abs
 import com.framenest.R
 import com.framenest.core.model.PlaybackRequest
 import com.framenest.feature.listen_translate.ListenDisplayMode
@@ -138,6 +150,15 @@ fun PlayerScreen(
     // Landscape stays immersive so chrome show/hide never changes system-bar
     // insets / window size (that used to re-layout and re-scale the video).
     PlayerImmersiveEffect(enabled = landscape)
+
+    // Keep the screen on while actively playing so the device does not lock /
+    // dim mid-video. Cleared the moment playback leaves the Playing phase or
+    // when the player leaves composition. No WAKE_LOCK permission required.
+    val keepScreenOnView = LocalView.current
+    DisposableEffect(state.phase, keepScreenOnView) {
+        keepScreenOnView.keepScreenOn = state.phase == PlayerState.Phase.Playing
+        onDispose { keepScreenOnView.keepScreenOn = false }
+    }
 
     val leave: () -> Unit = {
         vm.onLeaveOrBackground()
@@ -444,6 +465,19 @@ private fun PlayerSurfaceStack(
         stringResource(R.string.player_controls_show)
     }
 
+    val context = LocalContext.current
+    val hostView = LocalView.current
+    val gestureController = remember(context, hostView) {
+        BrightnessVolumeController(context, hostView)
+    }
+    var gestureIndicator by remember { mutableStateOf<PlayerGesture?>(null) }
+    // Restore screen brightness to the system value once the player leaves the
+    // surface (e.g. navigates back). Volume is a real system setting and is
+    // intentionally left at whatever the user set.
+    DisposableEffect(gestureController) {
+        onDispose { gestureController.restoreBrightness() }
+    }
+
     Box(
         modifier = modifier
             .background(Color.Black)
@@ -467,17 +501,27 @@ private fun PlayerSurfaceStack(
                 )
             }
             state.phase == PlayerState.Phase.Playing && state.firstFrameReady -> {
-                // Tap video to toggle chrome (pause still available from controls).
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = onToggleChrome,
-                        )
-                        .semantics { contentDescription = toggleCd }
-                        .testTag("player_playing_touch"),
+                // Tap toggles chrome; a vertical drag on the left half adjusts
+                // screen brightness, on the right half adjusts media volume.
+                PlayerGestureLayer(
+                    toggleCd = toggleCd,
+                    onToggleChrome = onToggleChrome,
+                    onGestureStart = { isBrightness ->
+                        gestureController.begin(isBrightness)
+                        gestureIndicator =
+                            if (isBrightness) {
+                                PlayerGesture.Brightness(gestureController.brightnessPct())
+                            } else {
+                                PlayerGesture.Volume(gestureController.volumePct())
+                            }
+                    },
+                    onGestureDrag = { isBrightness, delta, range ->
+                        val pct = gestureController.apply(isBrightness, delta, range)
+                        gestureIndicator =
+                            if (isBrightness) PlayerGesture.Brightness(pct)
+                            else PlayerGesture.Volume(pct)
+                    },
+                    onGestureEnd = { gestureIndicator = null },
                 )
             }
             state.firstFrameReady &&
@@ -515,6 +559,14 @@ private fun PlayerSurfaceStack(
             ListenTranslateOverlay(
                 text = listenUi.overlayText,
                 modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
+
+        // Brightness / volume feedback shown briefly while the user drags.
+        gestureIndicator?.let { gesture ->
+            GestureIndicator(
+                gesture = gesture,
+                modifier = Modifier.align(Alignment.Center),
             )
         }
     }
@@ -815,4 +867,241 @@ private fun formatMs(ms: Long): String {
     val m = totalSec / 60
     val s = totalSec % 60
     return "%d:%02d".format(m, s)
+}
+
+/**
+ * Transient indicator shown while the user drags on the video to adjust
+ * brightness (left half) or volume (right half).
+ */
+private sealed interface PlayerGesture {
+    val percent: Int
+    data class Brightness(override val percent: Int) : PlayerGesture
+    data class Volume(override val percent: Int) : PlayerGesture
+}
+
+/**
+ * Overlay on the playing surface that turns a tap into a chrome toggle and a
+ * vertical drag into brightness/volume control. Splits the surface in half:
+ * drag up/down on the **left** changes brightness, on the **right** changes
+ * media volume. A short tap anywhere is still a chrome toggle.
+ *
+ * Uses a single [pointerInput] that distinguishes tap vs. drag manually so the
+ * two gestures do not steal events from each other. Drag distance is reported
+ * **cumulatively from press** (not per-frame) so [BrightnessVolumeController]
+ * can map against a fixed baseline.
+ */
+@Composable
+private fun PlayerGestureLayer(
+    toggleCd: String,
+    onToggleChrome: () -> Unit,
+    onGestureStart: (isBrightness: Boolean) -> Unit,
+    onGestureDrag: (isBrightness: Boolean, totalDeltaPx: Float, rangePx: Float) -> Unit,
+    onGestureEnd: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    val touchSlop = viewConfiguration.touchSlop
+                    var downX = 0f
+                    var downY = 0f
+                    var dragging = false
+                    var isBrightness = true
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull() ?: continue
+                        // Half the surface height ≈ full 0→100% swing from baseline.
+                        val range = (size.height / 2f).coerceAtLeast(1f)
+                        when (event.type) {
+                            PointerEventType.Press -> {
+                                downX = change.position.x
+                                downY = change.position.y
+                                dragging = false
+                            }
+                            PointerEventType.Move -> {
+                                if (!change.pressed) continue
+                                val y = change.position.y
+                                // Prefer vertical intent: ignore mostly-horizontal moves
+                                // so scrub-like sideways slides do not start a level drag.
+                                val dy = abs(y - downY)
+                                val dx = abs(change.position.x - downX)
+                                if (!dragging && dy > touchSlop && dy >= dx) {
+                                    dragging = true
+                                    isBrightness = downX < size.width / 2f
+                                    onGestureStart(isBrightness)
+                                    change.consume()
+                                }
+                                if (dragging) {
+                                    // Cumulative: finger up → positive (increase level).
+                                    val totalDelta = downY - y
+                                    onGestureDrag(isBrightness, totalDelta, range)
+                                    change.consume()
+                                }
+                            }
+                            PointerEventType.Release -> {
+                                if (dragging) {
+                                    onGestureEnd()
+                                } else {
+                                    onToggleChrome()
+                                }
+                                dragging = false
+                            }
+                            else -> Unit
+                        }
+                    }
+                }
+            }
+            .semantics { contentDescription = toggleCd }
+            .testTag("player_playing_touch"),
+    )
+}
+
+@Composable
+private fun GestureIndicator(gesture: PlayerGesture, modifier: Modifier = Modifier) {
+    val icon = when (gesture) {
+        is PlayerGesture.Brightness -> Icons.Filled.BrightnessMedium
+        is PlayerGesture.Volume -> Icons.AutoMirrored.Filled.VolumeUp
+    }
+    val fraction = (gesture.percent / 100f).coerceIn(0f, 1f)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .testTag("player_gesture_indicator"),
+    ) {
+        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(30.dp))
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = "${gesture.percent}%",
+            color = Color.White,
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Spacer(Modifier.height(8.dp))
+        // Track + fill bar so the user sees the level change as they drag.
+        Box(
+            modifier = Modifier
+                .width(100.dp)
+                .height(4.dp)
+                .background(Color.White.copy(alpha = 0.25f), RoundedCornerShape(2.dp)),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction)
+                    .height(4.dp)
+                    .background(Color.White, RoundedCornerShape(2.dp)),
+            )
+        }
+    }
+}
+
+/**
+ * Owns screen brightness and media volume for the vertical-drag gesture.
+ * Brightness is applied via [Window] attributes and restored once the player
+ * surface leaves composition; volume is a real system setting and is left as-is.
+ *
+ * Brightness starting point: if no override is active, approximate from the
+ * system brightness setting so the indicator matches what the user sees.
+ *
+ * [apply] expects a **cumulative** drag distance from the press (see
+ * [BrightnessVolumeMath]), not a per-frame delta.
+ */
+private class BrightnessVolumeController(
+    private val context: Context,
+    private val view: View,
+) {
+    private val audioManager =
+        context.applicationContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val maxVolume =
+        audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(0)
+
+    private var baselineBrightness = 0.5f
+    private var baselineVolume = 0
+
+    /**
+     * Resolve the host [Activity] window. [LocalView] / Compose contexts are often
+     * [ContextWrapper]s, so a plain `as? Activity` is null and brightness would
+     * silently never apply.
+     */
+    private fun window(): Window? = view.context.findActivity()?.window
+
+    /** Snapshot the baseline used for the rest of this gesture. */
+    fun begin(isBrightness: Boolean) {
+        if (isBrightness) {
+            val current = window()?.attributes?.screenBrightness ?: -1f
+            baselineBrightness = if (current < 0f) currentSystemBrightness() else current
+        } else {
+            baselineVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        }
+    }
+
+    /**
+     * Apply a cumulative drag (positive = finger moved up = increase).
+     * [rangePx] is the px distance mapped to a full 0→1 / 0→max swing from baseline.
+     * Returns the resulting percentage (0..100) for the on-screen indicator.
+     */
+    fun apply(isBrightness: Boolean, totalDeltaPx: Float, rangePx: Float): Int {
+        return if (isBrightness) {
+            val target = BrightnessVolumeMath.brightnessTarget(
+                baseline = baselineBrightness,
+                totalDeltaPx = totalDeltaPx,
+                rangePx = rangePx,
+            )
+            window()?.let { w ->
+                w.attributes = w.attributes.apply { screenBrightness = target }
+            }
+            BrightnessVolumeMath.brightnessPercent(target)
+        } else {
+            val target = BrightnessVolumeMath.volumeTarget(
+                baseline = baselineVolume,
+                maxVolume = maxVolume,
+                totalDeltaPx = totalDeltaPx,
+                rangePx = rangePx,
+            )
+            // flags=0: suppress the system volume toast; we draw our own indicator.
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
+            BrightnessVolumeMath.volumePercent(target, maxVolume)
+        }
+    }
+
+    fun brightnessPct(): Int {
+        val level = window()?.attributes?.screenBrightness?.takeIf { it >= 0f }
+            ?: currentSystemBrightness()
+        return BrightnessVolumeMath.brightnessPercent(level)
+    }
+
+    fun volumePct(): Int {
+        val cur = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        return BrightnessVolumeMath.volumePercent(cur, maxVolume)
+    }
+
+    /** Reset the window override so the system brightness takes over again. */
+    fun restoreBrightness() {
+        window()?.let { w ->
+            if (w.attributes.screenBrightness >= 0f) {
+                w.attributes = w.attributes.apply { screenBrightness = -1f }
+            }
+        }
+    }
+
+    private fun currentSystemBrightness(): Float {
+        val raw = try {
+            Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS)
+        } catch (_: Exception) {
+            128
+        }
+        // Floor slightly above 0 so a full dim still leaves the UI readable.
+        return (raw / 255f).coerceIn(0.05f, 1f)
+    }
+}
+
+/** Walk [ContextWrapper] chain — Compose view contexts are rarely a raw [Activity]. */
+private fun Context.findActivity(): Activity? {
+    var ctx: Context? = this
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return ctx as? Activity
 }
