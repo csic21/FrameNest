@@ -78,6 +78,8 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     val listenTranslateClearedTemplate = stringResource(R.string.settings_listen_translate_cleared)
     val listenModelsClearedTemplate = stringResource(R.string.settings_listen_models_cleared)
     val listenModelsInstalled = stringResource(R.string.settings_listen_models_installed)
+    val listenModelsLangInstalledTemplate = stringResource(R.string.settings_listen_models_lang_installed)
+    val listenModelsAllInstalled = stringResource(R.string.settings_listen_models_all_installed)
     val listenModelsFailedTemplate = stringResource(R.string.settings_listen_models_failed)
     val installStepTemplate = stringResource(R.string.settings_install_listen_models_step)
     val diagnosticsSavedTemplate = stringResource(R.string.settings_diagnostics_saved)
@@ -274,27 +276,8 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             modifier = Modifier.testTag("settings_listen_models_size"),
         )
         Spacer(Modifier.height(6.dp))
-        voskStatuses.forEach { status ->
-            VoskLangStatusRow(
-                status = status,
-                label = stringResource(
-                    langLabels[status.langTag] ?: R.string.settings_listen_models_lang_en,
-                ),
-                okLabel = langOk,
-                missingLabel = langMissing,
-            )
-        }
-        Text(
-            text = stringResource(R.string.settings_listen_models_mt_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .padding(top = 4.dp)
-                .widthIn(max = FrameNestDimens.ReadableContentMaxWidth)
-                .testTag("settings_listen_models_mt_note"),
-        )
         if (modelsInstalling) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
             LinearProgressIndicator(
                 progress = { installProgress.coerceIn(0f, 1f) },
                 modifier = Modifier
@@ -311,7 +294,63 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                         .testTag("settings_listen_models_step"),
                 )
             }
+            Spacer(Modifier.height(6.dp))
         }
+        voskStatuses.forEach { status ->
+            val label = stringResource(
+                langLabels[status.langTag] ?: R.string.settings_listen_models_lang_en,
+            )
+            VoskLangStatusRow(
+                status = status,
+                label = label,
+                okLabel = langOk,
+                missingLabel = langMissing,
+                installing = modelsInstalling,
+                onInstall = {
+                    if (modelsInstalling || status.installed) return@VoskLangStatusRow
+                    scope.launch {
+                        modelsInstalling = true
+                        installProgress = 0f
+                        statusMessage = null
+                        installStep = "Vosk ${status.langTag}"
+                        val result = runCatching {
+                            withContext(Dispatchers.IO) {
+                                container.voskModelInstaller.ensureInstalled(status.langTag) { p ->
+                                    installProgress = p.coerceIn(0f, 1f)
+                                }
+                            }
+                            refreshModelSizesAndStatus()
+                        }
+                        modelsInstalling = false
+                        installStep = null
+                        if (result.isSuccess) {
+                            statusMessage = listenModelsLangInstalledTemplate.format(label)
+                            DiagnosticLog.info(
+                                "Settings",
+                                "vosk lang installed lang=${status.langTag}",
+                            )
+                        } else {
+                            val msg = result.exceptionOrNull()?.message?.take(200) ?: "error"
+                            statusMessage = listenModelsFailedTemplate.format(msg)
+                            DiagnosticLog.info(
+                                "Settings",
+                                "vosk lang install failed lang=${status.langTag}: $msg",
+                            )
+                            refreshModelSizesAndStatus()
+                        }
+                    }
+                },
+            )
+        }
+        Text(
+            text = stringResource(R.string.settings_listen_models_mt_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .widthIn(max = FrameNestDimens.ReadableContentMaxWidth)
+                .testTag("settings_listen_models_mt_note"),
+        )
         Spacer(Modifier.height(8.dp))
         Button(
             onClick = {
@@ -378,6 +417,57 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     stringResource(R.string.settings_install_listen_models)
                 },
             )
+        }
+        val missingLangs = voskStatuses.filter { !it.installed }.map { it.langTag }
+        if (missingLangs.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = {
+                    if (modelsInstalling) return@OutlinedButton
+                    scope.launch {
+                        modelsInstalling = true
+                        installProgress = 0f
+                        statusMessage = null
+                        val result = runCatching {
+                            missingLangs.forEachIndexed { index, lang ->
+                                installStep = "Vosk $lang"
+                                val base = index.toFloat() / missingLangs.size
+                                val span = 1f / missingLangs.size
+                                withContext(Dispatchers.IO) {
+                                    container.voskModelInstaller.ensureInstalled(lang) { p ->
+                                        installProgress = (base + p * span).coerceIn(0f, 1f)
+                                    }
+                                }
+                            }
+                            refreshModelSizesAndStatus()
+                        }
+                        modelsInstalling = false
+                        installStep = null
+                        if (result.isSuccess) {
+                            statusMessage = listenModelsAllInstalled
+                            DiagnosticLog.info(
+                                "Settings",
+                                "all missing vosk langs installed count=${missingLangs.size}",
+                            )
+                        } else {
+                            val msg = result.exceptionOrNull()?.message?.take(200) ?: "error"
+                            statusMessage = listenModelsFailedTemplate.format(msg)
+                            DiagnosticLog.info(
+                                "Settings",
+                                "install all missing vosk failed: $msg",
+                            )
+                            refreshModelSizesAndStatus()
+                        }
+                    }
+                },
+                enabled = !modelsInstalling,
+                modifier = Modifier
+                    .heightIn(min = FrameNestDimens.MinTouchTarget)
+                    .minimumInteractiveComponentSize()
+                    .testTag("settings_install_all_missing_vosk"),
+            ) {
+                Text(stringResource(R.string.settings_install_listen_models_all_missing))
+            }
         }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
@@ -551,25 +641,56 @@ private fun VoskLangStatusRow(
     label: String,
     okLabel: String,
     missingLabel: String,
+    installing: Boolean,
+    onInstall: () -> Unit,
 ) {
     val stateLabel = if (status.installed) okLabel else missingLabel
-    Text(
-        text = stringResource(
-            R.string.settings_listen_models_lang_line,
-            label,
-            status.langTag,
-            stateLabel,
-        ),
-        style = MaterialTheme.typography.bodyMedium,
-        color = if (status.installed) {
-            MaterialTheme.colorScheme.onSurface
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
+    Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = FrameNestDimens.MinTouchTarget)
+            .padding(vertical = 2.dp)
             .testTag("settings_vosk_lang_${status.langTag}"),
-    )
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = stringResource(
+                R.string.settings_listen_models_lang_line,
+                label,
+                status.langTag,
+                formatBytes(status.approxBytes),
+                stateLabel,
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (status.installed) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 8.dp),
+        )
+        if (status.installed) {
+            Text(
+                text = stringResource(R.string.settings_install_lang_done),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.testTag("settings_vosk_lang_${status.langTag}_done"),
+            )
+        } else {
+            OutlinedButton(
+                onClick = onInstall,
+                enabled = !installing,
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .testTag("settings_vosk_lang_${status.langTag}_install"),
+            ) {
+                Text(stringResource(R.string.settings_install_lang))
+            }
+        }
+    }
 }
 
 @Composable

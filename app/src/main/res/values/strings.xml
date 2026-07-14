@@ -161,11 +161,11 @@
     <string name="listen_translate_models_ready">模型已就绪</string>
 
     <string name="settings_listen_models_row">听译模型（本机）</string>
-    <string name="settings_listen_models_hint">在此安装与查看状态。听译需要：Vosk 离线 ASR（按源语言，约 40–80MB，存 filesDir）+ ML Kit 翻译（系统管理）。推荐先装「中文+英文」。卸载应用后 Vosk 一并删除。需联网下载。</string>
+    <string name="settings_listen_models_hint">在此安装与查看各语言 Vosk ASR（约 40–80MB/语种，存应用私有目录）。听译时源语言需已安装对应 ASR；翻译走 ML Kit（按语言对下载）。可装推荐中+英，或点每行「安装」单独装其它语言。需联网；卸载应用后删除。</string>
     <string name="settings_listen_models_size">Vosk 模型约占用 %1$s</string>
     <string name="settings_listen_models_ready_yes">推荐模型：已就绪（中文 + 英文 ASR）</string>
-    <string name="settings_listen_models_ready_no">推荐模型：未就绪 — 请点下方安装</string>
-    <string name="settings_listen_models_lang_line">%1$s（%2$s）：%3$s</string>
+    <string name="settings_listen_models_ready_no">推荐模型：未就绪 — 可一键安装中+英，或按语言单独安装</string>
+    <string name="settings_listen_models_lang_line">%1$s（%2$s）· 约 %3$s · %4$s</string>
     <string name="settings_listen_models_lang_ok">已安装</string>
     <string name="settings_listen_models_lang_missing">未安装</string>
     <string name="settings_listen_models_lang_zh">中文</string>
@@ -176,13 +176,18 @@
     <string name="settings_listen_models_lang_de">德语</string>
     <string name="settings_listen_models_lang_es">西语</string>
     <string name="settings_install_listen_models">安装推荐模型（中+英）</string>
+    <string name="settings_install_listen_models_all_missing">安装全部未装语言</string>
+    <string name="settings_install_lang">安装</string>
+    <string name="settings_install_lang_done">已装</string>
     <string name="settings_install_listen_models_busy">正在安装… %1$d%%</string>
     <string name="settings_install_listen_models_step">正在安装：%1$s</string>
     <string name="settings_clear_listen_models">清除听译模型</string>
     <string name="settings_listen_models_installed">推荐听译模型已就绪（Vosk 中/英 + ML Kit 中↔英）</string>
+    <string name="settings_listen_models_lang_installed">已安装：%1$s</string>
+    <string name="settings_listen_models_all_installed">所选语言包已安装</string>
     <string name="settings_listen_models_cleared">已清除模型约 %1$s</string>
     <string name="settings_listen_models_failed">模型操作失败：%1$s</string>
-    <string name="settings_listen_models_mt_note">翻译包由 ML Kit 管理；安装推荐模型时会预下载 中↔英。</string>
+    <string name="settings_listen_models_mt_note">翻译包由 ML Kit 管理；安装推荐模型时会预下载 中↔英。其它语言对在播放页首次听译时按需下载。</string>
     <string name="settings_subtitle_lang_row">默认字幕语言</string>
     <string name="settings_subtitle_lang_hint">影响自动匹配外挂/内嵌字幕的优先级（下次播放生效）。</string>
     <string name="settings_lang_system">跟随系统</string>
