@@ -3,6 +3,7 @@ package com.framenest.app
 import android.content.Context
 import com.framenest.core.diagnostics.DiagnosticLogExporter
 import com.framenest.data.history.PlaybackHistoryRepository
+import com.framenest.data.listen_translate.ListenTranslateRepository
 import com.framenest.data.server.AppDatabase
 import com.framenest.data.server.BrowseRepository
 import com.framenest.data.server.CredentialStore
@@ -44,6 +45,11 @@ class AppContainer(
         dao = database.playbackHistoryDao(),
     )
 
+    /** Listen-translate cues/jobs (FN-11); app-private Room only. */
+    val listenTranslateRepository: ListenTranslateRepository = ListenTranslateRepository(
+        dao = database.listenTranslateDao(),
+    )
+
     /** List thumbnails (FN-07); concurrency from [userPreferences]. */
     val thumbnailRepository: ThumbnailRepository = ThumbnailRepository(
         context = appContext,
@@ -55,6 +61,7 @@ class AppContainer(
     val cacheMaintenance: CacheMaintenance = CacheMaintenance(
         context = appContext,
         thumbnailRepository = thumbnailRepository,
+        listenTranslateRepository = listenTranslateRepository,
     )
 
     val diagnosticLogExporter: DiagnosticLogExporter = DiagnosticLogExporter(appContext)

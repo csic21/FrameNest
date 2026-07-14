@@ -11,6 +11,7 @@ import com.framenest.data.discovery.DiscoveryMerge
 import com.framenest.data.discovery.DiscoveryPhase
 import com.framenest.data.discovery.DiscoverySource
 import com.framenest.data.discovery.LanDiscoveryCoordinator
+import com.framenest.data.listen_translate.ListenTranslateRepository
 import com.framenest.data.server.ServerRepository
 import com.framenest.data.server.SmbUiMessages
 import kotlinx.coroutines.Job
@@ -61,6 +62,7 @@ data class ServersUiState(
 class ServersViewModel(
     private val serverRepository: ServerRepository,
     private val discovery: LanDiscoveryCoordinator,
+    private val listenTranslateRepository: ListenTranslateRepository? = null,
 ) : ViewModel() {
 
     private val serversFlow: StateFlow<List<SavedServer>> = serverRepository
@@ -367,6 +369,8 @@ class ServersViewModel(
             _ui.update { it.copy(isDeleting = true, actionError = null) }
             try {
                 serverRepository.deleteServer(id)
+                // Drop listen-translate jobs for this server (decision 0005 cleanup).
+                listenTranslateRepository?.purgeServer(id)
                 _ui.update { state ->
                     state.copy(
                         isDeleting = false,
@@ -436,11 +440,16 @@ class ServersViewModel(
         private val serverRepository: ServerRepository,
         private val appContext: Context,
         private val discovery: LanDiscoveryCoordinator = LanDiscoveryCoordinator(appContext),
+        private val listenTranslateRepository: ListenTranslateRepository? = null,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(ServersViewModel::class.java)) {
-                return ServersViewModel(serverRepository, discovery) as T
+                return ServersViewModel(
+                    serverRepository,
+                    discovery,
+                    listenTranslateRepository,
+                ) as T
             }
             error("Unknown ViewModel: ${modelClass.name}")
         }

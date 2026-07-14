@@ -60,6 +60,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.framenest.ContextAppContainer
 import com.framenest.R
 import com.framenest.core.model.SavedServer
 import com.framenest.data.discovery.DiscoveredHost
@@ -74,10 +75,12 @@ fun ServersRoute(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val container = remember(context) { ContextAppContainer(context) }
     val viewModel: ServersViewModel = viewModel(
         factory = ServersViewModel.Factory(
             serverRepository = serverRepository,
             appContext = context.applicationContext,
+            listenTranslateRepository = container.listenTranslateRepository,
         ),
     )
     val state by viewModel.uiState.collectAsStateWithLifecycle()

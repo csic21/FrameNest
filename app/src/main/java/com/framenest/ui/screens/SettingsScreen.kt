@@ -54,17 +54,28 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
 
     var cacheBytes by remember {
-        mutableStateOf(container.cacheMaintenance.approximateTotalBytes())
+        mutableStateOf(container.cacheMaintenance.approximateDiskCacheBytes())
     }
+    var listenTranslateBytes by remember { mutableStateOf(0L) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var languagePreset by remember { mutableStateOf(prefs.subtitleLanguagePreset()) }
     var thumbConcurrency by remember { mutableStateOf(prefs.thumbnailConcurrency()) }
 
     // Resolve strings at composition time (lint: avoid Context.getString in callbacks).
     val cacheClearedTemplate = stringResource(R.string.settings_cache_cleared)
+    val listenTranslateClearedTemplate = stringResource(R.string.settings_listen_translate_cleared)
     val diagnosticsSavedTemplate = stringResource(R.string.settings_diagnostics_saved)
     val diagnosticsShareTitle = stringResource(R.string.settings_diagnostics_share)
     val diagnosticsFailed = stringResource(R.string.settings_diagnostics_failed)
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        listenTranslateBytes = withContext(Dispatchers.IO) {
+            container.cacheMaintenance.approximateListenTranslateBytes()
+        }
+        cacheBytes = withContext(Dispatchers.IO) {
+            container.cacheMaintenance.approximateTotalBytes()
+        }
+    }
 
     Column(
         modifier = modifier
@@ -122,6 +133,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                         container.cacheMaintenance.clearAllCaches()
                     }
                     cacheBytes = result.remainingApproxBytes
+                    listenTranslateBytes = 0L
                     statusMessage = cacheClearedTemplate.format(formatBytes(result.freedApproxBytes))
                     DiagnosticLog.info("Settings", "cache cleared freed=${result.freedApproxBytes}")
                 }
@@ -132,6 +144,52 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 .testTag("settings_clear_cache"),
         ) {
             Text(stringResource(R.string.settings_clear_cache))
+        }
+
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = stringResource(R.string.settings_listen_translate_row),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.testTag("settings_listen_translate_row"),
+        )
+        Text(
+            text = stringResource(R.string.settings_listen_translate_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.widthIn(max = FrameNestDimens.ReadableContentMaxWidth),
+        )
+        Text(
+            text = stringResource(
+                R.string.settings_listen_translate_size,
+                formatBytes(listenTranslateBytes),
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag("settings_listen_translate_size"),
+        )
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = {
+                scope.launch {
+                    val result = withContext(Dispatchers.IO) {
+                        container.cacheMaintenance.clearListenTranslateCache()
+                    }
+                    listenTranslateBytes = 0L
+                    cacheBytes = result.remainingApproxBytes
+                    statusMessage =
+                        listenTranslateClearedTemplate.format(formatBytes(result.freedApproxBytes))
+                    DiagnosticLog.info(
+                        "Settings",
+                        "listen-translate cache cleared freed=${result.freedApproxBytes}",
+                    )
+                }
+            },
+            modifier = Modifier
+                .heightIn(min = FrameNestDimens.MinTouchTarget)
+                .minimumInteractiveComponentSize()
+                .testTag("settings_clear_listen_translate"),
+        ) {
+            Text(stringResource(R.string.settings_clear_listen_translate))
         }
 
         Spacer(modifier.height(20.dp))

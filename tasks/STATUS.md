@@ -15,7 +15,7 @@
 | FN-08 自适应体验打磨 | 已完成 | agent | → main | FN-04, FN-05 | [FN-08](handoffs/FN-08.md) |
 | FN-09 稳定与发布 | 已完成 | agent | → main | FN-04..FN-08 | [FN-09](handoffs/FN-09.md) |
 | FN-10 听译 PCM spike | 已完成 | agent | `agent/FN-10-listen-translate` | FN-01, FN-05 | [FN-10](handoffs/FN-10.md) |
-| FN-11 听译 Room/清理 | 未开始 | — | — | FN-10 | — |
+| FN-11 听译 Room/清理 | 已完成 | agent | `agent/FN-11-listen-translate-room` | FN-10 | [FN-11](handoffs/FN-11.md) |
 | FN-12 听译管线+UI | 未开始 | — | — | FN-10, FN-11 | — |
 | FN-13 听译模型下载 | 未开始 | — | — | FN-12（可接口并行） | — |
 
