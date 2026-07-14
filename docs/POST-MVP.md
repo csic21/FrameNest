@@ -15,15 +15,15 @@ FN-00～FN-09 已封板。**0.3.1-internal** 已落地一批后处理；剩余�
 
 产品与存储边界见 [`docs/decisions/0005-listen-translate.md`](decisions/0005-listen-translate.md)。
 
-**产品状态：未可用（演示壳）。** 播放页可开关听译，但出字是时间窗 stub，不是真识别。
+**产品状态：可用（需首次下载模型）。** PCM→Vosk 离线 ASR→ML Kit 本机 MT；质量= small 模型水平。
 
 | 任务 | 内容 | 状态 |
 |---|---|---|
-| FN-10 | 播放中本机取 PCM（MediaCodec）— **debug spike only** | 基建完成；**未接产品播放器** |
-| FN-11 | Room job/cue + 清理 | 基建完成 |
-| FN-12 | 管线/UI/叠层 | **部分完成**：UI 通，引擎为 stub |
-| FN-13 | 模型安装目录与设置 | **部分完成**：JSON 占位包，非神经模型 |
-| FN-14 | 真听译：PCM→本机 ASR→本机 MT 进产品路径 | **未开始（产品验收以此为准）** |
+| FN-10 | 播放中本机取 PCM（MediaCodec）spike | 完成；产品侧由 FN-14 复用解码思路 |
+| FN-11 | Room job/cue + 清理 | 完成 |
+| FN-12 | 管线/UI/叠层 | 完成（UI 壳） |
+| FN-13 | JSON 模型目录壳 | 完成（遗留）；真 ASR 模型由 FN-14 Vosk 管理 |
+| FN-14 | 真听译：PCM→Vosk→ML Kit | **完成** |
 
 硬约束（仍有效）：全本机；源/目标语言手选；原文+译文入库；**不写 NAS**；**卸载无残留**。
 

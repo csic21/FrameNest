@@ -16,7 +16,14 @@ enum class ListenDisplayMode {
  * Codes are lowercase BCP-47 primary tags.
  */
 object ListenTranslateLanguages {
+    /** Target languages (ML Kit). */
     val ALL: List<String> = listOf("zh", "en", "ja", "ko", "fr", "de", "es")
+
+    /**
+     * Source languages with a small offline Vosk pack (FN-14).
+     * Keep in sync with [com.framenest.feature.listen_translate.asr.VoskModelInstaller.SPECS].
+     */
+    val ASR_SOURCES: List<String> = listOf("en", "zh", "ja", "ko", "fr", "de", "es")
 
     fun label(code: String): String =
         when (code.lowercase()) {
@@ -33,7 +40,7 @@ object ListenTranslateLanguages {
 
 data class ListenTranslateUiState(
     val enabled: Boolean = false,
-    val sourceLang: String = "ja",
+    val sourceLang: String = "en",
     val targetLang: String = "zh",
     val displayMode: ListenDisplayMode = ListenDisplayMode.Bilingual,
     val status: ListenTranslateJobStatus = ListenTranslateJobStatus.Idle,

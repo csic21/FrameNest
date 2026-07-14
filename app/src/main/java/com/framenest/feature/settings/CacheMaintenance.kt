@@ -5,6 +5,7 @@ import com.framenest.core.diagnostics.DiagnosticLog
 import com.framenest.data.listen_translate.ListenTranslateRepository
 import com.framenest.data.listen_translate.model.ListenModelManager
 import com.framenest.data.thumbnail.ThumbnailRepository
+import com.framenest.feature.listen_translate.asr.VoskModelInstaller
 import java.io.File
 import kotlinx.coroutines.runBlocking
 
@@ -21,6 +22,7 @@ class CacheMaintenance(
     private val thumbnailRepository: ThumbnailRepository,
     private val listenTranslateRepository: ListenTranslateRepository? = null,
     private val listenModelManager: ListenModelManager? = null,
+    private val voskModelInstaller: VoskModelInstaller? = null,
 ) {
     fun clearAllCaches(): CacheClearResult {
         val before = approximateTotalBytes()
@@ -35,6 +37,7 @@ class CacheMaintenance(
         runBlocking {
             listenTranslateRepository?.purgeAll()
             listenModelManager?.deleteAll()
+            voskModelInstaller?.deleteAll()
         }
         val after = approximateTotalBytes()
         return CacheClearResult(
@@ -56,11 +59,12 @@ class CacheMaintenance(
         )
     }
 
-    /** Clear only on-device model packs under filesDir/listen_models. */
+    /** Clear only on-device model packs under filesDir/listen_models (JSON + Vosk). */
     fun clearListenModels(): CacheClearResult {
         val before = approximateTotalBytes()
         runBlocking {
             listenModelManager?.deleteAll()
+            voskModelInstaller?.deleteAll()
         }
         val after = approximateTotalBytes()
         return CacheClearResult(
@@ -74,8 +78,11 @@ class CacheMaintenance(
             listenTranslateRepository?.approximateCacheBytes() ?: 0L
         }
 
-    fun approximateListenModelBytes(): Long =
-        listenModelManager?.approximateBytes() ?: 0L
+    fun approximateListenModelBytes(): Long {
+        var total = listenModelManager?.approximateBytes() ?: 0L
+        total += voskModelInstaller?.approximateBytes() ?: 0L
+        return total
+    }
 
     fun approximateTotalBytes(): Long {
         var total = approximateDiskCacheBytes()

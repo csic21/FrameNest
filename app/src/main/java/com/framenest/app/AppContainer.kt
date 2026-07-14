@@ -12,6 +12,7 @@ import com.framenest.data.server.EncryptedCredentialStore
 import com.framenest.data.server.ServerRepository
 import com.framenest.data.settings.UserPreferences
 import com.framenest.data.thumbnail.ThumbnailRepository
+import com.framenest.feature.listen_translate.asr.VoskModelInstaller
 import com.framenest.feature.settings.CacheMaintenance
 import com.framenest.smb.SmbClient
 import com.framenest.smb.SmbjClient
@@ -51,8 +52,11 @@ class AppContainer(
         dao = database.listenTranslateDao(),
     )
 
-    /** On-device ASR/MT packs under filesDir (FN-13); uninstall clears. */
+    /** Legacy JSON packs under filesDir (FN-13 shell); uninstall clears. */
     val listenModelManager: ListenModelManager = ListenModelManager(appContext)
+
+    /** Vosk offline ASR models (FN-14); filesDir/listen_models/vosk. */
+    val voskModelInstaller: VoskModelInstaller = VoskModelInstaller(appContext)
 
     /** List thumbnails (FN-07); concurrency from [userPreferences]. */
     val thumbnailRepository: ThumbnailRepository = ThumbnailRepository(
@@ -67,6 +71,7 @@ class AppContainer(
         thumbnailRepository = thumbnailRepository,
         listenTranslateRepository = listenTranslateRepository,
         listenModelManager = listenModelManager,
+        voskModelInstaller = voskModelInstaller,
     )
 
     val diagnosticLogExporter: DiagnosticLogExporter = DiagnosticLogExporter(appContext)

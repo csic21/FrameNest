@@ -69,13 +69,11 @@ class ModelAwareListenTranslateEngine(
 
 class ModelsNotReadyException(message: String) : IllegalStateException(message)
 
-/** Factory used by the player: prefer model-backed engine, no silent network. */
+/** Factory used by the player (legacy placeholder packs — prefer [RealListenTranslateEngine]). */
 object ListenTranslateEngineFactory {
     fun create(models: ListenModelManager): ListenTranslateEngine =
         ModelAwareListenTranslateEngine(
             models = models,
-            // Keep stub only until user installs; Session can still show errors on process.
-            // Using null forces explicit install for "real" path once packs exist.
             fallbackWhenMissing = null,
         )
 

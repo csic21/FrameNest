@@ -23,7 +23,7 @@ import kotlinx.coroutines.sync.withLock
  */
 class ListenTranslateSession(
     private val repository: ListenTranslateRepository,
-    private val engine: ListenTranslateEngine,
+    private var engine: ListenTranslateEngine,
     private val scope: CoroutineScope,
     private val identity: PlaybackIdentity,
     private val contentKey: String = "",
@@ -32,6 +32,10 @@ class ListenTranslateSession(
 ) {
     private val _ui = MutableStateFlow(ListenTranslateUiState())
     val uiState: StateFlow<ListenTranslateUiState> = _ui.asStateFlow()
+
+    fun setEngine(engine: ListenTranslateEngine) {
+        this.engine = engine
+    }
 
     private val processMutex = Mutex()
     private var pollJob: Job? = null
@@ -232,16 +236,19 @@ class ListenTranslateSession(
                     sourceLang = langs.sourceLang,
                     targetLang = langs.targetLang,
                 )
-                repository.upsertCue(
-                    identity = identity,
-                    languages = langs,
-                    startMs = startMs,
-                    endMs = endMs,
-                    textSrc = result.textSrc,
-                    textTgt = result.textTgt,
-                    rev = 1,
-                    contentKey = contentKey,
-                )
+                // Silence / empty ASR: still advance coverage so we do not loop forever.
+                if (result.textSrc.isNotBlank() || result.textTgt.isNotBlank()) {
+                    repository.upsertCue(
+                        identity = identity,
+                        languages = langs,
+                        startMs = startMs,
+                        endMs = endMs,
+                        textSrc = result.textSrc,
+                        textTgt = result.textTgt,
+                        rev = 1,
+                        contentKey = contentKey,
+                    )
+                }
                 repository.updateProgress(
                     identity = identity,
                     languages = langs,
@@ -255,6 +262,11 @@ class ListenTranslateSession(
                         isProcessing = false,
                         status = ListenTranslateJobStatus.Partial,
                         coveredUntilMs = endMs.coerceAtLeast(it.coveredUntilMs),
+                        message = if (result.textSrc.isBlank()) {
+                            it.message
+                        } else {
+                            "ASR: ${engine.asrModelId} · MT: ${engine.mtModelId}"
+                        },
                     )
                 }
                 refreshActiveCue()

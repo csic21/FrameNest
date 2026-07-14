@@ -139,7 +139,7 @@
 
     <!-- Listen-translate (FN-12) -->
     <string name="listen_translate_title">听译字幕</string>
-    <string name="listen_translate_hint">本机听音出字并翻译，结果只保存在应用内。当前为演示引擎（stub），可换真模型。不写 NAS。</string>
+    <string name="listen_translate_hint">本机听译：Vosk 离线识别 + ML Kit 翻译。首次开启需下载源语言 ASR 模型（约 40–80MB，仅应用私有目录）。结果不写 NAS。</string>
     <string name="listen_translate_enable">开启听译</string>
     <string name="listen_translate_source_lang">源语言</string>
     <string name="listen_translate_target_lang">目标语言</string>
@@ -153,7 +153,7 @@
     <string name="listen_translate_models_ready">模型已就绪</string>
 
     <string name="settings_listen_models_row">听译模型</string>
-    <string name="settings_listen_models_hint">ASR/MT 包仅安装在应用私有目录（filesDir/listen_models）。卸载应用后一并删除；不写 NAS 或公共下载目录。</string>
+    <string name="settings_listen_models_hint">Vosk 离线 ASR 与遗留 JSON 包在 filesDir/listen_models；ML Kit 翻译包由系统管理。卸载后应用侧模型删除。首次听译需联网下载 Vosk（按源语言）。</string>
     <string name="settings_listen_models_size">模型约占用 %1$s</string>
     <string name="settings_install_listen_models">安装听译模型</string>
     <string name="settings_clear_listen_models">清除听译模型</string>

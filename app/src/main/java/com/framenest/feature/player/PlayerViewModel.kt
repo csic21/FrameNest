@@ -12,12 +12,19 @@ import com.framenest.core.model.PlaybackRequest
 import com.framenest.data.history.PlaybackHistoryRepository
 import com.framenest.data.history.PlaybackProgressRules
 import com.framenest.data.listen_translate.ListenTranslateRepository
-import com.framenest.data.listen_translate.model.ListenModelManager
 import com.framenest.data.server.AppDatabase
 import com.framenest.feature.listen_translate.ListenDisplayMode
-import com.framenest.feature.listen_translate.ListenTranslateEngineFactory
+import com.framenest.feature.listen_translate.ListenTranslateEngine
 import com.framenest.feature.listen_translate.ListenTranslateSession
 import com.framenest.feature.listen_translate.ListenTranslateUiState
+import com.framenest.feature.listen_translate.ListenWindowResult
+import com.framenest.feature.listen_translate.ModelsNotReadyException
+import com.framenest.feature.listen_translate.RealListenTranslateEngine
+import com.framenest.feature.listen_translate.asr.VoskAsrEngine
+import com.framenest.feature.listen_translate.asr.VoskModelInstaller
+import com.framenest.feature.listen_translate.audio.ListenAudioSource
+import com.framenest.feature.listen_translate.audio.ListenAudioSources
+import com.framenest.feature.listen_translate.mt.MlKitMtEngine
 import com.framenest.feature.subtitle.ExternalSubtitleLoader
 import com.framenest.feature.subtitle.ExternalSubtitleOption
 import com.framenest.feature.subtitle.SidecarSubtitleScanner
@@ -56,7 +63,7 @@ import kotlinx.coroutines.withContext
 /**
  * Product player session: open media (path B preferred), first-frame paused,
  * progress save, retry, release coordination, subtitle selection (FN-06),
- * and listen-translate overlay (FN-12).
+ * and listen-translate (FN-14: Vosk ASR + ML Kit MT).
  */
 class PlayerViewModel(
     application: Application,
@@ -64,8 +71,6 @@ class PlayerViewModel(
     private val historyRepository: PlaybackHistoryRepository,
     private val listenTranslateRepository: ListenTranslateRepository =
         resolveListenTranslate(application),
-    private val listenModelManager: ListenModelManager =
-        resolveListenModels(application),
     private val controllerFactory: (Application) -> PlayerController = { app ->
         VlcPlayerController(app, enableHwDecoder = true)
     },
@@ -84,9 +89,15 @@ class PlayerViewModel(
     private val _subtitleUiState = MutableStateFlow(SubtitleUiState())
     val subtitleUiState: StateFlow<SubtitleUiState> = _subtitleUiState.asStateFlow()
 
+    private val voskInstaller = VoskModelInstaller(application)
+    private val voskAsr = VoskAsrEngine()
+    private val mlKitMt = MlKitMtEngine()
+    private var realListenEngine: RealListenTranslateEngine? = null
+    private var listenOnlySmbClient: SmbjClient? = null
+
     private val listenSession = ListenTranslateSession(
         repository = listenTranslateRepository,
-        engine = ListenTranslateEngineFactory.create(listenModelManager),
+        engine = PendingListenEngine,
         scope = viewModelScope,
         identity = request.identity,
         contentKey = "",
@@ -144,42 +155,136 @@ class PlayerViewModel(
             return
         }
         viewModelScope.launch {
-            listenSession.setInstallingModels(
-                installing = true,
-                message = "正在安装本机听译模型（仅应用私有目录）…",
-                error = null,
-            )
-            val result = runCatching {
-                listenModelManager.installCoreModels().getOrThrow()
-            }
-            if (result.isFailure) {
-                val msg = result.exceptionOrNull()?.message
-                    ?: "模型安装失败"
-                listenSession.setInstallingModels(installing = false, error = msg)
-                listenSession.setModelsReady(false)
-                listenSession.setEnabled(false)
-                return@launch
-            }
-            listenSession.setModelsReady(true)
-            listenSession.setInstallingModels(
-                installing = false,
-                message = "模型已就绪：${listenModelManager.asrModelId()} / ${listenModelManager.mtModelId()}",
-                error = null,
-            )
-            listenSession.setEnabled(true)
+            enableRealListenTranslate()
         }
     }
 
     fun setListenSourceLang(code: String) {
         listenSession.setSourceLang(code)
+        // Re-download ASR model if already enabled.
+        if (listenSession.uiState.value.enabled) {
+            viewModelScope.launch { enableRealListenTranslate() }
+        }
     }
 
     fun setListenTargetLang(code: String) {
         listenSession.setTargetLang(code)
+        if (listenSession.uiState.value.enabled) {
+            viewModelScope.launch { enableRealListenTranslate() }
+        }
     }
 
     fun setListenDisplayMode(mode: ListenDisplayMode) {
         listenSession.setDisplayMode(mode)
+    }
+
+    private suspend fun enableRealListenTranslate() {
+        val sourceLang = listenSession.uiState.value.sourceLang
+        val targetLang = listenSession.uiState.value.targetLang
+        listenSession.setInstallingModels(
+            installing = true,
+            message = "正在准备本机听译：Vosk($sourceLang) + ML Kit($sourceLang→$targetLang)…\n" +
+                "首次需下载离线模型（仅应用私有目录，约数十 MB）",
+            error = null,
+        )
+        val prepared = runCatching {
+            withContext(Dispatchers.IO) {
+                ensureSmbConnectedForListen()
+                val audio = buildListenAudioSource()
+                    ?: error("当前片源暂不支持听译音频（需要本地文件或 SMB 随机读）")
+                voskInstaller.ensureInstalled(sourceLang) { p ->
+                    // progress callback on IO; UI message is approximate
+                    if (p >= 0.99f || p < 0.05f) return@ensureInstalled
+                }
+                mlKitMt.ensureModel(sourceLang, targetLang)
+                val engine = RealListenTranslateEngine(
+                    audio = audio,
+                    vosk = voskAsr,
+                    mt = mlKitMt,
+                    voskModels = voskInstaller,
+                    asrModelLabel = { "vosk-small-$sourceLang" },
+                    mtModelLabel = { "mlkit-$sourceLang-$targetLang" },
+                )
+                realListenEngine?.close()
+                realListenEngine = engine
+                listenSession.setEngine(engine)
+            }
+        }
+        if (prepared.isFailure) {
+            val msg = prepared.exceptionOrNull()?.message?.take(200)
+                ?: "听译模型准备失败"
+            listenSession.setInstallingModels(installing = false, error = msg)
+            listenSession.setModelsReady(false)
+            listenSession.setEnabled(false)
+            return
+        }
+        listenSession.setModelsReady(true)
+        listenSession.setInstallingModels(
+            installing = false,
+            message = "本机听译已就绪：Vosk small($sourceLang) + ML Kit Translate",
+            error = null,
+        )
+        listenSession.setEnabled(true)
+    }
+
+    private fun buildListenAudioSource(): ListenAudioSource? {
+        val app = getApplication<Application>()
+        return when (val ds = request.dataSource) {
+            is PlaybackDataSource.LocalFile -> ListenAudioSources.forLocalFile(ds.path)
+            is PlaybackDataSource.LocalRawResource ->
+                ListenAudioSources.forRaw(app, ds.resId)
+            is PlaybackDataSource.SeekableSmb -> {
+                val client = smbClient ?: return null
+                ListenAudioSources.forSmb(app, client, ds.share, ds.path)
+            }
+            is PlaybackDataSource.DirectSmbUrl -> {
+                val client = listenOnlySmbClient ?: return null
+                ListenAudioSources.forSmb(app, client, ds.share, ds.path)
+            }
+        }
+    }
+
+    /**
+     * Ensure an SMB session exists for second-path audio decode while VLC plays.
+     */
+    private suspend fun ensureSmbConnectedForListen() = withContext(Dispatchers.IO) {
+        when (val ds = request.dataSource) {
+            is PlaybackDataSource.SeekableSmb -> {
+                if (smbClient != null) return@withContext
+                val client = SmbjClient()
+                val creds = SmbSessionCredentials(
+                    host = ds.host,
+                    port = ds.port,
+                    username = ds.username,
+                    password = ds.password.copyOf(),
+                    domain = ds.domain,
+                )
+                try {
+                    client.connect(creds)
+                    smbClient = client
+                } finally {
+                    creds.clearPassword()
+                }
+            }
+            is PlaybackDataSource.DirectSmbUrl -> {
+                if (listenOnlySmbClient != null) return@withContext
+                val client = SmbjClient()
+                val creds = SmbSessionCredentials(
+                    host = ds.host,
+                    port = ds.port ?: 445,
+                    username = ds.username,
+                    password = ds.password.toCharArray(),
+                    domain = ds.domain.orEmpty(),
+                )
+                try {
+                    client.connect(creds)
+                    listenOnlySmbClient = client
+                } finally {
+                    creds.clearPassword()
+                }
+            }
+            else -> Unit
+        }
     }
 
     fun play() {
@@ -630,6 +735,12 @@ class PlayerViewModel(
             runCatching { client.disconnect() }
             runCatching { client.close() }
         }
+        val listenClient = listenOnlySmbClient
+        listenOnlySmbClient = null
+        if (listenClient != null) {
+            runCatching { listenClient.disconnect() }
+            runCatching { listenClient.close() }
+        }
     }
 
     override fun onCleared() {
@@ -645,6 +756,10 @@ class PlayerViewModel(
             }
         }
         listenSession.release()
+        realListenEngine?.close()
+        realListenEngine = null
+        voskAsr.close()
+        mlKitMt.close()
         stopProgressLoop()
         audioFocus.abandon()
         controller.release()
@@ -662,8 +777,6 @@ class PlayerViewModel(
         private val historyRepository: PlaybackHistoryRepository = resolveHistory(application),
         private val listenTranslateRepository: ListenTranslateRepository =
             resolveListenTranslate(application),
-        private val listenModelManager: ListenModelManager =
-            resolveListenModels(application),
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -673,7 +786,6 @@ class PlayerViewModel(
                     request,
                     historyRepository,
                     listenTranslateRepository,
-                    listenModelManager,
                 ) as T
             }
             throw IllegalArgumentException("Unknown ViewModel ${modelClass.name}")
@@ -691,6 +803,17 @@ class PlayerViewModel(
     companion object {
         private const val TAG = "FrameNestPlayerVM"
 
+        private object PendingListenEngine : ListenTranslateEngine {
+            override val asrModelId: String = "pending"
+            override val mtModelId: String = "pending"
+            override suspend fun processWindow(
+                startMs: Long,
+                endMs: Long,
+                sourceLang: String,
+                targetLang: String,
+            ): ListenWindowResult = throw ModelsNotReadyException("听译引擎未就绪")
+        }
+
         fun resolvePreferredLanguages(application: Application): List<String> {
             val userTags = (application as? FrameNestApplication)
                 ?.container
@@ -705,12 +828,6 @@ class PlayerViewModel(
                 ?.let { return it }
             val db = AppDatabase.createInMemory(application)
             return ListenTranslateRepository(db.listenTranslateDao())
-        }
-
-        fun resolveListenModels(application: Application): ListenModelManager {
-            (application as? FrameNestApplication)?.container?.listenModelManager
-                ?.let { return it }
-            return ListenModelManager(application)
         }
     }
 }

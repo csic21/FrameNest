@@ -134,6 +134,11 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.security.crypto)
 
+    // FN-14: on-device listen-translate (Vosk ASR + ML Kit MT).
+    implementation(libs.vosk.android)
+    implementation(libs.mlkit.translate)
+    implementation(libs.kotlinx.coroutines.play.services)
+
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 

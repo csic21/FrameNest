@@ -18,11 +18,10 @@
 | FN-11 听译 Room/清理 | 已完成 | agent | → main | FN-10 | [FN-11](handoffs/FN-11.md) |
 | FN-12 听译管线+UI | 部分完成（stub） | agent | → main | FN-10, FN-11 | [FN-12](handoffs/FN-12.md) |
 | FN-13 听译模型壳 | 部分完成（JSON 占位包） | agent | → main | FN-12 | [FN-13](handoffs/FN-13.md) |
-| FN-14 听译真 ASR/MT | 未开始 | — | — | FN-10..FN-13 | — |
+| FN-14 听译真 ASR/MT | 已完成 | agent | `agent/FN-14-real-listen-translate` | FN-10..FN-13 | [FN-14](handoffs/FN-14.md) |
 
-> **听译产品未交付。** FN-10～13 只完成了基础设施与演示壳（时间窗假字幕 +
-> JSON 占位包）。**不能**把「任务已完成」理解成「无字幕片能听出真译文」。
-> 真听译见 FN-14。
+> FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
+> 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。
 
 **当前发布**：`0.3.1-internal`（versionCode 4）
 

@@ -75,6 +75,7 @@ fun ListenTranslateControls(
         LangChipRow(
             selected = uiState.sourceLang,
             onSelect = onSourceLang,
+            languages = ListenTranslateLanguages.ASR_SOURCES,
             testTagPrefix = "listen_src",
         )
 
@@ -86,6 +87,7 @@ fun ListenTranslateControls(
         LangChipRow(
             selected = uiState.targetLang,
             onSelect = onTargetLang,
+            languages = ListenTranslateLanguages.ALL,
             testTagPrefix = "listen_tgt",
         )
 
@@ -180,6 +182,7 @@ fun ListenTranslateControls(
 private fun LangChipRow(
     selected: String,
     onSelect: (String) -> Unit,
+    languages: List<String>,
     testTagPrefix: String,
 ) {
     Row(
@@ -189,7 +192,7 @@ private fun LangChipRow(
             .padding(top = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        for (code in ListenTranslateLanguages.ALL) {
+        for (code in languages) {
             FilterChip(
                 selected = selected.equals(code, ignoreCase = true),
                 onClick = { onSelect(code) },
