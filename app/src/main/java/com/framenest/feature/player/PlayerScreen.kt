@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,6 +54,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.framenest.R
 import com.framenest.core.model.PlaybackRequest
+import com.framenest.feature.listen_translate.ListenTranslateControls
+import com.framenest.feature.listen_translate.ListenTranslateOverlay
 import com.framenest.feature.subtitle.SubtitleControls
 import com.framenest.player.PlayerState
 
@@ -76,7 +79,9 @@ fun PlayerScreen(
     )
     val state by vm.playerState.collectAsStateWithLifecycle()
     val subtitleUi by vm.subtitleUiState.collectAsStateWithLifecycle()
+    val listenUi by vm.listenTranslateUiState.collectAsStateWithLifecycle()
     var showSubtitles by remember { mutableStateOf(false) }
+    var showListenTranslate by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner, vm) {
@@ -126,7 +131,24 @@ fun PlayerScreen(
                 },
                 actions = {
                     IconButton(
-                        onClick = { showSubtitles = !showSubtitles },
+                        onClick = {
+                            showListenTranslate = !showListenTranslate
+                            if (showListenTranslate) showSubtitles = false
+                        },
+                        modifier = Modifier
+                            .semantics { contentDescription = "player_listen_translate" }
+                            .testTag("player_listen_translate"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Translate,
+                            contentDescription = stringResource(R.string.listen_translate_title),
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            showSubtitles = !showSubtitles
+                            if (showSubtitles) showListenTranslate = false
+                        },
                         modifier = Modifier
                             .semantics { contentDescription = "player_subtitles" }
                             .testTag("player_subtitles"),
@@ -212,6 +234,15 @@ fun PlayerScreen(
                         }
                     }
                 }
+
+                if (listenUi.enabled && listenUi.overlayText.isNotBlank() &&
+                    state.phase != PlayerState.Phase.Error
+                ) {
+                    ListenTranslateOverlay(
+                        text = listenUi.overlayText,
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
+                }
             }
 
             PlayerControls(
@@ -220,6 +251,20 @@ fun PlayerScreen(
                 onPause = { vm.pause() },
                 onSeek = { vm.seekTo(it) },
             )
+
+            if (showListenTranslate) {
+                ListenTranslateControls(
+                    uiState = listenUi,
+                    onEnabledChange = { vm.setListenTranslateEnabled(it) },
+                    onSourceLang = { vm.setListenSourceLang(it) },
+                    onTargetLang = { vm.setListenTargetLang(it) },
+                    onDisplayMode = { vm.setListenDisplayMode(it) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(260.dp)
+                        .background(MaterialTheme.colorScheme.surface),
+                )
+            }
 
             if (showSubtitles) {
                 SubtitleControls(

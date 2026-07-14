@@ -136,6 +136,19 @@
     <string name="settings_listen_translate_size">听译约占用 %1$s</string>
     <string name="settings_clear_listen_translate">清除听译缓存</string>
     <string name="settings_listen_translate_cleared">已清除听译约 %1$s</string>
+
+    <!-- Listen-translate (FN-12) -->
+    <string name="listen_translate_title">听译字幕</string>
+    <string name="listen_translate_hint">本机听音出字并翻译，结果只保存在应用内。当前为演示引擎（stub），可换真模型。不写 NAS。</string>
+    <string name="listen_translate_enable">开启听译</string>
+    <string name="listen_translate_source_lang">源语言</string>
+    <string name="listen_translate_target_lang">目标语言</string>
+    <string name="listen_translate_display_mode">显示</string>
+    <string name="listen_translate_mode_src">原文</string>
+    <string name="listen_translate_mode_tgt">译文</string>
+    <string name="listen_translate_mode_both">双语</string>
+    <string name="listen_translate_status">状态：%1$s</string>
+    <string name="listen_translate_covered">已覆盖至 %1$d 秒</string>
     <string name="settings_subtitle_lang_row">默认字幕语言</string>
     <string name="settings_subtitle_lang_hint">影响自动匹配外挂/内嵌字幕的优先级（下次播放生效）。</string>
     <string name="settings_lang_system">跟随系统</string>

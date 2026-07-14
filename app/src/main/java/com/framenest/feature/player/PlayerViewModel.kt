@@ -11,7 +11,12 @@ import com.framenest.core.model.PlaybackDataSource
 import com.framenest.core.model.PlaybackRequest
 import com.framenest.data.history.PlaybackHistoryRepository
 import com.framenest.data.history.PlaybackProgressRules
+import com.framenest.data.listen_translate.ListenTranslateRepository
 import com.framenest.data.server.AppDatabase
+import com.framenest.feature.listen_translate.ListenDisplayMode
+import com.framenest.feature.listen_translate.ListenTranslateSession
+import com.framenest.feature.listen_translate.ListenTranslateUiState
+import com.framenest.feature.listen_translate.StubListenTranslateEngine
 import com.framenest.feature.subtitle.ExternalSubtitleLoader
 import com.framenest.feature.subtitle.ExternalSubtitleOption
 import com.framenest.feature.subtitle.SidecarSubtitleScanner
@@ -49,12 +54,15 @@ import kotlinx.coroutines.withContext
 
 /**
  * Product player session: open media (path B preferred), first-frame paused,
- * progress save, retry, release coordination, and subtitle selection (FN-06).
+ * progress save, retry, release coordination, subtitle selection (FN-06),
+ * and listen-translate overlay (FN-12).
  */
 class PlayerViewModel(
     application: Application,
     private val request: PlaybackRequest,
     private val historyRepository: PlaybackHistoryRepository,
+    private val listenTranslateRepository: ListenTranslateRepository =
+        resolveListenTranslate(application),
     private val controllerFactory: (Application) -> PlayerController = { app ->
         VlcPlayerController(app, enableHwDecoder = true)
     },
@@ -73,6 +81,15 @@ class PlayerViewModel(
     private val _subtitleUiState = MutableStateFlow(SubtitleUiState())
     val subtitleUiState: StateFlow<SubtitleUiState> = _subtitleUiState.asStateFlow()
 
+    private val listenSession = ListenTranslateSession(
+        repository = listenTranslateRepository,
+        engine = StubListenTranslateEngine(),
+        scope = viewModelScope,
+        identity = request.identity,
+        contentKey = "",
+    )
+    val listenTranslateUiState: StateFlow<ListenTranslateUiState> = listenSession.uiState
+
     private val audioFocus = PlayerAudioFocus(application) {
         pauseFromSystem()
     }
@@ -90,6 +107,11 @@ class PlayerViewModel(
         }
         viewModelScope.launch {
             controller.state.collect { state ->
+                listenSession.onPlaybackTick(
+                    positionMs = state.positionMs,
+                    durationMs = state.durationMs,
+                    playing = state.phase == PlayerState.Phase.Playing,
+                )
                 if (state.phase == PlayerState.Phase.Playing) {
                     ensureProgressLoop()
                 } else if (state.phase == PlayerState.Phase.Ended) {
@@ -111,6 +133,22 @@ class PlayerViewModel(
                 }
             }
         }
+    }
+
+    fun setListenTranslateEnabled(enabled: Boolean) {
+        listenSession.setEnabled(enabled)
+    }
+
+    fun setListenSourceLang(code: String) {
+        listenSession.setSourceLang(code)
+    }
+
+    fun setListenTargetLang(code: String) {
+        listenSession.setTargetLang(code)
+    }
+
+    fun setListenDisplayMode(mode: ListenDisplayMode) {
+        listenSession.setDisplayMode(mode)
     }
 
     fun play() {
@@ -209,11 +247,13 @@ class PlayerViewModel(
         } catch (se: SmbException) {
             val err = PlayerErrorMapper.fromSmb(se.error)
             Log.w(TAG, "SMB open failed code=${err.code} msg=${err.message}")
+            purgeListenTranslateForMissingMedia()
             injectError(err)
             return
         } catch (t: Throwable) {
             val err = PlayerErrorMapper.fromThrowable(t)
             Log.w(TAG, "Open failed: ${err.message}")
+            purgeListenTranslateForMissingMedia()
             injectError(err)
             return
         }
@@ -223,6 +263,13 @@ class PlayerViewModel(
     private fun injectError(error: PlayerError) {
         (controller as? VlcPlayerController)?.reportExternalError(error)
             ?: controller.prepare(MediaSource.LocalFile("/__framenest_missing__"))
+    }
+
+    /** Decision 0005: drop local listen-translate rows when the media cannot be opened. */
+    private fun purgeListenTranslateForMissingMedia() {
+        viewModelScope.launch {
+            runCatching { listenTranslateRepository.purgeMedia(request.identity) }
+        }
     }
 
     private suspend fun resolveMediaSource(dataSource: PlaybackDataSource): MediaSource =
@@ -566,6 +613,7 @@ class PlayerViewModel(
                 }
             }
         }
+        listenSession.release()
         stopProgressLoop()
         audioFocus.abandon()
         controller.release()
@@ -581,11 +629,18 @@ class PlayerViewModel(
         private val application: Application,
         private val request: PlaybackRequest,
         private val historyRepository: PlaybackHistoryRepository = resolveHistory(application),
+        private val listenTranslateRepository: ListenTranslateRepository =
+            resolveListenTranslate(application),
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(PlayerViewModel::class.java)) {
-                return PlayerViewModel(application, request, historyRepository) as T
+                return PlayerViewModel(
+                    application,
+                    request,
+                    historyRepository,
+                    listenTranslateRepository,
+                ) as T
             }
             throw IllegalArgumentException("Unknown ViewModel ${modelClass.name}")
         }
@@ -609,6 +664,13 @@ class PlayerViewModel(
                 ?.subtitleLanguageTags()
                 .orEmpty()
             return SubtitleLanguagePrefs.preferredLanguages(userPreferred = userTags)
+        }
+
+        fun resolveListenTranslate(application: Application): ListenTranslateRepository {
+            (application as? FrameNestApplication)?.container?.listenTranslateRepository
+                ?.let { return it }
+            val db = AppDatabase.createInMemory(application)
+            return ListenTranslateRepository(db.listenTranslateDao())
         }
     }
 }
