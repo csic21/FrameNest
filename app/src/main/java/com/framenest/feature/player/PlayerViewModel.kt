@@ -114,8 +114,25 @@ class PlayerViewModel(
 
     private var smbClient: SmbjClient? = null
     private var progressJob: Job? = null
+    /**
+     * Outstanding open lifecycle (initial [loadResumeAndOpen] or SMB path-B→A fallback).
+     * Cancelling an in-flight open before starting the next prevents the two from
+     * overlapping when an error + retry race into [maybeFallbackSeekableSmbToDirect].
+     */
+    private var openJob: Job? = null
+    /** Volatile: read on a background teardown thread to skip a duplicate save. */
+    @Volatile
     private var lastSavedPositionMs: Long? = null
+    /** Background progress save kicked by [onLeaveOrBackground]; cancelled in [onCleared]. */
+    private var leaveSaveJob: Job? = null
     private var startPositionMs: Long = request.startPositionMs
+    /**
+     * One-shot latch for the resume-position seek. Replacing `startPositionMs > 0`
+     * as the "fired?" flag fixes a race where pressing play before the first Ready
+     * state let `startPositionMs` drag the viewer back to the resume point on a
+     * later Paused event. See [ResumeSeekGate].
+     */
+    private val resumeSeekGate = ResumeSeekGate()
     private var subtitleBootstrapDone: Boolean = false
     private var preferredLanguages: List<String> = resolvePreferredLanguages(application)
     /**
@@ -127,7 +144,7 @@ class PlayerViewModel(
     private var lastOpenUsedPathB: Boolean = false
 
     init {
-        viewModelScope.launch {
+        openJob = viewModelScope.launch {
             loadResumeAndOpen()
         }
         viewModelScope.launch {
@@ -143,12 +160,8 @@ class PlayerViewModel(
                     saveProgressNow(force = true)
                     stopProgressLoop()
                 }
-                // After first frame ready, seek to resume position once.
-                if (state.firstFrameReady &&
-                    startPositionMs > 0L &&
-                    (state.phase == PlayerState.Phase.Ready ||
-                        state.phase == PlayerState.Phase.Paused)
-                ) {
+                // After first frame ready, seek to resume position exactly once per open.
+                if (resumeSeekGate.shouldFire(state.firstFrameReady, state.phase, startPositionMs)) {
                     val target = startPositionMs
                     startPositionMs = 0L
                     val duration = state.durationMs
@@ -325,6 +338,10 @@ class PlayerViewModel(
             retry()
             return
         }
+        // User took over playback: cancel any pending resume-seek so a later Paused
+        // does not drag the viewer back to the resume point.
+        resumeSeekGate.markFired()
+        startPositionMs = 0L
         if (!audioFocus.request()) {
             Log.w(TAG, "Audio focus not granted; playing anyway")
         }
@@ -391,7 +408,9 @@ class PlayerViewModel(
     }
 
     fun retry() {
-        viewModelScope.launch {
+        // Replace any in-flight open so rapid retries do not overlap.
+        openJob?.cancel()
+        openJob = viewModelScope.launch {
             // Close proxy FD / media first so SmbRandomAccess can release cleanly,
             // then disconnect SMB off the main thread.
             (controller as? VlcPlayerController)?.closeCurrentMedia()
@@ -402,6 +421,20 @@ class PlayerViewModel(
             smbDirectFallbackUsed = false
             lastOpenUsedPathB = false
             subtitleBootstrapDone = false
+            // Re-arm resume seek for the fresh open — never blindly restore
+            // request.startPositionMs:
+            // - If the gate already fired (or the user pressed play), jump back to
+            //   last persisted / live position so mid-playback recovery does not
+            //   rewind to the entry resume point.
+            // - If the open failed before fire, leave [startPositionMs] as-is so a
+            //   history-derived start is not wiped when request.startPositionMs == 0.
+            if (resumeSeekGate.hasFired) {
+                val live = controller.state.value.positionMs.takeIf { it > 0L } ?: 0L
+                startPositionMs = lastSavedPositionMs?.takeIf { it > 0L } ?: live
+            }
+            if (startPositionMs > 0L) {
+                resumeSeekGate.reset()
+            }
             _subtitleUiState.value = SubtitleUiState(
                 delayMs = _subtitleUiState.value.delayMs,
                 fontRelSize = _subtitleUiState.value.fontRelSize,
@@ -429,7 +462,13 @@ class PlayerViewModel(
         val duration = state.durationMs
         val identity = request.identity
         val name = request.displayName
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        // Skip if already persists to this exact position (races with periodic saves
+        // and with onCleared's fallback write).
+        if (lastSavedPositionMs == position) return
+        // Cancel any prior in-flight leave save so a newer snapshot wins; this is the
+        // single coordinated entry point (instead of an unmanaged CoroutineScope).
+        leaveSaveJob?.cancel()
+        leaveSaveJob = CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 historyRepository.saveProgress(
                     identity = identity,
@@ -510,7 +549,9 @@ class PlayerViewModel(
         val dataSource = request.dataSource as? PlaybackDataSource.SeekableSmb ?: return
         smbDirectFallbackUsed = true
         lastOpenUsedPathB = false
-        viewModelScope.launch {
+        // Cancel any in-flight open before starting the fallback so the two never overlap.
+        openJob?.cancel()
+        openJob = viewModelScope.launch {
             Log.w(
                 TAG,
                 "path B failed before first frame (${err.code}); " +
@@ -615,19 +656,15 @@ class PlayerViewModel(
             client.connect(sessionCreds)
             val randomAccess = client.openRandomAccess(dataSource.share, dataSource.path)
             val size = randomAccess.size
-            // Multi-GiB files frequently break ProxyFileDescriptor + libVLC imem
-            // ("stream: read error" / EncounteredError). Prefer path A (direct smb://
-            // + option credentials) for those sizes; keep path B for normal files.
-            if (size >= LARGE_SMB_FILE_BYTES) {
-                Log.i(
-                    TAG,
-                    "SMB file size=$size ≥ ${LARGE_SMB_FILE_BYTES}; " +
-                        "using libVLC direct smb:// for reliability",
-                )
-                runCatching { randomAccess.close() }
-                teardownSmbClientOnly()
-                return openDirectSmb(dataSource)
-            }
+            // Always prefer path B (SMBJ + ProxyFileDescriptor). Large files use
+            // UNKNOWN_LENGTH + Media(FileDescriptor) in SmbSeekableMedia / VlcPlayerController
+            // so seek stays byte-accurate. Path A (direct smb://) often reports duration
+            // but does not refresh frames on seek — only used as open-failure fallback.
+            Log.i(
+                TAG,
+                "SMB path B open size=$size share=${dataSource.share} " +
+                    "path=${dataSource.path.trimStart('/')}",
+            )
             val opened = SmbSeekableMedia.open(
                 context = getApplication(),
                 randomAccess = randomAccess,
@@ -941,6 +978,9 @@ class PlayerViewModel(
         realListenEngine = null
         stopProgressLoop()
         audioFocus.abandon()
+        // Cancel the leave-save so a final snapshot wins and we don't double-write.
+        leaveSaveJob?.cancel()
+        leaveSaveJob = null
 
         val player = controller
         val asr = voskAsr
@@ -954,7 +994,10 @@ class PlayerViewModel(
         // VLC/ASR/SMB teardown that used to freeze the exit transition on the main thread.
         Thread(
             {
-                if (shouldSave) {
+                // Skip if the leave-save or a periodic save already persisted this exact
+                // position — read volatile lastSavedPositionMs to avoid double-writing
+                // (and potentially racing a stale earlier position) on popBack.
+                if (shouldSave && lastSavedPositionMs != savePosition) {
                     runCatching {
                         runBlocking {
                             withTimeoutOrNull(1_500L) {
@@ -1026,12 +1069,6 @@ class PlayerViewModel(
 
     companion object {
         private const val TAG = "FrameNestPlayerVM"
-
-        /**
-         * At/above this size, prefer libVLC direct `smb://` over ProxyFileDescriptor
-         * (path B). Multi-GiB MP4s hit imem read errors with fixed AFD lengths.
-         */
-        private const val LARGE_SMB_FILE_BYTES: Long = 1L shl 32 // 4 GiB
 
         private object PendingListenEngine : ListenTranslateEngine {
             override val asrModelId: String = "pending"

@@ -92,6 +92,38 @@ class VlcPlayerController(
      * failure as success.
      */
     private var ignoreEndReachedBudget: Int = 0
+    /**
+     * After seek while paused/Ready, briefly play so libVLC decodes a frame at the
+     * new position, then re-pause. Without this, [setTime] updates the clock only.
+     */
+    private var seekPreviewActive: Boolean = false
+    private var seekPreviewTargetMs: Long = -1L
+    private val seekPreviewPauseRunnable = Runnable { finishSeekPreview(reason = "timeout") }
+    private val seekPreviewSettleRunnable = Runnable { finishSeekPreview(reason = "settled") }
+
+    /**
+     * Single source of truth for resetting the transient playback-control flags.
+     *
+     * Called from [prepare] (opening=true) and every teardown / error / release path
+     * (opening=false). Centralizing this fixes a class of bugs where individual sites
+     * hand-copied a *subset* of the flags and left stale ones set (e.g. a leftover
+     * [holdForUserPlay] after a fallback, or [seekPreviewActive] not cleared on
+     * [failOpen]) — which produced phantom "Playing ignored (seek preview)" /
+     * "Playing ignored (hold)" events that froze playback.
+     *
+     * Does NOT touch the suppress flags ([suppressEndReached] / [suppressAllTerminalEvents]):
+     * those are intentional per-call policy, and every caller sets them explicitly for
+     * the teardown/open it is about to perform. [seekPreviewActive] / target are cleared
+     * and the preview runnables removed via [cancelSeekPreview].
+     */
+    private fun resetTransientFlags(opening: Boolean) {
+        awaitingFirstFramePause = opening
+        holdForUserPlay = opening
+        endedWhileHolding = false
+        openedCurrentMedia = false
+        ignoreEndReachedBudget = 0
+        cancelSeekPreview(pausePlayer = false)
+    }
     /** Owned AFD from path B; closed on re-prepare / release. */
     private var ownedSeekableAfd: AssetFileDescriptor? = null
     private var subtitleDelayMs: Long = 0L
@@ -100,6 +132,17 @@ class VlcPlayerController(
 
     private val eventListener = MediaPlayer.EventListener { event ->
         if (released) return@EventListener
+        // Serialize all event handling onto the main thread. The transient flags
+        // below are read/written by main-thread methods (play/pause/seekTo/prepare);
+        // handling events here on the libVLC thread caused visibility races. StateFlow
+        // itself is thread-safe, but the gating flags are not — post to the main looper
+        // so the controller behaves like a single-threaded state machine. release()
+        // removes all callbacks, so queued events after release are dropped via the
+        // guard inside handleEvent.
+        mainHandler.post { if (!released) handleEvent(event) }
+    }
+
+    private fun handleEvent(event: MediaPlayer.Event) {
         when (event.type) {
             MediaPlayer.Event.Opening -> {
                 // New media is opening. Keep suppressEndReached until the post-stop
@@ -112,7 +155,7 @@ class VlcPlayerController(
                 // Keep Preparing until first frame; ignore mid-stream buffering noise.
             }
             MediaPlayer.Event.Playing -> {
-                if (suppressAllTerminalEvents) return@EventListener
+                if (suppressAllTerminalEvents) return@handleEvent
                 // Hold first-frame gate until user explicitly calls play(): late Playing
                 // events after Vout+pause must not flip Ready → Playing (then → Paused).
                 if (awaitingFirstFramePause || holdForUserPlay) {
@@ -120,7 +163,12 @@ class VlcPlayerController(
                         TAG,
                         "Playing ignored (awaitingFirst=$awaitingFirstFramePause holdForUser=$holdForUserPlay)",
                     )
-                    return@EventListener
+                    return@handleEvent
+                }
+                // Seek-preview play is internal — keep UI in Paused/Ready.
+                if (seekPreviewActive) {
+                    Log.i(TAG, "Playing ignored (seek preview)")
+                    return@handleEvent
                 }
                 _state.update {
                     it.copy(
@@ -130,24 +178,13 @@ class VlcPlayerController(
                 }
             }
             MediaPlayer.Event.Paused -> {
-                if (suppressAllTerminalEvents) return@EventListener
+                if (suppressAllTerminalEvents) return@handleEvent
+                // Single-direction: only the Playing→Paused transition is driven by this
+                // event. The first-frame Ready state is set by [onFirstVout], not here;
+                // re-deriving phase from a stale Paused (e.g. after seek-preview while
+                // phase == Ended) used to rewrite Ended → Paused and break replay.
                 _state.update {
-                    val phase = when {
-                        // Still preparing first frame or holding for user tap: stay Ready once framed.
-                        holdForUserPlay && it.firstFrameReady -> PlayerState.Phase.Ready
-                        it.firstFrameReady && !awaitingFirstFramePause -> {
-                            if (it.phase == PlayerState.Phase.Preparing ||
-                                it.phase == PlayerState.Phase.Ready
-                            ) {
-                                PlayerState.Phase.Ready
-                            } else {
-                                PlayerState.Phase.Paused
-                            }
-                        }
-                        it.firstFrameReady -> PlayerState.Phase.Ready
-                        else -> it.phase
-                    }
-                    it.copy(phase = phase)
+                    if (it.phase == PlayerState.Phase.Playing) it.copy(phase = PlayerState.Phase.Paused) else it
                 }
             }
             MediaPlayer.Event.Stopped -> {
@@ -156,7 +193,7 @@ class VlcPlayerController(
             MediaPlayer.Event.EndReached -> {
                 if (suppressAllTerminalEvents) {
                     Log.i(TAG, "EndReached ignored (suppressed during close/release)")
-                    return@EventListener
+                    return@handleEvent
                 }
                 // Residual EOF from stop()/media=null — often arrives after Opening of
                 // the next media. Drop budgeted residuals and anything still inside the
@@ -167,33 +204,33 @@ class VlcPlayerController(
                         TAG,
                         "EndReached ignored (residual budget left=$ignoreEndReachedBudget)",
                     )
-                    return@EventListener
+                    return@handleEvent
                 }
                 if (suppressEndReached) {
                     Log.i(TAG, "EndReached ignored (suppress window after stop)")
-                    return@EventListener
+                    return@handleEvent
                 }
                 if (!openedCurrentMedia) {
                     Log.i(TAG, "EndReached ignored (no Opening for current media yet)")
-                    return@EventListener
+                    return@handleEvent
                 }
                 handleEndReached()
             }
             MediaPlayer.Event.EncounteredError -> {
                 if (suppressAllTerminalEvents) {
                     Log.i(TAG, "EncounteredError ignored (suppressed during close/release)")
-                    return@EventListener
+                    return@handleEvent
                 }
                 // Residual errors from stop are rare; still report once current media
                 // has started opening so real open failures are not swallowed.
                 if (suppressEndReached && !openedCurrentMedia) {
                     Log.i(TAG, "EncounteredError ignored (residual before Opening)")
-                    return@EventListener
+                    return@handleEvent
                 }
+                // Cancel seek-preview settle/timeout so a late finishSeekPreview
+                // cannot overwrite Error → Paused.
+                resetTransientFlags(opening = false)
                 suppressEndReached = false
-                ignoreEndReachedBudget = 0
-                awaitingFirstFramePause = false
-                holdForUserPlay = false
                 val message = CredentialRedactor.redact("Playback failed (libVLC EncounteredError)")
                 Log.w(TAG, message)
                 _state.update {
@@ -210,6 +247,17 @@ class VlcPlayerController(
             MediaPlayer.Event.TimeChanged -> {
                 val time = event.timeChanged.coerceAtLeast(0L)
                 _state.update { it.copy(positionMs = time) }
+                if (seekPreviewActive && seekPreviewTargetMs >= 0L) {
+                    val delta = kotlin.math.abs(time - seekPreviewTargetMs)
+                    if (delta <= SEEK_PREVIEW_TOLERANCE_MS) {
+                        // Clock reached target — but the HW decoder has not necessarily
+                        // painted the new frame to the SurfaceView yet (SMB / large MP4
+                        // lag by tens to hundreds of ms). Pausing here freezes the
+                        // previous frame while the clock shows the new position. Wait
+                        // FRAME_SETTLE_MS for the frame to land before re-pausing.
+                        scheduleSeekPreviewSettle()
+                    }
+                }
             }
             MediaPlayer.Event.LengthChanged -> {
                 val length = event.lengthChanged.coerceAtLeast(0L)
@@ -334,11 +382,7 @@ class VlcPlayerController(
             ownedSeekableAfd = source.assetFileDescriptor
         }
         pendingSource = source
-        awaitingFirstFramePause = true
-        holdForUserPlay = true
-        endedWhileHolding = false
-        openedCurrentMedia = false
-        ignoreEndReachedBudget = 0
+        resetTransientFlags(opening = true)
         suppressEndReached = false
         suppressAllTerminalEvents = false
         _state.update {
@@ -360,12 +404,8 @@ class VlcPlayerController(
      */
     fun closeCurrentMedia() {
         if (released) return
-        awaitingFirstFramePause = false
-        holdForUserPlay = false
-        endedWhileHolding = false
-        openedCurrentMedia = false
-        ignoreEndReachedBudget = 0
         pendingSource = null
+        resetTransientFlags(opening = false)
         suppressAllTerminalEvents = true
         suppressEndReached = true
         val player = mediaPlayer
@@ -398,12 +438,8 @@ class VlcPlayerController(
      */
     fun reportExternalError(error: PlayerError) {
         if (released) return
-        awaitingFirstFramePause = false
-        holdForUserPlay = false
-        endedWhileHolding = false
-        openedCurrentMedia = false
-        ignoreEndReachedBudget = 0
         pendingSource = null
+        resetTransientFlags(opening = false)
         val safe = error.copy(message = CredentialRedactor.redact(error.message))
         Log.w(TAG, "external error code=${safe.code} msg=${safe.message}")
         _state.update {
@@ -427,6 +463,11 @@ class VlcPlayerController(
             Log.w(TAG, "play() ignored in phase=$phase")
             return
         }
+        // User-initiated play cancels pause-scrub preview and continues for real.
+        // Not using resetTransientFlags here: [endedWhileHolding] must survive until
+        // the atOrPastEnd check below so a stale EOF while holding for the user can
+        // still trigger restart-from-0. The other flags are cleared inline.
+        cancelSeekPreview(pausePlayer = false)
         awaitingFirstFramePause = false
         holdForUserPlay = false
         suppressEndReached = false
@@ -444,7 +485,7 @@ class VlcPlayerController(
         if (atOrPastEnd) {
             Log.i(TAG, "play() restart from 0 (phase=$phase time=$time length=$length)")
             // Prefer seek-to-start over stop(): stop() can drop the media/surface binding.
-            runCatching { player.time = 0L }
+            runCatching { player.setTime(0L, /* fast = */ false) }
             _state.update { it.copy(positionMs = 0L) }
         } else {
             Log.i(TAG, "play() phase=$phase time=$time length=$length")
@@ -475,11 +516,104 @@ class VlcPlayerController(
         ) {
             return
         }
-        if (!player.isSeekable && _state.value.durationMs <= 0L) return
+        if (!player.isSeekable && _state.value.durationMs <= 0L) {
+            Log.w(TAG, "seekTo ignored (not seekable, duration unknown)")
+            return
+        }
         val duration = player.length.takeIf { it > 0 } ?: _state.value.durationMs
         val clamped = positionMs.coerceIn(0L, if (duration > 0) duration else positionMs)
-        player.time = clamped
-        _state.update { it.copy(positionMs = clamped) }
+        // Cancel any in-flight pause-scrub preview before a new seek.
+        cancelSeekPreview(/* pausePlayer = */ false)
+        // Precise seek (fast=false). Property setter also uses false; call explicitly
+        // for the return value and logging.
+        val applied = runCatching { player.setTime(clamped, /* fast = */ false) }
+            .getOrDefault(-1L)
+        val position = if (applied >= 0L) applied else clamped
+        _state.update { it.copy(positionMs = position) }
+        Log.i(
+            TAG,
+            "seekTo target=$clamped applied=$applied seekable=${player.isSeekable} " +
+                "phase=$phase playing=${player.isPlaying}",
+        )
+        // While paused / first-frame Ready, setTime alone does not paint a new frame
+        // (HW decoder holds the last surface). Briefly play then re-pause.
+        val needFramePreview = _state.value.firstFrameReady &&
+            !player.isPlaying &&
+            phase != PlayerState.Phase.Playing
+        if (needFramePreview) {
+            startSeekPreview(player, position)
+        }
+    }
+
+    private fun startSeekPreview(player: MediaPlayer, targetMs: Long) {
+        seekPreviewActive = true
+        seekPreviewTargetMs = targetMs
+        mainHandler.removeCallbacks(seekPreviewPauseRunnable)
+        mainHandler.removeCallbacks(seekPreviewSettleRunnable)
+        mainHandler.postDelayed(seekPreviewPauseRunnable, SEEK_PREVIEW_TIMEOUT_MS)
+        runCatching { player.play() }
+            .onFailure { t ->
+                Log.w(TAG, "seek preview play failed: ${t.message}")
+                cancelSeekPreview(pausePlayer = false)
+            }
+    }
+
+    /**
+     * Once the clock has reached the seek target, wait [FRAME_SETTLE_MS] for the HW
+     * decoder to paint the new frame before re-pausing. Without this, pausing on the
+     * first [TimeChanged] inside tolerance freezes the *previous* frame while the UI
+     * shows the new position ("clock moves, picture stuck"). Idempotent — every
+     * TimeChanged hit re-arms the timer so we finish only after the last matching
+     * clock tick, not the first. A real Vout (frame composited) preempts this via
+     * [onFirstVout].
+     */
+    private fun scheduleSeekPreviewSettle() {
+        mainHandler.removeCallbacks(seekPreviewSettleRunnable)
+        mainHandler.postDelayed(seekPreviewSettleRunnable, FRAME_SETTLE_MS)
+    }
+
+    private fun finishSeekPreview(reason: String) {
+        if (!seekPreviewActive) return
+        seekPreviewActive = false
+        seekPreviewTargetMs = -1L
+        mainHandler.removeCallbacks(seekPreviewPauseRunnable)
+        mainHandler.removeCallbacks(seekPreviewSettleRunnable)
+        val player = mediaPlayer
+        if (player != null && player.isPlaying) {
+            runCatching { player.pause() }
+        }
+        _state.update {
+            // Never clobber terminal/open phases (Error/Ended/Preparing/Idle) that
+            // may have been set while the settle timer was still armed.
+            if (it.phase != PlayerState.Phase.Playing &&
+                it.phase != PlayerState.Phase.Ready &&
+                it.phase != PlayerState.Phase.Paused
+            ) {
+                return@update it
+            }
+            val phase = when {
+                holdForUserPlay && it.firstFrameReady -> PlayerState.Phase.Ready
+                it.firstFrameReady -> PlayerState.Phase.Paused
+                else -> it.phase
+            }
+            it.copy(phase = phase)
+        }
+        Log.i(TAG, "seek preview finished ($reason)")
+    }
+
+    private fun cancelSeekPreview(pausePlayer: Boolean) {
+        val wasActive = seekPreviewActive || seekPreviewTargetMs >= 0L
+        seekPreviewActive = false
+        seekPreviewTargetMs = -1L
+        mainHandler.removeCallbacks(seekPreviewPauseRunnable)
+        mainHandler.removeCallbacks(seekPreviewSettleRunnable)
+        if (!wasActive) return
+        if (pausePlayer) {
+            val player = mediaPlayer
+            if (player != null && player.isPlaying) {
+                runCatching { player.pause() }
+            }
+        }
     }
 
     override fun selectAudioTrack(trackId: Int) {
@@ -580,6 +714,13 @@ class VlcPlayerController(
 
     override fun refreshVideoSurfaces() {
         if (released || !viewsAttached) return
+        // A surface rebuild (orientation/size change) re-triggers Vout; if a seek
+        // preview is in flight, that Vout would land in the normal onFirstVout path
+        // and overwrite the pause-at-seek-target result. Finalize the preview first
+        // so the surfaced frame is exactly the seek target before we rebuild.
+        if (seekPreviewActive) {
+            finishSeekPreview(reason = "surface-refresh")
+        }
         val player = mediaPlayer ?: return
         // Layout/orientation change only — do not reassign scale (that also
         // triggers a full surface rebuild and can freeze the current frame).
@@ -590,12 +731,8 @@ class VlcPlayerController(
     override fun release() {
         if (released) return
         released = true
-        awaitingFirstFramePause = false
-        holdForUserPlay = false
-        endedWhileHolding = false
-        openedCurrentMedia = false
-        ignoreEndReachedBudget = 0
         pendingSource = null
+        resetTransientFlags(opening = false)
         suppressAllTerminalEvents = true
         suppressEndReached = true
         mainHandler.removeCallbacksAndMessages(null)
@@ -806,8 +943,8 @@ class VlcPlayerController(
         // Spurious EOF during open (bad FD / zero-length / demux) must not
         // look like a finished movie with a permanent loading spinner.
         if (awaitingFirstFramePause || !_state.value.firstFrameReady) {
-            awaitingFirstFramePause = false
-            holdForUserPlay = false
+            // Clear seek-preview + hold flags so a late settle cannot leave Error.
+            resetTransientFlags(opening = false)
             val message = CredentialRedactor.redact(
                 "Playback ended before a video frame was ready",
             )
@@ -932,6 +1069,12 @@ class VlcPlayerController(
         // First video output means residual stop() EOF is no longer relevant.
         suppressEndReached = false
         ignoreEndReachedBudget = 0
+        if (seekPreviewActive) {
+            // A decoded frame at the seek target — freeze there again.
+            finishSeekPreview(reason = "vout")
+            refreshTracks()
+            return
+        }
         if (!awaitingFirstFramePause) {
             // Normal playback path: just ensure tracks are refreshed.
             refreshTracks()
@@ -988,16 +1131,13 @@ class VlcPlayerController(
     }
 
     private fun failOpen(message: String) {
-        awaitingFirstFramePause = false
-        holdForUserPlay = false
-        endedWhileHolding = false
-        openedCurrentMedia = false
-        ignoreEndReachedBudget = 0
+        resetTransientFlags(opening = false)
         suppressEndReached = false
         val safe = CredentialRedactor.redact(message)
         _state.update {
             it.copy(
                 phase = PlayerState.Phase.Error,
+                firstFrameReady = false,
                 error = PlayerError(
                     code = PlayerError.Code.OpenFailed,
                     message = safe,
@@ -1020,6 +1160,16 @@ class VlcPlayerController(
          * media. Residual EOF commonly arrives after Opening of the next item.
          */
         private const val STOP_EVENT_SUPPRESS_MS: Long = 400L
+        /** Max time to run play() after a paused seek before re-pausing. */
+        private const val SEEK_PREVIEW_TIMEOUT_MS: Long = 750L
+        /** Consider seek-preview settled when TimeChanged is this close to target. */
+        private const val SEEK_PREVIEW_TOLERANCE_MS: Long = 500L
+        /**
+         * After the clock hits the seek target, wait this long for the HW decoder to
+         * composite the frame before re-pausing. Tuned to cover SMB / large-MP4 decode
+         * lag without feeling laggy; bounded above by [SEEK_PREVIEW_TIMEOUT_MS].
+         */
+        private const val FRAME_SETTLE_MS: Long = 200L
 
         /** Sample SMB URI used in docs / manual tests (no credentials). */
         fun sampleSmbUri(

@@ -648,7 +648,6 @@ private fun PlayerControls(
     // short/SMB clips while TimeChanged keeps ticking (frozen frame + running clock).
     var scrubbing by remember { mutableStateOf(false) }
     var scrubFraction by remember { mutableFloatStateOf(0f) }
-    var resumeAfterScrub by remember { mutableStateOf(false) }
     val displayProgress = if (scrubbing) scrubFraction else progress
     val displayPosition = if (scrubbing && duration > 0L) {
         (scrubFraction * duration).toLong().coerceIn(0L, duration)
@@ -694,28 +693,17 @@ private fun PlayerControls(
         Slider(
             value = displayProgress,
             onValueChange = { fraction ->
-                if (!scrubbing) {
-                    scrubbing = true
-                    // Pause while scrubbing so the clock does not run ahead of the frame
-                    // and listen-translate does not prefetch against a moving target.
-                    if (state.phase == PlayerState.Phase.Playing) {
-                        resumeAfterScrub = true
-                        onPause()
-                    } else {
-                        resumeAfterScrub = false
-                    }
-                }
+                // Local scrub only — do not pause. pause→seek→play freezes many SMB/HW
+                // paths (clock jumps, last frame sticks). Seek once on release while
+                // still playing so the decoder keeps painting.
+                scrubbing = true
                 scrubFraction = fraction.coerceIn(0f, 1f)
             },
             onValueChangeFinished = {
                 if (duration > 0L) {
                     onSeek((scrubFraction * duration).toLong())
                 }
-                if (resumeAfterScrub) {
-                    onPlay()
-                }
                 scrubbing = false
-                resumeAfterScrub = false
             },
             enabled = (state.isSeekable || duration > 0) &&
                 state.phase != PlayerState.Phase.Error &&
