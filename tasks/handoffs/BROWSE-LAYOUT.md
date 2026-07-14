@@ -1,0 +1,29 @@
+## Browse layout 交接
+
+- 状态：完成
+- 分支与提交：本地未单独开分支（`main` 工作区改动，尚未 commit）
+- 改动路径：
+  - `app/src/main/java/com/framenest/data/settings/BrowseLayoutMode.kt` — LIST/GRID 枚举与存储解析
+  - `app/src/main/java/com/framenest/data/settings/UserPreferences.kt` — 持久化浏览布局
+  - `app/src/main/java/com/framenest/feature/browser/BrowseGridColumns.kt` — 自适应列数（2/3/4）
+  - `app/src/main/java/com/framenest/feature/browser/BrowseScreen.kt` — 列表/网格 UI + 顶栏切换
+  - `app/src/main/java/com/framenest/ui/theme/Dimens.kt` — 网格间距/缩略图尺寸
+  - `app/src/main/res/values/strings.xml` — 布局切换 a11y 文案
+  - `app/src/test/java/com/framenest/feature/browser/BrowseLayoutModeTest.kt`
+  - `CHANGELOG.md`（Unreleased）
+- 验收结果：
+  - 默认列表（与原先一致）
+  - TopAppBar 可在列表 ↔ 网格间切换；选择写入 SharedPreferences，重进目录保留
+  - 网格列数：宽度 &lt;600dp → 2；≥600 → 3；≥840 → 4
+  - 网格单元格：16:9 封面区 + 文件名 + 类型；视频走既有缩略图管线（不创建播放器）
+  - 文件夹/共享/字幕用图标卡片
+- 执行过的命令及结果：
+  - `./gradlew testDebugUnitTest --tests "com.framenest.feature.browser.BrowseLayoutModeTest" assembleDebug` → BUILD SUCCESSFUL
+  - `./gradlew testDebugUnitTest` →（见同会话完整单测结果）
+- 决策记录：无（未改已接受决策；偏好键 `browse_layout_mode`）
+- 未解决问题：未在真机/平板配置上做 Compose UI 仪器测试；手动建议 phone + tablet 各看一次
+- 集成 Agent 需要做的共享文件改动：无（偏好经 `ContextAppContainer` 读取，未改 `FrameNestApp` / 导航）
+- 后续任务可依赖的接口/行为：
+  - `UserPreferences.browseLayoutMode()` / `setBrowseLayoutMode(BrowseLayoutMode)`
+  - `browseGridColumnCount(widthDp: Float)`
+  - testTags：`browse_layout_toggle`、`browse_list`、`browse_grid`

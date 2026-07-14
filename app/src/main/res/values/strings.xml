@@ -17,8 +17,15 @@
     <string name="servers_title">服务器</string>
     <string name="servers_subtitle">已保存的 SMB 服务器（凭证已加密）</string>
     <string name="servers_empty">尚未添加服务器</string>
-    <string name="servers_empty_hint">点击右下角「+」添加 NAS</string>
+    <string name="servers_empty_hint">可扫描局域网，或点击右下角「+」手动添加 NAS</string>
     <string name="servers_add">添加服务器</string>
+    <string name="servers_scan_lan">扫描局域网</string>
+    <string name="servers_scan_title">局域网 SMB 发现</string>
+    <string name="servers_scan_hint">默认使用 mDNS（设备广播）。可选「深度扫描」探测当前子网 445 端口，更慢但更全。仅填充主机，不会自动登录。</string>
+    <string name="servers_scan_deep">深度扫描（探测 445）</string>
+    <string name="servers_scan_deep_running">正在探测端口…</string>
+    <string name="servers_scan_stop">停止</string>
+    <string name="servers_scan_empty">尚未发现设备。可等待 mDNS，或点深度扫描。</string>
     <string name="servers_add_title">添加服务器</string>
     <string name="servers_edit_title">编辑服务器</string>
     <string name="servers_edit">编辑</string>
@@ -46,6 +53,8 @@
     <string name="browse_path_label">路径：%1$s</string>
     <string name="browse_refresh">刷新</string>
     <string name="browse_retry">重试</string>
+    <string name="browse_layout_list">列表视图</string>
+    <string name="browse_layout_grid">网格视图</string>
     <string name="browse_empty_shares">没有可访问的共享。请在服务器设置中填写默认共享名。</string>
     <string name="browse_empty_dir">此目录为空（或没有可识别的视频/字幕文件）</string>
     <string name="browse_type_share">共享</string>

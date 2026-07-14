@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Improvements
+
+- **Browse layout**: list / multi-column grid toggle in SMB browser (phone ≈2 cols, tablet ≈3–4); preference persisted
+- **LAN discovery**: user-initiated mDNS (`_smb._tcp`) on Servers; optional deep scan probes subnet TCP 445; fills host only (no credentials)
+
 ## 0.3.1-internal (2026-07-14)
 
 Post-MVP batch: size, share probe, settings, debug isolation.

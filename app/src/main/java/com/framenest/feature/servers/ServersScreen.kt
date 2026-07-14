@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -47,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -59,6 +62,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.framenest.R
 import com.framenest.core.model.SavedServer
+import com.framenest.data.discovery.DiscoveredHost
 import com.framenest.data.server.ServerRepository
 import com.framenest.ui.theme.FrameNestDimens
 
@@ -68,10 +72,14 @@ fun ServersRoute(
     serverRepository: ServerRepository,
     onOpenBrowse: (serverId: String, defaultShare: String?) -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: ServersViewModel = viewModel(
-        factory = ServersViewModel.Factory(serverRepository),
-    ),
 ) {
+    val context = LocalContext.current
+    val viewModel: ServersViewModel = viewModel(
+        factory = ServersViewModel.Factory(
+            serverRepository = serverRepository,
+            appContext = context.applicationContext,
+        ),
+    )
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     ServersScreen(
         state = state,
@@ -79,6 +87,7 @@ fun ServersRoute(
         onSelect = viewModel::selectServer,
         onOpenBrowse = { server -> onOpenBrowse(server.id, server.defaultShare) },
         onAdd = viewModel::openAddEditor,
+        onScanLan = viewModel::openLanDiscovery,
         onEdit = viewModel::openEditEditor,
         onDelete = viewModel::deleteServer,
         onDismissEditor = viewModel::dismissEditor,
@@ -86,6 +95,10 @@ fun ServersRoute(
         onTest = viewModel::testEditorConnection,
         onSave = viewModel::saveEditor,
         onClearError = viewModel::clearActionError,
+        onDismissDiscovery = viewModel::dismissLanDiscovery,
+        onStopDiscovery = viewModel::stopLanDiscovery,
+        onDeepPortScan = viewModel::startDeepPortScan,
+        onSelectDiscovered = viewModel::selectDiscoveredHost,
         modifier = modifier,
     )
 }
@@ -97,6 +110,7 @@ fun ServersScreen(
     onSelect: (String?) -> Unit,
     onOpenBrowse: (SavedServer) -> Unit,
     onAdd: () -> Unit,
+    onScanLan: () -> Unit,
     onEdit: (SavedServer) -> Unit,
     onDelete: (String) -> Unit,
     onDismissEditor: () -> Unit,
@@ -104,6 +118,10 @@ fun ServersScreen(
     onTest: () -> Unit,
     onSave: () -> Unit,
     onClearError: () -> Unit,
+    onDismissDiscovery: () -> Unit,
+    onStopDiscovery: () -> Unit,
+    onDeepPortScan: () -> Unit,
+    onSelectDiscovered: (DiscoveredHost) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var pendingDeleteId by remember { mutableStateOf<String?>(null) }
@@ -140,6 +158,7 @@ fun ServersScreen(
                     onOpen = onOpenBrowse,
                     onEdit = onEdit,
                     onDelete = { pendingDeleteId = it.id },
+                    onScanLan = onScanLan,
                     modifier = Modifier
                         .weight(0.4f)
                         .fillMaxHeight(),
@@ -169,6 +188,7 @@ fun ServersScreen(
                 onOpen = onOpenBrowse,
                 onEdit = onEdit,
                 onDelete = { pendingDeleteId = it.id },
+                onScanLan = onScanLan,
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize()
@@ -184,6 +204,16 @@ fun ServersScreen(
             onUpdate = onUpdateEditor,
             onTest = onTest,
             onSave = onSave,
+        )
+    }
+
+    if (state.discovery.isOpen) {
+        LanDiscoveryDialog(
+            state = state.discovery,
+            onDismiss = onDismissDiscovery,
+            onStop = onStopDiscovery,
+            onDeepScan = onDeepPortScan,
+            onSelect = onSelectDiscovered,
         )
     }
 
@@ -235,6 +265,7 @@ private fun ServerListPane(
     onOpen: (SavedServer) -> Unit,
     onEdit: (SavedServer) -> Unit,
     onDelete: (SavedServer) -> Unit,
+    onScanLan: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.padding(FrameNestDimens.ScreenPadding)) {
@@ -249,8 +280,23 @@ private fun ServerListPane(
             text = stringResource(R.string.servers_subtitle),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
         )
+        OutlinedButton(
+            onClick = onScanLan,
+            modifier = Modifier
+                .padding(bottom = 12.dp)
+                .minimumInteractiveComponentSize()
+                .testTag("servers_scan_lan"),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Radar,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.servers_scan_lan))
+        }
         if (servers.isEmpty()) {
             Column(
                 modifier = Modifier
@@ -613,6 +659,139 @@ private fun ServerEditorDialog(
         dismissButton = {
             TextButton(onClick = onDismiss, enabled = !state.isSaving) {
                 Text(stringResource(R.string.action_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun LanDiscoveryDialog(
+    state: LanDiscoveryUiState,
+    onDismiss: () -> Unit,
+    onStop: () -> Unit,
+    onDeepScan: () -> Unit,
+    onSelect: (DiscoveredHost) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.testTag("servers_discovery_dialog"),
+        title = { Text(stringResource(R.string.servers_scan_title)) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.servers_scan_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                state.statusMessage?.let { msg ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (state.isBusy) {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .testTag("servers_scan_progress"),
+                                strokeWidth = 2.dp,
+                            )
+                        }
+                        Text(
+                            text = msg,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.testTag("servers_scan_status"),
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = onDeepScan,
+                        enabled = !state.portScanRunning,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("servers_scan_deep"),
+                    ) {
+                        Text(
+                            text = if (state.portScanRunning) {
+                                stringResource(R.string.servers_scan_deep_running)
+                            } else {
+                                stringResource(R.string.servers_scan_deep)
+                            },
+                        )
+                    }
+                    if (state.isBusy) {
+                        TextButton(
+                            onClick = onStop,
+                            modifier = Modifier.testTag("servers_scan_stop"),
+                        ) {
+                            Text(stringResource(R.string.servers_scan_stop))
+                        }
+                    }
+                }
+                if (state.results.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.servers_scan_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(vertical = 12.dp)
+                            .testTag("servers_scan_empty"),
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 260.dp)
+                            .testTag("servers_scan_results"),
+                    ) {
+                        items(state.results, key = { it.mergeKey() }) { host ->
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = FrameNestDimens.MinTouchTarget)
+                                    .clickable { onSelect(host) }
+                                    .padding(vertical = 10.dp)
+                                    .testTag("servers_scan_item_${host.mergeKey()}"),
+                            ) {
+                                Text(
+                                    text = host.displayTitle,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    text = buildString {
+                                        append(host.connectHost)
+                                        if (host.port != DiscoveredHost.DEFAULT_SMB_PORT) {
+                                            append(':')
+                                            append(host.port)
+                                        }
+                                        append(" · ")
+                                        append(discoverySourceLabel(host.sources))
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            HorizontalDivider()
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.testTag("servers_scan_close"),
+            ) {
+                Text(stringResource(R.string.action_ok))
             }
         },
     )

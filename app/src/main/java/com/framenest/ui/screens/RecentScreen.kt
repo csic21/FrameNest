@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -52,6 +53,8 @@ fun RecentScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            // Edge-to-edge (MainActivity): keep title below the status bar.
+            .statusBarsPadding()
             .padding(FrameNestDimens.ScreenPadding)
             .testTag("recent_screen"),
     ) {

@@ -1,11 +1,19 @@
 package com.framenest.feature.servers
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.framenest.core.model.SavedServer
+import com.framenest.data.discovery.DiscoveredHost
+import com.framenest.data.discovery.DiscoveryEvent
+import com.framenest.data.discovery.DiscoveryMerge
+import com.framenest.data.discovery.DiscoveryPhase
+import com.framenest.data.discovery.DiscoverySource
+import com.framenest.data.discovery.LanDiscoveryCoordinator
 import com.framenest.data.server.ServerRepository
 import com.framenest.data.server.SmbUiMessages
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -31,16 +39,28 @@ data class ServerEditorState(
     val formError: String? = null,
 )
 
+data class LanDiscoveryUiState(
+    val isOpen: Boolean = false,
+    val mdnsRunning: Boolean = false,
+    val portScanRunning: Boolean = false,
+    val results: List<DiscoveredHost> = emptyList(),
+    val statusMessage: String? = null,
+) {
+    val isBusy: Boolean get() = mdnsRunning || portScanRunning
+}
+
 data class ServersUiState(
     val servers: List<SavedServer> = emptyList(),
     val selectedServerId: String? = null,
     val editor: ServerEditorState? = null,
+    val discovery: LanDiscoveryUiState = LanDiscoveryUiState(),
     val actionError: String? = null,
     val isDeleting: Boolean = false,
 )
 
 class ServersViewModel(
     private val serverRepository: ServerRepository,
+    private val discovery: LanDiscoveryCoordinator,
 ) : ViewModel() {
 
     private val serversFlow: StateFlow<List<SavedServer>> = serverRepository
@@ -49,6 +69,8 @@ class ServersViewModel(
 
     private val _ui = MutableStateFlow(ServersUiState())
     val uiState: StateFlow<ServersUiState> = _ui.asStateFlow()
+
+    private var eventsJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -103,6 +125,121 @@ class ServersViewModel(
         _ui.update { state ->
             val editor = state.editor ?: return@update state
             state.copy(editor = transform(editor).copy(formError = null))
+        }
+    }
+
+    fun openLanDiscovery() {
+        stopDiscoveryInternal(keepDialog = false)
+        _ui.update {
+            it.copy(
+                discovery = LanDiscoveryUiState(
+                    isOpen = true,
+                    mdnsRunning = true,
+                    statusMessage = "正在通过 mDNS 发现 SMB 设备…",
+                ),
+                actionError = null,
+            )
+        }
+        eventsJob = viewModelScope.launch {
+            discovery.events.collect { event ->
+                when (event) {
+                    is DiscoveryEvent.Found -> {
+                        _ui.update { state ->
+                            state.copy(
+                                discovery = state.discovery.copy(
+                                    results = DiscoveryMerge.upsert(
+                                        state.discovery.results,
+                                        event.host,
+                                    ),
+                                ),
+                            )
+                        }
+                    }
+                    is DiscoveryEvent.Phase -> {
+                        _ui.update { state ->
+                            val d = state.discovery
+                            state.copy(
+                                discovery = when (event.phase) {
+                                    DiscoveryPhase.MDNS_RUNNING -> d.copy(
+                                        mdnsRunning = true,
+                                        statusMessage = d.statusMessage
+                                            ?: "正在通过 mDNS 发现 SMB 设备…",
+                                    )
+                                    DiscoveryPhase.PORT_SCAN_RUNNING -> d.copy(
+                                        portScanRunning = true,
+                                        statusMessage = "正在探测局域网 SMB 端口…",
+                                    )
+                                    DiscoveryPhase.PORT_SCAN_DONE -> d.copy(
+                                        portScanRunning = false,
+                                        statusMessage = if (d.mdnsRunning) {
+                                            "端口探测结束；mDNS 仍在监听"
+                                        } else {
+                                            "扫描结束"
+                                        },
+                                    )
+                                },
+                            )
+                        }
+                    }
+                    is DiscoveryEvent.Message -> {
+                        _ui.update { state ->
+                            state.copy(
+                                discovery = state.discovery.copy(statusMessage = event.text),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        discovery.startMdns(viewModelScope)
+    }
+
+    fun startDeepPortScan() {
+        if (!_ui.value.discovery.isOpen) return
+        if (_ui.value.discovery.portScanRunning) return
+        discovery.startPortScan(viewModelScope)
+    }
+
+    fun stopLanDiscovery() {
+        stopDiscoveryInternal(keepDialog = true)
+        _ui.update { state ->
+            state.copy(
+                discovery = state.discovery.copy(
+                    mdnsRunning = false,
+                    portScanRunning = false,
+                    statusMessage = "已停止",
+                ),
+            )
+        }
+    }
+
+    fun dismissLanDiscovery() {
+        stopDiscoveryInternal(keepDialog = false)
+        _ui.update { it.copy(discovery = LanDiscoveryUiState()) }
+    }
+
+    fun selectDiscoveredHost(host: DiscoveredHost) {
+        stopDiscoveryInternal(keepDialog = false)
+        _ui.update {
+            it.copy(
+                discovery = LanDiscoveryUiState(),
+                editor = ServerEditorState(
+                    name = host.displayTitle,
+                    host = host.connectHost,
+                    port = host.port.toString(),
+                    isPasswordRequired = true,
+                ),
+                actionError = null,
+            )
+        }
+    }
+
+    private fun stopDiscoveryInternal(keepDialog: Boolean) {
+        discovery.stopAll()
+        eventsJob?.cancel()
+        eventsJob = null
+        if (!keepDialog) {
+            // caller resets discovery state
         }
     }
 
@@ -252,6 +389,11 @@ class ServersViewModel(
         _ui.update { it.copy(actionError = null) }
     }
 
+    override fun onCleared() {
+        stopDiscoveryInternal(keepDialog = false)
+        super.onCleared()
+    }
+
     private data class ParsedEditor(
         val name: String,
         val host: String,
@@ -292,13 +434,24 @@ class ServersViewModel(
 
     class Factory(
         private val serverRepository: ServerRepository,
+        private val appContext: Context,
+        private val discovery: LanDiscoveryCoordinator = LanDiscoveryCoordinator(appContext),
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(ServersViewModel::class.java)) {
-                return ServersViewModel(serverRepository) as T
+                return ServersViewModel(serverRepository, discovery) as T
             }
             error("Unknown ViewModel: ${modelClass.name}")
         }
     }
+}
+
+/** Source labels for discovery result rows (UI / tests). */
+fun discoverySourceLabel(sources: Set<DiscoverySource>): String {
+    val parts = buildList {
+        if (DiscoverySource.MDNS in sources) add("mDNS")
+        if (DiscoverySource.PORT_PROBE in sources) add("445")
+    }
+    return parts.joinToString(" · ").ifEmpty { "LAN" }
 }

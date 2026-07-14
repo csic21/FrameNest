@@ -4,6 +4,9 @@
     <!-- SMB / remote playback (FN-01 direct smb://; FN-02 SMBJ client). -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- LAN discovery: mDNS multicast + optional subnet 445 probe (user-initiated). -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
     <application
         android:name=".FrameNestApplication"

@@ -1,0 +1,29 @@
+## LAN discovery 交接
+
+- 状态：完成
+- 分支与提交：本地工作区改动，尚未 commit
+- 改动路径：
+  - `app/src/main/java/com/framenest/data/discovery/**` — mDNS、445 探测、合并、子网枚举
+  - `app/src/main/java/com/framenest/feature/servers/ServersViewModel.kt` — 发现状态与选中填表
+  - `app/src/main/java/com/framenest/feature/servers/ServersScreen.kt` — 扫描入口与对话框
+  - `app/src/main/AndroidManifest.xml` — `CHANGE_WIFI_MULTICAST_STATE`、`ACCESS_WIFI_STATE`
+  - `app/src/main/res/values/strings.xml`
+  - `app/src/test/java/com/framenest/data/discovery/DiscoveryMergeTest.kt`
+  - `docs/decisions/0004-lan-discovery.md`、`docs/PRODUCT.md`、`docs/POST-MVP.md`、`CHANGELOG.md`
+- 验收结果：
+  - 服务器页「扫描局域网」→ 默认 mDNS（`_smb._tcp.`）
+  - 「深度扫描（探测 445）」可选；/24 上限 254；宽前缀收窄到 /24
+  - 结果按 IP 去重；点选仅填充添加服务器表单的名称/主机/端口；**不**填密码
+  - 用户可停止 / 关闭对话框
+- 执行过的命令及结果：
+  - `./gradlew compileDebugKotlin testDebugUnitTest --tests "com.framenest.data.discovery.*"` → SUCCESS
+  - `./gradlew testDebugUnitTest assembleDebug` →（见会话输出）
+- 决策记录：`docs/decisions/0004-lan-discovery.md`
+- 未解决问题：
+  - 真 NAS 上 mDNS/445 覆盖率未在本机验证
+  - mDNS `resolveService` 在新 API 上有 deprecation 警告（仍可用）
+  - 无仪器测试覆盖发现对话框
+- 集成 Agent 需要做的共享文件改动：无（`FrameNestApp` 未改）
+- 后续任务可依赖的接口/行为：
+  - `LanDiscoveryCoordinator` / `DiscoveryMerge` / `SubnetHosts`
+  - testTags：`servers_scan_lan`、`servers_discovery_dialog`、`servers_scan_deep`、`servers_scan_item_*`

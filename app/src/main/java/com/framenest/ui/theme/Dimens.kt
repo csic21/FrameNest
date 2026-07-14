@@ -18,4 +18,16 @@ object FrameNestDimens {
 
     /** Max width for empty/error body copy on medium+ so text does not stretch edge-to-edge. */
     val ReadableContentMaxWidth = 480.dp
+
+    /** Leading thumbnail in browse list rows. */
+    val BrowseListThumbSize = 40.dp
+
+    /** Corner radius for browse thumbnails / grid media. */
+    val BrowseThumbCorner = 8.dp
+
+    /** Horizontal/vertical gap between browse grid cells. */
+    val BrowseGridSpacing = 12.dp
+
+    /** Outer padding around the browse grid. */
+    val BrowseGridPadding = 16.dp
 }

@@ -57,11 +57,20 @@ class UserPreferences(
             .apply()
     }
 
+    /** SMB browse directory layout: list (default) or multi-column grid. */
+    fun browseLayoutMode(): BrowseLayoutMode =
+        BrowseLayoutMode.fromStorage(prefs.getString(KEY_BROWSE_LAYOUT, null))
+
+    fun setBrowseLayoutMode(mode: BrowseLayoutMode) {
+        prefs.edit().putString(KEY_BROWSE_LAYOUT, mode.storageValue()).apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "framenest_user_prefs"
         private const val KEY_SUBTITLE_LANGS = "subtitle_language_tags"
         private const val KEY_SUBTITLE_PRESET = "subtitle_language_preset"
         private const val KEY_THUMB_CONCURRENCY = "thumbnail_concurrency"
+        private const val KEY_BROWSE_LAYOUT = "browse_layout_mode"
 
         const val PRESET_SYSTEM = "system"
         const val PRESET_ZH = "zh"

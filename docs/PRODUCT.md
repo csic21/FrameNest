@@ -33,7 +33,8 @@
 
 ## MVP 不做
 
-- NAS 自动发现、DLNA、WebDAV、FTP、云同步
+- 完整媒体库发现（DLNA/SSDP）、WebDAV、FTP、云同步  
+  （post-MVP 可提供**用户主动**的局域网 SMB 轻量发现：mDNS + 可选 445 探测，见决策 0004）
 - TMDB 刮削、海报墙、媒体库全盘扫描
 - 账号系统、弹幕、儿童锁
 - 多播放器内核切换 UI
