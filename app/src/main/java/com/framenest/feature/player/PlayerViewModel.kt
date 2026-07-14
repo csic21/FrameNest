@@ -47,8 +47,10 @@ import com.framenest.player.VlcPlayerController
 import com.framenest.smb.SmbException
 import com.framenest.smb.SmbjClient
 import com.framenest.smb.SmbCredentials as SmbSessionCredentials
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -116,6 +118,13 @@ class PlayerViewModel(
     private var startPositionMs: Long = request.startPositionMs
     private var subtitleBootstrapDone: Boolean = false
     private var preferredLanguages: List<String> = resolvePreferredLanguages(application)
+    /**
+     * After path B (Proxy FD) fails before first frame, retry once with libVLC
+     * direct `smb://` (path A). Avoids permanent OpenFailed on demux/imem issues.
+     */
+    private var smbDirectFallbackUsed: Boolean = false
+    /** True when the last successful open used path B seekable descriptor. */
+    private var lastOpenUsedPathB: Boolean = false
 
     init {
         viewModelScope.launch {
@@ -162,6 +171,7 @@ class PlayerViewModel(
                     subtitleBootstrapDone = true
                     bootstrapSubtitles(state)
                 }
+                maybeFallbackSeekableSmbToDirect(state)
             }
         }
     }
@@ -388,6 +398,9 @@ class PlayerViewModel(
             withContext(Dispatchers.IO) {
                 teardownMediaResources()
             }
+            // Manual retry may try path B again, then auto-fallback can re-arm once.
+            smbDirectFallbackUsed = false
+            lastOpenUsedPathB = false
             subtitleBootstrapDone = false
             _subtitleUiState.value = SubtitleUiState(
                 delayMs = _subtitleUiState.value.delayMs,
@@ -397,10 +410,38 @@ class PlayerViewModel(
         }
     }
 
-    /** Call when UI leaves or process goes to background pause policy. */
+    /**
+     * Call when UI leaves or process goes to background pause policy.
+     *
+     * Progress is written on an application-style IO scope (not [viewModelScope]) so the
+     * write can finish after [onCleared] cancels the ViewModel scope during popBackStack.
+     */
     fun onLeaveOrBackground() {
         pauseFromSystem()
-        viewModelScope.launch { saveProgressNow(force = true) }
+        val state = controller.state.value
+        if (state.phase == PlayerState.Phase.Idle ||
+            state.phase == PlayerState.Phase.Preparing ||
+            state.phase == PlayerState.Phase.Error
+        ) {
+            return
+        }
+        val position = state.positionMs
+        val duration = state.durationMs
+        val identity = request.identity
+        val name = request.displayName
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                historyRepository.saveProgress(
+                    identity = identity,
+                    displayName = name,
+                    positionMs = position,
+                    durationMs = duration,
+                )
+                lastSavedPositionMs = position
+            } catch (t: Throwable) {
+                Log.w(TAG, "leave saveProgress failed: ${CredentialRedactor.redact(t.message)}")
+            }
+        }
     }
 
     private fun pauseFromSystem() {
@@ -422,7 +463,7 @@ class PlayerViewModel(
 
     private suspend fun openSource() {
         val mediaSource = try {
-            resolveMediaSource(request.dataSource)
+            resolveMediaSource(request.dataSource, forceDirectSmb = false)
         } catch (se: SmbException) {
             val err = PlayerErrorMapper.fromSmb(se.error)
             Log.w(TAG, "SMB open failed code=${err.code} msg=${err.message}")
@@ -451,34 +492,113 @@ class PlayerViewModel(
         }
     }
 
-    private suspend fun resolveMediaSource(dataSource: PlaybackDataSource): MediaSource =
+    /**
+     * Path B (SMBJ + ProxyFileDescriptor) sometimes ends demux before any Vout
+     * ("Playback ended before a video frame was ready") or hits imem read errors.
+     * Fall back once to path A (libVLC direct smb:// + option credentials).
+     */
+    private fun maybeFallbackSeekableSmbToDirect(state: PlayerState) {
+        if (smbDirectFallbackUsed || !lastOpenUsedPathB) return
+        if (state.phase != PlayerState.Phase.Error) return
+        if (state.firstFrameReady) return
+        val err = state.error ?: return
+        if (err.code != PlayerError.Code.OpenFailed &&
+            err.code != PlayerError.Code.PlaybackError
+        ) {
+            return
+        }
+        val dataSource = request.dataSource as? PlaybackDataSource.SeekableSmb ?: return
+        smbDirectFallbackUsed = true
+        lastOpenUsedPathB = false
+        viewModelScope.launch {
+            Log.w(
+                TAG,
+                "path B failed before first frame (${err.code}); " +
+                    "falling back to libVLC direct smb://",
+            )
+            (controller as? VlcPlayerController)?.closeCurrentMedia()
+            withContext(Dispatchers.IO) {
+                teardownMediaResources()
+            }
+            val direct = try {
+                withContext(Dispatchers.IO) {
+                    openDirectSmb(dataSource)
+                }
+            } catch (se: SmbException) {
+                injectError(PlayerErrorMapper.fromSmb(se.error))
+                return@launch
+            } catch (t: Throwable) {
+                injectError(PlayerErrorMapper.fromThrowable(t))
+                return@launch
+            }
+            controller.prepare(direct)
+        }
+    }
+
+    private suspend fun resolveMediaSource(
+        dataSource: PlaybackDataSource,
+        forceDirectSmb: Boolean,
+    ): MediaSource =
         when (dataSource) {
-            is PlaybackDataSource.LocalRawResource ->
+            is PlaybackDataSource.LocalRawResource -> {
+                lastOpenUsedPathB = false
                 MediaSource.RawResource(dataSource.resId)
-            is PlaybackDataSource.LocalFile ->
+            }
+            is PlaybackDataSource.LocalFile -> {
+                lastOpenUsedPathB = false
                 MediaSource.LocalFile(dataSource.path)
+            }
             is PlaybackDataSource.SeekableSmb -> withContext(Dispatchers.IO) {
-                openSeekableSmb(dataSource)
+                if (forceDirectSmb) {
+                    openDirectSmb(dataSource)
+                } else {
+                    openSeekableSmb(dataSource)
+                }
             }
             is PlaybackDataSource.DirectSmbUrl -> {
-                val uri = SmbMediaUri.build(
-                    host = dataSource.host,
-                    share = dataSource.share,
-                    path = dataSource.path,
-                    port = dataSource.port,
-                )
-                val creds = if (dataSource.username.isNotEmpty()) {
-                    SmbCredentials(
-                        username = dataSource.username,
-                        password = dataSource.password,
-                        domain = dataSource.domain,
-                    )
-                } else {
-                    null
-                }
-                MediaSource.Smb(uri = uri, credentials = creds)
+                lastOpenUsedPathB = false
+                openDirectSmbUrl(dataSource)
             }
         }
+
+    private fun openDirectSmbUrl(dataSource: PlaybackDataSource.DirectSmbUrl): MediaSource {
+        val uri = SmbMediaUri.build(
+            host = dataSource.host,
+            share = dataSource.share,
+            path = dataSource.path,
+            port = dataSource.port,
+        )
+        val creds = if (dataSource.username.isNotEmpty()) {
+            SmbCredentials(
+                username = dataSource.username,
+                password = dataSource.password,
+                domain = dataSource.domain,
+            )
+        } else {
+            null
+        }
+        return MediaSource.Smb(uri = uri, credentials = creds)
+    }
+
+    private fun openDirectSmb(dataSource: PlaybackDataSource.SeekableSmb): MediaSource {
+        lastOpenUsedPathB = false
+        teardownSmbClientOnly()
+        val uri = SmbMediaUri.build(
+            host = dataSource.host,
+            share = dataSource.share,
+            path = dataSource.path,
+            port = dataSource.port,
+        )
+        val passwordString = String(dataSource.password)
+        return MediaSource.Smb(
+            uri = uri,
+            credentials = SmbCredentials(
+                username = dataSource.username,
+                password = passwordString,
+                domain = dataSource.domain.ifEmpty { null },
+            ),
+        )
+    }
 
     private fun openSeekableSmb(dataSource: PlaybackDataSource.SeekableSmb): MediaSource {
         teardownSmbClientOnly()
@@ -506,30 +626,18 @@ class PlayerViewModel(
                 )
                 runCatching { randomAccess.close() }
                 teardownSmbClientOnly()
-                val uri = SmbMediaUri.build(
-                    host = dataSource.host,
-                    share = dataSource.share,
-                    path = dataSource.path,
-                    port = dataSource.port,
-                )
-                val passwordString = String(dataSource.password)
-                return MediaSource.Smb(
-                    uri = uri,
-                    credentials = SmbCredentials(
-                        username = dataSource.username,
-                        password = passwordString,
-                        domain = dataSource.domain.ifEmpty { null },
-                    ),
-                )
+                return openDirectSmb(dataSource)
             }
             val opened = SmbSeekableMedia.open(
                 context = getApplication(),
                 randomAccess = randomAccess,
                 debugLabel = "smb://${dataSource.share}/${dataSource.path.trimStart('/')}",
             )
+            lastOpenUsedPathB = true
             return opened.mediaSource
         } catch (t: Throwable) {
             teardownSmbClientOnly()
+            lastOpenUsedPathB = false
             throw t
         } finally {
             sessionCreds.clearPassword()
@@ -815,49 +923,72 @@ class PlayerViewModel(
     }
 
     override fun onCleared() {
-        runCatching {
-            val state = controller.state.value
-            if (state.phase != PlayerState.Phase.Idle &&
-                state.phase != PlayerState.Phase.Error &&
-                state.phase != PlayerState.Phase.Preparing
-            ) {
-                // Bound save so a slow Room write cannot freeze leave forever.
-                runBlocking {
-                    withTimeoutOrNull(2_000L) {
-                        saveProgressNow(force = true)
-                    }
-                }
-            }
-        }
+        // Snapshot everything needed for background teardown. Do not block the main
+        // thread here — popBackStack animation runs concurrently with onCleared.
+        val stateSnapshot = controller.state.value
+        val shouldSave =
+            stateSnapshot.phase != PlayerState.Phase.Idle &&
+                stateSnapshot.phase != PlayerState.Phase.Error &&
+                stateSnapshot.phase != PlayerState.Phase.Preparing
+        val savePosition = stateSnapshot.positionMs
+        val saveDuration = stateSnapshot.durationMs
+        val saveIdentity = request.identity
+        val saveDisplayName = request.displayName
+        val history = historyRepository
+
         listenSession.release()
-        realListenEngine?.close()
+        val listenEngine = realListenEngine
         realListenEngine = null
-        voskAsr.close()
-        mlKitMt.close()
         stopProgressLoop()
         audioFocus.abandon()
-        // Stop VLC + close proxy AFD first (releases SmbRandomAccess), then SMB session.
-        runCatching { controller.release() }
-        // Capture clients and tear down off the main thread without unbounded runBlocking
-        // (SMB disconnect hang was freezing leave and ANR/crash).
+
+        val player = controller
+        val asr = voskAsr
+        val mt = mlKitMt
         val clients = listOfNotNull(smbClient, listenOnlySmbClient)
         smbClient = null
         listenOnlySmbClient = null
-        if (clients.isNotEmpty()) {
-            Thread(
-                {
-                    clients.forEach { client ->
-                        runCatching { client.disconnect() }
-                        runCatching { client.close() }
+        val subtitles = subtitleLoader
+
+        // Leave already started an async save; this thread is a bounded backup plus
+        // VLC/ASR/SMB teardown that used to freeze the exit transition on the main thread.
+        Thread(
+            {
+                if (shouldSave) {
+                    runCatching {
+                        runBlocking {
+                            withTimeoutOrNull(1_500L) {
+                                history.saveProgress(
+                                    identity = saveIdentity,
+                                    displayName = saveDisplayName,
+                                    positionMs = savePosition,
+                                    durationMs = saveDuration,
+                                )
+                            }
+                        }
+                    }.onFailure { t ->
+                        Log.w(
+                            TAG,
+                            "teardown saveProgress: ${CredentialRedactor.redact(t.message)}",
+                        )
                     }
-                },
-                "framenest-smb-teardown",
-            ).apply {
-                isDaemon = true
-                start()
-            }
+                }
+                // Order: stop player / close proxy AFD, then SMB sessions.
+                runCatching { player.release() }
+                runCatching { listenEngine?.close() }
+                runCatching { asr.close() }
+                runCatching { mt.close() }
+                clients.forEach { client ->
+                    runCatching { client.disconnect() }
+                    runCatching { client.close() }
+                }
+                runCatching { subtitles.clearCache() }
+            },
+            "framenest-player-teardown",
+        ).apply {
+            isDaemon = true
+            start()
         }
-        runCatching { subtitleLoader.clearCache() }
         super.onCleared()
     }
 

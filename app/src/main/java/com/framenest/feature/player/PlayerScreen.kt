@@ -42,6 +42,7 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -643,6 +644,17 @@ private fun PlayerControls(
     val duration = state.durationMs.coerceAtLeast(0L)
     val position = state.positionMs.coerceIn(0L, if (duration > 0) duration else state.positionMs)
     val progress = if (duration > 0) position.toFloat() / duration.toFloat() else 0f
+    // Scrub locally while dragging; seek once on release. Continuous seek-on-drag freezes
+    // short/SMB clips while TimeChanged keeps ticking (frozen frame + running clock).
+    var scrubbing by remember { mutableStateOf(false) }
+    var scrubFraction by remember { mutableFloatStateOf(0f) }
+    var resumeAfterScrub by remember { mutableStateOf(false) }
+    val displayProgress = if (scrubbing) scrubFraction else progress
+    val displayPosition = if (scrubbing && duration > 0L) {
+        (scrubFraction * duration).toLong().coerceIn(0L, duration)
+    } else {
+        position
+    }
     val scaleLabel = videoScaleLabel(state.videoScaleMode)
     val scaleCd = stringResource(R.string.player_video_scale_cd, scaleLabel)
     val playCd = stringResource(R.string.player_play)
@@ -680,11 +692,30 @@ private fun PlayerControls(
                 .testTag("player_status"),
         )
         Slider(
-            value = progress,
+            value = displayProgress,
             onValueChange = { fraction ->
-                if (duration > 0) {
-                    onSeek((fraction * duration).toLong())
+                if (!scrubbing) {
+                    scrubbing = true
+                    // Pause while scrubbing so the clock does not run ahead of the frame
+                    // and listen-translate does not prefetch against a moving target.
+                    if (state.phase == PlayerState.Phase.Playing) {
+                        resumeAfterScrub = true
+                        onPause()
+                    } else {
+                        resumeAfterScrub = false
+                    }
                 }
+                scrubFraction = fraction.coerceIn(0f, 1f)
+            },
+            onValueChangeFinished = {
+                if (duration > 0L) {
+                    onSeek((scrubFraction * duration).toLong())
+                }
+                if (resumeAfterScrub) {
+                    onPlay()
+                }
+                scrubbing = false
+                resumeAfterScrub = false
             },
             enabled = (state.isSeekable || duration > 0) &&
                 state.phase != PlayerState.Phase.Error &&
@@ -702,7 +733,7 @@ private fun PlayerControls(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "${formatMs(position)} / ${formatMs(duration)}",
+                text = "${formatMs(displayPosition)} / ${formatMs(duration)}",
                 style = MaterialTheme.typography.labelMedium,
                 color = onBg,
                 modifier = Modifier.testTag("player_time"),

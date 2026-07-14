@@ -70,10 +70,28 @@ class VlcPlayerController(
     private var endedWhileHolding: Boolean = false
     private var released: Boolean = false
     /**
-     * When true, ignore EndReached / EncounteredError from intentional stop/release
-     * so [closeCurrentMedia] does not leave UI stuck on [PlayerState.Phase.Ended].
+     * When true, ignore EndReached from intentional [stop]/media=null (re-prepare /
+     * close). Cleared on a short timer or first Vout — **not** on Opening, because a
+     * residual EndReached from stop() often arrives *after* Opening of the new media
+     * and would otherwise surface as "ended before a video frame was ready".
      */
-    private var suppressTerminalEvents: Boolean = false
+    private var suppressEndReached: Boolean = false
+    /**
+     * When true, ignore both EndReached and EncounteredError (closeCurrentMedia /
+     * release teardown only).
+     */
+    private var suppressAllTerminalEvents: Boolean = false
+    /**
+     * True after [MediaPlayer.Event.Opening] for the media started by the latest
+     * [tryStartPendingIfReady]. Residual EndReached before Opening is always ignored.
+     */
+    private var openedCurrentMedia: Boolean = false
+    /**
+     * Number of EndReached events to drop after stop() when the previous media was
+     * non-null. Covers the common residual EOF without treating a later real demux
+     * failure as success.
+     */
+    private var ignoreEndReachedBudget: Int = 0
     /** Owned AFD from path B; closed on re-prepare / release. */
     private var ownedSeekableAfd: AssetFileDescriptor? = null
     private var subtitleDelayMs: Long = 0L
@@ -84,17 +102,17 @@ class VlcPlayerController(
         if (released) return@EventListener
         when (event.type) {
             MediaPlayer.Event.Opening -> {
-                // New media is opening — stop suppressing residual EndReached from prior stop().
-                if (suppressTerminalEvents) {
-                    suppressTerminalEvents = false
-                }
+                // New media is opening. Keep suppressEndReached until the post-stop
+                // grace window ends so a late EndReached from stop() is not treated
+                // as "ended before first frame" for this media.
+                openedCurrentMedia = true
                 _state.update { it.copy(phase = PlayerState.Phase.Preparing, error = null) }
             }
             MediaPlayer.Event.Buffering -> {
                 // Keep Preparing until first frame; ignore mid-stream buffering noise.
             }
             MediaPlayer.Event.Playing -> {
-                if (suppressTerminalEvents) return@EventListener
+                if (suppressAllTerminalEvents) return@EventListener
                 // Hold first-frame gate until user explicitly calls play(): late Playing
                 // events after Vout+pause must not flip Ready → Playing (then → Paused).
                 if (awaitingFirstFramePause || holdForUserPlay) {
@@ -112,7 +130,7 @@ class VlcPlayerController(
                 }
             }
             MediaPlayer.Event.Paused -> {
-                if (suppressTerminalEvents) return@EventListener
+                if (suppressAllTerminalEvents) return@EventListener
                 _state.update {
                     val phase = when {
                         // Still preparing first frame or holding for user tap: stay Ready once framed.
@@ -136,68 +154,46 @@ class VlcPlayerController(
                 // no-op; release path handles teardown
             }
             MediaPlayer.Event.EndReached -> {
-                if (suppressTerminalEvents) {
-                    Log.i(TAG, "EndReached ignored (suppressed during stop/close)")
+                if (suppressAllTerminalEvents) {
+                    Log.i(TAG, "EndReached ignored (suppressed during close/release)")
                     return@EventListener
                 }
-                val player = mediaPlayer
-                val pos = player?.time ?: _state.value.positionMs
-                val len = player?.length ?: _state.value.durationMs
-                Log.i(
-                    TAG,
-                    "EndReached pos=$pos len=$len firstFrame=${_state.value.firstFrameReady} " +
-                        "awaitingFirst=$awaitingFirstFramePause holdForUser=$holdForUserPlay " +
-                        "phase=${_state.value.phase}",
-                )
-                // Spurious EOF during open (bad FD / zero-length / demux) must not
-                // look like a finished movie with a permanent loading spinner.
-                if (awaitingFirstFramePause || !_state.value.firstFrameReady) {
-                    awaitingFirstFramePause = false
-                    holdForUserPlay = false
-                    val message = CredentialRedactor.redact(
-                        "Playback ended before a video frame was ready",
-                    )
-                    Log.w(TAG, message)
-                    _state.update {
-                        it.copy(
-                            phase = PlayerState.Phase.Error,
-                            error = PlayerError(
-                                code = PlayerError.Code.OpenFailed,
-                                message = message,
-                                retryable = true,
-                            ),
-                            firstFrameReady = false,
-                        )
-                    }
-                    return@EventListener
-                }
-                // Delayed/stale EndReached while still holding first frame (user has not
-                // tapped play) must not jump Ready → Ended. Common after stop()+setMedia
-                // or pause-on-Vout races with short samples / proxy FDs.
-                if (holdForUserPlay) {
-                    endedWhileHolding = true
-                    Log.w(
+                // Residual EOF from stop()/media=null — often arrives after Opening of
+                // the next media. Drop budgeted residuals and anything still inside the
+                // post-stop grace window so we do not false-error "before first frame".
+                if (ignoreEndReachedBudget > 0) {
+                    ignoreEndReachedBudget--
+                    Log.i(
                         TAG,
-                        "EndReached ignored while holding first frame for user play " +
-                            "(will restart on play)",
+                        "EndReached ignored (residual budget left=$ignoreEndReachedBudget)",
                     )
                     return@EventListener
                 }
-                awaitingFirstFramePause = false
-                holdForUserPlay = false
-                _state.update {
-                    it.copy(
-                        phase = PlayerState.Phase.Ended,
-                        positionMs = it.durationMs.takeIf { d -> d > 0 } ?: pos.coerceAtLeast(0L),
-                    )
+                if (suppressEndReached) {
+                    Log.i(TAG, "EndReached ignored (suppress window after stop)")
+                    return@EventListener
                 }
+                if (!openedCurrentMedia) {
+                    Log.i(TAG, "EndReached ignored (no Opening for current media yet)")
+                    return@EventListener
+                }
+                handleEndReached()
             }
             MediaPlayer.Event.EncounteredError -> {
-                if (suppressTerminalEvents) {
-                    Log.i(TAG, "EncounteredError ignored (suppressed during stop/close)")
+                if (suppressAllTerminalEvents) {
+                    Log.i(TAG, "EncounteredError ignored (suppressed during close/release)")
                     return@EventListener
                 }
+                // Residual errors from stop are rare; still report once current media
+                // has started opening so real open failures are not swallowed.
+                if (suppressEndReached && !openedCurrentMedia) {
+                    Log.i(TAG, "EncounteredError ignored (residual before Opening)")
+                    return@EventListener
+                }
+                suppressEndReached = false
+                ignoreEndReachedBudget = 0
                 awaitingFirstFramePause = false
+                holdForUserPlay = false
                 val message = CredentialRedactor.redact("Playback failed (libVLC EncounteredError)")
                 Log.w(TAG, message)
                 _state.update {
@@ -341,7 +337,10 @@ class VlcPlayerController(
         awaitingFirstFramePause = true
         holdForUserPlay = true
         endedWhileHolding = false
-        suppressTerminalEvents = false
+        openedCurrentMedia = false
+        ignoreEndReachedBudget = 0
+        suppressEndReached = false
+        suppressAllTerminalEvents = false
         _state.update {
             PlayerState(
                 phase = PlayerState.Phase.Preparing,
@@ -364,8 +363,11 @@ class VlcPlayerController(
         awaitingFirstFramePause = false
         holdForUserPlay = false
         endedWhileHolding = false
+        openedCurrentMedia = false
+        ignoreEndReachedBudget = 0
         pendingSource = null
-        suppressTerminalEvents = true
+        suppressAllTerminalEvents = true
+        suppressEndReached = true
         val player = mediaPlayer
         if (player != null) {
             runCatching { player.stop() }
@@ -382,7 +384,12 @@ class VlcPlayerController(
             )
         }
         // Clear after libVLC has delivered any async EndReached from stop().
-        mainHandler.postDelayed({ suppressTerminalEvents = false }, 250L)
+        mainHandler.postDelayed({
+            if (!released) {
+                suppressAllTerminalEvents = false
+                suppressEndReached = false
+            }
+        }, STOP_EVENT_SUPPRESS_MS)
     }
 
     /**
@@ -394,6 +401,8 @@ class VlcPlayerController(
         awaitingFirstFramePause = false
         holdForUserPlay = false
         endedWhileHolding = false
+        openedCurrentMedia = false
+        ignoreEndReachedBudget = 0
         pendingSource = null
         val safe = error.copy(message = CredentialRedactor.redact(error.message))
         Log.w(TAG, "external error code=${safe.code} msg=${safe.message}")
@@ -420,7 +429,9 @@ class VlcPlayerController(
         }
         awaitingFirstFramePause = false
         holdForUserPlay = false
-        suppressTerminalEvents = false
+        suppressEndReached = false
+        suppressAllTerminalEvents = false
+        ignoreEndReachedBudget = 0
         val length = player.length.takeIf { it > 0 } ?: _state.value.durationMs
         val time = player.time.coerceAtLeast(0L)
         // Restart when already at/near EOF (stale pause after full decode, bad resume
@@ -582,35 +593,98 @@ class VlcPlayerController(
         awaitingFirstFramePause = false
         holdForUserPlay = false
         endedWhileHolding = false
+        openedCurrentMedia = false
+        ignoreEndReachedBudget = 0
         pendingSource = null
-        suppressTerminalEvents = true
+        suppressAllTerminalEvents = true
+        suppressEndReached = true
         mainHandler.removeCallbacksAndMessages(null)
 
+        // Snapshot then null fields so concurrent callers see a released controller.
         val player = mediaPlayer
         mediaPlayer = null
-        if (player != null) {
-            runCatching {
-                player.setEventListener(null)
-                if (viewsAttached) {
-                    player.detachViews()
-                    viewsAttached = false
-                }
-                player.stop()
-            }
-            runCatching { player.release() }
-        }
-
-        videoLayout?.let { layout ->
-            (layout.parent as? ViewGroup)?.removeView(layout)
-        }
+        val layout = videoLayout
         videoLayout = null
-
-        // Close AFD after media player is stopped/released so proxy reads stop first.
-        closeOwnedSeekableAfd()
-
+        val wasAttached = viewsAttached
+        viewsAttached = false
         val vlc = libVlc
         libVlc = null
-        runCatching { vlc?.release() }
+        val afd = ownedSeekableAfd
+        ownedSeekableAfd = null
+
+        /**
+         * View detach / removeView must run on the main thread.
+         * stop() is best-effort so the surface stops painting before pop animation.
+         */
+        fun detachAndStop() {
+            if (player != null) {
+                runCatching {
+                    player.setEventListener(null)
+                    if (wasAttached) {
+                        runCatching { player.detachViews() }
+                    }
+                    player.stop()
+                }
+            }
+            if (layout != null) {
+                val parent = layout.parent as? ViewGroup
+                if (parent != null) {
+                    if (Looper.myLooper() == Looper.getMainLooper()) {
+                        runCatching { parent.removeView(layout) }
+                    } else {
+                        mainHandler.post { runCatching { parent.removeView(layout) } }
+                    }
+                }
+            }
+        }
+
+        /** Native release + proxy AFD close can block on SMB; never block the UI thread. */
+        fun releaseNative() {
+            if (player != null) {
+                runCatching { player.release() }
+            }
+            if (afd != null) {
+                runCatching { afd.close() }
+            }
+            runCatching { vlc?.release() }
+        }
+
+        val onMain = Looper.myLooper() == Looper.getMainLooper()
+        val needsMainDetach = wasAttached || layout?.parent != null
+        when {
+            onMain -> {
+                detachAndStop()
+                // Keep popBackStack animation smooth: heavy native/AFD work off main.
+                Thread(
+                    { releaseNative() },
+                    "framenest-vlc-release",
+                ).apply {
+                    isDaemon = true
+                    start()
+                }
+            }
+            needsMainDetach -> {
+                val done = java.util.concurrent.CountDownLatch(1)
+                mainHandler.post {
+                    try {
+                        detachAndStop()
+                    } finally {
+                        done.countDown()
+                    }
+                }
+                if (!done.await(300, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                    Log.w(TAG, "release: main detach timed out; continuing native release")
+                    runCatching { player?.setEventListener(null) }
+                    runCatching { player?.stop() }
+                }
+                releaseNative()
+            }
+            else -> {
+                // Typical leave path: AndroidView already detached surfaces.
+                detachAndStop()
+                releaseNative()
+            }
+        }
 
         _state.value = PlayerState(
             phase = PlayerState.Phase.Idle,
@@ -674,16 +748,28 @@ class VlcPlayerController(
             return
         }
         pendingSource = null
-        // stop()/media=null can emit EndReached asynchronously. Stay suppressed until
-        // Opening for the new media (see event listener) or a short safety timeout.
-        suppressTerminalEvents = true
+        // stop()/media=null can emit EndReached asynchronously — often *after*
+        // Opening of the next media. Drop residual EOF and keep a short suppress
+        // window; do not clear that suppress on Opening (see event listener).
+        openedCurrentMedia = false
+        val hadMedia = player.media != null
+        suppressEndReached = true
         runCatching { player.stop() }
         runCatching { player.media = null }
+        ignoreEndReachedBudget = if (hadMedia) 1 else 0
         mainHandler.postDelayed({
-            if (!released && suppressTerminalEvents) {
-                suppressTerminalEvents = false
+            if (released) return@postDelayed
+            if (suppressEndReached) {
+                suppressEndReached = false
+                // stop() never delivered EndReached — drop unused residual budget so a
+                // later real demux EOF is not swallowed.
+                if (ignoreEndReachedBudget > 0) {
+                    Log.i(TAG, "clearing unused EndReached residual budget")
+                    ignoreEndReachedBudget = 0
+                }
+                Log.i(TAG, "EndReached suppress window ended")
             }
-        }, 250L)
+        }, STOP_EVENT_SUPPRESS_MS)
         val media = createMedia(source) ?: return
         try {
             player.media = media
@@ -694,7 +780,8 @@ class VlcPlayerController(
             media.release()
             holdForUserPlay = false
             awaitingFirstFramePause = false
-            suppressTerminalEvents = false
+            suppressEndReached = false
+            ignoreEndReachedBudget = 0
             val msg = CredentialRedactor.redact(t.message ?: "Failed to open media")
             Log.w(TAG, "prepare failed: $msg")
             _state.update {
@@ -703,6 +790,60 @@ class VlcPlayerController(
                     error = PlayerError(PlayerError.Code.OpenFailed, msg, retryable = true),
                 )
             }
+        }
+    }
+
+    private fun handleEndReached() {
+        val player = mediaPlayer
+        val pos = player?.time ?: _state.value.positionMs
+        val len = player?.length ?: _state.value.durationMs
+        Log.i(
+            TAG,
+            "EndReached pos=$pos len=$len firstFrame=${_state.value.firstFrameReady} " +
+                "awaitingFirst=$awaitingFirstFramePause holdForUser=$holdForUserPlay " +
+                "phase=${_state.value.phase}",
+        )
+        // Spurious EOF during open (bad FD / zero-length / demux) must not
+        // look like a finished movie with a permanent loading spinner.
+        if (awaitingFirstFramePause || !_state.value.firstFrameReady) {
+            awaitingFirstFramePause = false
+            holdForUserPlay = false
+            val message = CredentialRedactor.redact(
+                "Playback ended before a video frame was ready",
+            )
+            Log.w(TAG, message)
+            _state.update {
+                it.copy(
+                    phase = PlayerState.Phase.Error,
+                    error = PlayerError(
+                        code = PlayerError.Code.OpenFailed,
+                        message = message,
+                        retryable = true,
+                    ),
+                    firstFrameReady = false,
+                )
+            }
+            return
+        }
+        // Delayed/stale EndReached while still holding first frame (user has not
+        // tapped play) must not jump Ready → Ended. Common after stop()+setMedia
+        // or pause-on-Vout races with short samples / proxy FDs.
+        if (holdForUserPlay) {
+            endedWhileHolding = true
+            Log.w(
+                TAG,
+                "EndReached ignored while holding first frame for user play " +
+                    "(will restart on play)",
+            )
+            return
+        }
+        awaitingFirstFramePause = false
+        holdForUserPlay = false
+        _state.update {
+            it.copy(
+                phase = PlayerState.Phase.Ended,
+                positionMs = it.durationMs.takeIf { d -> d > 0 } ?: pos.coerceAtLeast(0L),
+            )
         }
     }
 
@@ -788,6 +929,9 @@ class VlcPlayerController(
     }
 
     private fun onFirstVout() {
+        // First video output means residual stop() EOF is no longer relevant.
+        suppressEndReached = false
+        ignoreEndReachedBudget = 0
         if (!awaitingFirstFramePause) {
             // Normal playback path: just ensure tracks are refreshed.
             refreshTracks()
@@ -847,6 +991,9 @@ class VlcPlayerController(
         awaitingFirstFramePause = false
         holdForUserPlay = false
         endedWhileHolding = false
+        openedCurrentMedia = false
+        ignoreEndReachedBudget = 0
+        suppressEndReached = false
         val safe = CredentialRedactor.redact(message)
         _state.update {
             it.copy(
@@ -868,6 +1015,11 @@ class VlcPlayerController(
         private const val MAX_SUBTITLE_FONT_REL_SIZE = 32
         /** Treat as EOF when remaining time is within this window (ms). */
         private const val END_EPSILON_MS: Long = 400L
+        /**
+         * How long to ignore EndReached after stop()/media=null when starting a new
+         * media. Residual EOF commonly arrives after Opening of the next item.
+         */
+        private const val STOP_EVENT_SUPPRESS_MS: Long = 400L
 
         /** Sample SMB URI used in docs / manual tests (no credentials). */
         fun sampleSmbUri(
