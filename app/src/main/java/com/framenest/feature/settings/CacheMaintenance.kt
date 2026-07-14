@@ -1,6 +1,7 @@
 package com.framenest.feature.settings
 
 import android.content.Context
+import com.framenest.core.diagnostics.DiagnosticLog
 import com.framenest.data.listen_translate.ListenTranslateRepository
 import com.framenest.data.listen_translate.model.ListenModelManager
 import com.framenest.data.thumbnail.ThumbnailRepository
@@ -26,8 +27,11 @@ class CacheMaintenance(
         thumbnailRepository.clearCache()
         val subtitleDir = File(context.cacheDir, "subtitles")
         runCatching { subtitleDir.listFiles()?.forEach { it.deleteRecursively() } }
+        // Exported diagnostic reports on disk.
         val diagDir = File(context.cacheDir, "diagnostics")
         runCatching { diagDir.listFiles()?.forEach { it.deleteRecursively() } }
+        // In-process diagnostic ring buffer (not counted in disk size).
+        DiagnosticLog.clear()
         runBlocking {
             listenTranslateRepository?.purgeAll()
             listenModelManager?.deleteAll()
