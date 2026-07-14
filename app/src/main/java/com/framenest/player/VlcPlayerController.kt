@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.update
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
+import org.videolan.libvlc.interfaces.IMedia
 import org.videolan.libvlc.util.VLCVideoLayout
 
 /**
@@ -57,6 +58,8 @@ class VlcPlayerController(
     private var released: Boolean = false
     /** Owned AFD from path B; closed on re-prepare / release. */
     private var ownedSeekableAfd: AssetFileDescriptor? = null
+    private var subtitleDelayMs: Long = 0L
+    private var subtitleFontRelSize: Int = DEFAULT_SUBTITLE_FONT_REL_SIZE
 
     private val eventListener = MediaPlayer.EventListener { event ->
         if (released) return@EventListener
@@ -220,6 +223,8 @@ class VlcPlayerController(
                 phase = PlayerState.Phase.Preparing,
                 hwDecoderRequested = enableHwDecoder,
                 firstFrameReady = false,
+                subtitleDelayMs = subtitleDelayMs,
+                subtitleFontRelSize = subtitleFontRelSize,
             )
         }
         tryStartPendingIfReady()
@@ -286,6 +291,73 @@ class VlcPlayerController(
         val player = mediaPlayer ?: return
         if (player.setSpuTrack(trackId)) {
             _state.update { it.copy(selectedSubtitleTrackId = trackId) }
+        }
+    }
+
+    override fun addExternalSubtitle(pathOrUri: String, select: Boolean): Boolean {
+        if (released) return false
+        val player = mediaPlayer ?: return false
+        val trimmed = pathOrUri.trim()
+        if (trimmed.isEmpty()) return false
+        return try {
+            val uri = when {
+                trimmed.startsWith("file:", ignoreCase = true) ||
+                    trimmed.startsWith("content:", ignoreCase = true) ||
+                    trimmed.startsWith("http", ignoreCase = true) -> Uri.parse(trimmed)
+                else -> Uri.fromFile(File(trimmed))
+            }
+            // Never pass SMB credentials here — only local/content paths.
+            val ok = player.addSlave(IMedia.Slave.Type.Subtitle, uri, select)
+            if (ok) {
+                // Give libVLC a beat to register ES, then refresh + apply delay.
+                mainHandler.post {
+                    if (released) return@post
+                    refreshTracks()
+                    applySpuDelay()
+                    if (select) {
+                        val tracks = mediaPlayer?.spuTracks
+                        val last = tracks?.lastOrNull()
+                        if (last != null && last.id >= 0) {
+                            mediaPlayer?.setSpuTrack(last.id)
+                            _state.update { it.copy(selectedSubtitleTrackId = last.id) }
+                        }
+                    }
+                }
+            } else {
+                Log.w(TAG, "addSlave returned false for external subtitle")
+            }
+            ok
+        } catch (t: Throwable) {
+            val msg = CredentialRedactor.redact(t.message ?: "addSlave failed")
+            Log.w(TAG, "addExternalSubtitle failed: $msg")
+            // Do not transition player to Error — video continues.
+            false
+        }
+    }
+
+    override fun disableSubtitles() {
+        if (released) return
+        val player = mediaPlayer ?: return
+        if (player.setSpuTrack(DISABLED_SPU_TRACK)) {
+            _state.update { it.copy(selectedSubtitleTrackId = DISABLED_SPU_TRACK) }
+        }
+    }
+
+    override fun setSubtitleDelayMs(delayMs: Long) {
+        if (released) return
+        subtitleDelayMs = delayMs
+        applySpuDelay()
+        _state.update { it.copy(subtitleDelayMs = delayMs) }
+    }
+
+    override fun setSubtitleFontRelSize(relSize: Int) {
+        if (released) return
+        val clamped = relSize.coerceIn(MIN_SUBTITLE_FONT_REL_SIZE, MAX_SUBTITLE_FONT_REL_SIZE)
+        subtitleFontRelSize = clamped
+        _state.update { it.copy(subtitleFontRelSize = clamped) }
+        // Best-effort live apply; full effect is on next prepare via media options.
+        runCatching {
+            mediaPlayer?.media?.addOption(":freetype-rel-fontsize=$clamped")
         }
     }
 
@@ -403,7 +475,18 @@ class VlcPlayerController(
         media.setDefaultMediaPlayerOptions()
         // Slight network cache helps SMB / remote FD; harmless for local.
         media.addOption(":network-caching=1500")
+        // Prefer UTF-8 for text subs; font size via freetype relative size.
+        media.addOption(":subsdec-encoding=UTF-8")
+        media.addOption(":freetype-rel-fontsize=$subtitleFontRelSize")
         return media
+    }
+
+    private fun applySpuDelay() {
+        val player = mediaPlayer ?: return
+        // libVLC setSpuDelay uses microseconds.
+        runCatching {
+            player.setSpuDelay(subtitleDelayMs * 1000L)
+        }
     }
 
     private fun createRawMedia(vlc: LibVLC, @RawRes resId: Int): Media? {
@@ -490,6 +573,10 @@ class VlcPlayerController(
 
     companion object {
         private const val TAG = "FrameNestPlayer"
+        private const val DISABLED_SPU_TRACK = -1
+        private const val DEFAULT_SUBTITLE_FONT_REL_SIZE = 16
+        private const val MIN_SUBTITLE_FONT_REL_SIZE = 8
+        private const val MAX_SUBTITLE_FONT_REL_SIZE = 32
 
         /** Sample SMB URI used in docs / manual tests (no credentials). */
         fun sampleSmbUri(

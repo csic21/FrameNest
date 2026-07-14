@@ -72,6 +72,23 @@
     <string name="player_phase_ended">已结束</string>
     <string name="player_phase_error">错误</string>
 
+    <!-- Subtitles (FN-06) -->
+    <string name="subtitle_section_title">字幕</string>
+    <string name="subtitle_scanning">正在扫描同目录外挂字幕…</string>
+    <string name="subtitle_off">关闭字幕</string>
+    <string name="subtitle_embedded">内嵌字幕</string>
+    <string name="subtitle_external">外挂字幕（当前目录）</string>
+    <string name="subtitle_none">未发现字幕轨或同目录字幕文件</string>
+    <string name="subtitle_delay_label">延迟 %1$d ms</string>
+    <string name="subtitle_delay_minus">−0.1s</string>
+    <string name="subtitle_delay_plus">+0.1s</string>
+    <string name="subtitle_delay_reset">重置</string>
+    <string name="subtitle_font_label">字号</string>
+    <string name="subtitle_font_small">小</string>
+    <string name="subtitle_font_normal">标准</string>
+    <string name="subtitle_font_large">大</string>
+    <string name="subtitle_font_xlarge">更大</string>
+
     <!-- Recent -->
     <string name="recent_title">最近播放</string>
     <string name="recent_subtitle_fake">假历史记录 · 进度仅用于展示</string>
