@@ -198,10 +198,15 @@ class PlayerViewModel(
     private suspend fun enableRealListenTranslate() {
         val sourceLang = listenSession.uiState.value.sourceLang
         val targetLang = listenSession.uiState.value.targetLang
+        val asrReady = voskInstaller.isInstalled(sourceLang)
         listenSession.setInstallingModels(
             installing = true,
-            message = "正在准备本机听译：Vosk($sourceLang) + ML Kit($sourceLang→$targetLang)…\n" +
-                "首次需下载离线模型（仅应用私有目录，约数十 MB）",
+            message = if (asrReady) {
+                "本机 ASR 已就绪（$sourceLang），正在启动听译…"
+            } else {
+                "正在下载 Vosk($sourceLang)…\n" +
+                    "也可先到「设置 → 听译模型」安装并查看状态"
+            },
             error = null,
         )
         val prepared = runCatching {

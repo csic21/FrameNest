@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
@@ -23,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -40,6 +42,9 @@ import com.framenest.ContextAppContainer
 import com.framenest.R
 import com.framenest.core.diagnostics.DiagnosticLog
 import com.framenest.data.settings.UserPreferences
+import com.framenest.feature.listen_translate.asr.VoskLanguageStatus
+import com.framenest.feature.listen_translate.asr.VoskModelInstaller
+import com.framenest.feature.listen_translate.mt.MlKitMtEngine
 import com.framenest.ui.theme.FrameNestDimens
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +63,12 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     }
     var listenTranslateBytes by remember { mutableStateOf(0L) }
     var listenModelBytes by remember { mutableStateOf(0L) }
+    var voskStatuses by remember {
+        mutableStateOf(container.voskModelInstaller.languageStatuses())
+    }
+    var modelsInstalling by remember { mutableStateOf(false) }
+    var installProgress by remember { mutableFloatStateOf(0f) }
+    var installStep by remember { mutableStateOf<String?>(null) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var languagePreset by remember { mutableStateOf(prefs.subtitleLanguagePreset()) }
     var thumbConcurrency by remember { mutableStateOf(prefs.thumbnailConcurrency()) }
@@ -68,20 +79,42 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     val listenModelsClearedTemplate = stringResource(R.string.settings_listen_models_cleared)
     val listenModelsInstalled = stringResource(R.string.settings_listen_models_installed)
     val listenModelsFailedTemplate = stringResource(R.string.settings_listen_models_failed)
+    val installStepTemplate = stringResource(R.string.settings_install_listen_models_step)
     val diagnosticsSavedTemplate = stringResource(R.string.settings_diagnostics_saved)
     val diagnosticsShareTitle = stringResource(R.string.settings_diagnostics_share)
     val diagnosticsFailed = stringResource(R.string.settings_diagnostics_failed)
+    val langOk = stringResource(R.string.settings_listen_models_lang_ok)
+    val langMissing = stringResource(R.string.settings_listen_models_lang_missing)
+    val langLabels = remember {
+        mapOf(
+            "zh" to R.string.settings_listen_models_lang_zh,
+            "en" to R.string.settings_listen_models_lang_en,
+            "ja" to R.string.settings_listen_models_lang_ja,
+            "ko" to R.string.settings_listen_models_lang_ko,
+            "fr" to R.string.settings_listen_models_lang_fr,
+            "de" to R.string.settings_listen_models_lang_de,
+            "es" to R.string.settings_listen_models_lang_es,
+        )
+    }
+
+    suspend fun refreshModelSizesAndStatus() {
+        val snapshot = withContext(Dispatchers.IO) {
+            Triple(
+                container.voskModelInstaller.languageStatuses(),
+                container.cacheMaintenance.approximateListenModelBytes(),
+                container.cacheMaintenance.approximateTotalBytes(),
+            )
+        }
+        voskStatuses = snapshot.first
+        listenModelBytes = snapshot.second
+        cacheBytes = snapshot.third
+    }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         listenTranslateBytes = withContext(Dispatchers.IO) {
             container.cacheMaintenance.approximateListenTranslateBytes()
         }
-        listenModelBytes = withContext(Dispatchers.IO) {
-            container.cacheMaintenance.approximateListenModelBytes()
-        }
-        cacheBytes = withContext(Dispatchers.IO) {
-            container.cacheMaintenance.approximateTotalBytes()
-        }
+        refreshModelSizesAndStatus()
     }
 
     Column(
@@ -109,7 +142,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag("settings_version"),
         )
-        Spacer(modifier.height(12.dp))
+        Spacer(Modifier.height(12.dp))
         Text(
             text = stringResource(R.string.settings_intro),
             style = MaterialTheme.typography.bodyMedium,
@@ -132,7 +165,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag("settings_cache_size"),
         )
-        Spacer(modifier.height(8.dp))
+        Spacer(Modifier.height(8.dp))
         Button(
             onClick = {
                 scope.launch {
@@ -142,6 +175,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     cacheBytes = result.remainingApproxBytes
                     listenTranslateBytes = 0L
                     listenModelBytes = 0L
+                    voskStatuses = container.voskModelInstaller.languageStatuses()
                     statusMessage = cacheClearedTemplate.format(formatBytes(result.freedApproxBytes))
                     DiagnosticLog.info("Settings", "cache cleared freed=${result.freedApproxBytes}")
                 }
@@ -212,6 +246,24 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.widthIn(max = FrameNestDimens.ReadableContentMaxWidth),
         )
+        Spacer(Modifier.height(8.dp))
+        val recommendedReady = VoskModelInstaller.isRecommendedReady(voskStatuses)
+        Text(
+            text = stringResource(
+                if (recommendedReady) {
+                    R.string.settings_listen_models_ready_yes
+                } else {
+                    R.string.settings_listen_models_ready_no
+                },
+            ),
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (recommendedReady) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.error
+            },
+            modifier = Modifier.testTag("settings_listen_models_ready"),
+        )
         Text(
             text = stringResource(
                 R.string.settings_listen_models_size,
@@ -221,45 +273,121 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag("settings_listen_models_size"),
         )
-        Spacer(modifier.height(8.dp))
+        Spacer(Modifier.height(6.dp))
+        voskStatuses.forEach { status ->
+            VoskLangStatusRow(
+                status = status,
+                label = stringResource(
+                    langLabels[status.langTag] ?: R.string.settings_listen_models_lang_en,
+                ),
+                okLabel = langOk,
+                missingLabel = langMissing,
+            )
+        }
+        Text(
+            text = stringResource(R.string.settings_listen_models_mt_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .widthIn(max = FrameNestDimens.ReadableContentMaxWidth)
+                .testTag("settings_listen_models_mt_note"),
+        )
+        if (modelsInstalling) {
+            Spacer(Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { installProgress.coerceIn(0f, 1f) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("settings_listen_models_progress"),
+            )
+            installStep?.let { step ->
+                Text(
+                    text = installStepTemplate.format(step),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .testTag("settings_listen_models_step"),
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
         Button(
             onClick = {
+                if (modelsInstalling) return@Button
                 scope.launch {
-                    val result = withContext(Dispatchers.IO) {
-                        container.listenModelManager.installCoreModels()
+                    modelsInstalling = true
+                    installProgress = 0f
+                    statusMessage = null
+                    val result = runCatching {
+                        val langs = VoskModelInstaller.RECOMMENDED_LANGS
+                        langs.forEachIndexed { index, lang ->
+                            installStep = "Vosk $lang"
+                            val base = index.toFloat() / (langs.size + 1)
+                            val span = 1f / (langs.size + 1)
+                            withContext(Dispatchers.IO) {
+                                container.voskModelInstaller.ensureInstalled(lang) { p ->
+                                    installProgress = (base + p * span).coerceIn(0f, 0.92f)
+                                }
+                            }
+                        }
+                        installStep = "ML Kit zh↔en"
+                        installProgress = 0.93f
+                        withContext(Dispatchers.IO) {
+                            val mt = MlKitMtEngine()
+                            try {
+                                mt.ensureModel("zh", "en")
+                                installProgress = 0.96f
+                                mt.ensureModel("en", "zh")
+                            } finally {
+                                mt.close()
+                            }
+                            // Tiny legacy JSON packs (FN-13); ignore failure.
+                            runCatching { container.listenModelManager.installCoreModels() }
+                        }
+                        installProgress = 1f
+                        refreshModelSizesAndStatus()
                     }
+                    modelsInstalling = false
+                    installStep = null
                     if (result.isSuccess) {
-                        listenModelBytes = withContext(Dispatchers.IO) {
-                            container.cacheMaintenance.approximateListenModelBytes()
-                        }
-                        cacheBytes = withContext(Dispatchers.IO) {
-                            container.cacheMaintenance.approximateTotalBytes()
-                        }
                         statusMessage = listenModelsInstalled
-                        DiagnosticLog.info("Settings", "listen models installed")
+                        DiagnosticLog.info("Settings", "recommended listen models installed")
                     } else {
-                        val msg = result.exceptionOrNull()?.message ?: "error"
+                        val msg = result.exceptionOrNull()?.message?.take(200) ?: "error"
                         statusMessage = listenModelsFailedTemplate.format(msg)
-                        DiagnosticLog.info("Settings", "listen models install failed")
+                        DiagnosticLog.info("Settings", "listen models install failed: $msg")
+                        refreshModelSizesAndStatus()
                     }
                 }
             },
+            enabled = !modelsInstalling,
             modifier = Modifier
                 .heightIn(min = FrameNestDimens.MinTouchTarget)
                 .minimumInteractiveComponentSize()
                 .testTag("settings_install_listen_models"),
         ) {
-            Text(stringResource(R.string.settings_install_listen_models))
+            Text(
+                if (modelsInstalling) {
+                    stringResource(
+                        R.string.settings_install_listen_models_busy,
+                        (installProgress * 100).toInt().coerceIn(0, 100),
+                    )
+                } else {
+                    stringResource(R.string.settings_install_listen_models)
+                },
+            )
         }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
             onClick = {
+                if (modelsInstalling) return@OutlinedButton
                 scope.launch {
                     val result = withContext(Dispatchers.IO) {
                         container.cacheMaintenance.clearListenModels()
                     }
-                    listenModelBytes = 0L
-                    cacheBytes = result.remainingApproxBytes
+                    refreshModelSizesAndStatus()
                     statusMessage =
                         listenModelsClearedTemplate.format(formatBytes(result.freedApproxBytes))
                     DiagnosticLog.info(
@@ -268,6 +396,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     )
                 }
             },
+            enabled = !modelsInstalling,
             modifier = Modifier
                 .heightIn(min = FrameNestDimens.MinTouchTarget)
                 .minimumInteractiveComponentSize()
@@ -276,7 +405,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             Text(stringResource(R.string.settings_clear_listen_models))
         }
 
-        Spacer(modifier.height(20.dp))
+        Spacer(Modifier.height(20.dp))
         Text(
             text = stringResource(R.string.settings_subtitle_lang_row),
             style = MaterialTheme.typography.titleMedium,
@@ -317,7 +446,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             },
         )
 
-        Spacer(modifier.height(20.dp))
+        Spacer(Modifier.height(20.dp))
         Text(
             text = stringResource(R.string.settings_thumb_concurrency_row),
             style = MaterialTheme.typography.titleMedium,
@@ -329,7 +458,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.widthIn(max = FrameNestDimens.ReadableContentMaxWidth),
         )
-        Spacer(modifier.height(8.dp))
+        Spacer(Modifier.height(8.dp))
         LanguageOption(
             label = stringResource(R.string.settings_thumb_concurrency_1),
             selected = thumbConcurrency == 1,
@@ -351,7 +480,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             },
         )
 
-        Spacer(modifier.height(20.dp))
+        Spacer(Modifier.height(20.dp))
         Text(
             text = stringResource(R.string.settings_diagnostics_row),
             style = MaterialTheme.typography.titleMedium,
@@ -363,7 +492,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.widthIn(max = FrameNestDimens.ReadableContentMaxWidth),
         )
-        Spacer(modifier.height(8.dp))
+        Spacer(Modifier.height(8.dp))
         OutlinedButton(
             onClick = {
                 scope.launch {
@@ -405,7 +534,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         }
 
         statusMessage?.let { msg ->
-            Spacer(modifier.height(16.dp))
+            Spacer(Modifier.height(16.dp))
             Text(
                 text = msg,
                 style = MaterialTheme.typography.bodyMedium,
@@ -414,6 +543,33 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+@Composable
+private fun VoskLangStatusRow(
+    status: VoskLanguageStatus,
+    label: String,
+    okLabel: String,
+    missingLabel: String,
+) {
+    val stateLabel = if (status.installed) okLabel else missingLabel
+    Text(
+        text = stringResource(
+            R.string.settings_listen_models_lang_line,
+            label,
+            status.langTag,
+            stateLabel,
+        ),
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (status.installed) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("settings_vosk_lang_${status.langTag}"),
+    )
 }
 
 @Composable

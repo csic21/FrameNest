@@ -147,7 +147,7 @@
 
     <!-- Listen-translate (FN-12) -->
     <string name="listen_translate_title">听译字幕</string>
-    <string name="listen_translate_hint">本机听译：Vosk 离线识别 + ML Kit 翻译。首次开启需下载源语言 ASR 模型（约 40–80MB，仅应用私有目录）。结果不写 NAS。</string>
+    <string name="listen_translate_hint">本机听译：Vosk 离线识别 + ML Kit 翻译。请先在「设置 → 听译模型」安装并确认状态；播放页开启时若缺模型会再下载。结果不写 NAS。</string>
     <string name="listen_translate_enable">开启听译</string>
     <string name="listen_translate_source_lang">源语言</string>
     <string name="listen_translate_target_lang">目标语言</string>
@@ -160,14 +160,29 @@
     <string name="listen_translate_installing">正在安装本机模型…</string>
     <string name="listen_translate_models_ready">模型已就绪</string>
 
-    <string name="settings_listen_models_row">听译模型</string>
-    <string name="settings_listen_models_hint">Vosk 离线 ASR 与遗留 JSON 包在 filesDir/listen_models；ML Kit 翻译包由系统管理。卸载后应用侧模型删除。首次听译需联网下载 Vosk（按源语言）。</string>
-    <string name="settings_listen_models_size">模型约占用 %1$s</string>
-    <string name="settings_install_listen_models">安装听译模型</string>
+    <string name="settings_listen_models_row">听译模型（本机）</string>
+    <string name="settings_listen_models_hint">在此安装与查看状态。听译需要：Vosk 离线 ASR（按源语言，约 40–80MB，存 filesDir）+ ML Kit 翻译（系统管理）。推荐先装「中文+英文」。卸载应用后 Vosk 一并删除。需联网下载。</string>
+    <string name="settings_listen_models_size">Vosk 模型约占用 %1$s</string>
+    <string name="settings_listen_models_ready_yes">推荐模型：已就绪（中文 + 英文 ASR）</string>
+    <string name="settings_listen_models_ready_no">推荐模型：未就绪 — 请点下方安装</string>
+    <string name="settings_listen_models_lang_line">%1$s（%2$s）：%3$s</string>
+    <string name="settings_listen_models_lang_ok">已安装</string>
+    <string name="settings_listen_models_lang_missing">未安装</string>
+    <string name="settings_listen_models_lang_zh">中文</string>
+    <string name="settings_listen_models_lang_en">英文</string>
+    <string name="settings_listen_models_lang_ja">日语</string>
+    <string name="settings_listen_models_lang_ko">韩语</string>
+    <string name="settings_listen_models_lang_fr">法语</string>
+    <string name="settings_listen_models_lang_de">德语</string>
+    <string name="settings_listen_models_lang_es">西语</string>
+    <string name="settings_install_listen_models">安装推荐模型（中+英）</string>
+    <string name="settings_install_listen_models_busy">正在安装… %1$d%%</string>
+    <string name="settings_install_listen_models_step">正在安装：%1$s</string>
     <string name="settings_clear_listen_models">清除听译模型</string>
-    <string name="settings_listen_models_installed">模型已安装</string>
+    <string name="settings_listen_models_installed">推荐听译模型已就绪（Vosk 中/英 + ML Kit 中↔英）</string>
     <string name="settings_listen_models_cleared">已清除模型约 %1$s</string>
     <string name="settings_listen_models_failed">模型操作失败：%1$s</string>
+    <string name="settings_listen_models_mt_note">翻译包由 ML Kit 管理；安装推荐模型时会预下载 中↔英。</string>
     <string name="settings_subtitle_lang_row">默认字幕语言</string>
     <string name="settings_subtitle_lang_hint">影响自动匹配外挂/内嵌字幕的优先级（下次播放生效）。</string>
     <string name="settings_lang_system">跟随系统</string>

@@ -33,6 +33,18 @@ class VoskModelInstaller(
 
     fun isInstalled(langTag: String): Boolean = modelDir(langTag) != null
 
+    /** Snapshot of every catalogued Vosk language for Settings UI. */
+    fun languageStatuses(): List<VoskLanguageStatus> =
+        SPECS.keys.sorted().map { lang ->
+            val spec = SPECS.getValue(lang)
+            VoskLanguageStatus(
+                langTag = lang,
+                installed = isInstalled(lang),
+                approxBytes = spec.approxBytes,
+                folderName = spec.folderName,
+            )
+        }
+
     fun approximateBytes(): Long = dirSize(root)
 
     suspend fun ensureInstalled(
@@ -166,6 +178,12 @@ class VoskModelInstaller(
         private const val BASE = "https://alphacephei.com/vosk/models"
 
         /**
+         * Recommended for Settings one-tap install (covers common 中↔英 listening).
+         * Each pack is ~40MB; install needs network.
+         */
+        val RECOMMENDED_LANGS: List<String> = listOf("zh", "en")
+
+        /**
          * Small offline packs only (size ~40–100MB). Keys are UI language tags.
          */
         val SPECS: Map<String, Spec> = mapOf(
@@ -207,5 +225,18 @@ class VoskModelInstaller(
         )
 
         fun supportedSourceLanguages(): Set<String> = SPECS.keys
+
+        fun isRecommendedReady(statuses: List<VoskLanguageStatus>): Boolean {
+            val installed = statuses.filter { it.installed }.map { it.langTag }.toSet()
+            return RECOMMENDED_LANGS.all { it in installed }
+        }
     }
 }
+
+/** Per-language Vosk pack status for Settings. */
+data class VoskLanguageStatus(
+    val langTag: String,
+    val installed: Boolean,
+    val approxBytes: Long,
+    val folderName: String,
+)
