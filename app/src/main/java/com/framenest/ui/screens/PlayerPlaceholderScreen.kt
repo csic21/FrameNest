@@ -25,18 +25,31 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.framenest.R
-import com.framenest.navigation.FakeCatalog
+import com.framenest.smb.SmbPathUtils
 
+/**
+ * FN-05 will replace this with real playback.
+ *
+ * Route args (stable): serverId + share + path (share-relative).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerPlaceholderScreen(
     serverId: String,
-    entryId: String,
+    share: String,
+    path: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val server = FakeCatalog.server(serverId)
-    val title = FakeCatalog.entryTitle(entryId)
+    val normalized = SmbPathUtils.normalizeRelative(path)
+    val title = normalized.substringAfterLast('/').ifEmpty {
+        share.ifEmpty { serverId }
+    }
+    val locationLabel = when {
+        share.isBlank() -> serverId
+        normalized.isEmpty() -> share
+        else -> "$share/$normalized"
+    }
 
     Scaffold(
         modifier = modifier
@@ -87,10 +100,17 @@ fun PlayerPlaceholderScreen(
                     text = stringResource(
                         R.string.player_placeholder_body,
                         title,
-                        server?.name ?: serverId,
+                        locationLabel,
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.player_placeholder_route_hint, serverId, share, normalized),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("player_route_args"),
                 )
             }
         }

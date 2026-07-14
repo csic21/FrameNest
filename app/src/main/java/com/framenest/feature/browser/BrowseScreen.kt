@@ -1,0 +1,244 @@
+package com.framenest.feature.browser
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.framenest.R
+import com.framenest.core.model.MediaExtensions
+import com.framenest.core.model.RemoteEntry
+import com.framenest.core.model.RemoteLocation
+import com.framenest.data.server.BrowseRepository
+import com.framenest.data.server.ServerRepository
+
+@Composable
+fun BrowseRoute(
+    serverId: String,
+    location: RemoteLocation,
+    serverRepository: ServerRepository,
+    browseRepository: BrowseRepository,
+    onBack: () -> Unit,
+    onOpenDirectory: (RemoteLocation) -> Unit,
+    onOpenFile: (RemoteEntry) -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: BrowseViewModel = viewModel(
+        key = "browse-$serverId-${location.share}-${location.path}",
+        factory = BrowseViewModel.Factory(
+            serverId = serverId,
+            location = location,
+            serverRepository = serverRepository,
+            browseRepository = browseRepository,
+        ),
+    ),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    BrowseScreen(
+        state = state,
+        title = viewModel.title(),
+        pathLabel = viewModel.pathLabel(),
+        onBack = onBack,
+        onRefresh = viewModel::refresh,
+        onOpenEntry = { entry ->
+            when {
+                entry.isShare -> onOpenDirectory(RemoteLocation.shareRoot(entry.share))
+                entry.isDirectory -> onOpenDirectory(
+                    RemoteLocation.of(entry.share, entry.path),
+                )
+                else -> onOpenFile(entry)
+            }
+        },
+        modifier = modifier,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun BrowseScreen(
+    state: BrowseUiState,
+    title: String,
+    pathLabel: String,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    onOpenEntry: (RemoteEntry) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Scaffold(
+        modifier = modifier
+            .fillMaxSize()
+            .testTag("browse_screen"),
+        topBar = {
+            TopAppBar(
+                title = { Text(title) },
+                navigationIcon = {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.testTag("browse_back"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = onRefresh,
+                        enabled = !state.isLoading,
+                        modifier = Modifier.testTag("browse_refresh"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Refresh,
+                            contentDescription = stringResource(R.string.browse_refresh),
+                        )
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize(),
+        ) {
+            Text(
+                text = stringResource(R.string.browse_path_label, pathLabel),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .testTag("browse_path"),
+            )
+
+            when {
+                state.isLoading && state.entries.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("browse_loading"),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+                state.errorMessage != null && state.entries.isEmpty() -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp)
+                            .testTag("browse_error"),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = state.errorMessage,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        Button(
+                            onClick = onRefresh,
+                            modifier = Modifier
+                                .padding(top = 16.dp)
+                                .testTag("browse_retry"),
+                        ) {
+                            Text(stringResource(R.string.browse_retry))
+                        }
+                    }
+                }
+                state.entries.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("browse_empty"),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = if (state.isShareList) {
+                                stringResource(R.string.browse_empty_shares)
+                            } else {
+                                stringResource(R.string.browse_empty_dir)
+                            },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(24.dp),
+                        )
+                    }
+                }
+                else -> {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(state.entries, key = { it.stableKey() }) { entry ->
+                            val tag = "browse_item_${entry.stableKey()}"
+                            ListItem(
+                                headlineContent = { Text(entry.name) },
+                                supportingContent = {
+                                    Text(entrySupportingText(entry))
+                                },
+                                leadingContent = {
+                                    Icon(
+                                        imageVector = entryIcon(entry),
+                                        contentDescription = null,
+                                    )
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag(tag)
+                                    .semantics { contentDescription = tag }
+                                    .clickable { onOpenEntry(entry) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun entrySupportingText(entry: RemoteEntry): String = when {
+    entry.isShare -> stringResource(R.string.browse_type_share)
+    entry.isDirectory -> stringResource(R.string.browse_type_folder)
+    MediaExtensions.isSubtitle(entry.name) -> stringResource(R.string.browse_type_subtitle)
+    MediaExtensions.isVideo(entry.name) -> stringResource(R.string.browse_type_video)
+    else -> stringResource(R.string.browse_type_file)
+}
+
+private fun entryIcon(entry: RemoteEntry) = when {
+    entry.isShare -> Icons.Filled.Storage
+    entry.isDirectory -> Icons.Filled.Folder
+    MediaExtensions.isVideo(entry.name) -> Icons.Filled.Movie
+    MediaExtensions.isSubtitle(entry.name) -> Icons.Filled.Subtitles
+    else -> Icons.AutoMirrored.Filled.InsertDriveFile
+}

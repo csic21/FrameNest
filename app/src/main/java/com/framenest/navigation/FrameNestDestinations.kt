@@ -8,6 +8,10 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.window.core.layout.WindowSizeClass
 import com.framenest.R
+import com.framenest.core.model.RemoteLocation
+import com.framenest.smb.SmbPathUtils
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 /**
  * Top-level destinations shown in the adaptive navigation suite
@@ -39,19 +43,71 @@ enum class TopLevelDestination(
     ),
 }
 
+/**
+ * Navigation routes for FrameNest.
+ *
+ * **Browse** (FN-04):
+ * ```
+ * servers/browse/{serverId}?share={share}&path={path}
+ * ```
+ * - empty share → share list
+ * - share set, empty path → share root
+ * - both set → directory under share
+ *
+ * **Player** (stable for FN-05):
+ * ```
+ * player/{serverId}?share={share}&path={path}
+ * ```
+ * - [share] required for real playback
+ * - [path] share-relative file path (no leading slash)
+ * - Never put passwords in routes
+ */
 object FrameNestRoutes {
     const val SERVERS_GRAPH = "servers"
     const val SERVERS_LIST = "servers/list"
-    const val BROWSE = "servers/browse/{serverId}/{pathId}"
-    const val PLAYER = "player/{serverId}/{entryId}"
+    const val BROWSE = "servers/browse/{serverId}?share={share}&path={path}"
+    const val PLAYER = "player/{serverId}?share={share}&path={path}"
     const val RECENT = "recent"
     const val SETTINGS = "settings"
 
-    fun browse(serverId: String, pathId: String = FakeCatalog.ROOT_PATH_ID): String =
-        "servers/browse/$serverId/$pathId"
+    const val ARG_SERVER_ID = "serverId"
+    const val ARG_SHARE = "share"
+    const val ARG_PATH = "path"
 
-    fun player(serverId: String, entryId: String): String =
-        "player/$serverId/$entryId"
+    fun browse(
+        serverId: String,
+        share: String = "",
+        path: String = "",
+    ): String {
+        val base = "servers/browse/$serverId"
+        val params = buildList {
+            if (share.isNotEmpty()) add("share=${encodeQuery(share)}")
+            val normalized = SmbPathUtils.normalizeRelative(path)
+            if (normalized.isNotEmpty()) add("path=${encodeQuery(normalized)}")
+        }
+        return if (params.isEmpty()) base else "$base?${params.joinToString("&")}"
+    }
+
+    fun browse(serverId: String, location: RemoteLocation): String =
+        browse(serverId, location.share, location.normalizedPath)
+
+    /**
+     * Player route for FN-05.
+     * @param share SMB share name (never empty for real media)
+     * @param path share-relative file path
+     */
+    fun player(serverId: String, share: String, path: String): String {
+        val normalized = SmbPathUtils.normalizeRelative(path)
+        return "player/$serverId?share=${encodeQuery(share)}&path=${encodeQuery(normalized)}"
+    }
+
+    fun locationFromArgs(share: String?, path: String?): RemoteLocation =
+        RemoteLocation.of(share.orEmpty(), path.orEmpty())
+
+    /** Query encoding that works on JVM unit tests (no android.net.Uri). */
+    internal fun encodeQuery(value: String): String =
+        URLEncoder.encode(value, StandardCharsets.UTF_8)
+            .replace("+", "%20")
 }
 
 /**
