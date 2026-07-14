@@ -12,6 +12,14 @@ import com.framenest.core.model.PlaybackRequest
 import com.framenest.data.history.PlaybackHistoryRepository
 import com.framenest.data.history.PlaybackProgressRules
 import com.framenest.data.server.AppDatabase
+import com.framenest.feature.subtitle.ExternalSubtitleLoader
+import com.framenest.feature.subtitle.ExternalSubtitleOption
+import com.framenest.feature.subtitle.SidecarSubtitleScanner
+import com.framenest.feature.subtitle.SubtitleFontSizes
+import com.framenest.feature.subtitle.SubtitleLanguagePrefs
+import com.framenest.feature.subtitle.SubtitleMatcher
+import com.framenest.feature.subtitle.SubtitleSelectionKeys
+import com.framenest.feature.subtitle.SubtitleUiState
 import com.framenest.player.CredentialRedactor
 import com.framenest.player.MediaSource
 import com.framenest.player.PlayerController
@@ -28,9 +36,12 @@ import com.framenest.smb.SmbCredentials as SmbSessionCredentials
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -38,7 +49,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Product player session: open media (path B preferred), first-frame paused,
- * progress save, retry, and release coordination.
+ * progress save, retry, release coordination, and subtitle selection (FN-06).
  */
 class PlayerViewModel(
     application: Application,
@@ -47,6 +58,8 @@ class PlayerViewModel(
     private val controllerFactory: (Application) -> PlayerController = { app ->
         VlcPlayerController(app, enableHwDecoder = true)
     },
+    private val sidecarScanner: SidecarSubtitleScanner = SidecarSubtitleScanner(),
+    private val subtitleLoader: ExternalSubtitleLoader = ExternalSubtitleLoader(application),
 ) : AndroidViewModel(application) {
 
     val controller: PlayerController = controllerFactory(application)
@@ -57,6 +70,9 @@ class PlayerViewModel(
         initialValue = controller.state.value,
     )
 
+    private val _subtitleUiState = MutableStateFlow(SubtitleUiState())
+    val subtitleUiState: StateFlow<SubtitleUiState> = _subtitleUiState.asStateFlow()
+
     private val audioFocus = PlayerAudioFocus(application) {
         pauseFromSystem()
     }
@@ -65,6 +81,8 @@ class PlayerViewModel(
     private var progressJob: Job? = null
     private var lastSavedPositionMs: Long? = null
     private var startPositionMs: Long = request.startPositionMs
+    private var subtitleBootstrapDone: Boolean = false
+    private var preferredLanguages: List<String> = SubtitleLanguagePrefs.preferredLanguages()
 
     init {
         viewModelScope.launch {
@@ -87,6 +105,10 @@ class PlayerViewModel(
                     startPositionMs = 0L
                     controller.seekTo(target)
                 }
+                if (state.firstFrameReady && !subtitleBootstrapDone) {
+                    subtitleBootstrapDone = true
+                    bootstrapSubtitles(state)
+                }
             }
         }
     }
@@ -107,9 +129,53 @@ class PlayerViewModel(
         controller.seekTo(positionMs)
     }
 
+    fun selectSubtitleOff() {
+        controller.disableSubtitles()
+        _subtitleUiState.update {
+            it.copy(selectedKey = SubtitleSelectionKeys.OFF, errorMessage = null)
+        }
+    }
+
+    fun selectEmbeddedSubtitle(trackId: Int) {
+        controller.selectSubtitleTrack(trackId)
+        _subtitleUiState.update {
+            it.copy(
+                selectedKey = SubtitleSelectionKeys.embedded(trackId),
+                errorMessage = null,
+            )
+        }
+    }
+
+    fun selectExternalSubtitle(option: ExternalSubtitleOption) {
+        viewModelScope.launch {
+            loadAndSelectExternal(option, userInitiated = true)
+        }
+    }
+
+    fun adjustSubtitleDelayMs(deltaMs: Long) {
+        val next = (_subtitleUiState.value.delayMs + deltaMs).coerceIn(-10_000L, 10_000L)
+        controller.setSubtitleDelayMs(next)
+        _subtitleUiState.update { it.copy(delayMs = next) }
+    }
+
+    fun setSubtitleFontRelSize(relSize: Int) {
+        val size = if (relSize in SubtitleFontSizes.ALL) {
+            relSize
+        } else {
+            SubtitleFontSizes.NORMAL
+        }
+        controller.setSubtitleFontRelSize(size)
+        _subtitleUiState.update { it.copy(fontRelSize = size) }
+    }
+
     fun retry() {
         viewModelScope.launch {
             teardownMediaResources()
+            subtitleBootstrapDone = false
+            _subtitleUiState.value = SubtitleUiState(
+                delayMs = _subtitleUiState.value.delayMs,
+                fontRelSize = _subtitleUiState.value.fontRelSize,
+            )
             loadResumeAndOpen(forceReloadHistory = false)
         }
     }
@@ -262,6 +328,218 @@ class PlayerViewModel(
         }
     }
 
+    private fun bootstrapSubtitles(state: PlayerState) {
+        viewModelScope.launch {
+            val smbParams = smbSubtitleParamsOrNull()
+            if (smbParams == null) {
+                autoSelectEmbeddedOnly(state)
+                return@launch
+            }
+            _subtitleUiState.update {
+                it.copy(scanning = true, errorMessage = null, message = null)
+            }
+            val scanResult = try {
+                sidecarScanner.scan(
+                    request = SidecarSubtitleScanner.ScanRequest(
+                        host = smbParams.host,
+                        port = smbParams.port,
+                        username = smbParams.username,
+                        password = smbParams.password.copyOf(),
+                        domain = smbParams.domain,
+                        share = smbParams.share,
+                        videoPath = smbParams.path,
+                    ),
+                    preferredLanguages = preferredLanguages,
+                )
+            } finally {
+                smbParams.password.fill('\u0000')
+            }
+
+            scanResult.fold(
+                onSuccess = { options ->
+                    _subtitleUiState.update {
+                        it.copy(
+                            scanning = false,
+                            externalOptions = options,
+                            errorMessage = null,
+                        )
+                    }
+                    val best = options.firstOrNull()
+                    if (best != null) {
+                        loadAndSelectExternal(best, userInitiated = false)
+                    } else {
+                        autoSelectEmbeddedOnly(controller.state.value)
+                    }
+                },
+                onFailure = { err ->
+                    val msg = CredentialRedactor.redact(
+                        err.message ?: "Subtitle directory scan failed",
+                    )
+                    Log.w(TAG, "sidecar scan failed: $msg")
+                    _subtitleUiState.update {
+                        it.copy(
+                            scanning = false,
+                            externalOptions = emptyList(),
+                            // Do not treat scan failure as fatal; still try embedded.
+                            message = null,
+                            errorMessage = null,
+                        )
+                    }
+                    autoSelectEmbeddedOnly(controller.state.value)
+                },
+            )
+        }
+    }
+
+    private suspend fun loadAndSelectExternal(
+        option: ExternalSubtitleOption,
+        userInitiated: Boolean,
+    ) {
+        val smbParams = smbSubtitleParamsOrNull()
+        if (smbParams == null) {
+            if (userInitiated) {
+                _subtitleUiState.update {
+                    it.copy(errorMessage = "External subtitles require SMB playback")
+                }
+            }
+            return
+        }
+        val passwordCopy = smbParams.password.copyOf()
+        val loadResult = try {
+            subtitleLoader.loadToLocalFile(
+                ExternalSubtitleLoader.LoadRequest(
+                    host = smbParams.host,
+                    port = smbParams.port,
+                    username = smbParams.username,
+                    password = passwordCopy,
+                    domain = smbParams.domain,
+                    share = smbParams.share,
+                    remotePath = option.remotePath,
+                    fileName = option.fileName,
+                ),
+            )
+        } finally {
+            passwordCopy.fill('\u0000')
+            smbParams.password.fill('\u0000')
+        }
+
+        loadResult.fold(
+            onSuccess = { loaded ->
+                val ok = runCatching {
+                    controller.addExternalSubtitle(loaded.localFile.absolutePath, select = true)
+                }.getOrDefault(false)
+                if (ok) {
+                    val updated = option.copy(localPath = loaded.localFile.absolutePath)
+                    _subtitleUiState.update { state ->
+                        val options = state.externalOptions.map {
+                            if (it.remotePath == option.remotePath) updated else it
+                        }.ifEmpty { listOf(updated) }
+                        state.copy(
+                            externalOptions = options,
+                            selectedKey = updated.selectionKey,
+                            message = loaded.encodingNote,
+                            errorMessage = null,
+                        )
+                    }
+                } else {
+                    Log.w(TAG, "addExternalSubtitle failed; video continues")
+                    _subtitleUiState.update {
+                        it.copy(
+                            errorMessage = if (userInitiated) {
+                                "Could not attach external subtitle"
+                            } else {
+                                null
+                            },
+                            message = loaded.encodingNote,
+                        )
+                    }
+                    if (!userInitiated) {
+                        autoSelectEmbeddedOnly(controller.state.value)
+                    }
+                }
+            },
+            onFailure = { err ->
+                val msg = CredentialRedactor.redact(err.message ?: "Subtitle load failed")
+                Log.w(TAG, "external subtitle load failed: $msg")
+                // Never break video playback on subtitle failure.
+                _subtitleUiState.update {
+                    it.copy(
+                        errorMessage = if (userInitiated) msg else null,
+                        message = if (!userInitiated) null else it.message,
+                    )
+                }
+                if (!userInitiated) {
+                    autoSelectEmbeddedOnly(controller.state.value)
+                }
+            },
+        )
+    }
+
+    private fun autoSelectEmbeddedOnly(state: PlayerState) {
+        val tracks = state.subtitleTracks.filter { it.id >= 0 }
+        if (tracks.isEmpty()) {
+            controller.disableSubtitles()
+            _subtitleUiState.update {
+                it.copy(selectedKey = SubtitleSelectionKeys.OFF, scanning = false)
+            }
+            return
+        }
+        val best = tracks.maxByOrNull { track ->
+            SubtitleMatcher.embeddedTrackLanguageScore(track.name, preferredLanguages)
+        }
+        val score = best?.let {
+            SubtitleMatcher.embeddedTrackLanguageScore(it.name, preferredLanguages)
+        } ?: 0
+        if (best != null && score > 0) {
+            controller.selectSubtitleTrack(best.id)
+            _subtitleUiState.update {
+                it.copy(
+                    selectedKey = SubtitleSelectionKeys.embedded(best.id),
+                    scanning = false,
+                )
+            }
+        } else {
+            // No language preference hit — leave off; user can pick manually.
+            controller.disableSubtitles()
+            _subtitleUiState.update {
+                it.copy(selectedKey = SubtitleSelectionKeys.OFF, scanning = false)
+            }
+        }
+    }
+
+    private data class SmbSubtitleParams(
+        val host: String,
+        val port: Int,
+        val username: String,
+        val password: CharArray,
+        val domain: String,
+        val share: String,
+        val path: String,
+    )
+
+    private fun smbSubtitleParamsOrNull(): SmbSubtitleParams? =
+        when (val ds = request.dataSource) {
+            is PlaybackDataSource.SeekableSmb -> SmbSubtitleParams(
+                host = ds.host,
+                port = ds.port,
+                username = ds.username,
+                password = ds.password.copyOf(),
+                domain = ds.domain,
+                share = ds.share,
+                path = ds.path,
+            )
+            is PlaybackDataSource.DirectSmbUrl -> SmbSubtitleParams(
+                host = ds.host,
+                port = ds.port ?: 445,
+                username = ds.username,
+                password = ds.password.toCharArray(),
+                domain = ds.domain.orEmpty(),
+                share = ds.share,
+                path = ds.path,
+            )
+            else -> null
+        }
+
     private fun teardownMediaResources() {
         stopProgressLoop()
         teardownSmbClientOnly()
@@ -292,6 +570,7 @@ class PlayerViewModel(
         audioFocus.abandon()
         controller.release()
         teardownSmbClientOnly()
+        runCatching { subtitleLoader.clearCache() }
         super.onCleared()
     }
 

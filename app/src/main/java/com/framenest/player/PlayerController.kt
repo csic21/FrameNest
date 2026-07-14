@@ -33,6 +33,31 @@ interface PlayerController {
 
     fun selectSubtitleTrack(trackId: Int)
 
+    /**
+     * Attach an external subtitle slave from a local filesystem path or content URI.
+     * Failures must not stop video playback; returns false on error.
+     *
+     * @param pathOrUri local absolute path or `file://` / content URI string
+     * @param select when true, select the newly added SPU track after attach
+     */
+    fun addExternalSubtitle(pathOrUri: String, select: Boolean = true): Boolean
+
+    /** Disable subtitles (libVLC SPU id -1). */
+    fun disableSubtitles()
+
+    /**
+     * Subtitle presentation delay in milliseconds (positive = show later).
+     * Mapped to libVLC microseconds via [org.videolan.libvlc.MediaPlayer.setSpuDelay].
+     */
+    fun setSubtitleDelayMs(delayMs: Long)
+
+    /**
+     * Relative freetype font size (libVLC `--freetype-rel-fontsize` / media option).
+     * Smaller values produce larger on-screen text. Applied on next media options
+     * and best-effort live via media options when a media is active.
+     */
+    fun setSubtitleFontRelSize(relSize: Int)
+
     /** Full teardown of MediaPlayer + LibVLC. Idempotent. */
     fun release()
 }

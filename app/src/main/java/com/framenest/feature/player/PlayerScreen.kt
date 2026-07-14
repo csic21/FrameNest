@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -33,7 +34,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,6 +53,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.framenest.R
 import com.framenest.core.model.PlaybackRequest
+import com.framenest.feature.subtitle.SubtitleControls
 import com.framenest.player.PlayerState
 
 /**
@@ -71,6 +75,8 @@ fun PlayerScreen(
         factory = PlayerViewModel.Factory(app, request),
     )
     val state by vm.playerState.collectAsStateWithLifecycle()
+    val subtitleUi by vm.subtitleUiState.collectAsStateWithLifecycle()
+    var showSubtitles by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner, vm) {
@@ -115,6 +121,19 @@ fun PlayerScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.action_back),
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = { showSubtitles = !showSubtitles },
+                        modifier = Modifier
+                            .semantics { contentDescription = "player_subtitles" }
+                            .testTag("player_subtitles"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.ClosedCaption,
+                            contentDescription = stringResource(R.string.subtitle_section_title),
                         )
                     }
                 },
@@ -204,6 +223,22 @@ fun PlayerScreen(
                 onPause = { vm.pause() },
                 onSeek = { vm.seekTo(it) },
             )
+
+            if (showSubtitles) {
+                SubtitleControls(
+                    uiState = subtitleUi,
+                    embeddedTracks = state.subtitleTracks.filter { it.id >= 0 },
+                    onSelectOff = { vm.selectSubtitleOff() },
+                    onSelectEmbedded = { vm.selectEmbeddedSubtitle(it) },
+                    onSelectExternal = { vm.selectExternalSubtitle(it) },
+                    onDelayDeltaMs = { vm.adjustSubtitleDelayMs(it) },
+                    onFontRelSize = { vm.setSubtitleFontRelSize(it) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp)
+                        .background(MaterialTheme.colorScheme.surface),
+                )
+            }
         }
     }
 }

@@ -17,6 +17,13 @@ data class PlayerState(
     val subtitleTracks: List<PlayerTrack> = emptyList(),
     val selectedAudioTrackId: Int? = null,
     val selectedSubtitleTrackId: Int? = null,
+    /** Subtitle delay in milliseconds (libVLC SPU delay / 1000). */
+    val subtitleDelayMs: Long = 0L,
+    /**
+     * Relative freetype font size for subtitles (smaller ⇒ larger text).
+     * Default 16 matches libVLC's typical freetype-rel-fontsize.
+     */
+    val subtitleFontRelSize: Int = 16,
     val hwDecoderRequested: Boolean = true,
     val error: PlayerError? = null,
 ) {
