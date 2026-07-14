@@ -118,6 +118,13 @@ fun shouldUseListDetailLayout(windowSizeClass: WindowSizeClass): Boolean =
     windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND)
 
 /**
+ * True when the current back-stack entry is the product player (full-screen chrome).
+ * Player uses [NavigationSuiteType.None] so phone bottom bar / tablet rail do not steal space.
+ */
+fun isPlayerRoute(route: String?): Boolean =
+    route != null && (route == "player" || route.startsWith("player/"))
+
+/**
  * Maps a Nav back-stack route to the matching top-level destination, if any.
  */
 fun topLevelDestinationForRoute(route: String?): TopLevelDestination? {
@@ -128,7 +135,7 @@ fun topLevelDestinationForRoute(route: String?): TopLevelDestination? {
         route == FrameNestRoutes.SETTINGS || route.startsWith("${FrameNestRoutes.SETTINGS}/") ->
             TopLevelDestination.Settings
         route.startsWith(FrameNestRoutes.SERVERS_GRAPH) ||
-            route.startsWith("player/") ->
+            isPlayerRoute(route) ->
             TopLevelDestination.Servers
         else -> null
     }

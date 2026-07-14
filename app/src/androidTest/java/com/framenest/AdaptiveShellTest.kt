@@ -9,14 +9,17 @@ import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.navigation.compose.rememberNavController
 import androidx.window.core.layout.WindowSizeClass
 import com.framenest.navigation.FrameNestApp
+import com.framenest.navigation.FrameNestRoutes
 import com.framenest.ui.theme.FrameNestTheme
 import org.junit.Rule
 import org.junit.Test
 
 /**
- * Adaptive shell UI tests. Servers list is empty until the user adds a NAS.
+ * Adaptive shell UI tests for phone (compact) and tablet (medium+) configurations.
+ * Real server list is empty until the user adds a NAS — empty states must still be correct.
  */
 class AdaptiveShellPhoneTest {
 
@@ -58,6 +61,7 @@ class AdaptiveShellPhoneTest {
         composeRule.onNodeWithTag("nav_recent").performClick()
         composeRule.onNodeWithTag("recent_screen").assertIsDisplayed()
         composeRule.onNodeWithTag("recent_title").assertIsDisplayed()
+        composeRule.onNodeWithTag("recent_empty").assertIsDisplayed()
 
         composeRule.onNodeWithTag("nav_settings").performClick()
         composeRule.onNodeWithTag("settings_screen").assertIsDisplayed()
@@ -84,6 +88,38 @@ class AdaptiveShellPhoneTest {
         composeRule.onNodeWithTag("server_test").assertIsDisplayed()
         composeRule.onNodeWithTag("server_save").assertIsDisplayed()
     }
+
+    @Test
+    fun compact_playerRoute_hidesNavigationSuite() {
+        composeRule.setContent {
+            FrameNestTheme {
+                val nav = rememberNavController()
+                FrameNestApp(
+                    windowAdaptiveInfo = compactAdaptiveInfo(),
+                    navigationSuiteType = NavigationSuiteType.NavigationBar,
+                    navController = nav,
+                )
+                // Navigate after composition so the shell can observe the player route.
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    nav.navigate(FrameNestRoutes.player("missing", "share", "file.mkv"))
+                }
+            }
+        }
+
+        // Missing server → player route error (still player destination → suite None).
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(androidx.compose.ui.test.hasTestTag("player_route_error"))
+                .fetchSemanticsNodes()
+                .isNotEmpty() ||
+                composeRule.onAllNodes(androidx.compose.ui.test.hasTestTag("player_route_loading"))
+                    .fetchSemanticsNodes()
+                    .isNotEmpty() ||
+                composeRule.onAllNodes(androidx.compose.ui.test.hasTestTag("player_screen"))
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+        }
+        composeRule.onNodeWithTag("nav_suite_none").assertIsDisplayed()
+    }
 }
 
 class AdaptiveShellTabletTest {
@@ -106,6 +142,52 @@ class AdaptiveShellTabletTest {
         composeRule.onNodeWithTag("servers_list_detail").assertIsDisplayed()
         composeRule.onNodeWithTag("servers_detail_pane").assertIsDisplayed()
         composeRule.onNodeWithTag("servers_empty").assertIsDisplayed()
+        // Detail empty prompt when no selection (empty list → null selection).
+        composeRule.onNodeWithTag("servers_detail_empty").assertIsDisplayed()
+    }
+
+    @Test
+    fun mediumWidth_recentAndSettingsEmptyStates() {
+        composeRule.setContent {
+            FrameNestTheme {
+                FrameNestApp(
+                    windowAdaptiveInfo = mediumAdaptiveInfo(),
+                    navigationSuiteType = NavigationSuiteType.NavigationRail,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("nav_recent").performClick()
+        composeRule.onNodeWithTag("recent_screen").assertIsDisplayed()
+        composeRule.onNodeWithTag("recent_empty").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("nav_settings").performClick()
+        composeRule.onNodeWithTag("settings_screen").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings_title").assertIsDisplayed()
+    }
+
+    @Test
+    fun medium_playerRoute_hidesNavigationRail() {
+        composeRule.setContent {
+            FrameNestTheme {
+                val nav = rememberNavController()
+                FrameNestApp(
+                    windowAdaptiveInfo = mediumAdaptiveInfo(),
+                    navigationSuiteType = NavigationSuiteType.NavigationRail,
+                    navController = nav,
+                )
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    nav.navigate(FrameNestRoutes.player("missing", "share", "file.mkv"))
+                }
+            }
+        }
+
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            composeRule.onAllNodes(androidx.compose.ui.test.hasTestTag("nav_suite_none"))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onNodeWithTag("nav_suite_none").assertIsDisplayed()
     }
 }
 
@@ -123,6 +205,17 @@ class AdaptiveShellRotationTest {
 
         composeRule.onNodeWithTag("settings_screen").assertIsDisplayed()
         composeRule.onNodeWithTag("nav_settings").assertIsSelected()
+    }
+
+    @Test
+    fun recreate_keepsRecentDestination() {
+        composeRule.onNodeWithTag("nav_recent").performClick()
+        composeRule.onNodeWithTag("recent_screen").assertIsDisplayed()
+
+        composeRule.activityRule.scenario.recreate()
+
+        composeRule.onNodeWithTag("recent_screen").assertIsDisplayed()
+        composeRule.onNodeWithTag("nav_recent").assertIsSelected()
     }
 }
 

@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -42,6 +45,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -53,6 +57,7 @@ import com.framenest.data.server.BrowseRepository
 import com.framenest.data.server.ServerRepository
 import com.framenest.data.thumbnail.ThumbnailRepository
 import com.framenest.data.thumbnail.ThumbnailUiState
+import com.framenest.ui.theme.FrameNestDimens
 
 @Composable
 fun BrowseRoute(
@@ -205,7 +210,9 @@ fun BrowseScreen(
                             },
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(24.dp),
+                            modifier = Modifier
+                                .widthIn(max = FrameNestDimens.ReadableContentMaxWidth)
+                                .padding(FrameNestDimens.ScreenPadding),
                         )
                     }
                 }
@@ -214,9 +221,19 @@ fun BrowseScreen(
                         items(state.entries, key = { it.stableKey() }) { entry ->
                             val tag = "browse_item_${entry.stableKey()}"
                             ListItem(
-                                headlineContent = { Text(entry.name) },
+                                headlineContent = {
+                                    Text(
+                                        text = entry.name,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                },
                                 supportingContent = {
-                                    Text(entrySupportingText(entry))
+                                    Text(
+                                        text = entrySupportingText(entry),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                 },
                                 leadingContent = {
                                     BrowseEntryLeading(
@@ -226,6 +243,8 @@ fun BrowseScreen(
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .heightIn(min = FrameNestDimens.MinTouchTarget)
+                                    .minimumInteractiveComponentSize()
                                     .testTag(tag)
                                     .semantics { contentDescription = tag }
                                     .clickable { onOpenEntry(entry) },

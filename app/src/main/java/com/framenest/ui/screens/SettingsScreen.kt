@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,13 +16,15 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.framenest.R
+import com.framenest.ui.theme.FrameNestDimens
 
 @Composable
 fun SettingsScreen(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .verticalScroll(rememberScrollState())
+            .padding(FrameNestDimens.ScreenPadding)
             .testTag("settings_screen"),
     ) {
         Text(
@@ -32,11 +37,13 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             text = stringResource(R.string.settings_placeholder_body),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.widthIn(max = FrameNestDimens.ReadableContentMaxWidth),
         )
         Spacer(Modifier.height(16.dp))
         Text(
             text = stringResource(R.string.settings_cache_row),
             style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.testTag("settings_cache_row"),
         )
         Text(
             text = stringResource(R.string.settings_cache_value_fake),
@@ -47,6 +54,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         Text(
             text = stringResource(R.string.settings_subtitle_lang_row),
             style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.testTag("settings_subtitle_lang_row"),
         )
         Text(
             text = stringResource(R.string.settings_subtitle_lang_value_fake),

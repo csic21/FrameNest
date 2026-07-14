@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -37,6 +39,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,12 +53,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.framenest.R
 import com.framenest.core.model.SavedServer
 import com.framenest.data.server.ServerRepository
+import com.framenest.ui.theme.FrameNestDimens
 
 @Composable
 fun ServersRoute(
@@ -108,7 +113,9 @@ fun ServersScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAdd,
-                modifier = Modifier.testTag("servers_add"),
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .testTag("servers_add"),
             ) {
                 Icon(
                     imageVector = Icons.Filled.Add,
@@ -117,6 +124,7 @@ fun ServersScreen(
             }
         },
     ) { padding ->
+        // useListDetail comes from WindowSizeClass medium+ (never raw width < 600).
         if (useListDetail) {
             Row(
                 modifier = Modifier
@@ -229,10 +237,12 @@ private fun ServerListPane(
     onDelete: (SavedServer) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.padding(16.dp)) {
+    Column(modifier = modifier.padding(FrameNestDimens.ScreenPadding)) {
         Text(
             text = stringResource(R.string.servers_title),
             style = MaterialTheme.typography.headlineSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.testTag("servers_title"),
         )
         Text(
@@ -253,12 +263,15 @@ private fun ServerListPane(
                     text = stringResource(R.string.servers_empty),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.widthIn(max = FrameNestDimens.ReadableContentMaxWidth),
                 )
                 Text(
                     text = stringResource(R.string.servers_empty_hint),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier
+                        .widthIn(max = FrameNestDimens.ReadableContentMaxWidth)
+                        .padding(top = 8.dp),
                 )
             }
         } else {
@@ -268,6 +281,7 @@ private fun ServerListPane(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .heightIn(min = FrameNestDimens.MinTouchTarget)
                             .testTag("server_item_${server.id}")
                             .semantics { contentDescription = "server_item_${server.id}" }
                             .clickable {
@@ -287,7 +301,10 @@ private fun ServerListPane(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                                .padding(
+                                    horizontal = 8.dp,
+                                    vertical = FrameNestDimens.ListRowVerticalPadding,
+                                ),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(
@@ -295,23 +312,34 @@ private fun ServerListPane(
                                     .weight(1f)
                                     .padding(8.dp),
                             ) {
-                                Text(server.name, style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    text = server.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                                 Text(
                                     text = hostLabel(server),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                                 server.defaultShare?.let { share ->
                                     Text(
                                         text = stringResource(R.string.servers_default_share, share),
                                         style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
                                 }
                             }
                             if (showRowActions) {
                                 IconButton(
                                     onClick = { onEdit(server) },
-                                    modifier = Modifier.testTag("server_row_edit_${server.id}"),
+                                    modifier = Modifier
+                                        .minimumInteractiveComponentSize()
+                                        .testTag("server_row_edit_${server.id}"),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Edit,
@@ -320,7 +348,9 @@ private fun ServerListPane(
                                 }
                                 IconButton(
                                     onClick = { onDelete(server) },
-                                    modifier = Modifier.testTag("server_row_delete_${server.id}"),
+                                    modifier = Modifier
+                                        .minimumInteractiveComponentSize()
+                                        .testTag("server_row_delete_${server.id}"),
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Delete,
@@ -354,7 +384,8 @@ private fun ServerDetailPane(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp),
+                    .padding(24.dp)
+                    .testTag("servers_detail_empty"),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -362,39 +393,60 @@ private fun ServerDetailPane(
                     text = stringResource(R.string.servers_select_prompt),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.widthIn(max = FrameNestDimens.ReadableContentMaxWidth),
                 )
             }
         } else {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Text(server.name, style = MaterialTheme.typography.headlineSmall)
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState())
+                    .testTag("servers_detail_content"),
+            ) {
+                Text(
+                    text = server.name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = stringResource(R.string.servers_detail_host, hostLabel(server)),
                     style = MaterialTheme.typography.bodyLarge,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Text(
                     text = stringResource(R.string.servers_detail_user, server.username),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 server.defaultShare?.let { share ->
                     Text(
                         text = stringResource(R.string.servers_default_share, share),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Spacer(Modifier.height(16.dp))
                 TextButton(
                     onClick = { onBrowse(server) },
-                    modifier = Modifier.testTag("servers_open_browse"),
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .testTag("servers_open_browse"),
                 ) {
                     Text(stringResource(R.string.servers_open_browse))
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(
                         onClick = { onEdit(server) },
-                        modifier = Modifier.testTag("servers_edit"),
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("servers_edit"),
                     ) {
                         Icon(Icons.Filled.Edit, contentDescription = null)
                         Spacer(Modifier.width(4.dp))
@@ -402,7 +454,9 @@ private fun ServerDetailPane(
                     }
                     TextButton(
                         onClick = { onDelete(server) },
-                        modifier = Modifier.testTag("servers_delete"),
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("servers_delete"),
                     ) {
                         Icon(Icons.Filled.Delete, contentDescription = null)
                         Spacer(Modifier.width(4.dp))

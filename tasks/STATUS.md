@@ -10,16 +10,17 @@
 | FN-03 自适应 App 外壳 | 已完成 | agent | → main | FN-00 | [FN-03](handoffs/FN-03.md) |
 | FN-04 服务器与 SMB 浏览 | 已完成 | agent | → main | FN-02, FN-03 | [FN-04](handoffs/FN-04.md) |
 | FN-05 SMB 播放与历史 | 已完成 | agent | → main | FN-01..FN-04 | [FN-05](handoffs/FN-05.md) |
-| FN-06 字幕 | 进行中 | agent | agent/FN-06-subtitles · `../FrameNest-FN-06` | FN-04, FN-05 |  |
-| FN-07 缩略图与首帧 | 进行中 | agent | agent/FN-07-thumbnails · `../FrameNest-FN-07` | FN-02, FN-04, FN-05 |  |
-| FN-08 自适应体验打磨 | 进行中 | agent | agent/FN-08-adaptive-polish · `../FrameNest-FN-08` | FN-04, FN-05 |  |
+| FN-06 字幕 | 已完成 | agent | → main | FN-04, FN-05 | [FN-06](handoffs/FN-06.md) |
+| FN-07 缩略图与首帧 | 已完成 | agent | → main | FN-02, FN-04, FN-05 | [FN-07](handoffs/FN-07.md) |
+| FN-08 自适应体验打磨 | 已完成 | agent | → main | FN-04, FN-05 | [FN-08](handoffs/FN-08.md) |
 | FN-09 稳定与发布 | 未开始 |  |  | FN-04..FN-08 |  |
 
-## Wave 3 并行约定
+## Wave 3 集成结果
 
-- **FN-06**：`feature/subtitle/**` + 播放器字幕 API/UI；勿改缩略图管线。
-- **FN-07**：`data/thumbnail/**` + 浏览列表封面；播放页仅确保 first-frame-ready 门闩；单并发生成。
-- **FN-08**：响应式布局/无障碍/触控/旋转；**不改** SMB/播放数据实现；与 FN-06/07 UI 冲突时写交接补丁。
+| 任务 | 结果 |
+|---|---|
+| FN-06 | 内嵌 + 外挂字幕（匹配排序、addSlave、延迟/字号） |
+| FN-07 | 列表缩略图（单并发 MMR）+ `canPlay` 首帧门闩 |
+| FN-08 | 自适应/无障碍；播放页 NavigationSuiteType.None |
 
-分配任务时只编辑本表的 Owner、状态和分支列。具体范围与验收标准以
-`tasks/TASKS.md` 为准。
+`versionName`：`0.3.0-wave3`。下一任务：**FN-09** 稳定与发布。

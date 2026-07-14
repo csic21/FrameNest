@@ -38,6 +38,7 @@ import com.framenest.ui.screens.SettingsScreen
 
 /**
  * Adaptive app shell: bottom bar on compact width, navigation rail on larger widths.
+ * Player route uses [NavigationSuiteType.None] for immersive full-screen playback.
  * Servers → Browse → Player wired to FN-04 repositories and FN-05 product player.
  */
 @Composable
@@ -55,21 +56,21 @@ fun FrameNestApp(
     }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val currentRoute = currentDestination?.route
     val useListDetail = shouldUseListDetailLayout(windowAdaptiveInfo.windowSizeClass)
+    // Full-screen player: hide suite via NavigationSuiteType.None (not a raw width check).
+    val effectiveSuiteType = if (isPlayerRoute(currentRoute)) {
+        NavigationSuiteType.None
+    } else {
+        navigationSuiteType
+    }
 
     NavigationSuiteScaffold(
         modifier = modifier
             .fillMaxSize()
             .semantics { testTagsAsResourceId = true }
-            .testTag(
-                when (navigationSuiteType) {
-                    NavigationSuiteType.NavigationRail,
-                    NavigationSuiteType.NavigationDrawer,
-                    -> "nav_suite_rail"
-                    else -> "nav_suite_bar"
-                },
-            ),
-        layoutType = navigationSuiteType,
+            .testTag(navigationSuiteTestTag(effectiveSuiteType)),
+        layoutType = effectiveSuiteType,
         navigationSuiteItems = {
             TopLevelDestination.entries.forEach { dest ->
                 val selected = currentDestination.isTopLevelDestinationInHierarchy(dest)
@@ -106,6 +107,15 @@ fun FrameNestApp(
         )
     }
 }
+
+internal fun navigationSuiteTestTag(suiteType: NavigationSuiteType): String =
+    when (suiteType) {
+        NavigationSuiteType.None -> "nav_suite_none"
+        NavigationSuiteType.NavigationRail,
+        NavigationSuiteType.NavigationDrawer,
+        -> "nav_suite_rail"
+        else -> "nav_suite_bar"
+    }
 
 @Composable
 private fun FrameNestNavHost(
