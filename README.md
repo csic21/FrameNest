@@ -2,9 +2,9 @@
 
 FrameNest（栖影）是面向 Android 手机和平板的 NAS/SMB 视频播放器。
 
-当前仓库已完成 **Wave 1（FN-00～FN-03）集成**：单 module Android 项目，含
-自适应导航外壳、libVLC 播放 spike、SMBJ 数据路径 spike 与两份决策记录。
-产品级 SMB 浏览/续播仍待 Wave 2（FN-04 / FN-05）。
+当前仓库已完成 **Wave 2（FN-00～FN-05）集成**：单 module Android 项目，含
+自适应导航、服务器管理（加密凭证）、SMB 目录浏览、产品播放页与播放历史。
+下一波：字幕 / 缩略图 / 平板打磨（FN-06～FN-08）。
 
 ## MVP 一句话
 
@@ -99,4 +99,4 @@ adb shell am start -n com.framenest/.MainActivity
 4. 将 [任务卡](tasks/TASKS.md) 中对应的 `FN-XX` 段落直接交给 Agent。
 5. 要求每个 Agent 按 [交接模板](tasks/HANDOFF.md) 回报。
 
-Wave 1 已集成。下一波可并行：`FN-04`（服务器与浏览）、`FN-05`（SMB 播放与历史）。
+Wave 2 已集成。下一波可并行：`FN-06`（字幕）、`FN-07`（缩略图/首帧）、`FN-08`（自适应打磨）。
