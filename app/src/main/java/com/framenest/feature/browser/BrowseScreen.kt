@@ -1,5 +1,6 @@
 package com.framenest.feature.browser
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -7,8 +8,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
@@ -28,9 +31,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -44,6 +51,8 @@ import com.framenest.core.model.RemoteEntry
 import com.framenest.core.model.RemoteLocation
 import com.framenest.data.server.BrowseRepository
 import com.framenest.data.server.ServerRepository
+import com.framenest.data.thumbnail.ThumbnailRepository
+import com.framenest.data.thumbnail.ThumbnailUiState
 
 @Composable
 fun BrowseRoute(
@@ -51,6 +60,7 @@ fun BrowseRoute(
     location: RemoteLocation,
     serverRepository: ServerRepository,
     browseRepository: BrowseRepository,
+    thumbnailRepository: ThumbnailRepository,
     onBack: () -> Unit,
     onOpenDirectory: (RemoteLocation) -> Unit,
     onOpenFile: (RemoteEntry) -> Unit,
@@ -70,6 +80,7 @@ fun BrowseRoute(
         state = state,
         title = viewModel.title(),
         pathLabel = viewModel.pathLabel(),
+        thumbnailRepository = thumbnailRepository,
         onBack = onBack,
         onRefresh = viewModel::refresh,
         onOpenEntry = { entry ->
@@ -95,6 +106,7 @@ fun BrowseScreen(
     onRefresh: () -> Unit,
     onOpenEntry: (RemoteEntry) -> Unit,
     modifier: Modifier = Modifier,
+    thumbnailRepository: ThumbnailRepository? = null,
 ) {
     Scaffold(
         modifier = modifier
@@ -207,9 +219,9 @@ fun BrowseScreen(
                                     Text(entrySupportingText(entry))
                                 },
                                 leadingContent = {
-                                    Icon(
-                                        imageVector = entryIcon(entry),
-                                        contentDescription = null,
+                                    BrowseEntryLeading(
+                                        entry = entry,
+                                        thumbnailRepository = thumbnailRepository,
                                     )
                                 },
                                 modifier = Modifier
@@ -221,6 +233,80 @@ fun BrowseScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowseEntryLeading(
+    entry: RemoteEntry,
+    thumbnailRepository: ThumbnailRepository?,
+) {
+    val isVideo = entry.isFile && MediaExtensions.isVideo(entry.name)
+    if (isVideo && thumbnailRepository != null) {
+        BrowseVideoThumbnail(
+            entry = entry,
+            repository = thumbnailRepository,
+            modifier = Modifier
+                .size(40.dp)
+                .testTag("browse_thumb_${entry.stableKey()}"),
+        )
+    } else {
+        Icon(
+            imageVector = entryIcon(entry),
+            contentDescription = null,
+        )
+    }
+}
+
+/**
+ * Shows a **cached** bitmap only. While generating, a placeholder icon is shown.
+ * Does not create a player instance.
+ */
+@Composable
+private fun BrowseVideoThumbnail(
+    entry: RemoteEntry,
+    repository: ThumbnailRepository,
+    modifier: Modifier = Modifier,
+) {
+    val state by repository.observe(entry).collectAsStateWithLifecycle(
+        initialValue = ThumbnailUiState.None,
+    )
+    DisposableEffect(entry.stableKey()) {
+        repository.retain(entry)
+        onDispose { repository.release(entry) }
+    }
+
+    Box(
+        modifier = modifier.clip(RoundedCornerShape(4.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        when (val s = state) {
+            is ThumbnailUiState.Ready -> {
+                Image(
+                    bitmap = s.bitmap.asImageBitmap(),
+                    contentDescription = stringResource(R.string.browse_type_video),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("browse_thumb_ready"),
+                )
+            }
+            ThumbnailUiState.Loading -> {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .testTag("browse_thumb_loading"),
+                    strokeWidth = 2.dp,
+                )
+            }
+            else -> {
+                Icon(
+                    imageVector = Icons.Filled.Movie,
+                    contentDescription = null,
+                    modifier = Modifier.testTag("browse_thumb_placeholder"),
+                )
             }
         }
     }

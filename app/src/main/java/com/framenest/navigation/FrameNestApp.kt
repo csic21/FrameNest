@@ -160,6 +160,7 @@ private fun FrameNestNavHost(
                     location = location,
                     serverRepository = container.serverRepository,
                     browseRepository = container.browseRepository,
+                    thumbnailRepository = container.thumbnailRepository,
                     onBack = { navController.popBackStack() },
                     onOpenDirectory = { next ->
                         navController.navigate(FrameNestRoutes.browse(serverId, next))
