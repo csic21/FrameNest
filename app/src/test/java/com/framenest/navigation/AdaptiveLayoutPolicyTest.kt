@@ -45,11 +45,13 @@ class AdaptiveLayoutPolicyTest {
         )
         assertEquals(
             TopLevelDestination.Servers,
-            topLevelDestinationForRoute(FrameNestRoutes.browse("home-nas", "movies")),
+            topLevelDestinationForRoute(FrameNestRoutes.browse("home-nas", "media", "movies")),
         )
         assertEquals(
             TopLevelDestination.Servers,
-            topLevelDestinationForRoute(FrameNestRoutes.player("home-nas", "movie-a")),
+            topLevelDestinationForRoute(
+                FrameNestRoutes.player("home-nas", "media", "Movies/a.mkv"),
+            ),
         )
         assertEquals(
             TopLevelDestination.Recent,
@@ -64,24 +66,24 @@ class AdaptiveLayoutPolicyTest {
     }
 
     @Test
-    fun fakeCatalog_hasServersAndBrowseTree() {
-        assertTrue(FakeCatalog.servers.isNotEmpty())
+    fun fakeCatalog_recentOnly_forFn05Placeholder() {
         assertTrue(FakeCatalog.recent.isNotEmpty())
-        val root = FakeCatalog.browseEntries("home-nas", FakeCatalog.ROOT_PATH_ID)
-        assertTrue(root.any { it.isDirectory })
-        val movies = FakeCatalog.browseEntries("home-nas", "movies")
-        assertTrue(movies.any { !it.isDirectory })
+        assertTrue(FakeCatalog.recent.all { it.share.isNotBlank() && it.path.isNotBlank() })
     }
 
     @Test
-    fun routeBuilders_useExpectedPatterns() {
+    fun routeBuilders_useShareAndPathQuery() {
         assertEquals(
-            "servers/browse/home-nas/root",
+            "servers/browse/home-nas",
             FrameNestRoutes.browse("home-nas"),
         )
         assertEquals(
-            "player/home-nas/movie-a",
-            FrameNestRoutes.player("home-nas", "movie-a"),
+            "servers/browse/home-nas?share=media",
+            FrameNestRoutes.browse("home-nas", "media"),
+        )
+        assertEquals(
+            "player/home-nas?share=media&path=Movies%2Fa.mkv",
+            FrameNestRoutes.player("home-nas", "media", "Movies/a.mkv"),
         )
     }
 }

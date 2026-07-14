@@ -22,9 +22,13 @@ import androidx.compose.ui.unit.dp
 import com.framenest.R
 import com.framenest.navigation.FakeCatalog
 
+/**
+ * Recent list still uses [FakeCatalog] until FN-05 history is wired.
+ * Opens the stable player route with share + path args.
+ */
 @Composable
 fun RecentScreen(
-    onOpenItem: (serverId: String, entryId: String) -> Unit,
+    onOpenItem: (serverId: String, share: String, path: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -52,13 +56,7 @@ fun RecentScreen(
                         .testTag("recent_item_${item.id}")
                         .semantics { contentDescription = "recent_item_${item.id}" }
                         .clickable {
-                            // Map recent ids to fake player entry ids for the shell.
-                            val entryId = when (item.id) {
-                                "rec-1" -> "movie-a"
-                                "rec-2" -> "ep-1"
-                                else -> "movie-b"
-                            }
-                            onOpenItem(item.serverId, entryId)
+                            onOpenItem(item.serverId, item.share, item.path)
                         }
                         .padding(vertical = 4.dp),
                 ) {

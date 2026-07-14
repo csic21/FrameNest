@@ -9,8 +9,10 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -25,19 +27,23 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.framenest.ui.screens.BrowseScreen
+import com.framenest.ContextAppContainer
+import com.framenest.app.AppContainer
+import com.framenest.core.model.RemoteLocation
+import com.framenest.feature.browser.BrowseRoute
+import com.framenest.feature.servers.ServersRoute
 import com.framenest.ui.screens.PlayerPlaceholderScreen
 import com.framenest.ui.screens.RecentScreen
-import com.framenest.ui.screens.ServersScreen
 import com.framenest.ui.screens.SettingsScreen
 
 /**
  * Adaptive app shell: bottom bar on compact width, navigation rail on larger widths,
- * with Servers → Browse → Player placeholder stack and fake data only.
+ * with Servers → Browse → Player stack wired to real FN-04 repositories.
  *
  * @param windowAdaptiveInfo override for tests; defaults to [currentWindowAdaptiveInfo].
  * @param navigationSuiteType override for tests; defaults from adaptive info.
  * @param navController optional hoisted controller (tests / state restore).
+ * @param appContainer optional DI graph; defaults to [FrameNestApplication] container.
  */
 @Composable
 fun FrameNestApp(
@@ -46,7 +52,12 @@ fun FrameNestApp(
     navigationSuiteType: NavigationSuiteType =
         NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo),
     navController: NavHostController = rememberNavController(),
+    appContainer: AppContainer? = null,
 ) {
+    val context = LocalContext.current
+    val container = remember(appContainer, context) {
+        appContainer ?: ContextAppContainer(context)
+    }
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val useListDetail = shouldUseListDetailLayout(windowAdaptiveInfo.windowSizeClass)
@@ -93,6 +104,7 @@ fun FrameNestApp(
         FrameNestNavHost(
             navController = navController,
             useListDetail = useListDetail,
+            container = container,
             modifier = Modifier
                 .fillMaxSize()
                 .testTag("nav_host"),
@@ -104,6 +116,7 @@ fun FrameNestApp(
 private fun FrameNestNavHost(
     navController: NavHostController,
     useListDetail: Boolean,
+    container: AppContainer,
     modifier: Modifier = Modifier,
 ) {
     NavHost(
@@ -116,36 +129,50 @@ private fun FrameNestNavHost(
             startDestination = FrameNestRoutes.SERVERS_LIST,
         ) {
             composable(FrameNestRoutes.SERVERS_LIST) {
-                ServersScreen(
+                ServersRoute(
                     useListDetail = useListDetail,
-                    onOpenBrowse = { serverId ->
-                        navController.navigate(
-                            FrameNestRoutes.browse(serverId, FakeCatalog.ROOT_PATH_ID),
-                        )
-                    },
-                    onOpenPlayer = { serverId, entryId ->
-                        navController.navigate(FrameNestRoutes.player(serverId, entryId))
+                    serverRepository = container.serverRepository,
+                    onOpenBrowse = { serverId, defaultShare ->
+                        val location = if (!defaultShare.isNullOrBlank()) {
+                            RemoteLocation.shareRoot(defaultShare)
+                        } else {
+                            RemoteLocation.ROOT
+                        }
+                        navController.navigate(FrameNestRoutes.browse(serverId, location))
                     },
                 )
             }
             composable(
                 route = FrameNestRoutes.BROWSE,
                 arguments = listOf(
-                    navArgument("serverId") { type = NavType.StringType },
-                    navArgument("pathId") { type = NavType.StringType },
+                    navArgument(FrameNestRoutes.ARG_SERVER_ID) { type = NavType.StringType },
+                    navArgument(FrameNestRoutes.ARG_SHARE) {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument(FrameNestRoutes.ARG_PATH) {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
                 ),
             ) { entry ->
-                val serverId = entry.arguments?.getString("serverId").orEmpty()
-                val pathId = entry.arguments?.getString("pathId") ?: FakeCatalog.ROOT_PATH_ID
-                BrowseScreen(
+                val serverId = entry.arguments?.getString(FrameNestRoutes.ARG_SERVER_ID).orEmpty()
+                val share = entry.arguments?.getString(FrameNestRoutes.ARG_SHARE).orEmpty()
+                val path = entry.arguments?.getString(FrameNestRoutes.ARG_PATH).orEmpty()
+                val location = FrameNestRoutes.locationFromArgs(share, path)
+                BrowseRoute(
                     serverId = serverId,
-                    pathId = pathId,
+                    location = location,
+                    serverRepository = container.serverRepository,
+                    browseRepository = container.browseRepository,
                     onBack = { navController.popBackStack() },
-                    onOpenDirectory = { nextPathId ->
-                        navController.navigate(FrameNestRoutes.browse(serverId, nextPathId))
+                    onOpenDirectory = { next ->
+                        navController.navigate(FrameNestRoutes.browse(serverId, next))
                     },
-                    onOpenFile = { entryId ->
-                        navController.navigate(FrameNestRoutes.player(serverId, entryId))
+                    onOpenFile = { remote ->
+                        navController.navigate(
+                            FrameNestRoutes.player(remote.serverId, remote.share, remote.path),
+                        )
                     },
                 )
             }
@@ -154,23 +181,32 @@ private fun FrameNestNavHost(
         composable(
             route = FrameNestRoutes.PLAYER,
             arguments = listOf(
-                navArgument("serverId") { type = NavType.StringType },
-                navArgument("entryId") { type = NavType.StringType },
+                navArgument(FrameNestRoutes.ARG_SERVER_ID) { type = NavType.StringType },
+                navArgument(FrameNestRoutes.ARG_SHARE) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument(FrameNestRoutes.ARG_PATH) {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
             ),
         ) { entry ->
-            val serverId = entry.arguments?.getString("serverId").orEmpty()
-            val entryId = entry.arguments?.getString("entryId").orEmpty()
+            val serverId = entry.arguments?.getString(FrameNestRoutes.ARG_SERVER_ID).orEmpty()
+            val share = entry.arguments?.getString(FrameNestRoutes.ARG_SHARE).orEmpty()
+            val path = entry.arguments?.getString(FrameNestRoutes.ARG_PATH).orEmpty()
             PlayerPlaceholderScreen(
                 serverId = serverId,
-                entryId = entryId,
+                share = share,
+                path = path,
                 onBack = { navController.popBackStack() },
             )
         }
 
         composable(FrameNestRoutes.RECENT) {
             RecentScreen(
-                onOpenItem = { serverId, entryId ->
-                    navController.navigate(FrameNestRoutes.player(serverId, entryId))
+                onOpenItem = { serverId, share, path ->
+                    navController.navigate(FrameNestRoutes.player(serverId, share, path))
                 },
             )
         }

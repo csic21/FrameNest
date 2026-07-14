@@ -16,8 +16,8 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Adaptive shell UI tests for phone-sized (compact) and tablet-sized (medium+) layouts,
- * plus configuration-change retention of the selected top-level destination.
+ * Adaptive shell UI tests for phone-sized (compact) and tablet-sized (medium+) layouts.
+ * Servers list is empty until the user adds a NAS (FN-04 real repository).
  */
 class AdaptiveShellPhoneTest {
 
@@ -41,26 +41,8 @@ class AdaptiveShellPhoneTest {
         composeRule.onNodeWithTag("nav_settings").assertIsDisplayed()
         composeRule.onNodeWithTag("servers_single_pane").assertIsDisplayed()
         composeRule.onNodeWithTag("servers_title").assertIsDisplayed()
-    }
-
-    @Test
-    fun compact_navigateServerToBrowseToPlayer_andBack() {
-        composeRule.setContent {
-            FrameNestTheme {
-                FrameNestApp(
-                    windowAdaptiveInfo = compactAdaptiveInfo(),
-                    navigationSuiteType = NavigationSuiteType.NavigationBar,
-                )
-            }
-        }
-
-        composeRule.onNodeWithTag("server_item_home-nas").performClick()
-        composeRule.onNodeWithTag("browse_screen").assertIsDisplayed()
-        composeRule.onNodeWithTag("browse_item_movies").performClick()
-        composeRule.onNodeWithTag("browse_item_movie-a").performClick()
-        composeRule.onNodeWithTag("player_placeholder").assertIsDisplayed()
-        composeRule.onNodeWithTag("player_back").performClick()
-        composeRule.onNodeWithTag("browse_screen").assertIsDisplayed()
+        composeRule.onNodeWithTag("servers_empty").assertIsDisplayed()
+        composeRule.onNodeWithTag("servers_add").assertIsDisplayed()
     }
 
     @Test
@@ -85,6 +67,24 @@ class AdaptiveShellPhoneTest {
         composeRule.onNodeWithTag("nav_servers").performClick()
         composeRule.onNodeWithTag("servers_single_pane").assertIsDisplayed()
     }
+
+    @Test
+    fun compact_openAddServerDialog() {
+        composeRule.setContent {
+            FrameNestTheme {
+                FrameNestApp(
+                    windowAdaptiveInfo = compactAdaptiveInfo(),
+                    navigationSuiteType = NavigationSuiteType.NavigationBar,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("servers_add").performClick()
+        composeRule.onNodeWithTag("server_field_name").assertIsDisplayed()
+        composeRule.onNodeWithTag("server_field_host").assertIsDisplayed()
+        composeRule.onNodeWithTag("server_test").assertIsDisplayed()
+        composeRule.onNodeWithTag("server_save").assertIsDisplayed()
+    }
 }
 
 class AdaptiveShellTabletTest {
@@ -106,28 +106,7 @@ class AdaptiveShellTabletTest {
         composeRule.onNodeWithTag("nav_suite_rail").assertIsDisplayed()
         composeRule.onNodeWithTag("servers_list_detail").assertIsDisplayed()
         composeRule.onNodeWithTag("servers_detail_pane").assertIsDisplayed()
-        composeRule.onNodeWithTag("server_item_home-nas").assertIsDisplayed()
-    }
-
-    @Test
-    fun tablet_openBrowseFromDetailAndPlayerPlaceholder() {
-        composeRule.setContent {
-            FrameNestTheme {
-                FrameNestApp(
-                    windowAdaptiveInfo = mediumAdaptiveInfo(),
-                    navigationSuiteType = NavigationSuiteType.NavigationRail,
-                )
-            }
-        }
-
-        composeRule.onNodeWithTag("server_item_media-box").performClick()
-        composeRule.onNodeWithTag("servers_open_browse").performClick()
-        composeRule.onNodeWithTag("browse_screen").assertIsDisplayed()
-        composeRule.onNodeWithTag("browse_back").performClick()
-        composeRule.onNodeWithTag("servers_list_detail").assertIsDisplayed()
-
-        composeRule.onNodeWithTag("servers_open_player").performClick()
-        composeRule.onNodeWithTag("player_placeholder").assertIsDisplayed()
+        composeRule.onNodeWithTag("servers_empty").assertIsDisplayed()
     }
 }
 
