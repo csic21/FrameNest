@@ -1,14 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Fallback vector mark (PNG mipmaps are primary). Viewport 108 with safe zone ~18–90. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Simple nest-like frame mark for the skeleton launcher icon. -->
+
+    <!-- Soft double frame -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M30,36h48c2.2,0 4,1.8 4,4v28c0,2.2 -1.8,4 -4,4H30c-2.2,0 -4,-1.8 -4,-4V40c0,-2.2 1.8,-4 4,-4z" />
+        android:fillColor="#00000000"
+        android:pathData="M34,32h40c4.4,0 8,3.6 8,8v32c0,4.4 -3.6,8 -8,8H34c-4.4,0 -8,-3.6 -8,-8V40c0,-4.4 3.6,-8 8,-8z"
+        android:strokeWidth="5"
+        android:strokeColor="#FFFFFF" />
     <path
-        android:fillColor="#1B6CA8"
-        android:pathData="M46,48l20,10 -20,10z" />
+        android:fillColor="#00000000"
+        android:pathData="M38,36h32c2.2,0 4,1.8 4,4v28c0,2.2 -1.8,4 -4,4H38c-2.2,0 -4,-1.8 -4,-4V40c0,-2.2 1.8,-4 4,-4z"
+        android:strokeWidth="2.5"
+        android:strokeColor="#E8F4FC" />
+
+    <!-- Teal play -->
+    <path
+        android:fillColor="#2A9D8F"
+        android:pathData="M48,42 L68,54 L48,66 Z" />
+
+    <!-- Nest arcs under frame -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M30,74 C40,86 68,86 78,74"
+        android:strokeWidth="3.2"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M34,70 C44,80 64,80 74,70"
+        android:strokeWidth="2.4"
+        android:strokeColor="#D0E8F5"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M38,78 C46,88 62,88 70,78"
+        android:strokeWidth="2.2"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineCap="round" />
 </vector>
