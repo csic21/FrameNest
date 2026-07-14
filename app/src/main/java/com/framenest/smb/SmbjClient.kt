@@ -78,15 +78,14 @@ class SmbjClient(
     override fun listShares(knownShares: List<String>): List<String> {
         synchronized(this) {
             val sess = requireSession()
-            // Pure SMB2/3 has no share-directory op; MS-SRVS is out of scope for this spike.
-            // Probe configured/known names via tree-connect so FN-04 can still show a list
-            // when the user supplies candidate shares.
-            val candidates = linkedSetOf<String>()
-            knownShares.map { it.trim() }.filter { it.isNotEmpty() }.forEach { candidates += it }
+            // Pure SMB2/3 has no share-directory op; full MS-SRVS NetShareEnum is not in
+            // stock SMBJ 0.14. Probe user + common home-NAS names via tree-connect.
+            val candidates = SmbShareCandidates.merge(knownShares)
             if (candidates.isEmpty()) {
-                SmbLog.w("listShares: no known share candidates; return empty (MS-SRVS not used)")
+                SmbLog.w("listShares: no candidates after merge")
                 return emptyList()
             }
+            SmbLog.i("listShares: probing ${candidates.size} candidates")
             val available = mutableListOf<String>()
             for (name in candidates) {
                 try {

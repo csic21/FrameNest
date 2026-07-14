@@ -6,7 +6,7 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-// Optional local NAS settings for the FN-02 SMB spike harness.
+// Optional local NAS settings for the debug SMB spike harness.
 // File is gitignored — never commit real hosts or passwords.
 val smbLocalProps = Properties().apply {
     val file = rootProject.file("smb.local.properties")
@@ -28,20 +28,14 @@ android {
         applicationId = "com.framenest"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.3.0-internal"
+        versionCode = 4
+        versionName = "0.3.1-internal"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
         }
 
-        // libVLC multi-ABI inflates APK (~200MB all ABIs). Keep common device +
-        // emulator ABIs for debug; widen in release packaging if needed.
-        ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
-        }
-
-        // Pre-fill SMB spike UI only; empty defaults keep CI / clean builds safe.
+        // Pre-fill debug spike UI only; empty defaults keep CI / clean builds safe.
         buildConfigField("String", "SMB_HOST", "\"${smbProp("smb.host")}\"")
         buildConfigField("int", "SMB_PORT", smbProp("smb.port", "445").ifBlank { "445" })
         buildConfigField("String", "SMB_USERNAME", "\"${smbProp("smb.username")}\"")
@@ -52,13 +46,34 @@ android {
         buildConfigField("String", "SMB_TEST_FILE", "\"${smbProp("smb.testFile")}\"")
     }
 
+    // Per-ABI APKs shrink install size (libVLC is the bulk).
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "x86_64")
+            isUniversalApk = true
+        }
+    }
+
     buildTypes {
-        release {
+        debug {
             isMinifyEnabled = false
+            // Emulator + modern phones for local debug.
+            ndk {
+                abiFilters += listOf("arm64-v8a", "x86_64")
+            }
+        }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            ndk {
+                abiFilters += listOf("arm64-v8a")
+            }
         }
     }
 
@@ -77,7 +92,6 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "META-INF/versions/9/previous-compilation-data.bin"
         }
-        // libVLC ships multi-ABI .so; keep default merge, avoid stripping debug symbols needed by some OEMs.
         jniLibs {
             keepDebugSymbols += "**/*.so"
         }
@@ -109,15 +123,12 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
-    // FN-01: libVLC playback kernel spike
     implementation(libs.libvlc.all)
 
-    // FN-02: SMBJ client + coroutines for IO
     implementation(libs.smbj)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
 
-    // Room (servers + history) + encrypted credential store
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)

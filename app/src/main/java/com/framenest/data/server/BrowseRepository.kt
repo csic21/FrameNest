@@ -72,21 +72,20 @@ class BrowseRepository(
     }
 
     private fun listShares(client: SmbClient, server: SavedServer): List<RemoteEntry> {
-        val candidates = buildList {
+        val userKnown = buildList {
             server.defaultShare?.trim()?.takeIf { it.isNotEmpty() }?.let { add(it) }
         }
         val found = try {
-            client.listShares(candidates)
+            // Merges userKnown with common NAS share names inside SmbjClient.
+            client.listShares(userKnown)
         } catch (e: SmbException) {
-            // Auth/network bubble up; empty candidate list is fine.
             throw e
         }
         val names = if (found.isNotEmpty()) {
             found
         } else {
-            // If probe returned nothing but user configured a share, still offer it
-            // so they can open and see a proper path/auth error.
-            candidates
+            // Still surface the user-configured default so open can show a real error.
+            userKnown
         }
         return names
             .distinctBy { it.lowercase() }

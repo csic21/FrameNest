@@ -7,7 +7,9 @@ import com.framenest.data.server.ServerRepository
 import com.framenest.smb.SmbClient
 import com.framenest.smb.SmbCredentials
 import com.framenest.smb.SmbjClient
+import com.framenest.data.settings.UserPreferences
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,10 +25,10 @@ import kotlinx.coroutines.launch
 import kotlin.coroutines.coroutineContext
 
 /**
- * List thumbnail facade: disk cache + **single concurrent** SMB extract worker.
+ * List thumbnail facade: disk cache + limited-concurrency SMB extract workers.
  *
- * UI must only display [ThumbnailUiState.Ready] bitmaps from cache/memory; while
- * generating, rows show a placeholder. Never creates a player instance per row.
+ * Default concurrency is **1** (architecture D2). Settings may raise to 2.
+ * UI must only display [ThumbnailUiState.Ready] bitmaps; never one player per row.
  */
 class ThumbnailRepository(
     context: Context,
@@ -34,6 +36,7 @@ class ThumbnailRepository(
     private val diskCache: ThumbnailDiskCache = ThumbnailDiskCache.fromContext(context),
     private val extractor: ThumbnailFrameExtractor = ThumbnailFrameExtractor(context.applicationContext),
     private val clientFactory: () -> SmbClient = { SmbjClient() },
+    private val concurrencyProvider: () -> Int = { UserPreferences.DEFAULT_THUMB_CONCURRENCY },
     ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val timeSource: () -> Long = { System.currentTimeMillis() },
 ) {
@@ -46,10 +49,11 @@ class ThumbnailRepository(
 
     private val queue = Channel<ThumbnailRequest>(Channel.UNLIMITED)
     private val workerLock = Any()
-    @Volatile private var workerJob: Job? = null
+    private val workerJobs = mutableListOf<Job>()
+    private val activeWorkers = AtomicInteger(0)
 
     init {
-        ensureWorker()
+        ensureWorkers()
     }
 
     /**
@@ -123,7 +127,10 @@ class ThumbnailRepository(
     fun approximateCacheSizeBytes(): Long = diskCache.approximateSizeBytes()
 
     fun close() {
-        workerJob?.cancel()
+        synchronized(workerLock) {
+            workerJobs.forEach { it.cancel() }
+            workerJobs.clear()
+        }
         queue.close()
         scope.cancel()
     }
@@ -142,19 +149,36 @@ class ThumbnailRepository(
             Log.w(TAG, "thumbnail queue send failed")
             return
         }
-        ensureWorker()
+        ensureWorkers()
     }
 
-    private fun ensureWorker() {
-        if (workerJob?.isActive == true) return
+    /** Current configured concurrency (1–2). */
+    fun configuredConcurrency(): Int =
+        concurrencyProvider()
+            .coerceIn(UserPreferences.MIN_THUMB_CONCURRENCY, UserPreferences.MAX_THUMB_CONCURRENCY)
+
+    /**
+     * Ensure worker count matches [configuredConcurrency] (1–2).
+     * Multiple coroutines consume the same channel → true parallel extracts.
+     * Safe to call after the user changes Settings.
+     */
+    fun ensureWorkers() {
+        val desired = configuredConcurrency()
         synchronized(workerLock) {
-            if (workerJob?.isActive == true) return
-            workerJob = scope.launch {
-                // Single consumer → at most one extract at a time.
-                for (request in queue) {
-                    processOne(request)
+            workerJobs.removeAll { !it.isActive }
+            while (workerJobs.size < desired) {
+                val job = scope.launch {
+                    for (request in queue) {
+                        processOne(request)
+                    }
                 }
+                workerJobs += job
             }
+            // Scale down: cancel idle extras (in-flight work finishes via cancellation cooperative points).
+            while (workerJobs.size > desired) {
+                workerJobs.removeAt(workerJobs.lastIndex).cancel()
+            }
+            activeWorkers.set(workerJobs.size)
         }
     }
 

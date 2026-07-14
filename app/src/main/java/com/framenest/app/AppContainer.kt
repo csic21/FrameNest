@@ -44,11 +44,12 @@ class AppContainer(
         dao = database.playbackHistoryDao(),
     )
 
-    /** List thumbnails (FN-07); clearable via [ThumbnailRepository.clearCache]. */
+    /** List thumbnails (FN-07); concurrency from [userPreferences]. */
     val thumbnailRepository: ThumbnailRepository = ThumbnailRepository(
         context = appContext,
         serverRepository = serverRepository,
         clientFactory = clientFactory,
+        concurrencyProvider = { userPreferences.thumbnailConcurrency() },
     )
 
     val cacheMaintenance: CacheMaintenance = CacheMaintenance(

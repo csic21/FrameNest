@@ -41,13 +41,34 @@ class UserPreferences(
         }
     }
 
+    /**
+     * Max concurrent list-thumbnail extract jobs (1–2). Default 1 per architecture.
+     */
+    fun thumbnailConcurrency(): Int =
+        prefs.getInt(KEY_THUMB_CONCURRENCY, DEFAULT_THUMB_CONCURRENCY)
+            .coerceIn(MIN_THUMB_CONCURRENCY, MAX_THUMB_CONCURRENCY)
+
+    fun setThumbnailConcurrency(value: Int) {
+        prefs.edit()
+            .putInt(
+                KEY_THUMB_CONCURRENCY,
+                value.coerceIn(MIN_THUMB_CONCURRENCY, MAX_THUMB_CONCURRENCY),
+            )
+            .apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "framenest_user_prefs"
         private const val KEY_SUBTITLE_LANGS = "subtitle_language_tags"
         private const val KEY_SUBTITLE_PRESET = "subtitle_language_preset"
+        private const val KEY_THUMB_CONCURRENCY = "thumbnail_concurrency"
 
         const val PRESET_SYSTEM = "system"
         const val PRESET_ZH = "zh"
         const val PRESET_EN = "en"
+
+        const val MIN_THUMB_CONCURRENCY = 1
+        const val MAX_THUMB_CONCURRENCY = 2
+        const val DEFAULT_THUMB_CONCURRENCY = 1
     }
 }

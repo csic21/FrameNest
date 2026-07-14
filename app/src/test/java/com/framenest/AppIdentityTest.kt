@@ -15,8 +15,8 @@ class AppIdentityTest {
 
     @Test
     fun versionName_isInternalRelease() {
-        val versionName = "0.3.0-internal"
-        assertTrue(versionName.startsWith("0.3.0"))
+        val versionName = "0.3.1-internal"
+        assertTrue(versionName.startsWith("0.3.1"))
         assertTrue(versionName.contains("internal"))
     }
 }

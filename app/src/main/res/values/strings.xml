@@ -126,6 +126,10 @@
     <string name="settings_lang_system">跟随系统</string>
     <string name="settings_lang_zh">中文优先</string>
     <string name="settings_lang_en">English first</string>
+    <string name="settings_thumb_concurrency_row">缩略图并发</string>
+    <string name="settings_thumb_concurrency_hint">列表封面生成任务数。默认 1 更省电；2 可加快首次出图（仍不会每行常驻播放器）。</string>
+    <string name="settings_thumb_concurrency_1">单任务（推荐）</string>
+    <string name="settings_thumb_concurrency_2">双任务</string>
     <string name="settings_diagnostics_row">诊断</string>
     <string name="settings_diagnostics_hint">导出脱敏后的应用内诊断信息，便于反馈问题。不会包含密码。</string>
     <string name="settings_export_logs">导出诊断日志</string>

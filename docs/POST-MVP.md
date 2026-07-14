@@ -1,23 +1,22 @@
-# Post-MVP backlog（可选）
+# Post-MVP backlog
 
-FN-00～FN-09 已封板。以下为有价值但未承诺的后续项：
+FN-00～FN-09 已封板。**0.3.1-internal** 已落地一批后处理；剩余如下。
 
-## 体验
+## 已完成（0.3.1）
 
-1. 真实 NAS 全量验收（PRODUCT 场景 1–7 在真机 + 真 NAS 勾选）
-2. 完整 SMB share 枚举（MS-SRVS）若默认共享体验不够
-3. 缩略图并发可配置（默认仍单并发）
-4. 播放页音轨选择 UI、外挂字幕编码更多回退
-5. 平板「最近播放 → 播放」专用 list-detail 历史详情
+- [x] ABI 分包 + release minify 基线  
+- [x] 常见 share 名探测（非完整 MS-SRVS）  
+- [x] 缩略图并发 1–2 可配置  
+- [x] Spike 隔离到 debug source set  
+- [x] allowBackup=false  
+- [x] 真实 NAS 验收勾选表  
 
-## 工程
+## 仍可选
 
-1. APK 体积：按 ABI 分包 / App Bundle；release minify
-2. 删除或隔离 spike 代码路径（PlayerSpike / SmbSpike）到 debug source set
-3. CI 上 instrumented 测试矩阵（phone + tablet AVD）
-4. Room schema export + 正式 migration 策略
-
-## 安全 / 合规
-
-1. 备份排除凭证存储确认（allowBackup 策略）
-2. 网络安全配置（cleartext 仅局域网可选）
+1. 真 NAS 勾完 `docs/NAS-ACCEPTANCE-CHECKLIST.md`  
+2. 完整 MS-SRVS share 枚举（需额外 RPC 依赖）  
+3. App Bundle / Play 分发  
+4. 播放页音轨 UI、更多字幕编码  
+5. CI instrumented 矩阵（phone + tablet）  
+6. Room schema export + 正式 migration  
+7. 网络安全配置（cleartext 局域网可选）  

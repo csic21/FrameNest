@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.1-internal (2026-07-14)
+
+Post-MVP batch: size, share probe, settings, debug isolation.
+
+### Improvements
+
+- **APK size**: ABI splits (`arm64-v8a`, `x86_64` + universal); release minify + shrinkResources
+- **Share list**: probe common home-NAS share names when MS-SRVS unavailable
+- **Thumbnails**: configurable concurrency 1–2 in Settings (default 1)
+- **Spikes**: Player/SMB spike activities moved to **debug** source set only
+- **Security**: `allowBackup=false`
+- **Docs**: `docs/NAS-ACCEPTANCE-CHECKLIST.md` for real-NAS sign-off
+
 ## 0.3.0-internal (2026-07-14)
 
 Internal test build after Waves 0–3 (FN-00 … FN-09).

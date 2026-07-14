@@ -57,6 +57,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var languagePreset by remember { mutableStateOf(prefs.subtitleLanguagePreset()) }
+    var thumbConcurrency by remember { mutableStateOf(prefs.thumbnailConcurrency()) }
 
     // Resolve strings at composition time (lint: avoid Context.getString in callbacks).
     val cacheClearedTemplate = stringResource(R.string.settings_cache_cleared)
@@ -168,6 +169,40 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             onSelect = {
                 languagePreset = UserPreferences.PRESET_EN
                 prefs.setSubtitleLanguagePreset(UserPreferences.PRESET_EN)
+            },
+        )
+
+        Spacer(modifier.height(20.dp))
+        Text(
+            text = stringResource(R.string.settings_thumb_concurrency_row),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.testTag("settings_thumb_concurrency_row"),
+        )
+        Text(
+            text = stringResource(R.string.settings_thumb_concurrency_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.widthIn(max = FrameNestDimens.ReadableContentMaxWidth),
+        )
+        Spacer(modifier.height(8.dp))
+        LanguageOption(
+            label = stringResource(R.string.settings_thumb_concurrency_1),
+            selected = thumbConcurrency == 1,
+            testTag = "settings_thumb_concurrency_1",
+            onSelect = {
+                thumbConcurrency = 1
+                prefs.setThumbnailConcurrency(1)
+                container.thumbnailRepository.ensureWorkers()
+            },
+        )
+        LanguageOption(
+            label = stringResource(R.string.settings_thumb_concurrency_2),
+            selected = thumbConcurrency == 2,
+            testTag = "settings_thumb_concurrency_2",
+            onSelect = {
+                thumbConcurrency = 2
+                prefs.setThumbnailConcurrency(2)
+                container.thumbnailRepository.ensureWorkers()
             },
         )
 

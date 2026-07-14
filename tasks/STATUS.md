@@ -13,8 +13,16 @@
 | FN-06 字幕 | 已完成 | agent | → main | FN-04, FN-05 | [FN-06](handoffs/FN-06.md) |
 | FN-07 缩略图与首帧 | 已完成 | agent | → main | FN-02, FN-04, FN-05 | [FN-07](handoffs/FN-07.md) |
 | FN-08 自适应体验打磨 | 已完成 | agent | → main | FN-04, FN-05 | [FN-08](handoffs/FN-08.md) |
-| FN-09 稳定与发布 | 已完成 | agent | agent/FN-09-release → main | FN-04..FN-08 | [FN-09](handoffs/FN-09.md) |
+| FN-09 稳定与发布 | 已完成 | agent | → main | FN-04..FN-08 | [FN-09](handoffs/FN-09.md) |
 
-**MVP 内部测试封板**：`0.3.0-internal`（versionCode 3）。  
-APK：`app/build/outputs/apk/debug/app-debug.apk`（约 129MB）。  
-验收：`docs/RELEASE-ACCEPTANCE.md`；变更：`CHANGELOG.md`；已知问题：`docs/KNOWN-ISSUES.md`。
+**当前发布**：`0.3.1-internal`（versionCode 4）
+
+| 产物 | 路径 | 约大小 |
+|---|---|---|
+| Debug universal | `app/build/outputs/apk/debug/app-universal-debug.apk` | ~129MB |
+| Debug arm64 | `app/build/outputs/apk/debug/app-arm64-v8a-debug.apk` | ~74MB |
+| Debug x86_64 | `app/build/outputs/apk/debug/app-x86_64-debug.apk` | ~79MB |
+| Release | `app/build/outputs/apk/release/` | minify 已启用 |
+
+NAS 验收勾选：`docs/NAS-ACCEPTANCE-CHECKLIST.md`  
+后续 backlog：`docs/POST-MVP.md`

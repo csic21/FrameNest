@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Debug-only spike harnesses (adb launch; not exported to other apps). -->
+    <application>
+        <activity
+            android:name=".feature.player.PlayerSpikeActivity"
+            android:exported="false"
+            android:theme="@style/Theme.FrameNest" />
+        <activity
+            android:name=".smb.spike.SmbSpikeActivity"
+            android:exported="false"
+            android:label="@string/smb_spike_label"
+            android:theme="@style/Theme.FrameNest" />
+    </application>
+</manifest>
