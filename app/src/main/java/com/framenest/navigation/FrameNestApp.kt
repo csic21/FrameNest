@@ -9,8 +9,12 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -65,6 +69,27 @@ fun FrameNestApp(
         navigationSuiteType
     }
 
+    // Remember which tab the user was on before opening the player (KI-05).
+    var lastNonPlayerTopLevel by rememberSaveable {
+        mutableStateOf(TopLevelDestination.Servers.name)
+    }
+    LaunchedEffect(currentRoute) {
+        if (!isPlayerRoute(currentRoute)) {
+            topLevelDestinationForRoute(currentRoute)?.let { dest ->
+                lastNonPlayerTopLevel = dest.name
+            }
+        }
+    }
+    val activeTopLevel: TopLevelDestination =
+        if (isPlayerRoute(currentRoute)) {
+            runCatching { TopLevelDestination.valueOf(lastNonPlayerTopLevel) }
+                .getOrDefault(TopLevelDestination.Servers)
+        } else {
+            topLevelDestinationForRoute(currentRoute)
+                ?: currentDestination.resolvedTopLevelDestination()
+                ?: TopLevelDestination.Servers
+        }
+
     NavigationSuiteScaffold(
         modifier = modifier
             .fillMaxSize()
@@ -73,7 +98,7 @@ fun FrameNestApp(
         layoutType = effectiveSuiteType,
         navigationSuiteItems = {
             TopLevelDestination.entries.forEach { dest ->
-                val selected = currentDestination.isTopLevelDestinationInHierarchy(dest)
+                val selected = dest == activeTopLevel
                 item(
                     selected = selected,
                     onClick = {
@@ -224,19 +249,11 @@ private fun FrameNestNavHost(
     }
 }
 
-private fun androidx.navigation.NavDestination?.isTopLevelDestinationInHierarchy(
-    destination: TopLevelDestination,
-): Boolean {
-    if (this == null) return false
-    return hierarchy.any { dest ->
-        val route = dest.route ?: return@any false
-        when (destination) {
-            TopLevelDestination.Servers ->
-                route.startsWith(FrameNestRoutes.SERVERS_GRAPH) || route.startsWith("player/")
-            TopLevelDestination.Recent ->
-                route == FrameNestRoutes.RECENT || route.startsWith("${FrameNestRoutes.RECENT}/")
-            TopLevelDestination.Settings ->
-                route == FrameNestRoutes.SETTINGS || route.startsWith("${FrameNestRoutes.SETTINGS}/")
-        }
+private fun androidx.navigation.NavDestination?.resolvedTopLevelDestination(): TopLevelDestination? {
+    if (this == null) return null
+    hierarchy.forEach { dest ->
+        val route = dest.route ?: return@forEach
+        topLevelDestinationForRoute(route)?.let { return it }
     }
+    return null
 }

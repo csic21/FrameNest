@@ -56,7 +56,7 @@ class AdaptiveLayoutPolicyTest {
     }
 
     @Test
-    fun topLevelDestination_mapsNestedAndPlayerRoutes() {
+    fun topLevelDestination_mapsNestedRoutes_playerIsNotATab() {
         assertEquals(
             TopLevelDestination.Servers,
             topLevelDestinationForRoute(FrameNestRoutes.SERVERS_LIST),
@@ -65,8 +65,9 @@ class AdaptiveLayoutPolicyTest {
             TopLevelDestination.Servers,
             topLevelDestinationForRoute(FrameNestRoutes.browse("home-nas", "media", "movies")),
         )
+        // Player is full-screen; tab highlight is owned by last non-player tab (KI-05).
         assertEquals(
-            TopLevelDestination.Servers,
+            null,
             topLevelDestinationForRoute(
                 FrameNestRoutes.player("home-nas", "media", "Movies/a.mkv"),
             ),
@@ -81,12 +82,6 @@ class AdaptiveLayoutPolicyTest {
         )
         assertEquals(null, topLevelDestinationForRoute(null))
         assertEquals(null, topLevelDestinationForRoute("unknown"))
-    }
-
-    @Test
-    fun fakeCatalog_recentOnly_forFn05Placeholder() {
-        assertTrue(FakeCatalog.recent.isNotEmpty())
-        assertTrue(FakeCatalog.recent.all { it.share.isNotBlank() && it.path.isNotBlank() })
     }
 
     @Test

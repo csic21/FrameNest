@@ -126,16 +126,19 @@ fun isPlayerRoute(route: String?): Boolean =
 
 /**
  * Maps a Nav back-stack route to the matching top-level destination, if any.
+ *
+ * Player is **not** a top-level tab — selection stays on the tab the user came from
+ * (see [FrameNestApp] last-non-player tracking). Fixes KI-05 (Recent → player
+ * incorrectly highlighting Servers).
  */
 fun topLevelDestinationForRoute(route: String?): TopLevelDestination? {
-    if (route == null) return null
+    if (route == null || isPlayerRoute(route)) return null
     return when {
         route == FrameNestRoutes.RECENT || route.startsWith("${FrameNestRoutes.RECENT}/") ->
             TopLevelDestination.Recent
         route == FrameNestRoutes.SETTINGS || route.startsWith("${FrameNestRoutes.SETTINGS}/") ->
             TopLevelDestination.Settings
-        route.startsWith(FrameNestRoutes.SERVERS_GRAPH) ||
-            isPlayerRoute(route) ->
+        route.startsWith(FrameNestRoutes.SERVERS_GRAPH) ->
             TopLevelDestination.Servers
         else -> null
     }
