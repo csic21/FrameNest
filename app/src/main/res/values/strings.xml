@@ -115,9 +115,22 @@
 
     <!-- Settings -->
     <string name="settings_title">设置</string>
-    <string name="settings_placeholder_body">缓存、字幕默认语言等选项将在后续任务实现。此处为导航占位。</string>
-    <string name="settings_cache_row">缩略图缓存</string>
-    <string name="settings_cache_value_fake">已启用磁盘缓存（清理入口后续任务）</string>
+    <string name="settings_intro">缓存、默认字幕语言与诊断日志。密码不会出现在日志导出中。</string>
+    <string name="settings_version_line">版本 %1$s (%2$d)</string>
+    <string name="settings_cache_row">缓存</string>
+    <string name="settings_cache_size">约占用 %1$s（缩略图 / 字幕临时文件）</string>
+    <string name="settings_clear_cache">清理缓存</string>
+    <string name="settings_cache_cleared">已清理约 %1$s</string>
     <string name="settings_subtitle_lang_row">默认字幕语言</string>
-    <string name="settings_subtitle_lang_value_fake">中文（占位）</string>
+    <string name="settings_subtitle_lang_hint">影响自动匹配外挂/内嵌字幕的优先级（下次播放生效）。</string>
+    <string name="settings_lang_system">跟随系统</string>
+    <string name="settings_lang_zh">中文优先</string>
+    <string name="settings_lang_en">English first</string>
+    <string name="settings_diagnostics_row">诊断</string>
+    <string name="settings_diagnostics_hint">导出脱敏后的应用内诊断信息，便于反馈问题。不会包含密码。</string>
+    <string name="settings_export_logs">导出诊断日志</string>
+    <string name="settings_diagnostics_saved">已写入 %1$s</string>
+    <string name="settings_diagnostics_failed">导出失败</string>
+    <string name="settings_diagnostics_share">分享诊断日志</string>
 </resources>
+

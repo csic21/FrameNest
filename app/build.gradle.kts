@@ -28,8 +28,8 @@ android {
         applicationId = "com.framenest"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.3.0-wave3"
+        versionCode = 3
+        versionName = "0.3.0-internal"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true

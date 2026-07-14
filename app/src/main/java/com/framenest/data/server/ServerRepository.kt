@@ -1,5 +1,6 @@
 package com.framenest.data.server
 
+import com.framenest.core.diagnostics.DiagnosticLog
 import com.framenest.core.model.SavedServer
 import com.framenest.smb.SmbClient
 import com.framenest.smb.SmbCredentials
@@ -128,10 +129,13 @@ class ServerRepository(
         )
         try {
             client.connect(credentials)
+            DiagnosticLog.info("SmbTest", "connect ok host=${host.trim()} port=$port")
             Result.success(Unit)
         } catch (e: SmbException) {
+            DiagnosticLog.warn("SmbTest", "connect failed: ${e.error} ${e.message}")
             Result.failure(e)
         } catch (t: Throwable) {
+            DiagnosticLog.warn("SmbTest", "connect failed: ${t.message}")
             Result.failure(t)
         } finally {
             runCatching { client.close() }

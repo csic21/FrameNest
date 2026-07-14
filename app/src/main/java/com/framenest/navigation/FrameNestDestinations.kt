@@ -11,7 +11,6 @@ import com.framenest.R
 import com.framenest.core.model.RemoteLocation
 import com.framenest.smb.SmbPathUtils
 import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 
 /**
  * Top-level destinations shown in the adaptive navigation suite
@@ -106,7 +105,8 @@ object FrameNestRoutes {
 
     /** Query encoding that works on JVM unit tests (no android.net.Uri). */
     internal fun encodeQuery(value: String): String =
-        URLEncoder.encode(value, StandardCharsets.UTF_8)
+        // Use String charset name for minSdk 26 (Charset overload is API 33+).
+        URLEncoder.encode(value, "UTF-8")
             .replace("+", "%20")
 }
 

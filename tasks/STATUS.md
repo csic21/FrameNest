@@ -13,14 +13,7 @@
 | FN-06 字幕 | 已完成 | agent | → main | FN-04, FN-05 | [FN-06](handoffs/FN-06.md) |
 | FN-07 缩略图与首帧 | 已完成 | agent | → main | FN-02, FN-04, FN-05 | [FN-07](handoffs/FN-07.md) |
 | FN-08 自适应体验打磨 | 已完成 | agent | → main | FN-04, FN-05 | [FN-08](handoffs/FN-08.md) |
-| FN-09 稳定与发布 | 未开始 |  |  | FN-04..FN-08 |  |
+| FN-09 稳定与发布 | 待集成 | agent | agent/FN-09-release | FN-04..FN-08 | [FN-09](handoffs/FN-09.md) |
 
-## Wave 3 集成结果
-
-| 任务 | 结果 |
-|---|---|
-| FN-06 | 内嵌 + 外挂字幕（匹配排序、addSlave、延迟/字号） |
-| FN-07 | 列表缩略图（单并发 MMR）+ `canPlay` 首帧门闩 |
-| FN-08 | 自适应/无障碍；播放页 NavigationSuiteType.None |
-
-`versionName`：`0.3.0-wave3`。下一任务：**FN-09** 稳定与发布。
+`versionName`：`0.3.0-internal`（versionCode 3）。  
+全部 FN 任务实现完成；FN-09 合并入 main 后即 MVP 内部测试封板。

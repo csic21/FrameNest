@@ -1,0 +1,53 @@
+package com.framenest.data.settings
+
+import android.content.Context
+import java.util.Locale
+
+/**
+ * Non-sensitive user preferences (SharedPreferences).
+ * Passwords never live here — only language tags and UI flags.
+ */
+class UserPreferences(
+    context: Context,
+) {
+    private val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    /**
+     * Preferred subtitle language tags, most preferred first.
+     * Empty means "follow system locale" (see [SubtitleLanguagePrefs]).
+     */
+    fun subtitleLanguageTags(): List<String> {
+        val raw = prefs.getString(KEY_SUBTITLE_LANGS, null)?.trim().orEmpty()
+        if (raw.isEmpty()) return emptyList()
+        return raw.split(',').map { it.trim().lowercase(Locale.ROOT) }.filter { it.isNotEmpty() }
+    }
+
+    fun setSubtitleLanguageTags(tags: List<String>) {
+        val cleaned = tags.map { it.trim().lowercase(Locale.ROOT) }.filter { it.isNotEmpty() }
+        prefs.edit().putString(KEY_SUBTITLE_LANGS, cleaned.joinToString(",")).apply()
+    }
+
+    /** Preset id for Settings UI: system | zh | en | custom */
+    fun subtitleLanguagePreset(): String =
+        prefs.getString(KEY_SUBTITLE_PRESET, PRESET_SYSTEM) ?: PRESET_SYSTEM
+
+    fun setSubtitleLanguagePreset(preset: String) {
+        prefs.edit().putString(KEY_SUBTITLE_PRESET, preset).apply()
+        when (preset) {
+            PRESET_SYSTEM -> setSubtitleLanguageTags(emptyList())
+            PRESET_ZH -> setSubtitleLanguageTags(listOf("zh", "chi", "chs", "cht"))
+            PRESET_EN -> setSubtitleLanguageTags(listOf("en", "eng"))
+            else -> Unit // custom leaves tags as-is
+        }
+    }
+
+    companion object {
+        private const val PREFS_NAME = "framenest_user_prefs"
+        private const val KEY_SUBTITLE_LANGS = "subtitle_language_tags"
+        private const val KEY_SUBTITLE_PRESET = "subtitle_language_preset"
+
+        const val PRESET_SYSTEM = "system"
+        const val PRESET_ZH = "zh"
+        const val PRESET_EN = "en"
+    }
+}

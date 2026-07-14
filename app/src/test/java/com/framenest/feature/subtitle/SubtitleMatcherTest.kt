@@ -154,6 +154,16 @@ class SubtitleLanguagePrefsTest {
         assertTrue(prefs.first().startsWith("en") || prefs.first() == "en-us")
         assertTrue(prefs.any { it.startsWith("zh") || it == "chi" || it == "chs" })
     }
+
+    @Test
+    fun userPreferred_prependedBeforeSystemLocale() {
+        val prefs = SubtitleLanguagePrefs.preferredLanguages(
+            locale = Locale.US,
+            userPreferred = listOf("zh", "chs"),
+        )
+        assertEquals("zh", prefs.first())
+        assertTrue(prefs.any { it.startsWith("en") || it == "eng" })
+    }
 }
 
 class SubtitleMatcherEmbeddedScoreTest {

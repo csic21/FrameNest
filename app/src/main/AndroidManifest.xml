@@ -22,17 +22,26 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <!-- FN-01 dedicated spike entry; launch via adb (see PlayerSpikeActivity KDoc). -->
+        <!-- Debug-only spikes: not exported so other apps cannot launch them. -->
         <activity
             android:name=".feature.player.PlayerSpikeActivity"
-            android:exported="true"
+            android:exported="false"
             android:theme="@style/Theme.FrameNest" />
-        <!-- FN-02 isolated harness; not part of product navigation (FN-03). -->
         <activity
             android:name=".smb.spike.SmbSpikeActivity"
-            android:exported="true"
+            android:exported="false"
             android:label="@string/smb_spike_label"
             android:theme="@style/Theme.FrameNest" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

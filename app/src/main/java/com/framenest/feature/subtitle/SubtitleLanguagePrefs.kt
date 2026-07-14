@@ -12,11 +12,22 @@ object SubtitleLanguagePrefs {
     /**
      * Ordered preference tokens (most preferred first). Includes common aliases
      * for Chinese/English so sidecar tags like `chs` / `eng` score correctly.
+     *
+     * @param userPreferred explicit tags from settings; when non-empty they are
+     * prepended ahead of system-locale defaults.
      */
-    fun preferredLanguages(locale: Locale = Locale.getDefault()): List<String> {
+    fun preferredLanguages(
+        locale: Locale = Locale.getDefault(),
+        userPreferred: List<String> = emptyList(),
+    ): List<String> {
+        val ordered = linkedSetOf<String>()
+        userPreferred
+            .map { it.trim().lowercase(Locale.ROOT) }
+            .filter { it.isNotEmpty() }
+            .forEach { ordered += it }
+
         val language = locale.language.trim().lowercase(Locale.ROOT).ifBlank { "zh" }
         val country = locale.country.trim().lowercase(Locale.ROOT)
-        val ordered = linkedSetOf<String>()
 
         if (country.isNotEmpty()) {
             ordered += "$language-$country"

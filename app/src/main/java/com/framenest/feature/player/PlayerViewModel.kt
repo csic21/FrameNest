@@ -82,7 +82,7 @@ class PlayerViewModel(
     private var lastSavedPositionMs: Long? = null
     private var startPositionMs: Long = request.startPositionMs
     private var subtitleBootstrapDone: Boolean = false
-    private var preferredLanguages: List<String> = SubtitleLanguagePrefs.preferredLanguages()
+    private var preferredLanguages: List<String> = resolvePreferredLanguages(application)
 
     init {
         viewModelScope.launch {
@@ -601,5 +601,14 @@ class PlayerViewModel(
 
     companion object {
         private const val TAG = "FrameNestPlayerVM"
+
+        fun resolvePreferredLanguages(application: Application): List<String> {
+            val userTags = (application as? FrameNestApplication)
+                ?.container
+                ?.userPreferences
+                ?.subtitleLanguageTags()
+                .orEmpty()
+            return SubtitleLanguagePrefs.preferredLanguages(userPreferred = userTags)
+        }
     }
 }

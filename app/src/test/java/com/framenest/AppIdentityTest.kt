@@ -14,9 +14,9 @@ class AppIdentityTest {
     }
 
     @Test
-    fun versionName_isWave3Milestone() {
-        val versionName = "0.3.0-wave3"
+    fun versionName_isInternalRelease() {
+        val versionName = "0.3.0-internal"
         assertTrue(versionName.startsWith("0.3.0"))
-        assertTrue(versionName.contains("wave3"))
+        assertTrue(versionName.contains("internal"))
     }
 }
