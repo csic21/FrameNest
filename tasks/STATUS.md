@@ -8,8 +8,8 @@
 | FN-01 播放内核 spike | 已完成 | agent | agent/FN-01-player-spike → main | FN-00 | [FN-01](handoffs/FN-01.md) |
 | FN-02 SMB 数据路径 spike | 已完成 | agent | agent/FN-02-smb-spike → main | FN-00 | [FN-02](handoffs/FN-02.md) |
 | FN-03 自适应 App 外壳 | 已完成 | agent | agent/FN-03-adaptive-shell → main | FN-00 | [FN-03](handoffs/FN-03.md) |
-| FN-04 服务器与 SMB 浏览 | 未开始 |  |  | FN-02, FN-03 |  |
-| FN-05 SMB 播放与历史 | 未开始 |  |  | FN-01, FN-02, FN-03 |  |
+| FN-04 服务器与 SMB 浏览 | 进行中 | agent | agent/FN-04-servers-browser · `../FrameNest-FN-04` | FN-02, FN-03 |  |
+| FN-05 SMB 播放与历史 | 进行中 | agent | agent/FN-05-smb-playback · `../FrameNest-FN-05` | FN-01, FN-02, FN-03 |  |
 | FN-06 字幕 | 未开始 |  |  | FN-04, FN-05 |  |
 | FN-07 缩略图与首帧 | 未开始 |  |  | FN-02, FN-04, FN-05 |  |
 | FN-08 自适应体验打磨 | 未开始 |  |  | FN-04, FN-05 |  |
@@ -24,6 +24,12 @@
 | FN-03 | 已合并 | 底部导航 / Rail + list-detail 假数据外壳 |
 
 `main` 上 versionName：`0.1.0-wave1`。决策记录：`docs/decisions/0001-player-engine.md`、`0002-smb-data-path.md`。
+
+## Wave 2 并行约定
+
+- **FN-04** 定义服务器/远程条目文件模型与 Room 服务器表；替换假数据浏览。
+- **FN-05** 使用同一路径键 `(serverId, share, path)` 做播放与历史；Room 历史表若与 FN-04 的 `AppDatabase` 冲突，在交接中写明实体/DAO 补丁，**不要**互相硬改对方已有实体文件。
+- 共享文件（`MainActivity`、导航、version catalog、Room DB 注册）各自最小改动 + 交接说明。
 
 分配任务时只编辑本表的 Owner、状态和分支列。具体范围与验收标准以
 `tasks/TASKS.md` 为准。
