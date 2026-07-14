@@ -58,7 +58,7 @@ class AdaptiveShellPhoneTest {
         composeRule.onNodeWithTag("browse_screen").assertIsDisplayed()
         composeRule.onNodeWithTag("browse_item_movies").performClick()
         composeRule.onNodeWithTag("browse_item_movie-a").performClick()
-        composeRule.onNodeWithTag("player_placeholder").assertIsDisplayed()
+        composeRule.onNodeWithTag("player_screen").assertIsDisplayed()
         composeRule.onNodeWithTag("player_back").performClick()
         composeRule.onNodeWithTag("browse_screen").assertIsDisplayed()
     }
@@ -127,7 +127,7 @@ class AdaptiveShellTabletTest {
         composeRule.onNodeWithTag("servers_list_detail").assertIsDisplayed()
 
         composeRule.onNodeWithTag("servers_open_player").performClick()
-        composeRule.onNodeWithTag("player_placeholder").assertIsDisplayed()
+        composeRule.onNodeWithTag("player_screen").assertIsDisplayed()
     }
 }
 

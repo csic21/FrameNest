@@ -1,6 +1,7 @@
 package com.framenest.player
 
 import android.content.Context
+import android.content.res.AssetFileDescriptor
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -27,8 +28,11 @@ import org.videolan.libvlc.util.VLCVideoLayout
  * 3. on first [MediaPlayer.Event.Vout] with count > 0, pauses and marks
  *    [PlayerState.firstFrameReady] so UI can show a decoded frame before play
  *
- * SMB: credentials are applied only as media options (`:smb-user` / `:smb-pwd` /
- * `:smb-domain`), never as URI userinfo. Failures are redacted before logging.
+ * Data paths (decision 0001 / 0002):
+ * - **B (preferred):** [MediaSource.SeekableDescriptor] from SMBJ + proxy FD
+ * - **A (optional):** [MediaSource.Smb] with options-only credentials, no URL userinfo
+ *
+ * Failures are redacted before logging.
  */
 class VlcPlayerController(
     appContext: Context,
@@ -51,6 +55,8 @@ class VlcPlayerController(
     private var pendingSource: MediaSource? = null
     private var awaitingFirstFramePause: Boolean = false
     private var released: Boolean = false
+    /** Owned AFD from path B; closed on re-prepare / release. */
+    private var ownedSeekableAfd: AssetFileDescriptor? = null
 
     private val eventListener = MediaPlayer.EventListener { event ->
         if (released) return@EventListener
@@ -108,7 +114,11 @@ class VlcPlayerController(
                 _state.update {
                     it.copy(
                         phase = PlayerState.Phase.Error,
-                        error = PlayerError(PlayerError.Code.PlaybackError, message),
+                        error = PlayerError(
+                            code = PlayerError.Code.PlaybackError,
+                            message = message,
+                            retryable = true,
+                        ),
                     )
                 }
             }
@@ -199,6 +209,10 @@ class VlcPlayerController(
         }
 
         ensureEngine()
+        closeOwnedSeekableAfd()
+        if (source is MediaSource.SeekableDescriptor) {
+            ownedSeekableAfd = source.assetFileDescriptor
+        }
         pendingSource = source
         awaitingFirstFramePause = true
         _state.update {
@@ -209,6 +223,25 @@ class VlcPlayerController(
             )
         }
         tryStartPendingIfReady()
+    }
+
+    /**
+     * Surfaces an open/session error without going through libVLC (e.g. SMB connect).
+     * Message must already be safe / redacted by the caller.
+     */
+    fun reportExternalError(error: PlayerError) {
+        if (released) return
+        awaitingFirstFramePause = false
+        pendingSource = null
+        val safe = error.copy(message = CredentialRedactor.redact(error.message))
+        Log.w(TAG, "external error code=${safe.code} msg=${safe.message}")
+        _state.update {
+            it.copy(
+                phase = PlayerState.Phase.Error,
+                error = safe,
+                firstFrameReady = false,
+            )
+        }
     }
 
     override fun play() {
@@ -282,11 +315,21 @@ class VlcPlayerController(
         }
         videoLayout = null
 
+        closeOwnedSeekableAfd()
+
         val vlc = libVlc
         libVlc = null
         runCatching { vlc?.release() }
 
         _state.value = PlayerState(phase = PlayerState.Phase.Idle, hwDecoderRequested = enableHwDecoder)
+    }
+
+    private fun closeOwnedSeekableAfd() {
+        val afd = ownedSeekableAfd
+        ownedSeekableAfd = null
+        if (afd != null) {
+            runCatching { afd.close() }
+        }
     }
 
     private fun ensureEngine() {
@@ -326,7 +369,7 @@ class VlcPlayerController(
             _state.update {
                 it.copy(
                     phase = PlayerState.Phase.Error,
-                    error = PlayerError(PlayerError.Code.OpenFailed, msg),
+                    error = PlayerError(PlayerError.Code.OpenFailed, msg, retryable = true),
                 )
             }
         }
@@ -345,6 +388,11 @@ class VlcPlayerController(
             }
             is MediaSource.ContentUri -> Media(vlc, source.uri)
             is MediaSource.RawResource -> createRawMedia(vlc, source.resId) ?: return null
+            is MediaSource.SeekableDescriptor -> {
+                Log.i(TAG, "Opening seekable descriptor label=${source.debugLabel}")
+                // libVLC takes the FD; we still close our AFD wrapper on release.
+                Media(vlc, source.assetFileDescriptor)
+            }
             is MediaSource.Smb -> {
                 val smbMedia = Media(vlc, source.uri)
                 applySmbCredentials(smbMedia, source.credentials)
@@ -353,7 +401,7 @@ class VlcPlayerController(
         }
         media.setHWDecoderEnabled(enableHwDecoder, /* force = */ false)
         media.setDefaultMediaPlayerOptions()
-        // Slight network cache helps SMB; harmless for local.
+        // Slight network cache helps SMB / remote FD; harmless for local.
         media.addOption(":network-caching=1500")
         return media
     }
@@ -427,10 +475,15 @@ class VlcPlayerController(
 
     private fun failOpen(message: String) {
         awaitingFirstFramePause = false
+        val safe = CredentialRedactor.redact(message)
         _state.update {
             it.copy(
                 phase = PlayerState.Phase.Error,
-                error = PlayerError(PlayerError.Code.OpenFailed, message),
+                error = PlayerError(
+                    code = PlayerError.Code.OpenFailed,
+                    message = safe,
+                    retryable = true,
+                ),
             )
         }
     }

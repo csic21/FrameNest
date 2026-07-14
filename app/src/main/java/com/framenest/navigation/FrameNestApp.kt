@@ -25,8 +25,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.framenest.feature.player.PlaybackRequestFactory
+import com.framenest.feature.player.PlayerScreen
 import com.framenest.ui.screens.BrowseScreen
-import com.framenest.ui.screens.PlayerPlaceholderScreen
 import com.framenest.ui.screens.RecentScreen
 import com.framenest.ui.screens.ServersScreen
 import com.framenest.ui.screens.SettingsScreen
@@ -160,9 +161,11 @@ private fun FrameNestNavHost(
         ) { entry ->
             val serverId = entry.arguments?.getString("serverId").orEmpty()
             val entryId = entry.arguments?.getString("entryId").orEmpty()
-            PlayerPlaceholderScreen(
-                serverId = serverId,
-                entryId = entryId,
+            // FN-05 product player. Nav still uses entryId; maps to PlaybackIdentity
+            // placeholders until FN-04 supplies real share/path + credentials.
+            val request = PlaybackRequestFactory.fromNavArgs(serverId, entryId)
+            PlayerScreen(
+                request = request,
                 onBack = { navController.popBackStack() },
             )
         }

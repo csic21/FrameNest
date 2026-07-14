@@ -9,7 +9,7 @@
 | FN-02 SMB 数据路径 spike | 已完成 | agent | agent/FN-02-smb-spike → main | FN-00 | [FN-02](handoffs/FN-02.md) |
 | FN-03 自适应 App 外壳 | 已完成 | agent | agent/FN-03-adaptive-shell → main | FN-00 | [FN-03](handoffs/FN-03.md) |
 | FN-04 服务器与 SMB 浏览 | 未开始 |  |  | FN-02, FN-03 |  |
-| FN-05 SMB 播放与历史 | 未开始 |  |  | FN-01, FN-02, FN-03 |  |
+| FN-05 SMB 播放与历史 | 待集成 | agent | agent/FN-05-smb-playback | FN-01, FN-02, FN-03 | [FN-05](handoffs/FN-05.md) |
 | FN-06 字幕 | 未开始 |  |  | FN-04, FN-05 |  |
 | FN-07 缩略图与首帧 | 未开始 |  |  | FN-02, FN-04, FN-05 |  |
 | FN-08 自适应体验打磨 | 未开始 |  |  | FN-04, FN-05 |  |
