@@ -16,8 +16,7 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * Adaptive shell UI tests for phone-sized (compact) and tablet-sized (medium+) layouts.
- * Servers list is empty until the user adds a NAS (FN-04 real repository).
+ * Adaptive shell UI tests. Servers list is empty until the user adds a NAS.
  */
 class AdaptiveShellPhoneTest {
 
@@ -117,7 +116,6 @@ class AdaptiveShellRotationTest {
 
     @Test
     fun recreate_keepsSelectedTopLevelDestination() {
-        // Navigate to Settings on the real activity (config change survivor).
         composeRule.onNodeWithTag("nav_settings").performClick()
         composeRule.onNodeWithTag("settings_screen").assertIsDisplayed()
 

@@ -1,6 +1,7 @@
 package com.framenest.app
 
 import android.content.Context
+import com.framenest.data.history.PlaybackHistoryRepository
 import com.framenest.data.server.AppDatabase
 import com.framenest.data.server.BrowseRepository
 import com.framenest.data.server.CredentialStore
@@ -10,7 +11,7 @@ import com.framenest.smb.SmbClient
 import com.framenest.smb.SmbjClient
 
 /**
- * Minimal manual DI graph for FN-04 (single app module).
+ * Minimal manual DI graph (single app module).
  */
 class AppContainer(
     context: Context,
@@ -18,6 +19,8 @@ class AppContainer(
     credentialStore: CredentialStore = EncryptedCredentialStore(context),
     clientFactory: () -> SmbClient = { SmbjClient() },
 ) {
+    val database: AppDatabase = database
+
     val serverRepository: ServerRepository = ServerRepository(
         serverDao = database.serverDao(),
         credentialStore = credentialStore,
@@ -27,6 +30,10 @@ class AppContainer(
     val browseRepository: BrowseRepository = BrowseRepository(
         serverRepository = serverRepository,
         clientFactory = clientFactory,
+    )
+
+    val historyRepository: PlaybackHistoryRepository = PlaybackHistoryRepository(
+        dao = database.playbackHistoryDao(),
     )
 
     companion object {

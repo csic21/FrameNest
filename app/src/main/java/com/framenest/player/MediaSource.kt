@@ -1,12 +1,13 @@
 package com.framenest.player
 
+import android.content.res.AssetFileDescriptor
 import android.net.Uri
 
 /**
- * Playback inputs for the FN-01 spike and the minimal UI boundary.
+ * Playback inputs for the player controller.
  *
- * SMB credentials are never part of the URI string; they travel only via
- * [SmbCredentials] applied as libVLC media options.
+ * SMB credentials are never part of a URI string; path B uses a seekable FD,
+ * path A (optional) uses media options only.
  */
 sealed class MediaSource {
     data class LocalFile(val path: String) : MediaSource()
@@ -17,7 +18,22 @@ sealed class MediaSource {
     data class RawResource(val resId: Int) : MediaSource()
 
     /**
-     * Direct libVLC SMB open.
+     * Decision 0002 path B: already-opened seekable descriptor backed by
+     * [com.framenest.smb.SmbRandomAccess] (or any seekable source).
+     *
+     * Ownership of [assetFileDescriptor] transfers to the controller; it is
+     * closed on re-prepare or [PlayerController.release].
+     */
+    data class SeekableDescriptor(
+        val assetFileDescriptor: AssetFileDescriptor,
+        /** Safe label for logs (no host credentials). */
+        val debugLabel: String = "seekable",
+    ) : MediaSource() {
+        override fun toString(): String = "SeekableDescriptor(label=$debugLabel)"
+    }
+
+    /**
+     * Optional path A: direct libVLC SMB open.
      *
      * [uri] must be built with [SmbMediaUri.build] (no userinfo).
      * [credentials] optional; applied only as media options, never logged.
@@ -29,8 +45,8 @@ sealed class MediaSource {
 }
 
 /**
- * SMB auth for libVLC options. Do not put these values into logs, URLs, or
- * toString of higher-level models that may be logged.
+ * SMB auth for libVLC options (path A only). Do not put these values into logs,
+ * URLs, or toString of higher-level models that may be logged.
  */
 data class SmbCredentials(
     val username: String,

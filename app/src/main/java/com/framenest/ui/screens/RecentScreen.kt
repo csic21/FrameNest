@@ -13,24 +13,38 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.framenest.FrameNestApplication
 import com.framenest.R
-import com.framenest.navigation.FakeCatalog
+import com.framenest.data.history.PlaybackHistoryItem
+import kotlinx.coroutines.flow.flowOf
 
 /**
- * Recent list still uses [FakeCatalog] until FN-05 history is wired.
- * Opens the stable player route with share + path args.
+ * Recent playback list backed by Room history (FN-05).
+ *
+ * [onOpenItem] receives (serverId, share, path) for the stable player route.
  */
 @Composable
 fun RecentScreen(
     onOpenItem: (serverId: String, share: String, path: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val app = LocalContext.current.applicationContext
+    val historyFlow = remember(app) {
+        (app as? FrameNestApplication)?.historyRepository?.observeRecent()
+            ?: flowOf(emptyList())
+    }
+    val history by historyFlow.collectAsStateWithLifecycle(initialValue = emptyList())
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -42,48 +56,87 @@ fun RecentScreen(
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.testTag("recent_title"),
         )
-        Text(
-            text = stringResource(R.string.recent_subtitle_fake),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
-        )
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(FakeCatalog.recent, key = { it.id }) { item ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("recent_item_${item.id}")
-                        .semantics { contentDescription = "recent_item_${item.id}" }
-                        .clickable {
-                            onOpenItem(item.serverId, item.share, item.path)
-                        }
-                        .padding(vertical = 4.dp),
-                ) {
-                    Text(item.title, style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = item.serverName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+
+        if (history.isEmpty()) {
+            Text(
+                text = stringResource(R.string.recent_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(top = 12.dp)
+                    .testTag("recent_empty"),
+            )
+        } else {
+            Text(
+                text = stringResource(R.string.recent_subtitle_history),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+            )
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(
+                    history,
+                    key = { "${it.identity.serverId}|${it.identity.share}|${it.identity.path}" },
+                ) { item ->
+                    HistoryRow(
+                        item = item,
+                        onClick = {
+                            onOpenItem(
+                                item.identity.serverId,
+                                item.identity.share,
+                                item.identity.path,
+                            )
+                        },
                     )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        LinearProgressIndicator(
-                            progress = { item.progressFraction },
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(top = 6.dp),
-                        )
-                        Text(
-                            text = "${(item.progressFraction * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                    }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryRow(
+    item: PlaybackHistoryItem,
+    onClick: () -> Unit,
+) {
+    val key = "${item.identity.serverId}_${item.identity.path}"
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("recent_history_$key")
+            .semantics { contentDescription = "recent_history_$key" }
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+    ) {
+        Text(item.displayName, style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = "${item.identity.share}/${item.identity.path}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (item.completed) {
+                Text(
+                    text = stringResource(R.string.recent_completed),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                LinearProgressIndicator(
+                    progress = { item.progressFraction },
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(top = 6.dp),
+                )
+                Text(
+                    text = "${(item.progressFraction * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelMedium,
+                )
             }
         }
     }

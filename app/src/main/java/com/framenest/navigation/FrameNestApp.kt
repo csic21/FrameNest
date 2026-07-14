@@ -9,8 +9,8 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -31,19 +31,14 @@ import com.framenest.ContextAppContainer
 import com.framenest.app.AppContainer
 import com.framenest.core.model.RemoteLocation
 import com.framenest.feature.browser.BrowseRoute
+import com.framenest.feature.player.PlayerRoute
 import com.framenest.feature.servers.ServersRoute
-import com.framenest.ui.screens.PlayerPlaceholderScreen
 import com.framenest.ui.screens.RecentScreen
 import com.framenest.ui.screens.SettingsScreen
 
 /**
- * Adaptive app shell: bottom bar on compact width, navigation rail on larger widths,
- * with Servers → Browse → Player stack wired to real FN-04 repositories.
- *
- * @param windowAdaptiveInfo override for tests; defaults to [currentWindowAdaptiveInfo].
- * @param navigationSuiteType override for tests; defaults from adaptive info.
- * @param navController optional hoisted controller (tests / state restore).
- * @param appContainer optional DI graph; defaults to [FrameNestApplication] container.
+ * Adaptive app shell: bottom bar on compact width, navigation rail on larger widths.
+ * Servers → Browse → Player wired to FN-04 repositories and FN-05 product player.
  */
 @Composable
 fun FrameNestApp(
@@ -195,10 +190,11 @@ private fun FrameNestNavHost(
             val serverId = entry.arguments?.getString(FrameNestRoutes.ARG_SERVER_ID).orEmpty()
             val share = entry.arguments?.getString(FrameNestRoutes.ARG_SHARE).orEmpty()
             val path = entry.arguments?.getString(FrameNestRoutes.ARG_PATH).orEmpty()
-            PlayerPlaceholderScreen(
+            PlayerRoute(
                 serverId = serverId,
                 share = share,
                 path = path,
+                container = container,
                 onBack = { navController.popBackStack() },
             )
         }

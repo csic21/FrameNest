@@ -53,14 +53,31 @@
     <string name="browse_type_video">视频</string>
     <string name="browse_type_subtitle">字幕</string>
 
-    <!-- Player placeholder -->
+    <!-- Player placeholder (legacy) -->
     <string name="player_placeholder_title">播放页占位</string>
     <string name="player_placeholder_body">「%1$s」· %2$s\n真实播放由 FN-05 接入</string>
     <string name="player_placeholder_route_hint">serverId=%1$s  share=%2$s  path=%3$s</string>
 
+    <!-- Product player (FN-05) -->
+    <string name="player_loading">正在准备…</string>
+    <string name="player_tap_to_play">点击播放</string>
+    <string name="player_replay">重新播放</string>
+    <string name="player_retry">重试</string>
+    <string name="player_error_generic">播放失败</string>
+    <string name="player_phase_idle">空闲</string>
+    <string name="player_phase_loading">加载中</string>
+    <string name="player_phase_ready">就绪</string>
+    <string name="player_phase_playing">播放中</string>
+    <string name="player_phase_paused">已暂停</string>
+    <string name="player_phase_ended">已结束</string>
+    <string name="player_phase_error">错误</string>
+
     <!-- Recent -->
     <string name="recent_title">最近播放</string>
-    <string name="recent_subtitle_fake">假历史记录 · 进度仅用于展示（FN-05 将接入真实历史）</string>
+    <string name="recent_subtitle_fake">假历史记录 · 进度仅用于展示</string>
+    <string name="recent_subtitle_history">来自本机播放历史</string>
+    <string name="recent_empty">暂无播放记录</string>
+    <string name="recent_completed">已看完</string>
 
     <!-- Settings -->
     <string name="settings_title">设置</string>

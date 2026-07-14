@@ -4,20 +4,29 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import com.framenest.data.history.PlaybackHistoryDao
+import com.framenest.data.history.PlaybackHistoryEntity
 
 /**
- * App-wide Room database.
+ * App-wide Room database (Wave 2).
  *
- * FN-04 registers **server** entities only. FN-05 should add history entities
- * here (or via migration) — see handoff for the integration patch.
+ * Entities:
+ * - [ServerEntity] (FN-04)
+ * - [PlaybackHistoryEntity] (FN-05)
+ *
+ * DB name stays [NAME] so both features share one process singleton.
  */
 @Database(
-    entities = [ServerEntity::class],
+    entities = [
+        ServerEntity::class,
+        PlaybackHistoryEntity::class,
+    ],
     version = 1,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun serverDao(): ServerDao
+    abstract fun playbackHistoryDao(): PlaybackHistoryDao
 
     companion object {
         const val NAME: String = "framenest.db"
@@ -31,7 +40,11 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     NAME,
-                ).build().also { instance = it }
+                )
+                    // Pre-release: no production users yet; safe while integrating Wave 2.
+                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .build()
+                    .also { instance = it }
             }
         }
 
