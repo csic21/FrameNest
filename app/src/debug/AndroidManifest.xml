@@ -11,5 +11,12 @@
             android:exported="false"
             android:label="@string/smb_spike_label"
             android:theme="@style/Theme.FrameNest" />
+        <!-- exported=true: API 34+ shell cannot start non-exported activities via adb. Debug-only. -->
+        <activity
+            android:name=".feature.listen_translate.spike.PcmCaptureSpikeActivity"
+            android:exported="true"
+            android:label="@string/pcm_spike_label"
+            android:theme="@style/Theme.FrameNest" />
     </application>
 </manifest>
+

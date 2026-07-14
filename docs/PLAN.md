@@ -40,4 +40,10 @@ FN-04 + FN-05 + FN-06 + FN-07 + FN-08 ──────────────
 - **M2 NAS 视频可看**：FN-04、FN-05
 - **M3 MVP 功能完整**：FN-06、FN-07、FN-08
 - **M4 测试版可发布**：FN-09
+- **M5 本机听译（post-MVP）**：FN-10 → FN-11 → FN-12 → FN-13  
+  （决策 [`docs/decisions/0005-listen-translate.md`](decisions/0005-listen-translate.md)）
+
+```text
+FN-10 PCM spike ── FN-11 Room/清理 ── FN-12 管线+UI ── FN-13 模型下载
+```
 

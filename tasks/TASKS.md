@@ -166,3 +166,76 @@
 验收：所有自动检查通过；发布验收记录完整；APK 可安装升级；无明文凭证、密钥或
 真实 NAS 地址进入产物和仓库。
 
+---
+
+## FN-10：听译 — 本机 PCM 取流 spike
+
+**依赖**：FN-01、FN-05（播放路径）  
+**拥有路径**：`docs/decisions/0005-listen-translate.md`、debug
+`feature/listen_translate/spike/**`、可选 `player/audio/**` 最小类型、相关测试  
+**目标**：验证播放同时能在本机稳定拿到 PCM（供后续 ASR），不写 NAS、不落公共目录。
+
+工作内容：
+
+- 确认 libVLC Android 绑定是否提供音频 sample 回调；若无，采用 **MediaExtractor +
+  MediaCodec 并行只解音轨**（决策 0005 路径 B）。
+- Debug Activity：本地 `sample_h264`（或可选文件）VLC 播放 + PCM 统计（采样率、
+  字节数、RMS、覆盖时间轴）。
+- PCM 环形缓冲/临时文件仅 `cacheDir`；日志脱敏。
+- 更新决策 0005 的 D1 证据表。
+
+验收：连续播放样本期间 PCM 持续入账；播放不崩溃；`assembleDebug` + 相关单测通过；
+交接说明 adb 启动命令。
+
+## FN-11：听译 — Room 缓存与清理
+
+**依赖**：FN-10（音频路径已定）、FN-04/FN-05（identity / AppDatabase）  
+**拥有路径**：`data/listen_translate/**`、相关单测；**共享** `AppDatabase` /
+`AppContainer` / 设置清理 在交接中描述，不抢写除非任集成 owner  
+
+**目标**：听译结果只存本机 SQLite；片源没了或用户清理可删；卸载后无残留（私有存储）。
+
+工作内容：
+
+- 表：`listen_translate_job`、`listen_translate_cue`（含 `text_src` + `text_tgt`、
+  `source_lang`/`target_lang`、`content_key`）。
+- Repository：upsert cue、按 identity 查询、`covered_until_ms`、purge API。
+- 清理触发：打开失败、删除服务器、设置「清除听译缓存」；可选 LRU。
+- 禁止任何 SMB 写回；模型路径预留仅私有目录。
+
+验收：单测覆盖 identity 隔离、content_key 失效丢弃、purge；无公共存储路径。
+
+## FN-12：听译 — 管线与播放页 UI
+
+**依赖**：FN-10、FN-11  
+**拥有路径**：`feature/listen_translate/**`、播放页叠层/开关的最小接入（共享
+导航/Player 接线写交接）、相关测试  
+
+**目标**：用户打开听译、手选源/目标语言，边播边出字，结果进 Room；二次进入命中缓存。
+
+工作内容：
+
+- 窗口化 ASR → MT（模型细节可先 stub/接口，真模型可与 FN-13 并行接线）。
+- 播放页：开关、源语言、目标语言、显示模式（原文/译文/双语）。
+- Seek：已有 cue 直接显示；空洞处从当前位置补跑。
+- 不改坏现有字幕轨/外挂字幕行为。
+
+验收：无字幕样本可出字（或 stub 管线可演示时间轴 cue）；Room 有原文+译文；
+断网（模型已在本地时）可用；手机布局可用。
+
+## FN-13：听译 — 模型下载与设置
+
+**依赖**：FN-12（或与 FN-12 约定接口后并行）  
+**拥有路径**：模型存储与下载、`feature/settings` 听译相关项（共享设置页写交接）、
+`CacheMaintenance` 扩展描述  
+
+**目标**：ASR/MT 模型按需下载到 **仅** app 私有目录；设置可看占用并清除；卸载无残留。
+
+工作内容：
+
+- 下载状态机、校验、版本字段写入 job。
+- 设置：听译缓存占用、清除听译、清除模型；文案说明全本机与卸载即删。
+- 禁止默认写入 Download/MediaStore。
+
+验收：卸装或清数据后模型与 DB 均不在；下载失败有可理解错误且无凭证泄露。
+

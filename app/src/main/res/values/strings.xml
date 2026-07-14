@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">FrameNest</string>
     <string name="smb_spike_label">FrameNest SMB Spike</string>
+    <string name="pcm_spike_label">FrameNest PCM Spike</string>
 
     <!-- Top-level navigation -->
     <string name="nav_servers">服务器</string>
