@@ -6,7 +6,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -27,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -35,6 +39,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -44,6 +49,7 @@ import com.framenest.core.model.RemoteEntry
 import com.framenest.core.model.RemoteLocation
 import com.framenest.data.server.BrowseRepository
 import com.framenest.data.server.ServerRepository
+import com.framenest.ui.theme.FrameNestDimens
 
 @Composable
 fun BrowseRoute(
@@ -102,11 +108,20 @@ fun BrowseScreen(
             .testTag("browse_screen"),
         topBar = {
             TopAppBar(
-                title = { Text(title) },
+                title = {
+                    Text(
+                        text = title,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("browse_title"),
+                    )
+                },
                 navigationIcon = {
                     IconButton(
                         onClick = onBack,
-                        modifier = Modifier.testTag("browse_back"),
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("browse_back"),
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -118,7 +133,9 @@ fun BrowseScreen(
                     IconButton(
                         onClick = onRefresh,
                         enabled = !state.isLoading,
-                        modifier = Modifier.testTag("browse_refresh"),
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .testTag("browse_refresh"),
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Refresh,
@@ -138,16 +155,20 @@ fun BrowseScreen(
                 text = stringResource(R.string.browse_path_label, pathLabel),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = FrameNestDimens.ScreenPadding, vertical = 8.dp)
                     .testTag("browse_path"),
             )
 
             when {
                 state.isLoading && state.entries.isEmpty() -> {
+                    val loadingCd = stringResource(R.string.browse_loading_cd)
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
+                            .semantics { contentDescription = loadingCd }
                             .testTag("browse_loading"),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -155,23 +176,28 @@ fun BrowseScreen(
                     }
                 }
                 state.errorMessage != null && state.entries.isEmpty() -> {
+                    val err = state.errorMessage
+                    val errorCd = stringResource(R.string.browse_error_cd, err)
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(24.dp)
+                            .semantics { contentDescription = errorCd }
                             .testTag("browse_error"),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(
-                            text = state.errorMessage,
+                            text = err,
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.widthIn(max = FrameNestDimens.ReadableContentMaxWidth),
                         )
                         Button(
                             onClick = onRefresh,
                             modifier = Modifier
                                 .padding(top = 16.dp)
+                                .minimumInteractiveComponentSize()
                                 .testTag("browse_retry"),
                         ) {
                             Text(stringResource(R.string.browse_retry))
@@ -193,37 +219,72 @@ fun BrowseScreen(
                             },
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(24.dp),
+                            modifier = Modifier
+                                .widthIn(max = FrameNestDimens.ReadableContentMaxWidth)
+                                .padding(24.dp),
                         )
                     }
                 }
                 else -> {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(state.entries, key = { it.stableKey() }) { entry ->
-                            val tag = "browse_item_${entry.stableKey()}"
-                            ListItem(
-                                headlineContent = { Text(entry.name) },
-                                supportingContent = {
-                                    Text(entrySupportingText(entry))
-                                },
-                                leadingContent = {
-                                    Icon(
-                                        imageVector = entryIcon(entry),
-                                        contentDescription = null,
-                                    )
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag(tag)
-                                    .semantics { contentDescription = tag }
-                                    .clickable { onOpenEntry(entry) },
-                            )
+                            BrowseEntryRow(entry = entry, onOpen = { onOpenEntry(entry) })
                         }
                     }
                 }
             }
         }
     }
+}
+
+/**
+ * Single browse row. Leading icon is a thin hook for FN-07 thumbnails
+ * (replace Icon with cached bitmap when available).
+ */
+@Composable
+private fun BrowseEntryRow(
+    entry: RemoteEntry,
+    onOpen: () -> Unit,
+) {
+    val tag = "browse_item_${entry.stableKey()}"
+    val typeLabel = entrySupportingText(entry)
+    val a11y = stringResource(R.string.browse_entry_cd, entry.name, typeLabel)
+    ListItem(
+        headlineContent = {
+            Text(
+                text = entry.name,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        supportingContent = {
+            Text(
+                text = typeLabel,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        leadingContent = {
+            // FN-07: thumbnail slot — keep fixed size so list layout is stable.
+            Box(
+                modifier = Modifier
+                    .size(FrameNestDimens.MinTouchTarget)
+                    .testTag("browse_thumb_slot_${entry.stableKey()}"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = entryIcon(entry),
+                    contentDescription = null,
+                )
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = FrameNestDimens.MinTouchTarget)
+            .testTag(tag)
+            .semantics { contentDescription = a11y }
+            .clickable(onClick = onOpen),
+    )
 }
 
 @Composable

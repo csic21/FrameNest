@@ -1,10 +1,17 @@
 package com.framenest.feature.player
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -15,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.framenest.R
 import com.framenest.app.AppContainer
 import com.framenest.core.model.PlaybackIdentity
@@ -23,6 +31,7 @@ import com.framenest.core.model.SavedServer
 import com.framenest.data.history.PlaybackProgressRules
 import com.framenest.player.CredentialRedactor
 import com.framenest.smb.SmbPathUtils
+import com.framenest.ui.theme.FrameNestDimens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -64,17 +73,30 @@ fun PlayerRoute(
 
     when {
         error != null -> {
-            Box(
+            BackHandler(onBack = onBack)
+            Column(
                 modifier = modifier
                     .fillMaxSize()
+                    .padding(24.dp)
                     .testTag("player_route_error"),
-                contentAlignment = Alignment.Center,
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
                     text = error ?: stringResource(R.string.player_error_generic),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.widthIn(max = FrameNestDimens.ReadableContentMaxWidth),
                 )
+                Button(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .padding(top = 16.dp)
+                        .minimumInteractiveComponentSize()
+                        .testTag("player_route_error_back"),
+                ) {
+                    Text(stringResource(R.string.action_back))
+                }
             }
         }
         request == null -> {

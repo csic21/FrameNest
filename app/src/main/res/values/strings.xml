@@ -58,7 +58,7 @@
     <string name="player_placeholder_body">「%1$s」· %2$s\n真实播放由 FN-05 接入</string>
     <string name="player_placeholder_route_hint">serverId=%1$s  share=%2$s  path=%3$s</string>
 
-    <!-- Product player (FN-05) -->
+    <!-- Product player (FN-05 / FN-08 a11y) -->
     <string name="player_loading">正在准备…</string>
     <string name="player_tap_to_play">点击播放</string>
     <string name="player_replay">重新播放</string>
@@ -71,6 +71,23 @@
     <string name="player_phase_paused">已暂停</string>
     <string name="player_phase_ended">已结束</string>
     <string name="player_phase_error">错误</string>
+    <string name="player_play">播放</string>
+    <string name="player_pause">暂停</string>
+    <string name="player_seek">进度条</string>
+    <string name="player_video_surface">视频画面</string>
+    <string name="player_controls_show">显示控制条</string>
+    <string name="player_controls_hide">隐藏控制条</string>
+    <string name="player_status_cd">播放状态：%1$s</string>
+    <string name="player_first_frame_ready">首帧已就绪</string>
+
+    <!-- Browse a11y -->
+    <string name="browse_loading_cd">正在加载目录</string>
+    <string name="browse_entry_cd">%1$s，%2$s</string>
+    <string name="browse_error_cd">浏览失败：%1$s</string>
+
+    <!-- Recent a11y -->
+    <string name="recent_item_cd">最近播放：%1$s</string>
+    <string name="recent_progress_cd">进度 %1$d%%</string>
 
     <!-- Recent -->
     <string name="recent_title">最近播放</string>

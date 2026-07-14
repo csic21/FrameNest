@@ -1,5 +1,6 @@
 package com.framenest.navigation
 
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.window.core.layout.WindowSizeClass
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -35,6 +36,23 @@ class AdaptiveLayoutPolicyTest {
             minHeightDp = WindowSizeClass.HEIGHT_DP_MEDIUM_LOWER_BOUND,
         )
         assertTrue(shouldUseListDetailLayout(expanded))
+    }
+
+    @Test
+    fun isPlayerRoute_detectsPlayerAndNotBrowse() {
+        assertTrue(isPlayerRoute("player/{serverId}?share={share}&path={path}"))
+        assertTrue(isPlayerRoute(FrameNestRoutes.player("s1", "media", "a.mkv")))
+        assertFalse(isPlayerRoute(FrameNestRoutes.SERVERS_LIST))
+        assertFalse(isPlayerRoute(FrameNestRoutes.browse("s1", "media", "dir")))
+        assertFalse(isPlayerRoute(null))
+        assertFalse(isPlayerRoute("recent"))
+    }
+
+    @Test
+    fun navigationSuiteTestTag_coversBarRailNone() {
+        assertEquals("nav_suite_bar", navigationSuiteTestTag(NavigationSuiteType.NavigationBar))
+        assertEquals("nav_suite_rail", navigationSuiteTestTag(NavigationSuiteType.NavigationRail))
+        assertEquals("nav_suite_none", navigationSuiteTestTag(NavigationSuiteType.None))
     }
 
     @Test

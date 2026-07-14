@@ -12,7 +12,7 @@
 | FN-05 SMB 播放与历史 | 已完成 | agent | agent/FN-05-smb-playback → main | FN-01..FN-04 | [FN-05](handoffs/FN-05.md) |
 | FN-06 字幕 | 未开始 |  |  | FN-04, FN-05 |  |
 | FN-07 缩略图与首帧 | 未开始 |  |  | FN-02, FN-04, FN-05 |  |
-| FN-08 自适应体验打磨 | 未开始 |  |  | FN-04, FN-05 |  |
+| FN-08 自适应体验打磨 | 待集成 | agent | agent/FN-08-adaptive-polish | FN-04, FN-05 | [FN-08](handoffs/FN-08.md) |
 | FN-09 稳定与发布 | 未开始 |  |  | FN-04..FN-08 |  |
 
 ## Wave 2 集成结果
