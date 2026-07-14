@@ -2,7 +2,14 @@ package com.framenest.feature.player
 
 import android.widget.FrameLayout
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.viewinterop.AndroidView
 import com.framenest.player.PlayerController
 
@@ -17,6 +24,10 @@ import com.framenest.player.PlayerController
  * - On dispose, detach views but leave player release to the Activity lifecycle
  *   so configuration changes can re-attach cleanly if needed
  *
+ * Avoid calling [PlayerController.refreshVideoSurfaces] on every recomposition —
+ * that resets libVLC surfaces and freezes the picture at the first decoded frame
+ * while the UI still reports "Playing".
+ *
  * Do not put Compose draw modifiers that clip/hardware-layer the surface in ways
  * that prevent the SurfaceView from compositing correctly.
  */
@@ -25,17 +36,44 @@ fun VlcVideoSurface(
     controller: PlayerController,
     modifier: Modifier = Modifier,
 ) {
+    val configuration = LocalConfiguration.current
+    var lastWidth by remember { mutableIntStateOf(0) }
+    var lastHeight by remember { mutableIntStateOf(0) }
+
+    // Only when orientation / window size class actually changes — and only after
+    // a frame is ready so prepare is not interrupted by surface rebuilds.
+    LaunchedEffect(
+        configuration.orientation,
+        configuration.screenWidthDp,
+        configuration.screenHeightDp,
+    ) {
+        if (controller.state.value.firstFrameReady) {
+            controller.refreshVideoSurfaces()
+        }
+    }
+
     AndroidView(
-        modifier = modifier,
+        modifier = modifier.onSizeChanged { size ->
+            if (size.width <= 0 || size.height <= 0) return@onSizeChanged
+            if (size.width == lastWidth && size.height == lastHeight) return@onSizeChanged
+            lastWidth = size.width
+            lastHeight = size.height
+            if (controller.state.value.firstFrameReady) {
+                controller.refreshVideoSurfaces()
+            }
+        },
         factory = { context ->
             FrameLayout(context).also { container ->
                 controller.attachVideoLayout(container)
             }
         },
         update = { container ->
+            // Re-bind only; do not refresh surfaces every recomposition.
             controller.attachVideoLayout(container)
         },
         onRelease = {
+            // Detach video output only — do not stop/release the player here.
+            // Player lifecycle is owned by PlayerViewModel.onCleared.
             controller.detachVideoLayout()
         },
     )

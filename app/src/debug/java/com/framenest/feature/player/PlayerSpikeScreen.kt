@@ -154,6 +154,15 @@ fun PlayerSpikeScreen(
             ) {
                 Text("+1s")
             }
+            Button(
+                onClick = {
+                    controller.setVideoScaleMode(state.videoScaleMode.next())
+                },
+                enabled = state.firstFrameReady,
+                modifier = Modifier.semantics { contentDescription = "player_video_scale" },
+            ) {
+                Text("Scale:${state.videoScaleMode.name}")
+            }
         }
 
         Spacer(Modifier.height(16.dp))
@@ -210,6 +219,7 @@ private fun statusLine(state: PlayerState): String = buildString {
     append("phase=${state.phase}")
     append(" · firstFrame=${state.firstFrameReady}")
     append(" · seekable=${state.isSeekable}")
+    append(" · scale=${state.videoScaleMode}")
     append(" · hw=${state.hwDecoderRequested}")
     state.error?.let { append(" · error=${it.code}") }
 }

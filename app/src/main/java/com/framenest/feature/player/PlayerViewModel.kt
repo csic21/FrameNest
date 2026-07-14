@@ -42,6 +42,7 @@ import com.framenest.player.PlayerState
 import com.framenest.player.SmbCredentials
 import com.framenest.player.SmbMediaUri
 import com.framenest.player.SmbSeekableMedia
+import com.framenest.player.VideoScaleMode
 import com.framenest.player.VlcPlayerController
 import com.framenest.smb.SmbException
 import com.framenest.smb.SmbjClient
@@ -59,6 +60,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Product player session: open media (path B preferred), first-frame paused,
@@ -135,11 +137,26 @@ class PlayerViewModel(
                 // After first frame ready, seek to resume position once.
                 if (state.firstFrameReady &&
                     startPositionMs > 0L &&
-                    state.phase == PlayerState.Phase.Ready
+                    (state.phase == PlayerState.Phase.Ready ||
+                        state.phase == PlayerState.Phase.Paused)
                 ) {
                     val target = startPositionMs
                     startPositionMs = 0L
-                    controller.seekTo(target)
+                    val duration = state.durationMs
+                    // Re-apply completion rule with the real media length so a bad
+                    // history row (duration 0 / wrong length) does not seek to EOF.
+                    val safeTarget = if (duration > 0L &&
+                        PlaybackProgressRules.isCompleted(target, duration)
+                    ) {
+                        0L
+                    } else if (duration > 0L) {
+                        target.coerceIn(0L, (duration - 1_000L).coerceAtLeast(0L))
+                    } else {
+                        target
+                    }
+                    if (safeTarget > 0L) {
+                        controller.seekTo(safeTarget)
+                    }
                 }
                 if (state.firstFrameReady && !subtitleBootstrapDone) {
                     subtitleBootstrapDone = true
@@ -288,6 +305,11 @@ class PlayerViewModel(
     }
 
     fun play() {
+        val phase = controller.state.value.phase
+        if (phase == PlayerState.Phase.Error) {
+            retry()
+            return
+        }
         if (!audioFocus.request()) {
             Log.w(TAG, "Audio focus not granted; playing anyway")
         }
@@ -295,12 +317,23 @@ class PlayerViewModel(
     }
 
     fun pause() {
+        if (controller.state.value.phase != PlayerState.Phase.Playing) return
         controller.pause()
         viewModelScope.launch { saveProgressNow(force = true) }
     }
 
     fun seekTo(positionMs: Long) {
         controller.seekTo(positionMs)
+    }
+
+    /** Cycle BestFit → FitScreen → Fill → 16:9 → 4:3 → Original. */
+    fun cycleVideoScaleMode() {
+        val next = controller.state.value.videoScaleMode.next()
+        controller.setVideoScaleMode(next)
+    }
+
+    fun setVideoScaleMode(mode: VideoScaleMode) {
+        controller.setVideoScaleMode(mode)
     }
 
     fun selectSubtitleOff() {
@@ -344,7 +377,12 @@ class PlayerViewModel(
 
     fun retry() {
         viewModelScope.launch {
-            teardownMediaResources()
+            // Close proxy FD / media first so SmbRandomAccess can release cleanly,
+            // then disconnect SMB off the main thread.
+            (controller as? VlcPlayerController)?.closeCurrentMedia()
+            withContext(Dispatchers.IO) {
+                teardownMediaResources()
+            }
             subtitleBootstrapDone = false
             _subtitleUiState.value = SubtitleUiState(
                 delayMs = _subtitleUiState.value.delayMs,
@@ -451,6 +489,34 @@ class PlayerViewModel(
         try {
             client.connect(sessionCreds)
             val randomAccess = client.openRandomAccess(dataSource.share, dataSource.path)
+            val size = randomAccess.size
+            // Multi-GiB files frequently break ProxyFileDescriptor + libVLC imem
+            // ("stream: read error" / EncounteredError). Prefer path A (direct smb://
+            // + option credentials) for those sizes; keep path B for normal files.
+            if (size >= LARGE_SMB_FILE_BYTES) {
+                Log.i(
+                    TAG,
+                    "SMB file size=$size ≥ ${LARGE_SMB_FILE_BYTES}; " +
+                        "using libVLC direct smb:// for reliability",
+                )
+                runCatching { randomAccess.close() }
+                teardownSmbClientOnly()
+                val uri = SmbMediaUri.build(
+                    host = dataSource.host,
+                    share = dataSource.share,
+                    path = dataSource.path,
+                    port = dataSource.port,
+                )
+                val passwordString = String(dataSource.password)
+                return MediaSource.Smb(
+                    uri = uri,
+                    credentials = SmbCredentials(
+                        username = dataSource.username,
+                        password = passwordString,
+                        domain = dataSource.domain.ifEmpty { null },
+                    ),
+                )
+            }
             val opened = SmbSeekableMedia.open(
                 context = getApplication(),
                 randomAccess = randomAccess,
@@ -750,8 +816,11 @@ class PlayerViewModel(
                 state.phase != PlayerState.Phase.Error &&
                 state.phase != PlayerState.Phase.Preparing
             ) {
+                // Bound save so a slow Room write cannot freeze leave forever.
                 runBlocking {
-                    saveProgressNow(force = true)
+                    withTimeoutOrNull(2_000L) {
+                        saveProgressNow(force = true)
+                    }
                 }
             }
         }
@@ -762,8 +831,27 @@ class PlayerViewModel(
         mlKitMt.close()
         stopProgressLoop()
         audioFocus.abandon()
-        controller.release()
-        teardownSmbClientOnly()
+        // Stop VLC + close proxy AFD first (releases SmbRandomAccess), then SMB session.
+        runCatching { controller.release() }
+        // Capture clients and tear down off the main thread without unbounded runBlocking
+        // (SMB disconnect hang was freezing leave and ANR/crash).
+        val clients = listOfNotNull(smbClient, listenOnlySmbClient)
+        smbClient = null
+        listenOnlySmbClient = null
+        if (clients.isNotEmpty()) {
+            Thread(
+                {
+                    clients.forEach { client ->
+                        runCatching { client.disconnect() }
+                        runCatching { client.close() }
+                    }
+                },
+                "framenest-smb-teardown",
+            ).apply {
+                isDaemon = true
+                start()
+            }
+        }
         runCatching { subtitleLoader.clearCache() }
         super.onCleared()
     }
@@ -802,6 +890,12 @@ class PlayerViewModel(
 
     companion object {
         private const val TAG = "FrameNestPlayerVM"
+
+        /**
+         * At/above this size, prefer libVLC direct `smb://` over ProxyFileDescriptor
+         * (path B). Multi-GiB MP4s hit imem read errors with fixed AFD lengths.
+         */
+        private const val LARGE_SMB_FILE_BYTES: Long = 1L shl 32 // 4 GiB
 
         private object PendingListenEngine : ListenTranslateEngine {
             override val asrModelId: String = "pending"

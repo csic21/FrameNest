@@ -2,9 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Debug-only spike harnesses (adb launch; not exported to other apps). -->
     <application>
+        <!-- exported=true: API 34+ shell cannot start non-exported activities via adb. -->
         <activity
             android:name=".feature.player.PlayerSpikeActivity"
-            android:exported="false"
+            android:exported="true"
             android:theme="@style/Theme.FrameNest" />
         <activity
             android:name=".smb.spike.SmbSpikeActivity"

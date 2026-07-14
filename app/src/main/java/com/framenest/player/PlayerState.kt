@@ -24,6 +24,11 @@ data class PlayerState(
      * Default 16 matches libVLC's typical freetype-rel-fontsize.
      */
     val subtitleFontRelSize: Int = 16,
+    /**
+     * How the decoded frame is fit into the video surface.
+     * Default [VideoScaleMode.BestFit] preserves aspect (no stretch).
+     */
+    val videoScaleMode: VideoScaleMode = VideoScaleMode.BestFit,
     val hwDecoderRequested: Boolean = true,
     val error: PlayerError? = null,
 ) {

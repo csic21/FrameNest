@@ -41,8 +41,9 @@ object SmbSeekableMedia {
             ?: throw IOException("StorageManager unavailable")
 
         val closed = AtomicBoolean(false)
+        val totalSize = randomAccess.size.coerceAtLeast(0L)
         val callback = object : ProxyFileDescriptorCallback() {
-            override fun onGetSize(): Long = randomAccess.size
+            override fun onGetSize(): Long = totalSize
 
             @Throws(ErrnoException::class)
             override fun onRead(offset: Long, size: Int, data: ByteArray): Int {
@@ -52,6 +53,10 @@ object SmbSeekableMedia {
                 if (offset < 0 || size < 0) {
                     throw ErrnoException("onRead", OsConstants.EINVAL)
                 }
+                // EOF past end — return 0 (POSIX-style), do not throw.
+                if (offset >= totalSize || size == 0) {
+                    return 0
+                }
                 return try {
                     val n = randomAccess.readAt(offset, data, 0, size)
                     when {
@@ -59,6 +64,11 @@ object SmbSeekableMedia {
                         else -> n
                     }
                 } catch (e: IOException) {
+                    android.util.Log.w(
+                        "FrameNestPlayer",
+                        "proxy onRead failed label=$debugLabel offset=$offset size=$size " +
+                            "fileSize=$totalSize: ${e.javaClass.simpleName}: ${e.message}",
+                    )
                     throw ErrnoException("onRead", OsConstants.EIO)
                 }
             }
@@ -78,8 +88,20 @@ object SmbSeekableMedia {
             callback,
             handler,
         )
-        val length = randomAccess.size.coerceAtLeast(0L)
-        val afd = AssetFileDescriptor(pfd, 0L, length)
+        // For files ≥ 4GiB, a fixed AFD length can overflow/mis-handle in libVLC's
+        // nativeNewFromFdWithOffsetLength and produce "stream: read error" / cannot peek.
+        // UNKNOWN_LENGTH + Media(FileDescriptor) lets VLC size via fstat/onGetSize.
+        val afdLength =
+            if (totalSize >= FOUR_GIB) {
+                AssetFileDescriptor.UNKNOWN_LENGTH
+            } else {
+                totalSize
+            }
+        val afd = AssetFileDescriptor(pfd, 0L, afdLength)
+        android.util.Log.i(
+            "FrameNestPlayer",
+            "SmbSeekableMedia open label=$debugLabel size=$totalSize afdLength=$afdLength",
+        )
         return SeekableOpenResult(
             mediaSource = MediaSource.SeekableDescriptor(
                 assetFileDescriptor = afd,
@@ -88,6 +110,8 @@ object SmbSeekableMedia {
             assetFileDescriptor = afd,
         )
     }
+
+    private const val FOUR_GIB = 1L shl 32
 
     data class SeekableOpenResult(
         val mediaSource: MediaSource.SeekableDescriptor,

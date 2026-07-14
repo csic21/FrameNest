@@ -1,6 +1,8 @@
 package com.framenest.player
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.res.AssetFileDescriptor
 import android.net.Uri
 import android.os.Handler
@@ -55,24 +57,51 @@ class VlcPlayerController(
 
     private var pendingSource: MediaSource? = null
     private var awaitingFirstFramePause: Boolean = false
+    /**
+     * True from [prepare] until the user calls [play]. Keeps phase at Ready after the
+     * first decoded frame and ignores stale Playing/EndReached events that would
+     * otherwise flash Playing → Paused or jump straight to Ended.
+     */
+    private var holdForUserPlay: Boolean = false
+    /**
+     * Set when [MediaPlayer.Event.EndReached] arrives while still holding for the user
+     * (stale EOF after first-frame pause). [play] restarts from 0 instead of no-op.
+     */
+    private var endedWhileHolding: Boolean = false
     private var released: Boolean = false
+    /**
+     * When true, ignore EndReached / EncounteredError from intentional stop/release
+     * so [closeCurrentMedia] does not leave UI stuck on [PlayerState.Phase.Ended].
+     */
+    private var suppressTerminalEvents: Boolean = false
     /** Owned AFD from path B; closed on re-prepare / release. */
     private var ownedSeekableAfd: AssetFileDescriptor? = null
     private var subtitleDelayMs: Long = 0L
     private var subtitleFontRelSize: Int = DEFAULT_SUBTITLE_FONT_REL_SIZE
+    private var videoScaleMode: VideoScaleMode = VideoScaleMode.BestFit
 
     private val eventListener = MediaPlayer.EventListener { event ->
         if (released) return@EventListener
         when (event.type) {
             MediaPlayer.Event.Opening -> {
+                // New media is opening — stop suppressing residual EndReached from prior stop().
+                if (suppressTerminalEvents) {
+                    suppressTerminalEvents = false
+                }
                 _state.update { it.copy(phase = PlayerState.Phase.Preparing, error = null) }
             }
             MediaPlayer.Event.Buffering -> {
                 // Keep Preparing until first frame; ignore mid-stream buffering noise.
             }
             MediaPlayer.Event.Playing -> {
-                if (awaitingFirstFramePause) {
-                    // Wait for Vout; some devices fire Playing slightly before surface paint.
+                if (suppressTerminalEvents) return@EventListener
+                // Hold first-frame gate until user explicitly calls play(): late Playing
+                // events after Vout+pause must not flip Ready → Playing (then → Paused).
+                if (awaitingFirstFramePause || holdForUserPlay) {
+                    Log.i(
+                        TAG,
+                        "Playing ignored (awaitingFirst=$awaitingFirstFramePause holdForUser=$holdForUserPlay)",
+                    )
                     return@EventListener
                 }
                 _state.update {
@@ -83,17 +112,22 @@ class VlcPlayerController(
                 }
             }
             MediaPlayer.Event.Paused -> {
+                if (suppressTerminalEvents) return@EventListener
                 _state.update {
-                    val phase = if (it.firstFrameReady && !awaitingFirstFramePause) {
-                        if (it.phase == PlayerState.Phase.Preparing || it.phase == PlayerState.Phase.Ready) {
-                            PlayerState.Phase.Ready
-                        } else {
-                            PlayerState.Phase.Paused
+                    val phase = when {
+                        // Still preparing first frame or holding for user tap: stay Ready once framed.
+                        holdForUserPlay && it.firstFrameReady -> PlayerState.Phase.Ready
+                        it.firstFrameReady && !awaitingFirstFramePause -> {
+                            if (it.phase == PlayerState.Phase.Preparing ||
+                                it.phase == PlayerState.Phase.Ready
+                            ) {
+                                PlayerState.Phase.Ready
+                            } else {
+                                PlayerState.Phase.Paused
+                            }
                         }
-                    } else if (it.firstFrameReady) {
-                        PlayerState.Phase.Ready
-                    } else {
-                        it.phase
+                        it.firstFrameReady -> PlayerState.Phase.Ready
+                        else -> it.phase
                     }
                     it.copy(phase = phase)
                 }
@@ -102,15 +136,67 @@ class VlcPlayerController(
                 // no-op; release path handles teardown
             }
             MediaPlayer.Event.EndReached -> {
+                if (suppressTerminalEvents) {
+                    Log.i(TAG, "EndReached ignored (suppressed during stop/close)")
+                    return@EventListener
+                }
+                val player = mediaPlayer
+                val pos = player?.time ?: _state.value.positionMs
+                val len = player?.length ?: _state.value.durationMs
+                Log.i(
+                    TAG,
+                    "EndReached pos=$pos len=$len firstFrame=${_state.value.firstFrameReady} " +
+                        "awaitingFirst=$awaitingFirstFramePause holdForUser=$holdForUserPlay " +
+                        "phase=${_state.value.phase}",
+                )
+                // Spurious EOF during open (bad FD / zero-length / demux) must not
+                // look like a finished movie with a permanent loading spinner.
+                if (awaitingFirstFramePause || !_state.value.firstFrameReady) {
+                    awaitingFirstFramePause = false
+                    holdForUserPlay = false
+                    val message = CredentialRedactor.redact(
+                        "Playback ended before a video frame was ready",
+                    )
+                    Log.w(TAG, message)
+                    _state.update {
+                        it.copy(
+                            phase = PlayerState.Phase.Error,
+                            error = PlayerError(
+                                code = PlayerError.Code.OpenFailed,
+                                message = message,
+                                retryable = true,
+                            ),
+                            firstFrameReady = false,
+                        )
+                    }
+                    return@EventListener
+                }
+                // Delayed/stale EndReached while still holding first frame (user has not
+                // tapped play) must not jump Ready → Ended. Common after stop()+setMedia
+                // or pause-on-Vout races with short samples / proxy FDs.
+                if (holdForUserPlay) {
+                    endedWhileHolding = true
+                    Log.w(
+                        TAG,
+                        "EndReached ignored while holding first frame for user play " +
+                            "(will restart on play)",
+                    )
+                    return@EventListener
+                }
                 awaitingFirstFramePause = false
+                holdForUserPlay = false
                 _state.update {
                     it.copy(
                         phase = PlayerState.Phase.Ended,
-                        positionMs = it.durationMs,
+                        positionMs = it.durationMs.takeIf { d -> d > 0 } ?: pos.coerceAtLeast(0L),
                     )
                 }
             }
             MediaPlayer.Event.EncounteredError -> {
+                if (suppressTerminalEvents) {
+                    Log.i(TAG, "EncounteredError ignored (suppressed during stop/close)")
+                    return@EventListener
+                }
                 awaitingFirstFramePause = false
                 val message = CredentialRedactor.redact("Playback failed (libVLC EncounteredError)")
                 Log.w(TAG, message)
@@ -150,7 +236,9 @@ class VlcPlayerController(
     override fun attachVideoLayout(container: ViewGroup) {
         if (released) return
         ensureEngine()
-        val layout = videoLayout ?: VLCVideoLayout(appContext).also { videoLayout = it }
+        // VideoHelper.updateVideoSurfaces() resolves Activity via VLCVideoLayout.context.
+        // Using applicationContext makes every setVideoScale / aspect cycle a silent no-op.
+        val layout = obtainVideoLayout(container)
         if (layout.parent !== container) {
             (layout.parent as? ViewGroup)?.removeView(layout)
             container.removeAllViews()
@@ -167,8 +255,41 @@ class VlcPlayerController(
             // args: layout, displayManager, subtitles, useTextureView
             player.attachViews(layout, null, true, false)
             viewsAttached = true
+            // VideoHelper exists only after attach — set scale once, not on every recomposition.
+            applyVideoScale(player)
         }
         tryStartPendingIfReady()
+    }
+
+    /**
+     * Prefer a UI/Activity context so libVLC can measure the window and apply scale modes.
+     * Recreate the layout if a previous instance was built with applicationContext.
+     */
+    private fun obtainVideoLayout(container: ViewGroup): VLCVideoLayout {
+        val hostContext = container.context
+        val existing = videoLayout
+        if (existing != null && isActivityContext(existing.context)) {
+            return existing
+        }
+        if (existing != null) {
+            Log.i(TAG, "Recreating VLCVideoLayout with Activity context for scale modes")
+            if (viewsAttached) {
+                runCatching { mediaPlayer?.detachViews() }
+                viewsAttached = false
+            }
+            (existing.parent as? ViewGroup)?.removeView(existing)
+            videoLayout = null
+        }
+        return VLCVideoLayout(hostContext).also { videoLayout = it }
+    }
+
+    private fun isActivityContext(context: Context): Boolean {
+        var current: Context? = context
+        while (current is ContextWrapper) {
+            if (current is Activity) return true
+            current = current.baseContext
+        }
+        return false
     }
 
     override fun detachVideoLayout() {
@@ -218,6 +339,9 @@ class VlcPlayerController(
         }
         pendingSource = source
         awaitingFirstFramePause = true
+        holdForUserPlay = true
+        endedWhileHolding = false
+        suppressTerminalEvents = false
         _state.update {
             PlayerState(
                 phase = PlayerState.Phase.Preparing,
@@ -225,9 +349,40 @@ class VlcPlayerController(
                 firstFrameReady = false,
                 subtitleDelayMs = subtitleDelayMs,
                 subtitleFontRelSize = subtitleFontRelSize,
+                videoScaleMode = videoScaleMode,
             )
         }
         tryStartPendingIfReady()
+    }
+
+    /**
+     * Stops current media and closes any owned seekable AFD without releasing the engine.
+     * Call before tearing down the SMB session that backs a [MediaSource.SeekableDescriptor].
+     */
+    fun closeCurrentMedia() {
+        if (released) return
+        awaitingFirstFramePause = false
+        holdForUserPlay = false
+        endedWhileHolding = false
+        pendingSource = null
+        suppressTerminalEvents = true
+        val player = mediaPlayer
+        if (player != null) {
+            runCatching { player.stop() }
+            runCatching { player.media = null }
+        }
+        closeOwnedSeekableAfd()
+        _state.update {
+            PlayerState(
+                phase = PlayerState.Phase.Idle,
+                hwDecoderRequested = enableHwDecoder,
+                subtitleDelayMs = subtitleDelayMs,
+                subtitleFontRelSize = subtitleFontRelSize,
+                videoScaleMode = videoScaleMode,
+            )
+        }
+        // Clear after libVLC has delivered any async EndReached from stop().
+        mainHandler.postDelayed({ suppressTerminalEvents = false }, 250L)
     }
 
     /**
@@ -237,6 +392,8 @@ class VlcPlayerController(
     fun reportExternalError(error: PlayerError) {
         if (released) return
         awaitingFirstFramePause = false
+        holdForUserPlay = false
+        endedWhileHolding = false
         pendingSource = null
         val safe = error.copy(message = CredentialRedactor.redact(error.message))
         Log.w(TAG, "external error code=${safe.code} msg=${safe.message}")
@@ -252,7 +409,35 @@ class VlcPlayerController(
     override fun play() {
         if (released) return
         val player = mediaPlayer ?: return
+        val phase = _state.value.phase
+        if (phase == PlayerState.Phase.Error ||
+            phase == PlayerState.Phase.Idle ||
+            phase == PlayerState.Phase.Preparing
+        ) {
+            // Nothing useful to resume; caller should retry/prepare again.
+            Log.w(TAG, "play() ignored in phase=$phase")
+            return
+        }
         awaitingFirstFramePause = false
+        holdForUserPlay = false
+        suppressTerminalEvents = false
+        val length = player.length.takeIf { it > 0 } ?: _state.value.durationMs
+        val time = player.time.coerceAtLeast(0L)
+        // Restart when already at/near EOF (stale pause after full decode, bad resume
+        // seek, short sample that finished during first-frame priming, or EndReached
+        // ignored while holding for the user).
+        val atOrPastEnd = phase == PlayerState.Phase.Ended ||
+            endedWhileHolding ||
+            (length > 0L && time >= (length - END_EPSILON_MS).coerceAtLeast(0L))
+        endedWhileHolding = false
+        if (atOrPastEnd) {
+            Log.i(TAG, "play() restart from 0 (phase=$phase time=$time length=$length)")
+            // Prefer seek-to-start over stop(): stop() can drop the media/surface binding.
+            runCatching { player.time = 0L }
+            _state.update { it.copy(positionMs = 0L) }
+        } else {
+            Log.i(TAG, "play() phase=$phase time=$time length=$length")
+        }
         player.play()
         _state.update { it.copy(phase = PlayerState.Phase.Playing, error = null) }
     }
@@ -260,6 +445,7 @@ class VlcPlayerController(
     override fun pause() {
         if (released) return
         val player = mediaPlayer ?: return
+        if (_state.value.phase != PlayerState.Phase.Playing) return
         player.pause()
         _state.update {
             it.copy(
@@ -271,6 +457,13 @@ class VlcPlayerController(
     override fun seekTo(positionMs: Long) {
         if (released) return
         val player = mediaPlayer ?: return
+        val phase = _state.value.phase
+        if (phase == PlayerState.Phase.Error ||
+            phase == PlayerState.Phase.Idle ||
+            phase == PlayerState.Phase.Preparing
+        ) {
+            return
+        }
         if (!player.isSeekable && _state.value.durationMs <= 0L) return
         val duration = player.length.takeIf { it > 0 } ?: _state.value.durationMs
         val clamped = positionMs.coerceIn(0L, if (duration > 0) duration else positionMs)
@@ -361,11 +554,36 @@ class VlcPlayerController(
         }
     }
 
+    override fun setVideoScaleMode(mode: VideoScaleMode) {
+        if (released) return
+        if (mode == videoScaleMode && _state.value.videoScaleMode == mode) {
+            // Still re-apply in case the surface was recreated with a different scale.
+            mediaPlayer?.let { applyVideoScale(it) }
+            return
+        }
+        videoScaleMode = mode
+        _state.update { it.copy(videoScaleMode = mode) }
+        Log.i(TAG, "videoScaleMode=$mode viewsAttached=$viewsAttached")
+        mediaPlayer?.let { applyVideoScale(it) }
+    }
+
+    override fun refreshVideoSurfaces() {
+        if (released || !viewsAttached) return
+        val player = mediaPlayer ?: return
+        // Layout/orientation change only — do not reassign scale (that also
+        // triggers a full surface rebuild and can freeze the current frame).
+        runCatching { player.updateVideoSurfaces() }
+            .onFailure { t -> Log.w(TAG, "refreshVideoSurfaces failed: ${t.message}") }
+    }
+
     override fun release() {
         if (released) return
         released = true
         awaitingFirstFramePause = false
+        holdForUserPlay = false
+        endedWhileHolding = false
         pendingSource = null
+        suppressTerminalEvents = true
         mainHandler.removeCallbacksAndMessages(null)
 
         val player = mediaPlayer
@@ -387,13 +605,41 @@ class VlcPlayerController(
         }
         videoLayout = null
 
+        // Close AFD after media player is stopped/released so proxy reads stop first.
         closeOwnedSeekableAfd()
 
         val vlc = libVlc
         libVlc = null
         runCatching { vlc?.release() }
 
-        _state.value = PlayerState(phase = PlayerState.Phase.Idle, hwDecoderRequested = enableHwDecoder)
+        _state.value = PlayerState(
+            phase = PlayerState.Phase.Idle,
+            hwDecoderRequested = enableHwDecoder,
+            videoScaleMode = videoScaleMode,
+        )
+    }
+
+    private fun applyVideoScale(player: MediaPlayer) {
+        if (!viewsAttached) {
+            Log.w(TAG, "applyVideoScale skipped (views not attached) mode=$videoScaleMode")
+            return
+        }
+        val layoutCtx = videoLayout?.context
+        if (layoutCtx != null && !isActivityContext(layoutCtx)) {
+            Log.w(
+                TAG,
+                "applyVideoScale: VLCVideoLayout has non-Activity context; " +
+                    "libVLC scale modes will not apply until re-attach",
+            )
+        }
+        runCatching {
+            // setVideoScale already calls VideoHelper.updateVideoSurfaces().
+            // Do not call updateVideoSurfaces again — double rebuild freezes frames.
+            player.videoScale = videoScaleMode.toLibVlcScaleType()
+            Log.i(TAG, "applyVideoScale ok mode=$videoScaleMode")
+        }.onFailure { t ->
+            Log.w(TAG, "applyVideoScale failed: ${t.message}")
+        }
     }
 
     private fun closeOwnedSeekableAfd() {
@@ -410,8 +656,8 @@ class VlcPlayerController(
             // Prefer OpenSL ES; keep options minimal for spike reproducibility.
             add("--aout=opensles")
             add("--audio-time-stretch")
-            // Avoid verbose credential-bearing logs in logcat.
-            add("-q")
+            // Reduce noise; app logs redacted errors via FrameNestPlayer.
+            add("--verbose=0")
         }
         val vlc = LibVLC(appContext, options)
         libVlc = vlc
@@ -428,6 +674,16 @@ class VlcPlayerController(
             return
         }
         pendingSource = null
+        // stop()/media=null can emit EndReached asynchronously. Stay suppressed until
+        // Opening for the new media (see event listener) or a short safety timeout.
+        suppressTerminalEvents = true
+        runCatching { player.stop() }
+        runCatching { player.media = null }
+        mainHandler.postDelayed({
+            if (!released && suppressTerminalEvents) {
+                suppressTerminalEvents = false
+            }
+        }, 250L)
         val media = createMedia(source) ?: return
         try {
             player.media = media
@@ -436,6 +692,9 @@ class VlcPlayerController(
             player.play()
         } catch (t: Throwable) {
             media.release()
+            holdForUserPlay = false
+            awaitingFirstFramePause = false
+            suppressTerminalEvents = false
             val msg = CredentialRedactor.redact(t.message ?: "Failed to open media")
             Log.w(TAG, "prepare failed: $msg")
             _state.update {
@@ -461,9 +720,20 @@ class VlcPlayerController(
             is MediaSource.ContentUri -> Media(vlc, source.uri)
             is MediaSource.RawResource -> createRawMedia(vlc, source.resId) ?: return null
             is MediaSource.SeekableDescriptor -> {
-                Log.i(TAG, "Opening seekable descriptor label=${source.debugLabel}")
-                // libVLC takes the FD; we still close our AFD wrapper on release.
-                Media(vlc, source.assetFileDescriptor)
+                val afd = source.assetFileDescriptor
+                val declared = afd.length
+                Log.i(
+                    TAG,
+                    "Opening seekable descriptor label=${source.debugLabel} " +
+                        "declaredLength=$declared",
+                )
+                // Proxy FD path (decision 0002 B):
+                // - Prefer bare FileDescriptor (nativeNewFromFd + fstat/onGetSize).
+                // - Media(AFD) uses nativeNewFromFdWithOffsetLength; for files ≥4GiB
+                //   that path has produced VLC "stream: read error" / "cannot peek"
+                //   / EncounteredError on real NAS samples (~7.5GiB mp4).
+                // Keep the AFD open for the session (ownedSeekableAfd).
+                Media(vlc, afd.fileDescriptor)
             }
             is MediaSource.Smb -> {
                 val smbMedia = Media(vlc, source.uri)
@@ -473,8 +743,9 @@ class VlcPlayerController(
         }
         media.setHWDecoderEnabled(enableHwDecoder, /* force = */ false)
         media.setDefaultMediaPlayerOptions()
-        // Slight network cache helps SMB / remote FD; harmless for local.
-        media.addOption(":network-caching=1500")
+        // Remote/proxy FD benefits from a larger cache (esp. large MP4 with moov-at-end).
+        media.addOption(":network-caching=3000")
+        media.addOption(":file-caching=3000")
         // Prefer UTF-8 for text subs; font size via freetype relative size.
         media.addOption(":subsdec-encoding=UTF-8")
         media.addOption(":freetype-rel-fontsize=$subtitleFontRelSize")
@@ -522,20 +793,36 @@ class VlcPlayerController(
             refreshTracks()
             return
         }
+        // Pause first so the decoded frame sticks. Keep holdForUserPlay=true until
+        // user taps play (see play()).
         awaitingFirstFramePause = false
         val player = mediaPlayer
         player?.pause()
         refreshTracks()
+        val length = player?.length?.coerceAtLeast(0L) ?: 0L
+        val time = player?.time?.coerceAtLeast(0L) ?: 0L
         _state.update {
             it.copy(
                 phase = PlayerState.Phase.Ready,
                 firstFrameReady = true,
-                durationMs = player?.length?.coerceAtLeast(0L) ?: it.durationMs,
-                positionMs = player?.time?.coerceAtLeast(0L) ?: it.positionMs,
+                durationMs = length.takeIf { d -> d > 0 } ?: it.durationMs,
+                positionMs = time,
                 isSeekable = player?.isSeekable == true,
             )
         }
-        Log.i(TAG, "first frame ready (paused); hwDecoderRequested=$enableHwDecoder")
+        Log.i(
+            TAG,
+            "first frame ready (paused); time=$time length=$length " +
+                "hwDecoderRequested=$enableHwDecoder holdForUser=$holdForUserPlay " +
+                "scale=$videoScaleMode",
+        )
+        // Defer scale apply one tick so VideoHelper has video size from this vout and
+        // we do not rebuild the surface in the middle of the pause transition.
+        mainHandler.post {
+            if (released || !viewsAttached) return@post
+            val p = mediaPlayer ?: return@post
+            applyVideoScale(p)
+        }
     }
 
     private fun refreshTracks() {
@@ -558,6 +845,8 @@ class VlcPlayerController(
 
     private fun failOpen(message: String) {
         awaitingFirstFramePause = false
+        holdForUserPlay = false
+        endedWhileHolding = false
         val safe = CredentialRedactor.redact(message)
         _state.update {
             it.copy(
@@ -577,6 +866,8 @@ class VlcPlayerController(
         private const val DEFAULT_SUBTITLE_FONT_REL_SIZE = 16
         private const val MIN_SUBTITLE_FONT_REL_SIZE = 8
         private const val MAX_SUBTITLE_FONT_REL_SIZE = 32
+        /** Treat as EOF when remaining time is within this window (ms). */
+        private const val END_EPSILON_MS: Long = 400L
 
         /** Sample SMB URI used in docs / manual tests (no credentials). */
         fun sampleSmbUri(
@@ -585,4 +876,13 @@ class VlcPlayerController(
             path: String = "samples/movie.mkv",
         ): Uri = SmbMediaUri.build(host, share, path)
     }
+}
+
+private fun VideoScaleMode.toLibVlcScaleType(): MediaPlayer.ScaleType = when (this) {
+    VideoScaleMode.BestFit -> MediaPlayer.ScaleType.SURFACE_BEST_FIT
+    VideoScaleMode.FitScreen -> MediaPlayer.ScaleType.SURFACE_FIT_SCREEN
+    VideoScaleMode.Fill -> MediaPlayer.ScaleType.SURFACE_FILL
+    VideoScaleMode.Ratio16_9 -> MediaPlayer.ScaleType.SURFACE_16_9
+    VideoScaleMode.Ratio4_3 -> MediaPlayer.ScaleType.SURFACE_4_3
+    VideoScaleMode.Original -> MediaPlayer.ScaleType.SURFACE_ORIGINAL
 }

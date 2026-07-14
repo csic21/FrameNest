@@ -1,6 +1,8 @@
 package com.framenest.feature.player
 
+import android.app.Activity
 import android.app.Application
+import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -31,7 +34,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -41,12 +47,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -54,16 +66,29 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.framenest.R
 import com.framenest.core.model.PlaybackRequest
+import com.framenest.feature.listen_translate.ListenDisplayMode
 import com.framenest.feature.listen_translate.ListenTranslateControls
 import com.framenest.feature.listen_translate.ListenTranslateOverlay
+import com.framenest.feature.listen_translate.ListenTranslateUiState
+import com.framenest.feature.subtitle.ExternalSubtitleOption
 import com.framenest.feature.subtitle.SubtitleControls
+import com.framenest.feature.subtitle.SubtitleUiState
+import com.framenest.player.PlayerController
 import com.framenest.player.PlayerState
+import com.framenest.player.PlayerTrack
+import com.framenest.player.VideoScaleMode
 
 /**
  * Product player UI: loading / ready / playing / paused / ended / error + retry.
  *
  * Opens with prepare → first decoded frame paused ([PlayerState.firstFrameReady]);
  * user taps play to start (product requirement).
+ *
+ * Orientation:
+ * - **Portrait**: video in the middle column, solid chrome below (and panels).
+ * - **Landscape**: video fills the window; chrome / panels overlay bottom.
+ * Video scale (BestFit by default) is re-applied on rotation so landscape
+ * sources are not stretched when the surface size changes.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,11 +107,16 @@ fun PlayerScreen(
     val listenUi by vm.listenTranslateUiState.collectAsStateWithLifecycle()
     var showSubtitles by remember { mutableStateOf(false) }
     var showListenTranslate by remember { mutableStateOf(false) }
+    var chromeVisible by remember { mutableStateOf(true) }
     val lifecycleOwner = LocalLifecycleOwner.current
+    val configuration = LocalConfiguration.current
+    // Orientation chrome only — not a device-model / width-bucket check.
+    val landscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     DisposableEffect(lifecycleOwner, vm) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
+                // Pause + save when app backgrounds; leave path also saves via BackHandler.
                 Lifecycle.Event.ON_STOP -> vm.onLeaveOrBackground()
                 else -> Unit
             }
@@ -94,194 +124,395 @@ fun PlayerScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            vm.onLeaveOrBackground()
+            // Do not call onLeaveOrBackground again here — BackHandler already did,
+            // and a second pass racing ViewModel.onCleared caused leave freezes.
         }
     }
 
-    BackHandler {
+    // Surface refresh on orientation is handled inside VlcVideoSurface — do not
+    // also thrash it from here on every state recomposition.
+
+    val immersive = state.phase == PlayerState.Phase.Playing && !chromeVisible && landscape
+    PlayerImmersiveEffect(enabled = immersive)
+
+    val leave: () -> Unit = {
         vm.onLeaveOrBackground()
         onBack()
     }
+
+    BackHandler(onBack = leave)
+
+    // Keep chrome visible when not actively playing so users can always reach controls.
+    val showChrome = chromeVisible || state.phase != PlayerState.Phase.Playing
+    val showBottomPanels = showChrome && (showListenTranslate || showSubtitles)
 
     Scaffold(
         modifier = modifier
             .fillMaxSize()
             .testTag("player_screen"),
+        containerColor = Color.Black,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = vm.displayName,
-                        modifier = Modifier.testTag("player_title"),
-                    )
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = {
-                            vm.onLeaveOrBackground()
-                            onBack()
-                        },
-                        modifier = Modifier.testTag("player_back"),
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.action_back),
+            if (showChrome) {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = vm.displayName,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.testTag("player_title"),
                         )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = {
-                            showListenTranslate = !showListenTranslate
-                            if (showListenTranslate) showSubtitles = false
-                        },
-                        modifier = Modifier
-                            .semantics { contentDescription = "player_listen_translate" }
-                            .testTag("player_listen_translate"),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Translate,
-                            contentDescription = stringResource(R.string.listen_translate_title),
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            showSubtitles = !showSubtitles
-                            if (showSubtitles) showListenTranslate = false
-                        },
-                        modifier = Modifier
-                            .semantics { contentDescription = "player_subtitles" }
-                            .testTag("player_subtitles"),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.ClosedCaption,
-                            contentDescription = stringResource(R.string.subtitle_section_title),
-                        )
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize(),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .background(Color.Black)
-                    .semantics { contentDescription = "player_video_surface" }
-                    .testTag("player_video_surface"),
-                contentAlignment = Alignment.Center,
-            ) {
-                VlcVideoSurface(
-                    controller = vm.controller,
-                    modifier = Modifier.fillMaxSize(),
-                )
-
-                // Gate playable / "tap to play" on real firstFrameReady (vout),
-                // never on a list static thumbnail or phase alone.
-                when {
-                    state.phase == PlayerState.Phase.Error -> {
-                        ErrorOverlay(
-                            message = state.error?.message
-                                ?: stringResource(R.string.player_error_generic),
-                            retryable = state.error?.retryable == true,
-                            onRetry = { vm.retry() },
-                        )
-                    }
-                    state.phase == PlayerState.Phase.Playing && state.firstFrameReady -> {
-                        // Tap video to pause.
-                        Box(
+                    },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = leave,
                             modifier = Modifier
-                                .fillMaxSize()
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    onClick = { vm.pause() },
-                                )
-                                .testTag("player_playing_touch"),
-                        )
-                    }
-                    state.firstFrameReady &&
-                        (
-                            state.phase == PlayerState.Phase.Ready ||
-                                state.phase == PlayerState.Phase.Paused ||
-                                state.phase == PlayerState.Phase.Ended
-                            ) -> {
-                        PlayOverlay(
-                            onPlay = { vm.play() },
-                            label = if (state.phase == PlayerState.Phase.Ended) {
-                                stringResource(R.string.player_replay)
-                            } else {
-                                stringResource(R.string.player_tap_to_play)
-                            },
-                        )
-                    }
-                    else -> {
-                        // Idle / Preparing / any phase without a decoded frame.
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = Color.White)
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                text = stringResource(R.string.player_loading),
-                                color = Color.White,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.testTag("player_phase_loading"),
+                                .minimumInteractiveComponentSize()
+                                .testTag("player_back"),
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.action_back),
                             )
                         }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = {
+                                showListenTranslate = !showListenTranslate
+                                if (showListenTranslate) {
+                                    showSubtitles = false
+                                    chromeVisible = true
+                                }
+                            },
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .semantics { contentDescription = "player_listen_translate" }
+                                .testTag("player_listen_translate"),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Translate,
+                                contentDescription = stringResource(R.string.listen_translate_title),
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                showSubtitles = !showSubtitles
+                                if (showSubtitles) {
+                                    showListenTranslate = false
+                                    chromeVisible = true
+                                }
+                            },
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .semantics { contentDescription = "player_subtitles" }
+                                .testTag("player_subtitles"),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.ClosedCaption,
+                                contentDescription = stringResource(R.string.subtitle_section_title),
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = if (landscape) {
+                            Color.Black.copy(alpha = 0.55f)
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        },
+                        titleContentColor = if (landscape) {
+                            Color.White
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                        navigationIconContentColor = if (landscape) {
+                            Color.White
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                        actionIconContentColor = if (landscape) {
+                            Color.White
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                    ),
+                )
+            }
+        },
+    ) { padding ->
+        // Single surface host for both orientations so AndroidView is not disposed
+        // on rotate (detachViews mid-play freezes "Playing · first frame ready").
+        Box(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize()
+                .background(Color.Black)
+                .testTag(if (landscape) "player_landscape_shell" else "player_portrait_shell"),
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                PlayerSurfaceStack(
+                    controller = vm.controller,
+                    state = state,
+                    listenUi = listenUi,
+                    chromeVisible = showChrome,
+                    onToggleChrome = {
+                        chromeVisible = !chromeVisible
+                        if (!chromeVisible) {
+                            showSubtitles = false
+                            showListenTranslate = false
+                        }
+                    },
+                    onPlay = { vm.play() },
+                    onRetry = { vm.retry() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+                // Portrait: solid chrome under the video (not overlaid).
+                if (!landscape && showChrome) {
+                    PlayerControls(
+                        state = state,
+                        onPlay = { vm.play() },
+                        onPause = { vm.pause() },
+                        onSeek = { vm.seekTo(it) },
+                        onCycleVideoScale = { vm.cycleVideoScaleMode() },
+                        overlay = false,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (showBottomPanels) {
+                        PlayerBottomPanels(
+                            showListenTranslate = showListenTranslate,
+                            showSubtitles = showSubtitles,
+                            listenUi = listenUi,
+                            subtitleUi = subtitleUi,
+                            embeddedTracks = state.subtitleTracks.filter { it.id >= 0 },
+                            onListenEnabled = { vm.setListenTranslateEnabled(it) },
+                            onSourceLang = { vm.setListenSourceLang(it) },
+                            onTargetLang = { vm.setListenTargetLang(it) },
+                            onDisplayMode = { vm.setListenDisplayMode(it) },
+                            onSelectOff = { vm.selectSubtitleOff() },
+                            onSelectEmbedded = { vm.selectEmbeddedSubtitle(it) },
+                            onSelectExternal = { vm.selectExternalSubtitle(it) },
+                            onDelayDeltaMs = { vm.adjustSubtitleDelayMs(it) },
+                            onFontRelSize = { vm.setSubtitleFontRelSize(it) },
+                            overlay = false,
+                        )
                     }
                 }
-
-                if (listenUi.enabled && listenUi.overlayText.isNotBlank() &&
-                    state.phase != PlayerState.Phase.Error
+            }
+            // Landscape: chrome overlays the bottom of the video.
+            if (landscape && showChrome) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth(),
                 ) {
-                    ListenTranslateOverlay(
-                        text = listenUi.overlayText,
-                        modifier = Modifier.align(Alignment.BottomCenter),
+                    if (showBottomPanels) {
+                        PlayerBottomPanels(
+                            showListenTranslate = showListenTranslate,
+                            showSubtitles = showSubtitles,
+                            listenUi = listenUi,
+                            subtitleUi = subtitleUi,
+                            embeddedTracks = state.subtitleTracks.filter { it.id >= 0 },
+                            onListenEnabled = { vm.setListenTranslateEnabled(it) },
+                            onSourceLang = { vm.setListenSourceLang(it) },
+                            onTargetLang = { vm.setListenTargetLang(it) },
+                            onDisplayMode = { vm.setListenDisplayMode(it) },
+                            onSelectOff = { vm.selectSubtitleOff() },
+                            onSelectEmbedded = { vm.selectEmbeddedSubtitle(it) },
+                            onSelectExternal = { vm.selectExternalSubtitle(it) },
+                            onDelayDeltaMs = { vm.adjustSubtitleDelayMs(it) },
+                            onFontRelSize = { vm.setSubtitleFontRelSize(it) },
+                            overlay = true,
+                        )
+                    }
+                    PlayerControls(
+                        state = state,
+                        onPlay = { vm.play() },
+                        onPause = { vm.pause() },
+                        onSeek = { vm.seekTo(it) },
+                        onCycleVideoScale = { vm.cycleVideoScaleMode() },
+                        overlay = true,
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
+        }
+    }
+}
 
-            PlayerControls(
-                state = state,
-                onPlay = { vm.play() },
-                onPause = { vm.pause() },
-                onSeek = { vm.seekTo(it) },
-            )
-
-            if (showListenTranslate) {
-                ListenTranslateControls(
-                    uiState = listenUi,
-                    onEnabledChange = { vm.setListenTranslateEnabled(it) },
-                    onSourceLang = { vm.setListenSourceLang(it) },
-                    onTargetLang = { vm.setListenTargetLang(it) },
-                    onDisplayMode = { vm.setListenDisplayMode(it) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(260.dp)
-                        .background(MaterialTheme.colorScheme.surface),
-                )
+/**
+ * Optional immersive system bars. Restores bars on dispose / when disabled so
+ * other destinations are not left immersive.
+ */
+@Composable
+private fun PlayerImmersiveEffect(enabled: Boolean) {
+    val view = LocalView.current
+    val context = LocalContext.current
+    DisposableEffect(enabled, view) {
+        val activity = context as? Activity
+        val window = activity?.window
+        if (window == null) {
+            onDispose { }
+        } else {
+            val controller = WindowCompat.getInsetsController(window, view)
+            if (enabled) {
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            } else {
+                controller.show(WindowInsetsCompat.Type.systemBars())
             }
-
-            if (showSubtitles) {
-                SubtitleControls(
-                    uiState = subtitleUi,
-                    embeddedTracks = state.subtitleTracks.filter { it.id >= 0 },
-                    onSelectOff = { vm.selectSubtitleOff() },
-                    onSelectEmbedded = { vm.selectEmbeddedSubtitle(it) },
-                    onSelectExternal = { vm.selectExternalSubtitle(it) },
-                    onDelayDeltaMs = { vm.adjustSubtitleDelayMs(it) },
-                    onFontRelSize = { vm.setSubtitleFontRelSize(it) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp)
-                        .background(MaterialTheme.colorScheme.surface),
-                )
+            onDispose {
+                controller.show(WindowInsetsCompat.Type.systemBars())
             }
         }
+    }
+}
+
+@Composable
+private fun PlayerSurfaceStack(
+    controller: PlayerController,
+    state: PlayerState,
+    listenUi: ListenTranslateUiState,
+    chromeVisible: Boolean,
+    onToggleChrome: () -> Unit,
+    onPlay: () -> Unit,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val surfaceCd = stringResource(R.string.player_video_surface)
+    val toggleCd = if (chromeVisible) {
+        stringResource(R.string.player_controls_hide)
+    } else {
+        stringResource(R.string.player_controls_show)
+    }
+
+    Box(
+        modifier = modifier
+            .background(Color.Black)
+            .semantics { contentDescription = surfaceCd }
+            .testTag("player_video_surface"),
+        contentAlignment = Alignment.Center,
+    ) {
+        VlcVideoSurface(
+            controller = controller,
+            modifier = Modifier.fillMaxSize(),
+        )
+
+        // Gate playable / "tap to play" on real firstFrameReady (vout).
+        when {
+            state.phase == PlayerState.Phase.Error -> {
+                ErrorOverlay(
+                    message = state.error?.message
+                        ?: stringResource(R.string.player_error_generic),
+                    retryable = state.error?.retryable == true,
+                    onRetry = onRetry,
+                )
+            }
+            state.phase == PlayerState.Phase.Playing && state.firstFrameReady -> {
+                // Tap video to toggle chrome (pause still available from controls).
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onToggleChrome,
+                        )
+                        .semantics { contentDescription = toggleCd }
+                        .testTag("player_playing_touch"),
+                )
+            }
+            state.firstFrameReady &&
+                (
+                    state.phase == PlayerState.Phase.Ready ||
+                        state.phase == PlayerState.Phase.Paused ||
+                        state.phase == PlayerState.Phase.Ended
+                    ) -> {
+                PlayOverlay(
+                    onPlay = onPlay,
+                    label = if (state.phase == PlayerState.Phase.Ended) {
+                        stringResource(R.string.player_replay)
+                    } else {
+                        stringResource(R.string.player_tap_to_play)
+                    },
+                )
+            }
+            else -> {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = Color.White)
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.player_loading),
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.testTag("player_phase_loading"),
+                    )
+                }
+            }
+        }
+
+        if (listenUi.enabled && listenUi.overlayText.isNotBlank() &&
+            state.phase != PlayerState.Phase.Error
+        ) {
+            ListenTranslateOverlay(
+                text = listenUi.overlayText,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlayerBottomPanels(
+    showListenTranslate: Boolean,
+    showSubtitles: Boolean,
+    listenUi: ListenTranslateUiState,
+    subtitleUi: SubtitleUiState,
+    embeddedTracks: List<PlayerTrack>,
+    onListenEnabled: (Boolean) -> Unit,
+    onSourceLang: (String) -> Unit,
+    onTargetLang: (String) -> Unit,
+    onDisplayMode: (ListenDisplayMode) -> Unit,
+    onSelectOff: () -> Unit,
+    onSelectEmbedded: (Int) -> Unit,
+    onSelectExternal: (ExternalSubtitleOption) -> Unit,
+    onDelayDeltaMs: (Long) -> Unit,
+    onFontRelSize: (Int) -> Unit,
+    overlay: Boolean,
+) {
+    val panelBg = if (overlay) {
+        Color.Black.copy(alpha = 0.72f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    if (showListenTranslate) {
+        ListenTranslateControls(
+            uiState = listenUi,
+            onEnabledChange = onListenEnabled,
+            onSourceLang = onSourceLang,
+            onTargetLang = onTargetLang,
+            onDisplayMode = onDisplayMode,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(260.dp)
+                .background(panelBg),
+        )
+    }
+    if (showSubtitles) {
+        SubtitleControls(
+            uiState = subtitleUi,
+            embeddedTracks = embeddedTracks,
+            onSelectOff = onSelectOff,
+            onSelectEmbedded = onSelectEmbedded,
+            onSelectExternal = onSelectExternal,
+            onDelayDeltaMs = onDelayDeltaMs,
+            onFontRelSize = onFontRelSize,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp)
+                .background(panelBg),
+        )
     }
 }
 
@@ -293,6 +524,7 @@ private fun PlayOverlay(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
+            .minimumInteractiveComponentSize()
             .clickable(onClick = onPlay)
             .padding(24.dp)
             .testTag("player_play_overlay"),
@@ -330,7 +562,9 @@ private fun ErrorOverlay(
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = onRetry,
-                modifier = Modifier.testTag("player_retry"),
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .testTag("player_retry"),
             ) {
                 Icon(Icons.Filled.Refresh, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
@@ -346,24 +580,47 @@ private fun PlayerControls(
     onPlay: () -> Unit,
     onPause: () -> Unit,
     onSeek: (Long) -> Unit,
+    onCycleVideoScale: () -> Unit,
+    overlay: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val duration = state.durationMs.coerceAtLeast(0L)
     val position = state.positionMs.coerceIn(0L, if (duration > 0) duration else state.positionMs)
     val progress = if (duration > 0) position.toFloat() / duration.toFloat() else 0f
+    val scaleLabel = videoScaleLabel(state.videoScaleMode)
+    val scaleCd = stringResource(R.string.player_video_scale_cd, scaleLabel)
+    val playCd = stringResource(R.string.player_play)
+    val pauseCd = stringResource(R.string.player_pause)
+    val seekCd = stringResource(R.string.player_seek)
+    val statusText = phaseLabel(state)
+    val statusCd = stringResource(R.string.player_status_cd, statusText)
+
+    val bg = if (overlay) {
+        Color.Black.copy(alpha = 0.65f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val onBg = if (overlay) Color.White else MaterialTheme.colorScheme.onSurface
+    val onBgVariant = if (overlay) {
+        Color.White.copy(alpha = 0.8f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
+        modifier = modifier
+            .background(bg)
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .testTag("player_controls"),
     ) {
         Text(
-            text = phaseLabel(state),
+            text = statusText,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = onBgVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier
-                .semantics { contentDescription = "player_status" }
+                .semantics { contentDescription = statusCd }
                 .testTag("player_status"),
         )
         Slider(
@@ -379,7 +636,8 @@ private fun PlayerControls(
                 state.phase != PlayerState.Phase.Preparing,
             modifier = Modifier
                 .fillMaxWidth()
-                .semantics { contentDescription = "player_seek" }
+                .minimumInteractiveComponentSize()
+                .semantics { contentDescription = seekCd }
                 .testTag("player_seek"),
         )
         Row(
@@ -390,30 +648,66 @@ private fun PlayerControls(
             Text(
                 text = "${formatMs(position)} / ${formatMs(duration)}",
                 style = MaterialTheme.typography.labelMedium,
+                color = onBg,
                 modifier = Modifier.testTag("player_time"),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(
+                    onClick = onCycleVideoScale,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .semantics { contentDescription = scaleCd }
+                        .testTag("player_video_scale"),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.AspectRatio,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = onBg,
+                    )
+                    Spacer(Modifier.size(4.dp))
+                    Text(
+                        text = scaleLabel,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = onBg,
+                    )
+                }
                 IconButton(
                     onClick = onPlay,
-                    enabled = state.canPlay,
+                    enabled = state.canPlay || state.phase == PlayerState.Phase.Error,
                     modifier = Modifier
-                        .semantics { contentDescription = "player_play" }
+                        .minimumInteractiveComponentSize()
+                        .semantics { contentDescription = playCd }
                         .testTag("player_play"),
                 ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = onBg)
                 }
                 IconButton(
                     onClick = onPause,
                     enabled = state.canPause,
                     modifier = Modifier
-                        .semantics { contentDescription = "player_pause" }
+                        .minimumInteractiveComponentSize()
+                        .semantics { contentDescription = pauseCd }
                         .testTag("player_pause"),
                 ) {
-                    Icon(Icons.Filled.Pause, contentDescription = null)
+                    Icon(Icons.Filled.Pause, contentDescription = null, tint = onBg)
                 }
             }
         }
     }
+}
+
+@Composable
+private fun videoScaleLabel(mode: VideoScaleMode): String = when (mode) {
+    VideoScaleMode.BestFit -> stringResource(R.string.player_scale_best_fit)
+    VideoScaleMode.FitScreen -> stringResource(R.string.player_scale_fit_screen)
+    VideoScaleMode.Fill -> stringResource(R.string.player_scale_fill)
+    VideoScaleMode.Ratio16_9 -> stringResource(R.string.player_scale_16_9)
+    VideoScaleMode.Ratio4_3 -> stringResource(R.string.player_scale_4_3)
+    VideoScaleMode.Original -> stringResource(R.string.player_scale_original)
 }
 
 @Composable
@@ -429,7 +723,14 @@ private fun phaseLabel(state: PlayerState): String {
     }
     return buildString {
         append(phase)
-        if (state.firstFrameReady) append(" · frame")
+        // Only annotate while waiting on the first-frame gate — not during Playing
+        // (that looked like "stuck at first frame ready").
+        if (state.firstFrameReady &&
+            (state.phase == PlayerState.Phase.Ready || state.phase == PlayerState.Phase.Paused)
+        ) {
+            append(" · ")
+            append(stringResource(R.string.player_first_frame_ready))
+        }
         state.error?.let { append(" · ${it.code}") }
     }
 }

@@ -58,6 +58,18 @@ interface PlayerController {
      */
     fun setSubtitleFontRelSize(relSize: Int)
 
+    /**
+     * How the video is fit into the surface (best-fit / fill / fixed ratios).
+     * Applied immediately when views are attached; remembered across prepare.
+     */
+    fun setVideoScaleMode(mode: VideoScaleMode)
+
+    /**
+     * Recompute surface size after container layout changes (rotation, chrome
+     * show/hide, window size). Safe no-op when views are not attached.
+     */
+    fun refreshVideoSurfaces()
+
     /** Full teardown of MediaPlayer + LibVLC. Idempotent. */
     fun release()
 }

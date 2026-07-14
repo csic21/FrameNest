@@ -6,11 +6,13 @@ import android.net.nsd.NsdServiceInfo
 import android.os.Build
 import java.net.InetAddress
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Discovers SMB advertisers via mDNS/NSD (`_smb._tcp.`).
- * Callbacks may arrive on binder threads — caller should hop to main/VM if needed.
+ * Callbacks may arrive on binder/background threads — caller should hop to main/VM if needed.
  */
 class MdnsSmbDiscovery(
     context: Context,
@@ -19,6 +21,12 @@ class MdnsSmbDiscovery(
     private val appContext = context.applicationContext
     private val nsd: NsdManager? =
         appContext.getSystemService(Context.NSD_SERVICE) as? NsdManager
+
+    /** Shared executor for API 34+ resolve callbacks (must not reverse-DNS on main). */
+    private val resolveExecutor: Executor =
+        Executors.newSingleThreadExecutor { r ->
+            Thread(r, "mdns-smb-resolve").apply { isDaemon = true }
+        }
 
     fun start(onFound: (DiscoveredHost) -> Unit): Session {
         val manager = nsd
@@ -74,22 +82,13 @@ class MdnsSmbDiscovery(
             override fun onServiceResolved(resolved: NsdServiceInfo) {
                 try {
                     if (!active.get()) return
-                    val host = resolvedHost(resolved) ?: return
-                    val address = host.hostAddress?.takeIf { it.isNotBlank() } ?: return
-                    val hostName = host.canonicalHostName
-                        .takeIf { it.isNotBlank() && !it.equals(address, ignoreCase = true) }
-                    val serviceName = resolved.serviceName.trim().takeIf { it.isNotEmpty() }
-                    val port = resolved.port.takeIf { it in 1..65535 }
-                        ?: DiscoveredHost.DEFAULT_SMB_PORT
-                    onFound(
-                        DiscoveredHost(
-                            address = address,
-                            hostName = hostName,
-                            serviceName = serviceName,
-                            port = port,
-                            sources = setOf(DiscoverySource.MDNS),
-                        ),
-                    )
+                    // Never call InetAddress.getCanonicalHostName()/getHostName() here:
+                    // reverse DNS is network I/O and can throw NetworkOnMainThreadException
+                    // when the callback is delivered on the main thread (common on older APIs).
+                    val host = toDiscoveredHost(resolved) ?: return
+                    onFound(host)
+                } catch (_: Exception) {
+                    // One bad service advertisement must not crash the app.
                 } finally {
                     onDone()
                 }
@@ -97,8 +96,7 @@ class MdnsSmbDiscovery(
         }
         try {
             if (Build.VERSION.SDK_INT >= 34) {
-                // resolveService(NsdServiceInfo, Executor, ResolveListener) is API 34+.
-                manager.resolveService(serviceInfo, appContext.mainExecutor, listener)
+                manager.resolveService(serviceInfo, resolveExecutor, listener)
             } else {
                 @Suppress("DEPRECATION")
                 manager.resolveService(serviceInfo, listener)
@@ -118,6 +116,26 @@ class MdnsSmbDiscovery(
         companion object {
             fun inactive(): Session = Session(AtomicBoolean(false)) {}
         }
+    }
+
+    /**
+     * Maps a resolved NSD service to a [DiscoveredHost] without reverse DNS.
+     * Prefer mDNS service name for display; IP for connection.
+     */
+    internal fun toDiscoveredHost(info: NsdServiceInfo): DiscoveredHost? {
+        val inet = resolvedHost(info) ?: return null
+        // hostAddress is a local string conversion; does not perform network I/O.
+        val address = inet.hostAddress?.takeIf { it.isNotBlank() } ?: return null
+        val serviceName = info.serviceName?.trim()?.takeIf { it.isNotEmpty() }
+        val port = info.port.takeIf { it in 1..65535 }
+            ?: DiscoveredHost.DEFAULT_SMB_PORT
+        return DiscoveredHost(
+            address = address,
+            hostName = null,
+            serviceName = serviceName,
+            port = port,
+            sources = setOf(DiscoverySource.MDNS),
+        )
     }
 
     private fun resolvedHost(info: NsdServiceInfo): InetAddress? {
