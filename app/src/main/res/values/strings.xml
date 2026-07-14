@@ -136,9 +136,9 @@
     <string name="settings_intro">缓存、默认字幕语言与诊断日志。密码不会出现在日志导出中。</string>
     <string name="settings_version_line">版本 %1$s (%2$d)</string>
     <string name="settings_cache_row">缓存</string>
-    <string name="settings_cache_size">约占用 %1$s（缩略图 / 字幕临时文件 / 听译 / 诊断导出）</string>
+    <string name="settings_cache_size">约占用 %1$s（缩略图 / 字幕临时文件 / 诊断导出；不含听译模型）</string>
     <string name="settings_clear_cache">清理缓存</string>
-    <string name="settings_cache_cleared">已清理约 %1$s（含诊断日志）</string>
+    <string name="settings_cache_cleared">已清理约 %1$s（含诊断日志与听译结果缓存；听译模型保留）</string>
     <string name="settings_listen_translate_row">听译缓存</string>
     <string name="settings_listen_translate_hint">本机听译字幕（原文+译文）仅保存在应用内数据库。模型在下方单独管理。不写 NAS；卸载应用后一并删除。</string>
     <string name="settings_listen_translate_size">听译约占用 %1$s</string>

@@ -174,10 +174,10 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     val result = withContext(Dispatchers.IO) {
                         container.cacheMaintenance.clearAllCaches()
                     }
+                    // Disk cache + listen-translate Room only; model packs stay
+                    // (dedicated「清除听译模型」button).
                     cacheBytes = result.remainingApproxBytes
                     listenTranslateBytes = 0L
-                    listenModelBytes = 0L
-                    voskStatuses = container.voskModelInstaller.languageStatuses()
                     statusMessage = cacheClearedTemplate.format(formatBytes(result.freedApproxBytes))
                     DiagnosticLog.info("Settings", "cache cleared freed=${result.freedApproxBytes}")
                 }

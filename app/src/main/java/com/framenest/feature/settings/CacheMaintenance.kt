@@ -10,9 +10,10 @@ import java.io.File
 import kotlinx.coroutines.runBlocking
 
 /**
- * Clears disk caches, listen-translate Room rows, and on-device model packs.
- * Never touches credentials. Models and DB live only in app-private storage
- * (decision 0005 — uninstall still clears everything).
+ * Clears disk caches and listen-translate Room rows.
+ * Never touches credentials. On-device model packs are **not** removed by
+ * [clearAllCaches] — settings has a dedicated「清除听译模型」control via
+ * [clearListenModels] (decision 0005). Uninstall still clears everything.
  *
  * Call clear / approximate methods that touch Room or models from a background
  * dispatcher.
@@ -34,15 +35,15 @@ class CacheMaintenance(
         runCatching { diagDir.listFiles()?.forEach { it.deleteRecursively() } }
         // In-process diagnostic ring buffer (not counted in disk size).
         DiagnosticLog.clear()
+        // Room cues only — leave Vosk / JSON model packs alone.
         runBlocking {
             listenTranslateRepository?.purgeAll()
-            listenModelManager?.deleteAll()
-            voskModelInstaller?.deleteAll()
         }
         val after = approximateTotalBytes()
         return CacheClearResult(
             freedApproxBytes = (before - after).coerceAtLeast(0L),
-            remainingApproxBytes = after,
+            // Cache row shows disk cache only (not model packs).
+            remainingApproxBytes = approximateDiskCacheBytes(),
         )
     }
 

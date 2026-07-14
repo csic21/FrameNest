@@ -89,7 +89,8 @@
 
 - 路径：`context.filesDir/listen_models/<id>/v<version>/` + `.ready` + SHA-256 校验。
 - 首装：从 `assets/listen_models/*` 安装（无公网依赖）；可选 `remoteUrl` 预留给 HTTP 更新。
-- 设置页：安装 / 清除模型；「清理缓存」一并删模型与听译 Room。
+- 设置页：安装 / 清除模型；「清理缓存」只清缩略图/字幕临时/诊断/听译 Room，**不**删模型
+  （模型用专门的「清除听译模型」）。
 - 引擎：`ModelAwareListenTranslateEngine` 依赖核心包就绪；当前 ASR 仍为窗口占位文本，
   MT 使用 pack 内 `phraseEntries`；替换权重时保持 store API 即可。
 
