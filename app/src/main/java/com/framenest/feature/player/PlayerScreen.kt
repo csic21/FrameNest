@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -86,7 +87,8 @@ import com.framenest.player.VideoScaleMode
  *
  * Orientation:
  * - **Portrait**: video in the middle column, solid chrome below (and panels).
- * - **Landscape**: video fills the window; chrome / panels overlay bottom.
+ * - **Landscape**: video always fills the full window; top bar + controls overlay
+ *   the surface so chrome show/hide does **not** resize the video (no scale jump).
  * Video scale (BestFit by default) is re-applied on rotation so landscape
  * sources are not stretched when the surface size changes.
  */
@@ -132,8 +134,9 @@ fun PlayerScreen(
     // Surface refresh on orientation is handled inside VlcVideoSurface — do not
     // also thrash it from here on every state recomposition.
 
-    val immersive = state.phase == PlayerState.Phase.Playing && !chromeVisible && landscape
-    PlayerImmersiveEffect(enabled = immersive)
+    // Landscape stays immersive so chrome show/hide never changes system-bar
+    // insets / window size (that used to re-layout and re-scale the video).
+    PlayerImmersiveEffect(enabled = landscape)
 
     val leave: () -> Unit = {
         vm.onLeaveOrBackground()
@@ -146,95 +149,45 @@ fun PlayerScreen(
     val showChrome = chromeVisible || state.phase != PlayerState.Phase.Playing
     val showBottomPanels = showChrome && (showListenTranslate || showSubtitles)
 
+    val toggleListen: () -> Unit = {
+        showListenTranslate = !showListenTranslate
+        if (showListenTranslate) {
+            showSubtitles = false
+            chromeVisible = true
+        }
+    }
+    val toggleSubtitles: () -> Unit = {
+        showSubtitles = !showSubtitles
+        if (showSubtitles) {
+            showListenTranslate = false
+            chromeVisible = true
+        }
+    }
+    val onToggleChrome: () -> Unit = {
+        chromeVisible = !chromeVisible
+        if (!chromeVisible) {
+            showSubtitles = false
+            showListenTranslate = false
+        }
+    }
+
     Scaffold(
         modifier = modifier
             .fillMaxSize()
             .testTag("player_screen"),
         containerColor = Color.Black,
+        // Zero insets: landscape content is full-window; portrait applies scaffold
+        // padding only (top bar). Avoid chrome-driven inset jumps in landscape.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            if (showChrome) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = vm.displayName,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.testTag("player_title"),
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(
-                            onClick = leave,
-                            modifier = Modifier
-                                .minimumInteractiveComponentSize()
-                                .testTag("player_back"),
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.action_back),
-                            )
-                        }
-                    },
-                    actions = {
-                        IconButton(
-                            onClick = {
-                                showListenTranslate = !showListenTranslate
-                                if (showListenTranslate) {
-                                    showSubtitles = false
-                                    chromeVisible = true
-                                }
-                            },
-                            modifier = Modifier
-                                .minimumInteractiveComponentSize()
-                                .semantics { contentDescription = "player_listen_translate" }
-                                .testTag("player_listen_translate"),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Translate,
-                                contentDescription = stringResource(R.string.listen_translate_title),
-                            )
-                        }
-                        IconButton(
-                            onClick = {
-                                showSubtitles = !showSubtitles
-                                if (showSubtitles) {
-                                    showListenTranslate = false
-                                    chromeVisible = true
-                                }
-                            },
-                            modifier = Modifier
-                                .minimumInteractiveComponentSize()
-                                .semantics { contentDescription = "player_subtitles" }
-                                .testTag("player_subtitles"),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.ClosedCaption,
-                                contentDescription = stringResource(R.string.subtitle_section_title),
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = if (landscape) {
-                            Color.Black.copy(alpha = 0.55f)
-                        } else {
-                            MaterialTheme.colorScheme.surface
-                        },
-                        titleContentColor = if (landscape) {
-                            Color.White
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                        navigationIconContentColor = if (landscape) {
-                            Color.White
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                        actionIconContentColor = if (landscape) {
-                            Color.White
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    ),
+            // Portrait only — landscape top bar is overlaid so video size is fixed.
+            if (!landscape && showChrome) {
+                PlayerTopBar(
+                    title = vm.displayName,
+                    overlay = false,
+                    onBack = leave,
+                    onToggleListen = toggleListen,
+                    onToggleSubtitles = toggleSubtitles,
                 )
             }
         },
@@ -243,101 +196,204 @@ fun PlayerScreen(
         // on rotate (detachViews mid-play freezes "Playing · first frame ready").
         Box(
             modifier = Modifier
-                .padding(padding)
+                .then(if (landscape) Modifier else Modifier.padding(padding))
                 .fillMaxSize()
                 .background(Color.Black)
                 .testTag(if (landscape) "player_landscape_shell" else "player_portrait_shell"),
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            if (landscape) {
+                // Full-window surface: top/bottom chrome float above and never
+                // change the video layout bounds when toggled.
                 PlayerSurfaceStack(
                     controller = vm.controller,
                     state = state,
                     listenUi = listenUi,
                     chromeVisible = showChrome,
-                    onToggleChrome = {
-                        chromeVisible = !chromeVisible
-                        if (!chromeVisible) {
-                            showSubtitles = false
-                            showListenTranslate = false
-                        }
-                    },
+                    onToggleChrome = onToggleChrome,
                     onPlay = { vm.play() },
                     onRetry = { vm.retry() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
+                    modifier = Modifier.fillMaxSize(),
                 )
-                // Portrait: solid chrome under the video (not overlaid).
-                if (!landscape && showChrome) {
-                    PlayerControls(
-                        state = state,
-                        onPlay = { vm.play() },
-                        onPause = { vm.pause() },
-                        onSeek = { vm.seekTo(it) },
-                        onCycleVideoScale = { vm.cycleVideoScaleMode() },
-                        overlay = false,
-                        modifier = Modifier.fillMaxWidth(),
+                if (showChrome) {
+                    PlayerTopBar(
+                        title = vm.displayName,
+                        overlay = true,
+                        onBack = leave,
+                        onToggleListen = toggleListen,
+                        onToggleSubtitles = toggleSubtitles,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .testTag("player_landscape_top_bar"),
                     )
-                    if (showBottomPanels) {
-                        PlayerBottomPanels(
-                            showListenTranslate = showListenTranslate,
-                            showSubtitles = showSubtitles,
-                            listenUi = listenUi,
-                            subtitleUi = subtitleUi,
-                            embeddedTracks = state.subtitleTracks.filter { it.id >= 0 },
-                            onListenEnabled = { vm.setListenTranslateEnabled(it) },
-                            onSourceLang = { vm.setListenSourceLang(it) },
-                            onTargetLang = { vm.setListenTargetLang(it) },
-                            onDisplayMode = { vm.setListenDisplayMode(it) },
-                            onSelectOff = { vm.selectSubtitleOff() },
-                            onSelectEmbedded = { vm.selectEmbeddedSubtitle(it) },
-                            onSelectExternal = { vm.selectExternalSubtitle(it) },
-                            onDelayDeltaMs = { vm.adjustSubtitleDelayMs(it) },
-                            onFontRelSize = { vm.setSubtitleFontRelSize(it) },
-                            overlay = false,
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .testTag("player_landscape_bottom_chrome"),
+                    ) {
+                        if (showBottomPanels) {
+                            PlayerBottomPanels(
+                                showListenTranslate = showListenTranslate,
+                                showSubtitles = showSubtitles,
+                                listenUi = listenUi,
+                                subtitleUi = subtitleUi,
+                                embeddedTracks = state.subtitleTracks.filter { it.id >= 0 },
+                                onListenEnabled = { vm.setListenTranslateEnabled(it) },
+                                onSourceLang = { vm.setListenSourceLang(it) },
+                                onTargetLang = { vm.setListenTargetLang(it) },
+                                onDisplayMode = { vm.setListenDisplayMode(it) },
+                                onSelectOff = { vm.selectSubtitleOff() },
+                                onSelectEmbedded = { vm.selectEmbeddedSubtitle(it) },
+                                onSelectExternal = { vm.selectExternalSubtitle(it) },
+                                onDelayDeltaMs = { vm.adjustSubtitleDelayMs(it) },
+                                onFontRelSize = { vm.setSubtitleFontRelSize(it) },
+                                overlay = true,
+                            )
+                        }
+                        PlayerControls(
+                            state = state,
+                            onPlay = { vm.play() },
+                            onPause = { vm.pause() },
+                            onSeek = { vm.seekTo(it) },
+                            onCycleVideoScale = { vm.cycleVideoScaleMode() },
+                            overlay = true,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
-            }
-            // Landscape: chrome overlays the bottom of the video.
-            if (landscape && showChrome) {
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth(),
-                ) {
-                    if (showBottomPanels) {
-                        PlayerBottomPanels(
-                            showListenTranslate = showListenTranslate,
-                            showSubtitles = showSubtitles,
-                            listenUi = listenUi,
-                            subtitleUi = subtitleUi,
-                            embeddedTracks = state.subtitleTracks.filter { it.id >= 0 },
-                            onListenEnabled = { vm.setListenTranslateEnabled(it) },
-                            onSourceLang = { vm.setListenSourceLang(it) },
-                            onTargetLang = { vm.setListenTargetLang(it) },
-                            onDisplayMode = { vm.setListenDisplayMode(it) },
-                            onSelectOff = { vm.selectSubtitleOff() },
-                            onSelectEmbedded = { vm.selectEmbeddedSubtitle(it) },
-                            onSelectExternal = { vm.selectExternalSubtitle(it) },
-                            onDelayDeltaMs = { vm.adjustSubtitleDelayMs(it) },
-                            onFontRelSize = { vm.setSubtitleFontRelSize(it) },
-                            overlay = true,
-                        )
-                    }
-                    PlayerControls(
+            } else {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    PlayerSurfaceStack(
+                        controller = vm.controller,
                         state = state,
+                        listenUi = listenUi,
+                        chromeVisible = showChrome,
+                        onToggleChrome = onToggleChrome,
                         onPlay = { vm.play() },
-                        onPause = { vm.pause() },
-                        onSeek = { vm.seekTo(it) },
-                        onCycleVideoScale = { vm.cycleVideoScaleMode() },
-                        overlay = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        onRetry = { vm.retry() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
                     )
+                    if (showChrome) {
+                        PlayerControls(
+                            state = state,
+                            onPlay = { vm.play() },
+                            onPause = { vm.pause() },
+                            onSeek = { vm.seekTo(it) },
+                            onCycleVideoScale = { vm.cycleVideoScaleMode() },
+                            overlay = false,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (showBottomPanels) {
+                            PlayerBottomPanels(
+                                showListenTranslate = showListenTranslate,
+                                showSubtitles = showSubtitles,
+                                listenUi = listenUi,
+                                subtitleUi = subtitleUi,
+                                embeddedTracks = state.subtitleTracks.filter { it.id >= 0 },
+                                onListenEnabled = { vm.setListenTranslateEnabled(it) },
+                                onSourceLang = { vm.setListenSourceLang(it) },
+                                onTargetLang = { vm.setListenTargetLang(it) },
+                                onDisplayMode = { vm.setListenDisplayMode(it) },
+                                onSelectOff = { vm.selectSubtitleOff() },
+                                onSelectEmbedded = { vm.selectEmbeddedSubtitle(it) },
+                                onSelectExternal = { vm.selectExternalSubtitle(it) },
+                                onDelayDeltaMs = { vm.adjustSubtitleDelayMs(it) },
+                                onFontRelSize = { vm.setSubtitleFontRelSize(it) },
+                                overlay = false,
+                            )
+                        }
+                    }
                 }
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlayerTopBar(
+    title: String,
+    overlay: Boolean,
+    onBack: () -> Unit,
+    onToggleListen: () -> Unit,
+    onToggleSubtitles: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    TopAppBar(
+        modifier = modifier,
+        title = {
+            Text(
+                text = title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("player_title"),
+            )
+        },
+        navigationIcon = {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .testTag("player_back"),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.action_back),
+                )
+            }
+        },
+        actions = {
+            IconButton(
+                onClick = onToggleListen,
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .semantics { contentDescription = "player_listen_translate" }
+                    .testTag("player_listen_translate"),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Translate,
+                    contentDescription = stringResource(R.string.listen_translate_title),
+                )
+            }
+            IconButton(
+                onClick = onToggleSubtitles,
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .semantics { contentDescription = "player_subtitles" }
+                    .testTag("player_subtitles"),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.ClosedCaption,
+                    contentDescription = stringResource(R.string.subtitle_section_title),
+                )
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = if (overlay) {
+                Color.Black.copy(alpha = 0.55f)
+            } else {
+                MaterialTheme.colorScheme.surface
+            },
+            titleContentColor = if (overlay) {
+                Color.White
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            navigationIconContentColor = if (overlay) {
+                Color.White
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            actionIconContentColor = if (overlay) {
+                Color.White
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+        ),
+    )
 }
 
 /**
