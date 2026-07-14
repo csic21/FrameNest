@@ -30,8 +30,13 @@ data class PlayerState(
         Error,
     }
 
+    /**
+     * True only when a real decoded frame has been delivered ([firstFrameReady])
+     * and the phase accepts play. List static thumbnails must never set this.
+     */
     val canPlay: Boolean
-        get() = phase == Phase.Ready || phase == Phase.Paused || phase == Phase.Ended
+        get() = firstFrameReady &&
+            (phase == Phase.Ready || phase == Phase.Paused || phase == Phase.Ended)
 
     val canPause: Boolean
         get() = phase == Phase.Playing

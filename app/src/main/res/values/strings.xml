@@ -83,7 +83,7 @@
     <string name="settings_title">设置</string>
     <string name="settings_placeholder_body">缓存、字幕默认语言等选项将在后续任务实现。此处为导航占位。</string>
     <string name="settings_cache_row">缩略图缓存</string>
-    <string name="settings_cache_value_fake">未启用（占位）</string>
+    <string name="settings_cache_value_fake">已启用磁盘缓存（清理入口后续任务）</string>
     <string name="settings_subtitle_lang_row">默认字幕语言</string>
     <string name="settings_subtitle_lang_value_fake">中文（占位）</string>
 </resources>

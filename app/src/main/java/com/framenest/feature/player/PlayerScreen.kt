@@ -140,41 +140,18 @@ fun PlayerScreen(
                     modifier = Modifier.fillMaxSize(),
                 )
 
-                when (state.phase) {
-                    PlayerState.Phase.Idle,
-                    PlayerState.Phase.Preparing,
-                    -> {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = Color.White)
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                text = stringResource(R.string.player_loading),
-                                color = Color.White,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.testTag("player_phase_loading"),
-                            )
-                        }
-                    }
-                    PlayerState.Phase.Ready -> {
-                        // First frame is on the surface; prompt user to play.
-                        PlayOverlay(
-                            onPlay = { vm.play() },
-                            label = stringResource(R.string.player_tap_to_play),
+                // Gate playable / "tap to play" on real firstFrameReady (vout),
+                // never on a list static thumbnail or phase alone.
+                when {
+                    state.phase == PlayerState.Phase.Error -> {
+                        ErrorOverlay(
+                            message = state.error?.message
+                                ?: stringResource(R.string.player_error_generic),
+                            retryable = state.error?.retryable == true,
+                            onRetry = { vm.retry() },
                         )
                     }
-                    PlayerState.Phase.Paused,
-                    PlayerState.Phase.Ended,
-                    -> {
-                        PlayOverlay(
-                            onPlay = { vm.play() },
-                            label = if (state.phase == PlayerState.Phase.Ended) {
-                                stringResource(R.string.player_replay)
-                            } else {
-                                stringResource(R.string.player_tap_to_play)
-                            },
-                        )
-                    }
-                    PlayerState.Phase.Playing -> {
+                    state.phase == PlayerState.Phase.Playing && state.firstFrameReady -> {
                         // Tap video to pause.
                         Box(
                             modifier = Modifier
@@ -187,13 +164,33 @@ fun PlayerScreen(
                                 .testTag("player_playing_touch"),
                         )
                     }
-                    PlayerState.Phase.Error -> {
-                        ErrorOverlay(
-                            message = state.error?.message
-                                ?: stringResource(R.string.player_error_generic),
-                            retryable = state.error?.retryable == true,
-                            onRetry = { vm.retry() },
+                    state.firstFrameReady &&
+                        (
+                            state.phase == PlayerState.Phase.Ready ||
+                                state.phase == PlayerState.Phase.Paused ||
+                                state.phase == PlayerState.Phase.Ended
+                            ) -> {
+                        PlayOverlay(
+                            onPlay = { vm.play() },
+                            label = if (state.phase == PlayerState.Phase.Ended) {
+                                stringResource(R.string.player_replay)
+                            } else {
+                                stringResource(R.string.player_tap_to_play)
+                            },
                         )
+                    }
+                    else -> {
+                        // Idle / Preparing / any phase without a decoded frame.
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = Color.White)
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                text = stringResource(R.string.player_loading),
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.testTag("player_phase_loading"),
+                            )
+                        }
                     }
                 }
             }
@@ -318,7 +315,7 @@ private fun PlayerControls(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 IconButton(
                     onClick = onPlay,
-                    enabled = state.canPlay || state.phase == PlayerState.Phase.Ready,
+                    enabled = state.canPlay,
                     modifier = Modifier
                         .semantics { contentDescription = "player_play" }
                         .testTag("player_play"),

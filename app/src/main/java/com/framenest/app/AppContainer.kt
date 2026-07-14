@@ -7,6 +7,7 @@ import com.framenest.data.server.BrowseRepository
 import com.framenest.data.server.CredentialStore
 import com.framenest.data.server.EncryptedCredentialStore
 import com.framenest.data.server.ServerRepository
+import com.framenest.data.thumbnail.ThumbnailRepository
 import com.framenest.smb.SmbClient
 import com.framenest.smb.SmbjClient
 
@@ -34,6 +35,13 @@ class AppContainer(
 
     val historyRepository: PlaybackHistoryRepository = PlaybackHistoryRepository(
         dao = database.playbackHistoryDao(),
+    )
+
+    /** List thumbnails (FN-07); clearable via [ThumbnailRepository.clearCache]. */
+    val thumbnailRepository: ThumbnailRepository = ThumbnailRepository(
+        context = context,
+        serverRepository = serverRepository,
+        clientFactory = clientFactory,
     )
 
     companion object {
