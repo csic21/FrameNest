@@ -132,7 +132,7 @@
     <string name="settings_clear_cache">清理缓存</string>
     <string name="settings_cache_cleared">已清理约 %1$s</string>
     <string name="settings_listen_translate_row">听译缓存</string>
-    <string name="settings_listen_translate_hint">本机听译字幕（原文+译文）仅保存在应用内数据库。不写 NAS；卸载应用后一并删除。</string>
+    <string name="settings_listen_translate_hint">本机听译字幕（原文+译文）仅保存在应用内数据库。模型在下方单独管理。不写 NAS；卸载应用后一并删除。</string>
     <string name="settings_listen_translate_size">听译约占用 %1$s</string>
     <string name="settings_clear_listen_translate">清除听译缓存</string>
     <string name="settings_listen_translate_cleared">已清除听译约 %1$s</string>
@@ -149,6 +149,17 @@
     <string name="listen_translate_mode_both">双语</string>
     <string name="listen_translate_status">状态：%1$s</string>
     <string name="listen_translate_covered">已覆盖至 %1$d 秒</string>
+    <string name="listen_translate_installing">正在安装本机模型…</string>
+    <string name="listen_translate_models_ready">模型已就绪</string>
+
+    <string name="settings_listen_models_row">听译模型</string>
+    <string name="settings_listen_models_hint">ASR/MT 包仅安装在应用私有目录（filesDir/listen_models）。卸载应用后一并删除；不写 NAS 或公共下载目录。</string>
+    <string name="settings_listen_models_size">模型约占用 %1$s</string>
+    <string name="settings_install_listen_models">安装听译模型</string>
+    <string name="settings_clear_listen_models">清除听译模型</string>
+    <string name="settings_listen_models_installed">模型已安装</string>
+    <string name="settings_listen_models_cleared">已清除模型约 %1$s</string>
+    <string name="settings_listen_models_failed">模型操作失败：%1$s</string>
     <string name="settings_subtitle_lang_row">默认字幕语言</string>
     <string name="settings_subtitle_lang_hint">影响自动匹配外挂/内嵌字幕的优先级（下次播放生效）。</string>
     <string name="settings_lang_system">跟随系统</string>

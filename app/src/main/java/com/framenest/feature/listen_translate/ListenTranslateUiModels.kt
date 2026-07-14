@@ -43,6 +43,9 @@ data class ListenTranslateUiState(
     val message: String? = null,
     val errorMessage: String? = null,
     val isProcessing: Boolean = false,
+    /** True while core ASR/MT packs are being installed into app-private storage. */
+    val isInstallingModels: Boolean = false,
+    val modelsReady: Boolean = false,
 ) {
     val languages: ListenLanguagePair
         get() = ListenLanguagePair(sourceLang, targetLang).normalized()

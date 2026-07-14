@@ -1,0 +1,49 @@
+{
+  "id": "mt-base",
+  "version": "1",
+  "kind": "mt",
+  "displayName": "MT Base (on-device pack)",
+  "notes": "Minimal phrase entries for demo; extend or swap for OPUS/NLLB later.",
+  "phraseEntries": [
+    {
+      "pair": "ja|zh",
+      "src": "こんにちは",
+      "tgt": "你好"
+    },
+    {
+      "pair": "ja|zh",
+      "src": "ありがとう",
+      "tgt": "谢谢"
+    },
+    {
+      "pair": "ja|zh",
+      "src": "はい",
+      "tgt": "是"
+    },
+    {
+      "pair": "ja|zh",
+      "src": "いいえ",
+      "tgt": "不"
+    },
+    {
+      "pair": "en|zh",
+      "src": "hello",
+      "tgt": "你好"
+    },
+    {
+      "pair": "en|zh",
+      "src": "thanks",
+      "tgt": "谢谢"
+    },
+    {
+      "pair": "en|zh",
+      "src": "yes",
+      "tgt": "是"
+    },
+    {
+      "pair": "en|zh",
+      "src": "no",
+      "tgt": "不"
+    }
+  ]
+}

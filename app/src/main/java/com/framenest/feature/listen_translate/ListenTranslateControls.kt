@@ -62,6 +62,7 @@ fun ListenTranslateControls(
             Switch(
                 checked = uiState.enabled,
                 onCheckedChange = onEnabledChange,
+                enabled = !uiState.isInstallingModels,
                 modifier = Modifier.testTag("listen_translate_enable"),
             )
         }
@@ -119,11 +120,27 @@ fun ListenTranslateControls(
             )
         }
 
-        if (uiState.enabled) {
+        if (uiState.isInstallingModels) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.listen_translate_installing),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.testTag("listen_translate_installing"),
+            )
+        }
+
+        if (uiState.enabled || uiState.modelsReady || uiState.message != null ||
+            uiState.errorMessage != null
+        ) {
             Spacer(Modifier.height(8.dp))
             val statusLine = buildString {
                 append(stringResource(R.string.listen_translate_status, uiState.status.name))
                 if (uiState.isProcessing) append(" · …")
+                if (uiState.modelsReady) {
+                    append(" · ")
+                    append(stringResource(R.string.listen_translate_models_ready))
+                }
                 if (uiState.coveredUntilMs > 0L) {
                     append(" · ")
                     append(

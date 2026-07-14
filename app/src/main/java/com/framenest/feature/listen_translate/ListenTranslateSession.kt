@@ -86,6 +86,24 @@ class ListenTranslateSession(
         }
     }
 
+    fun setModelsReady(ready: Boolean) {
+        _ui.update { it.copy(modelsReady = ready) }
+    }
+
+    fun setInstallingModels(installing: Boolean, message: String? = null, error: String? = null) {
+        _ui.update {
+            it.copy(
+                isInstallingModels = installing,
+                message = message ?: it.message,
+                errorMessage = error,
+            )
+        }
+    }
+
+    fun reportError(message: String) {
+        _ui.update { it.copy(errorMessage = message, isInstallingModels = false) }
+    }
+
     fun onPlaybackTick(positionMs: Long, durationMs: Long, playing: Boolean) {
         lastPositionMs = positionMs.coerceAtLeast(0L)
         lastDurationMs = durationMs.coerceAtLeast(0L)

@@ -12,11 +12,12 @@ import com.framenest.core.model.PlaybackRequest
 import com.framenest.data.history.PlaybackHistoryRepository
 import com.framenest.data.history.PlaybackProgressRules
 import com.framenest.data.listen_translate.ListenTranslateRepository
+import com.framenest.data.listen_translate.model.ListenModelManager
 import com.framenest.data.server.AppDatabase
 import com.framenest.feature.listen_translate.ListenDisplayMode
+import com.framenest.feature.listen_translate.ListenTranslateEngineFactory
 import com.framenest.feature.listen_translate.ListenTranslateSession
 import com.framenest.feature.listen_translate.ListenTranslateUiState
-import com.framenest.feature.listen_translate.StubListenTranslateEngine
 import com.framenest.feature.subtitle.ExternalSubtitleLoader
 import com.framenest.feature.subtitle.ExternalSubtitleOption
 import com.framenest.feature.subtitle.SidecarSubtitleScanner
@@ -63,6 +64,8 @@ class PlayerViewModel(
     private val historyRepository: PlaybackHistoryRepository,
     private val listenTranslateRepository: ListenTranslateRepository =
         resolveListenTranslate(application),
+    private val listenModelManager: ListenModelManager =
+        resolveListenModels(application),
     private val controllerFactory: (Application) -> PlayerController = { app ->
         VlcPlayerController(app, enableHwDecoder = true)
     },
@@ -83,7 +86,7 @@ class PlayerViewModel(
 
     private val listenSession = ListenTranslateSession(
         repository = listenTranslateRepository,
-        engine = StubListenTranslateEngine(),
+        engine = ListenTranslateEngineFactory.create(listenModelManager),
         scope = viewModelScope,
         identity = request.identity,
         contentKey = "",
@@ -136,7 +139,35 @@ class PlayerViewModel(
     }
 
     fun setListenTranslateEnabled(enabled: Boolean) {
-        listenSession.setEnabled(enabled)
+        if (!enabled) {
+            listenSession.setEnabled(false)
+            return
+        }
+        viewModelScope.launch {
+            listenSession.setInstallingModels(
+                installing = true,
+                message = "正在安装本机听译模型（仅应用私有目录）…",
+                error = null,
+            )
+            val result = runCatching {
+                listenModelManager.installCoreModels().getOrThrow()
+            }
+            if (result.isFailure) {
+                val msg = result.exceptionOrNull()?.message
+                    ?: "模型安装失败"
+                listenSession.setInstallingModels(installing = false, error = msg)
+                listenSession.setModelsReady(false)
+                listenSession.setEnabled(false)
+                return@launch
+            }
+            listenSession.setModelsReady(true)
+            listenSession.setInstallingModels(
+                installing = false,
+                message = "模型已就绪：${listenModelManager.asrModelId()} / ${listenModelManager.mtModelId()}",
+                error = null,
+            )
+            listenSession.setEnabled(true)
+        }
     }
 
     fun setListenSourceLang(code: String) {
@@ -631,6 +662,8 @@ class PlayerViewModel(
         private val historyRepository: PlaybackHistoryRepository = resolveHistory(application),
         private val listenTranslateRepository: ListenTranslateRepository =
             resolveListenTranslate(application),
+        private val listenModelManager: ListenModelManager =
+            resolveListenModels(application),
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -640,6 +673,7 @@ class PlayerViewModel(
                     request,
                     historyRepository,
                     listenTranslateRepository,
+                    listenModelManager,
                 ) as T
             }
             throw IllegalArgumentException("Unknown ViewModel ${modelClass.name}")
@@ -671,6 +705,12 @@ class PlayerViewModel(
                 ?.let { return it }
             val db = AppDatabase.createInMemory(application)
             return ListenTranslateRepository(db.listenTranslateDao())
+        }
+
+        fun resolveListenModels(application: Application): ListenModelManager {
+            (application as? FrameNestApplication)?.container?.listenModelManager
+                ?.let { return it }
+            return ListenModelManager(application)
         }
     }
 }

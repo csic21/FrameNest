@@ -2,21 +2,24 @@ package com.framenest.feature.settings
 
 import android.content.Context
 import com.framenest.data.listen_translate.ListenTranslateRepository
+import com.framenest.data.listen_translate.model.ListenModelManager
 import com.framenest.data.thumbnail.ThumbnailRepository
 import java.io.File
+import kotlinx.coroutines.runBlocking
 
 /**
- * Clears disk caches and optional Room listen-translate rows.
- * Never touches credentials. Listen-translate data lives only in app-private Room
+ * Clears disk caches, listen-translate Room rows, and on-device model packs.
+ * Never touches credentials. Models and DB live only in app-private storage
  * (decision 0005 — uninstall still clears everything).
  *
- * Call [clearAllCaches] / [clearListenTranslateCache] / [approximateListenTranslateBytes]
- * from a background dispatcher (Room is not main-thread safe here).
+ * Call clear / approximate methods that touch Room or models from a background
+ * dispatcher.
  */
 class CacheMaintenance(
     private val context: Context,
     private val thumbnailRepository: ThumbnailRepository,
     private val listenTranslateRepository: ListenTranslateRepository? = null,
+    private val listenModelManager: ListenModelManager? = null,
 ) {
     fun clearAllCaches(): CacheClearResult {
         val before = approximateTotalBytes()
@@ -25,9 +28,9 @@ class CacheMaintenance(
         runCatching { subtitleDir.listFiles()?.forEach { it.deleteRecursively() } }
         val diagDir = File(context.cacheDir, "diagnostics")
         runCatching { diagDir.listFiles()?.forEach { it.deleteRecursively() } }
-        // Room purge — caller should already be on Dispatchers.IO.
-        kotlinx.coroutines.runBlocking {
+        runBlocking {
             listenTranslateRepository?.purgeAll()
+            listenModelManager?.deleteAll()
         }
         val after = approximateTotalBytes()
         return CacheClearResult(
@@ -36,10 +39,10 @@ class CacheMaintenance(
         )
     }
 
-    /** Clear only listen-translate Room rows (not thumbnails / subtitle temps). */
+    /** Clear only listen-translate Room rows (not model packs). */
     fun clearListenTranslateCache(): CacheClearResult {
         val before = approximateTotalBytes()
-        kotlinx.coroutines.runBlocking {
+        runBlocking {
             listenTranslateRepository?.purgeAll()
         }
         val after = approximateTotalBytes()
@@ -49,19 +52,31 @@ class CacheMaintenance(
         )
     }
 
-    /** Approximate Room text payload; call from IO. */
+    /** Clear only on-device model packs under filesDir/listen_models. */
+    fun clearListenModels(): CacheClearResult {
+        val before = approximateTotalBytes()
+        runBlocking {
+            listenModelManager?.deleteAll()
+        }
+        val after = approximateTotalBytes()
+        return CacheClearResult(
+            freedApproxBytes = (before - after).coerceAtLeast(0L),
+            remainingApproxBytes = after,
+        )
+    }
+
     fun approximateListenTranslateBytes(): Long =
-        kotlinx.coroutines.runBlocking {
+        runBlocking {
             listenTranslateRepository?.approximateCacheBytes() ?: 0L
         }
 
-    /**
-     * Disk caches + listen-translate Room estimate.
-     * Prefer calling from a background thread when Room is included.
-     */
+    fun approximateListenModelBytes(): Long =
+        listenModelManager?.approximateBytes() ?: 0L
+
     fun approximateTotalBytes(): Long {
         var total = approximateDiskCacheBytes()
         total += approximateListenTranslateBytes()
+        total += approximateListenModelBytes()
         return total
     }
 

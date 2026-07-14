@@ -4,6 +4,7 @@ import android.content.Context
 import com.framenest.core.diagnostics.DiagnosticLogExporter
 import com.framenest.data.history.PlaybackHistoryRepository
 import com.framenest.data.listen_translate.ListenTranslateRepository
+import com.framenest.data.listen_translate.model.ListenModelManager
 import com.framenest.data.server.AppDatabase
 import com.framenest.data.server.BrowseRepository
 import com.framenest.data.server.CredentialStore
@@ -50,6 +51,9 @@ class AppContainer(
         dao = database.listenTranslateDao(),
     )
 
+    /** On-device ASR/MT packs under filesDir (FN-13); uninstall clears. */
+    val listenModelManager: ListenModelManager = ListenModelManager(appContext)
+
     /** List thumbnails (FN-07); concurrency from [userPreferences]. */
     val thumbnailRepository: ThumbnailRepository = ThumbnailRepository(
         context = appContext,
@@ -62,6 +66,7 @@ class AppContainer(
         context = appContext,
         thumbnailRepository = thumbnailRepository,
         listenTranslateRepository = listenTranslateRepository,
+        listenModelManager = listenModelManager,
     )
 
     val diagnosticLogExporter: DiagnosticLogExporter = DiagnosticLogExporter(appContext)

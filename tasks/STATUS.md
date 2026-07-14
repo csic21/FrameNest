@@ -17,7 +17,7 @@
 | FN-10 听译 PCM spike | 已完成 | agent | `agent/FN-10-listen-translate` | FN-01, FN-05 | [FN-10](handoffs/FN-10.md) |
 | FN-11 听译 Room/清理 | 已完成 | agent | `agent/FN-11-listen-translate-room` | FN-10 | [FN-11](handoffs/FN-11.md) |
 | FN-12 听译管线+UI | 已完成 | agent | `agent/FN-12-listen-translate-ui` | FN-10, FN-11 | [FN-12](handoffs/FN-12.md) |
-| FN-13 听译模型下载 | 未开始 | — | — | FN-12（可接口并行） | — |
+| FN-13 听译模型下载 | 已完成 | agent | `agent/FN-13-listen-models` | FN-12 | [FN-13](handoffs/FN-13.md) |
 
 **当前发布**：`0.3.1-internal`（versionCode 4）
 

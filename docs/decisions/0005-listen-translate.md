@@ -85,6 +85,14 @@
 - 播放页叠层建议 App 自绘（原/译/双语），不强制改 libVLC 内嵌字幕渲染。
 - 机型门槛与发热需在 FN-12/13 实测后写入设置文案；不承诺毫秒级同传。
 
+### FN-13 模型落盘（已落地）
+
+- 路径：`context.filesDir/listen_models/<id>/v<version>/` + `.ready` + SHA-256 校验。
+- 首装：从 `assets/listen_models/*` 安装（无公网依赖）；可选 `remoteUrl` 预留给 HTTP 更新。
+- 设置页：安装 / 清除模型；「清理缓存」一并删模型与听译 Room。
+- 引擎：`ModelAwareListenTranslateEngine` 依赖核心包就绪；当前 ASR 仍为窗口占位文本，
+  MT 使用 pack 内 `phraseEntries`；替换权重时保持 store API 即可。
+
 ## 后续可修订
 
 - 若未来 libVLC 4.x Android 绑定暴露音频回调，可再评估与路径 B 的取舍（新决策或修订本文件）。

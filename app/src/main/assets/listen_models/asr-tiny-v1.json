@@ -1,0 +1,7 @@
+{
+  "id": "asr-tiny",
+  "version": "1",
+  "kind": "asr",
+  "displayName": "ASR Tiny (on-device pack)",
+  "notes": "Placeholder pack layout for FN-13. Replace weights with whisper/sherpa later without changing store API."
+}
