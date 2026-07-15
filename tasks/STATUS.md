@@ -19,11 +19,11 @@
 | FN-12 听译管线+UI | 部分完成（stub） | agent | → main | FN-10, FN-11 | [FN-12](handoffs/FN-12.md) |
 | FN-13 听译模型壳 | 部分完成（JSON 占位包） | agent | → main | FN-12 | [FN-13](handoffs/FN-13.md) |
 | FN-14 听译真 ASR/MT | 已完成 | agent | `→ main` | FN-10..FN-13 | [FN-14](handoffs/FN-14.md) |
-| FN-15 拖拽与控制交互 | 已完成 | agent | `agent/FN-15-player-scrub` | FN-05, FN-08 | [FN-15](handoffs/FN-15.md) |
-| FN-16 音轨/倍速/快进退 | 已完成 | agent | `agent/FN-16-player-controls` | FN-05, FN-08, FN-15 | [FN-16](handoffs/FN-16.md) |
-| FN-17 锁屏与方向锁 | 已完成 | agent | `agent/FN-17-player-lock` | FN-08, FN-16 | [FN-17](handoffs/FN-17.md) |
-| FN-18 同目录连播 | 已完成 | agent | `agent/FN-18-sibling-playlist` | FN-05, FN-17 | [FN-18](handoffs/FN-18.md) |
-| FN-19 缓冲提示 | 已完成 | agent | `agent/FN-19-buffer-indicator` | FN-05 | [FN-19](handoffs/FN-19.md) |
+| FN-15 拖拽与控制交互 | 已完成 | agent | → main | FN-05, FN-08 | [FN-15](handoffs/FN-15.md) |
+| FN-16 音轨/倍速/快进退 | 已完成 | agent | → main | FN-05, FN-08, FN-15 | [FN-16](handoffs/FN-16.md) |
+| FN-17 锁屏与方向锁 | 已完成 | agent | → main | FN-08, FN-16 | [FN-17](handoffs/FN-17.md) |
+| FN-18 同目录连播 | 已完成 | agent | → main | FN-05, FN-17 | [FN-18](handoffs/FN-18.md) |
+| FN-19 缓冲提示 | 已完成 | agent | → main | FN-05 | [FN-19](handoffs/FN-19.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。
