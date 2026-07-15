@@ -29,6 +29,10 @@ data class PlayerState(
      * Default [VideoScaleMode.BestFit] preserves aspect (no stretch).
      */
     val videoScaleMode: VideoScaleMode = VideoScaleMode.BestFit,
+    /**
+     * Playback rate multiplier (1.0 = normal). Discrete steps in [PlaybackRates.ALL].
+     */
+    val playbackRate: Float = PlaybackRates.DEFAULT,
     val hwDecoderRequested: Boolean = true,
     val error: PlayerError? = null,
 ) {

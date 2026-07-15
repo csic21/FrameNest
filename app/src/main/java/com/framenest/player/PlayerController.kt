@@ -34,6 +34,12 @@ interface PlayerController {
 
     fun selectAudioTrack(trackId: Int)
 
+    /**
+     * Playback rate multiplier. Values are snapped to [PlaybackRates] steps.
+     * Applied immediately when a [MediaPlayer] exists; remembered across prepare.
+     */
+    fun setPlaybackRate(rate: Float)
+
     fun selectSubtitleTrack(trackId: Int)
 
     /**

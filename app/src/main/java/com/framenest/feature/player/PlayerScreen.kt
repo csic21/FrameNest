@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.media.AudioManager
 import android.os.SystemClock
@@ -30,11 +31,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.BrightnessMedium
 import androidx.compose.material.icons.filled.ClosedCaption
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ScreenLockRotation
+import androidx.compose.material.icons.filled.ScreenRotation
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,11 +58,13 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,6 +89,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlin.math.abs
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.framenest.R
 import com.framenest.core.model.PlaybackRequest
 import com.framenest.feature.listen_translate.ListenDisplayMode
@@ -89,6 +101,7 @@ import com.framenest.feature.listen_translate.ListenTranslateUiState
 import com.framenest.feature.subtitle.ExternalSubtitleOption
 import com.framenest.feature.subtitle.SubtitleControls
 import com.framenest.feature.subtitle.SubtitleUiState
+import com.framenest.player.PlaybackRates
 import com.framenest.player.PlayerController
 import com.framenest.player.PlayerState
 import com.framenest.player.PlayerTrack
@@ -106,6 +119,10 @@ import com.framenest.player.VideoScaleMode
  *   the surface so chrome show/hide does **not** resize the video (no scale jump).
  * Video scale (BestFit by default) is re-applied on rotation so landscape
  * sources are not stretched when the surface size changes.
+ *
+ * FN-17 locks:
+ * - **Controls lock**: hide chrome, swallow gestures, back unlocks first.
+ * - **Orientation lock**: freeze current rotation via [Activity.requestedOrientation].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -124,7 +141,11 @@ fun PlayerScreen(
     val listenUi by vm.listenTranslateUiState.collectAsStateWithLifecycle()
     var showSubtitles by remember { mutableStateOf(false) }
     var showListenTranslate by remember { mutableStateOf(false) }
+    var showAudioTracks by remember { mutableStateOf(false) }
     var chromeVisible by remember { mutableStateOf(true) }
+    var controlsLocked by remember { mutableStateOf(false) }
+    var orientationLocked by remember { mutableStateOf(false) }
+    var showUnlockHint by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
     val configuration = LocalConfiguration.current
     // Orientation chrome only — not a device-model / width-bucket check.
@@ -151,7 +172,11 @@ fun PlayerScreen(
 
     // Landscape stays immersive so chrome show/hide never changes system-bar
     // insets / window size (that used to re-layout and re-scale the video).
-    PlayerImmersiveEffect(enabled = landscape)
+    // Controls-lock also immerses so a locked portrait session is not edged with chrome.
+    PlayerImmersiveEffect(enabled = landscape || controlsLocked)
+
+    // Freeze / unfreeze activity orientation for the lifetime of this destination.
+    PlayerOrientationLockEffect(orientationLocked = orientationLocked)
 
     // Keep the screen on while actively playing so the device does not lock /
     // dim mid-video. Cleared the moment playback leaves the Playing phase or
@@ -162,21 +187,64 @@ fun PlayerScreen(
         onDispose { keepScreenOnView.keepScreenOn = false }
     }
 
+    // Error must always expose Retry — drop the control lock automatically.
+    LaunchedEffect(state.phase, controlsLocked) {
+        if (controlsLocked && PlayerLockPolicy.shouldAutoUnlock(state.phase)) {
+            controlsLocked = false
+            showUnlockHint = false
+            chromeVisible = true
+        }
+    }
+
+    LaunchedEffect(showUnlockHint, controlsLocked) {
+        if (showUnlockHint && controlsLocked) {
+            delay(PlayerLockPolicy.UNLOCK_HINT_MS)
+            showUnlockHint = false
+        }
+    }
+
     val leave: () -> Unit = {
         vm.onLeaveOrBackground()
         onBack()
     }
 
-    BackHandler(onBack = leave)
+    val unlockControls: () -> Unit = {
+        controlsLocked = false
+        showUnlockHint = false
+        chromeVisible = true
+    }
+
+    val lockControls: () -> Unit = {
+        controlsLocked = true
+        showUnlockHint = false
+        chromeVisible = false
+        showSubtitles = false
+        showListenTranslate = false
+        showAudioTracks = false
+    }
+
+    BackHandler {
+        when (PlayerLockPolicy.consumeBack(controlsLocked)) {
+            PlayerLockPolicy.BackAction.Unlock -> unlockControls()
+            PlayerLockPolicy.BackAction.Leave -> leave()
+        }
+    }
 
     // Keep chrome visible when not actively playing so users can always reach controls.
-    val showChrome = chromeVisible || state.phase != PlayerState.Phase.Playing
-    val showBottomPanels = showChrome && (showListenTranslate || showSubtitles)
+    // Locked sessions force chrome off (unlock affordance is a separate overlay).
+    val showChrome = PlayerLockPolicy.showChrome(
+        controlsLocked = controlsLocked,
+        chromeVisible = chromeVisible,
+        phase = state.phase,
+    )
+    val showBottomPanels =
+        showChrome && (showListenTranslate || showSubtitles || showAudioTracks)
 
     val toggleListen: () -> Unit = {
         showListenTranslate = !showListenTranslate
         if (showListenTranslate) {
             showSubtitles = false
+            showAudioTracks = false
             chromeVisible = true
         }
     }
@@ -184,14 +252,28 @@ fun PlayerScreen(
         showSubtitles = !showSubtitles
         if (showSubtitles) {
             showListenTranslate = false
+            showAudioTracks = false
+            chromeVisible = true
+        }
+    }
+    val toggleAudioTracks: () -> Unit = {
+        showAudioTracks = !showAudioTracks
+        if (showAudioTracks) {
+            showListenTranslate = false
+            showSubtitles = false
             chromeVisible = true
         }
     }
     val onToggleChrome: () -> Unit = {
-        chromeVisible = !chromeVisible
-        if (!chromeVisible) {
-            showSubtitles = false
-            showListenTranslate = false
+        if (controlsLocked) {
+            showUnlockHint = true
+        } else {
+            chromeVisible = !chromeVisible
+            if (!chromeVisible) {
+                showSubtitles = false
+                showListenTranslate = false
+                showAudioTracks = false
+            }
         }
     }
 
@@ -212,6 +294,7 @@ fun PlayerScreen(
                     onBack = leave,
                     onToggleListen = toggleListen,
                     onToggleSubtitles = toggleSubtitles,
+                    onToggleAudioTracks = toggleAudioTracks,
                 )
             }
         },
@@ -233,7 +316,9 @@ fun PlayerScreen(
                     state = state,
                     listenUi = listenUi,
                     chromeVisible = showChrome,
+                    controlsLocked = controlsLocked,
                     onToggleChrome = onToggleChrome,
+                    onSkipBy = { vm.skipBy(it) },
                     onPlay = { vm.play() },
                     onRetry = { vm.retry() },
                     modifier = Modifier.fillMaxSize(),
@@ -245,6 +330,7 @@ fun PlayerScreen(
                         onBack = leave,
                         onToggleListen = toggleListen,
                         onToggleSubtitles = toggleSubtitles,
+                        onToggleAudioTracks = toggleAudioTracks,
                         modifier = Modifier
                             .align(Alignment.TopCenter)
                             .fillMaxWidth()
@@ -260,9 +346,12 @@ fun PlayerScreen(
                             PlayerBottomPanels(
                                 showListenTranslate = showListenTranslate,
                                 showSubtitles = showSubtitles,
+                                showAudioTracks = showAudioTracks,
                                 listenUi = listenUi,
                                 subtitleUi = subtitleUi,
                                 embeddedTracks = state.subtitleTracks.filter { it.id >= 0 },
+                                audioTracks = state.audioTracks.filter { it.id >= 0 },
+                                selectedAudioTrackId = state.selectedAudioTrackId,
                                 onListenEnabled = { vm.setListenTranslateEnabled(it) },
                                 onSourceLang = { vm.setListenSourceLang(it) },
                                 onTargetLang = { vm.setListenTargetLang(it) },
@@ -272,6 +361,7 @@ fun PlayerScreen(
                                 onSelectExternal = { vm.selectExternalSubtitle(it) },
                                 onDelayDeltaMs = { vm.adjustSubtitleDelayMs(it) },
                                 onFontRelSize = { vm.setSubtitleFontRelSize(it) },
+                                onSelectAudio = { vm.selectAudioTrack(it) },
                                 overlay = true,
                             )
                         }
@@ -282,25 +372,53 @@ fun PlayerScreen(
                             onPreviewSeek = { vm.previewSeekTo(it) },
                             onSeek = { vm.seekTo(it) },
                             onCycleVideoScale = { vm.cycleVideoScaleMode() },
+                            onCyclePlaybackRate = { vm.cyclePlaybackRate() },
+                            onLockControls = lockControls,
+                            orientationLocked = orientationLocked,
+                            onToggleOrientationLock = {
+                                orientationLocked = !orientationLocked
+                            },
                             overlay = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
+                if (controlsLocked && showUnlockHint) {
+                    LockedUnlockOverlay(
+                        onUnlock = unlockControls,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 32.dp),
+                    )
+                }
             } else {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    PlayerSurfaceStack(
-                        controller = vm.controller,
-                        state = state,
-                        listenUi = listenUi,
-                        chromeVisible = showChrome,
-                        onToggleChrome = onToggleChrome,
-                        onPlay = { vm.play() },
-                        onRetry = { vm.retry() },
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
-                    )
+                    ) {
+                        PlayerSurfaceStack(
+                            controller = vm.controller,
+                            state = state,
+                            listenUi = listenUi,
+                            chromeVisible = showChrome,
+                            controlsLocked = controlsLocked,
+                            onToggleChrome = onToggleChrome,
+                            onSkipBy = { vm.skipBy(it) },
+                            onPlay = { vm.play() },
+                            onRetry = { vm.retry() },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        if (controlsLocked && showUnlockHint) {
+                            LockedUnlockOverlay(
+                                onUnlock = unlockControls,
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = 24.dp),
+                            )
+                        }
+                    }
                     if (showChrome) {
                         PlayerControls(
                             state = state,
@@ -309,6 +427,12 @@ fun PlayerScreen(
                             onPreviewSeek = { vm.previewSeekTo(it) },
                             onSeek = { vm.seekTo(it) },
                             onCycleVideoScale = { vm.cycleVideoScaleMode() },
+                            onCyclePlaybackRate = { vm.cyclePlaybackRate() },
+                            onLockControls = lockControls,
+                            orientationLocked = orientationLocked,
+                            onToggleOrientationLock = {
+                                orientationLocked = !orientationLocked
+                            },
                             overlay = false,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -316,9 +440,12 @@ fun PlayerScreen(
                             PlayerBottomPanels(
                                 showListenTranslate = showListenTranslate,
                                 showSubtitles = showSubtitles,
+                                showAudioTracks = showAudioTracks,
                                 listenUi = listenUi,
                                 subtitleUi = subtitleUi,
                                 embeddedTracks = state.subtitleTracks.filter { it.id >= 0 },
+                                audioTracks = state.audioTracks.filter { it.id >= 0 },
+                                selectedAudioTrackId = state.selectedAudioTrackId,
                                 onListenEnabled = { vm.setListenTranslateEnabled(it) },
                                 onSourceLang = { vm.setListenSourceLang(it) },
                                 onTargetLang = { vm.setListenTargetLang(it) },
@@ -328,12 +455,73 @@ fun PlayerScreen(
                                 onSelectExternal = { vm.selectExternalSubtitle(it) },
                                 onDelayDeltaMs = { vm.adjustSubtitleDelayMs(it) },
                                 onFontRelSize = { vm.setSubtitleFontRelSize(it) },
+                                onSelectAudio = { vm.selectAudioTrack(it) },
                                 overlay = false,
                             )
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Apply [PlayerLockPolicy.orientationRequest] to the host Activity. Always restores
+ * [ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED] when leaving the player so other
+ * destinations are not left orientation-locked.
+ */
+@Composable
+private fun PlayerOrientationLockEffect(orientationLocked: Boolean) {
+    val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
+    DisposableEffect(orientationLocked, activity) {
+        val act = activity
+        if (act == null) {
+            onDispose { }
+        } else {
+            act.requestedOrientation =
+                PlayerLockPolicy.orientationRequest(orientationLocked)
+            onDispose {
+                act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
+        }
+    }
+}
+
+@Composable
+private fun LockedUnlockOverlay(
+    onUnlock: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val unlockCd = stringResource(R.string.player_unlock_controls_cd)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .testTag("player_unlock_overlay"),
+    ) {
+        Text(
+            text = stringResource(R.string.player_locked_hint),
+            color = Color.White,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.testTag("player_locked_hint"),
+        )
+        Spacer(Modifier.height(8.dp))
+        IconButton(
+            onClick = onUnlock,
+            modifier = Modifier
+                .minimumInteractiveComponentSize()
+                .semantics { contentDescription = unlockCd }
+                .testTag("player_unlock"),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.LockOpen,
+                contentDescription = stringResource(R.string.player_unlock_controls),
+                tint = Color.White,
+                modifier = Modifier.size(32.dp),
+            )
         }
     }
 }
@@ -346,6 +534,7 @@ private fun PlayerTopBar(
     onBack: () -> Unit,
     onToggleListen: () -> Unit,
     onToggleSubtitles: () -> Unit,
+    onToggleAudioTracks: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     TopAppBar(
@@ -372,6 +561,7 @@ private fun PlayerTopBar(
             }
         },
         actions = {
+            val audioTracksCd = stringResource(R.string.player_audio_tracks_cd)
             IconButton(
                 onClick = onToggleListen,
                 modifier = Modifier
@@ -382,6 +572,18 @@ private fun PlayerTopBar(
                 Icon(
                     imageVector = Icons.Filled.Translate,
                     contentDescription = stringResource(R.string.listen_translate_title),
+                )
+            }
+            IconButton(
+                onClick = onToggleAudioTracks,
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .semantics { contentDescription = audioTracksCd }
+                    .testTag("player_audio_tracks"),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Audiotrack,
+                    contentDescription = stringResource(R.string.player_audio_tracks),
                 )
             }
             IconButton(
@@ -457,7 +659,9 @@ private fun PlayerSurfaceStack(
     state: PlayerState,
     listenUi: ListenTranslateUiState,
     chromeVisible: Boolean,
+    controlsLocked: Boolean,
     onToggleChrome: () -> Unit,
+    onSkipBy: (Long) -> Unit,
     onPlay: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
@@ -468,6 +672,7 @@ private fun PlayerSurfaceStack(
     } else {
         stringResource(R.string.player_controls_show)
     }
+    val lockedCd = stringResource(R.string.player_locked_hint)
 
     val context = LocalContext.current
     val hostView = LocalView.current
@@ -475,11 +680,18 @@ private fun PlayerSurfaceStack(
         BrightnessVolumeController(context, hostView)
     }
     var gestureIndicator by remember { mutableStateOf<PlayerGesture?>(null) }
+    var skipIndicator by remember { mutableStateOf<SkipIndicator?>(null) }
     // Restore screen brightness to the system value once the player leaves the
     // surface (e.g. navigates back). Volume is a real system setting and is
     // intentionally left at whatever the user set.
     DisposableEffect(gestureController) {
         onDispose { gestureController.restoreBrightness() }
+    }
+    LaunchedEffect(skipIndicator) {
+        if (skipIndicator != null) {
+            delay(700)
+            skipIndicator = null
+        }
     }
 
     Box(
@@ -496,6 +708,17 @@ private fun PlayerSurfaceStack(
 
         // Gate playable / "tap to play" on real firstFrameReady (vout).
         when {
+            // Control lock swallows all surface input except "show unlock".
+            // Error still wins so Retry remains reachable after auto-unlock.
+            controlsLocked && state.phase != PlayerState.Phase.Error -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clickable(onClick = onToggleChrome)
+                        .semantics { contentDescription = lockedCd }
+                        .testTag("player_locked_touch"),
+                )
+            }
             state.phase == PlayerState.Phase.Error -> {
                 ErrorOverlay(
                     message = state.error?.message
@@ -505,11 +728,19 @@ private fun PlayerSurfaceStack(
                 )
             }
             state.phase == PlayerState.Phase.Playing && state.firstFrameReady -> {
-                // Tap toggles chrome; a vertical drag on the left half adjusts
-                // screen brightness, on the right half adjusts media volume.
+                // Tap toggles chrome; double-tap left/right skips ±10s; vertical
+                // drag left = brightness, right = volume.
                 PlayerGestureLayer(
                     toggleCd = toggleCd,
                     onToggleChrome = onToggleChrome,
+                    onSkipBack = {
+                        onSkipBy(-SkipSeekMath.SKIP_DELTA_MS)
+                        skipIndicator = SkipIndicator.Back
+                    },
+                    onSkipForward = {
+                        onSkipBy(SkipSeekMath.SKIP_DELTA_MS)
+                        skipIndicator = SkipIndicator.Forward
+                    },
                     onGestureStart = { isBrightness ->
                         gestureController.begin(isBrightness)
                         gestureIndicator =
@@ -574,6 +805,15 @@ private fun PlayerSurfaceStack(
                 modifier = Modifier.align(Alignment.Center),
             )
         }
+        skipIndicator?.let { skip ->
+            SkipIndicatorOverlay(
+                skip = skip,
+                modifier = Modifier.align(
+                    if (skip == SkipIndicator.Back) Alignment.CenterStart
+                    else Alignment.CenterEnd,
+                ),
+            )
+        }
     }
 }
 
@@ -581,9 +821,12 @@ private fun PlayerSurfaceStack(
 private fun PlayerBottomPanels(
     showListenTranslate: Boolean,
     showSubtitles: Boolean,
+    showAudioTracks: Boolean,
     listenUi: ListenTranslateUiState,
     subtitleUi: SubtitleUiState,
     embeddedTracks: List<PlayerTrack>,
+    audioTracks: List<PlayerTrack>,
+    selectedAudioTrackId: Int?,
     onListenEnabled: (Boolean) -> Unit,
     onSourceLang: (String) -> Unit,
     onTargetLang: (String) -> Unit,
@@ -593,6 +836,7 @@ private fun PlayerBottomPanels(
     onSelectExternal: (ExternalSubtitleOption) -> Unit,
     onDelayDeltaMs: (Long) -> Unit,
     onFontRelSize: (Int) -> Unit,
+    onSelectAudio: (Int) -> Unit,
     overlay: Boolean,
 ) {
     val panelBg = if (overlay) {
@@ -625,6 +869,17 @@ private fun PlayerBottomPanels(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp)
+                .background(panelBg),
+        )
+    }
+    if (showAudioTracks) {
+        AudioTrackControls(
+            tracks = audioTracks,
+            selectedTrackId = selectedAudioTrackId,
+            onSelect = onSelectAudio,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp)
                 .background(panelBg),
         )
     }
@@ -696,6 +951,10 @@ private fun PlayerControls(
     onPreviewSeek: (Long) -> Unit,
     onSeek: (Long) -> Unit,
     onCycleVideoScale: () -> Unit,
+    onCyclePlaybackRate: () -> Unit,
+    onLockControls: () -> Unit,
+    orientationLocked: Boolean,
+    onToggleOrientationLock: () -> Unit,
     overlay: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -716,6 +975,16 @@ private fun PlayerControls(
     }
     val scaleLabel = videoScaleLabel(state.videoScaleMode)
     val scaleCd = stringResource(R.string.player_video_scale_cd, scaleLabel)
+    val rateLabel = PlaybackRates.label(state.playbackRate)
+    val rateCd = stringResource(R.string.player_playback_rate_cd, rateLabel)
+    val lockCd = stringResource(R.string.player_lock_controls_cd)
+    val orientationCd = stringResource(
+        if (orientationLocked) {
+            R.string.player_orientation_unlock_cd
+        } else {
+            R.string.player_orientation_lock_cd
+        },
+    )
     val playCd = stringResource(R.string.player_play)
     val pauseCd = stringResource(R.string.player_pause)
     val seekCd = stringResource(R.string.player_seek)
@@ -804,6 +1073,62 @@ private fun PlayerControls(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                IconButton(
+                    onClick = onLockControls,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .semantics { contentDescription = lockCd }
+                        .testTag("player_lock_controls"),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Lock,
+                        contentDescription = stringResource(R.string.player_lock_controls),
+                        tint = onBg,
+                    )
+                }
+                IconButton(
+                    onClick = onToggleOrientationLock,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .semantics { contentDescription = orientationCd }
+                        .testTag("player_orientation_lock"),
+                ) {
+                    Icon(
+                        imageVector = if (orientationLocked) {
+                            Icons.Filled.ScreenLockRotation
+                        } else {
+                            Icons.Filled.ScreenRotation
+                        },
+                        contentDescription = stringResource(
+                            if (orientationLocked) {
+                                R.string.player_orientation_unlock
+                            } else {
+                                R.string.player_orientation_lock
+                            },
+                        ),
+                        tint = onBg,
+                    )
+                }
+                TextButton(
+                    onClick = onCyclePlaybackRate,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .semantics { contentDescription = rateCd }
+                        .testTag("player_playback_rate"),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Speed,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = onBg,
+                    )
+                    Spacer(Modifier.size(4.dp))
+                    Text(
+                        text = rateLabel,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = onBg,
+                    )
+                }
                 TextButton(
                     onClick = onCycleVideoScale,
                     modifier = Modifier
@@ -911,24 +1236,35 @@ private sealed interface PlayerGesture {
 }
 
 /**
- * Overlay on the playing surface that turns a tap into a chrome toggle and a
- * vertical drag into brightness/volume control. Splits the surface in half:
- * drag up/down on the **left** changes brightness, on the **right** changes
- * media volume. A short tap anywhere is still a chrome toggle.
+ * Overlay on the playing surface that turns a tap into a chrome toggle, a
+ * double-tap into ±10s skip, and a vertical drag into brightness/volume.
+ * Splits the surface in half for level control: drag up/down on the **left**
+ * changes brightness, on the **right** changes media volume.
  *
  * Uses a single [pointerInput] that distinguishes tap vs. drag manually so the
- * two gestures do not steal events from each other. Drag distance is reported
+ * gestures do not steal events from each other. Drag distance is reported
  * **cumulatively from press** (not per-frame) so [BrightnessVolumeController]
  * can map against a fixed baseline.
+ *
+ * Single-tap chrome toggle is delayed by [SkipSeekMath.DOUBLE_TAP_WINDOW_MS]
+ * so a second tap can still become a skip without flashing chrome.
  */
 @Composable
 private fun PlayerGestureLayer(
     toggleCd: String,
     onToggleChrome: () -> Unit,
+    onSkipBack: () -> Unit,
+    onSkipForward: () -> Unit,
     onGestureStart: (isBrightness: Boolean) -> Unit,
     onGestureDrag: (isBrightness: Boolean, totalDeltaPx: Float, rangePx: Float) -> Unit,
     onGestureEnd: () -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
+    // Holder so the pointerInput block can cancel/reschedule chrome without
+    // restarting the gesture detector on every recomposition.
+    val chromeJob = remember { mutableStateOf<Job?>(null) }
+    val lastTapAtMs = remember { mutableLongStateOf(0L) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -959,6 +1295,10 @@ private fun PlayerGestureLayer(
                                 val dx = abs(change.position.x - downX)
                                 if (!dragging && dy > touchSlop && dy >= dx) {
                                     dragging = true
+                                    // A drag cancels a pending single-tap chrome toggle.
+                                    chromeJob.value?.cancel()
+                                    chromeJob.value = null
+                                    lastTapAtMs.longValue = 0L
                                     isBrightness = downX < size.width / 2f
                                     onGestureStart(isBrightness)
                                     change.consume()
@@ -974,7 +1314,36 @@ private fun PlayerGestureLayer(
                                 if (dragging) {
                                     onGestureEnd()
                                 } else {
-                                    onToggleChrome()
+                                    val nowMs = SystemClock.uptimeMillis()
+                                    val action = SkipSeekMath.classifyTap(
+                                        nowMs = nowMs,
+                                        x = downX,
+                                        widthPx = size.width.toFloat(),
+                                        lastTapAtMs = lastTapAtMs.longValue,
+                                    )
+                                    when (action) {
+                                        SurfaceTapAction.SkipBack -> {
+                                            chromeJob.value?.cancel()
+                                            chromeJob.value = null
+                                            lastTapAtMs.longValue = 0L
+                                            onSkipBack()
+                                        }
+                                        SurfaceTapAction.SkipForward -> {
+                                            chromeJob.value?.cancel()
+                                            chromeJob.value = null
+                                            lastTapAtMs.longValue = 0L
+                                            onSkipForward()
+                                        }
+                                        SurfaceTapAction.SingleTap -> {
+                                            chromeJob.value?.cancel()
+                                            lastTapAtMs.longValue = nowMs
+                                            chromeJob.value = scope.launch {
+                                                delay(SkipSeekMath.DOUBLE_TAP_WINDOW_MS)
+                                                lastTapAtMs.longValue = 0L
+                                                onToggleChrome()
+                                            }
+                                        }
+                                    }
                                 }
                                 dragging = false
                             }
@@ -1025,6 +1394,33 @@ private fun GestureIndicator(gesture: PlayerGesture, modifier: Modifier = Modifi
             )
         }
     }
+}
+
+private enum class SkipIndicator { Back, Forward }
+
+@Composable
+private fun SkipIndicatorOverlay(skip: SkipIndicator, modifier: Modifier = Modifier) {
+    val label = when (skip) {
+        SkipIndicator.Back -> stringResource(R.string.player_skip_back_label)
+        SkipIndicator.Forward -> stringResource(R.string.player_skip_forward_label)
+    }
+    val cd = when (skip) {
+        SkipIndicator.Back -> stringResource(R.string.player_skip_back)
+        SkipIndicator.Forward -> stringResource(R.string.player_skip_forward)
+    }
+    Text(
+        text = label,
+        color = Color.White,
+        style = MaterialTheme.typography.headlineSmall,
+        modifier = modifier
+            .padding(24.dp)
+            .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .semantics { contentDescription = cd }
+            .testTag(
+                if (skip == SkipIndicator.Back) "player_skip_back" else "player_skip_forward",
+            ),
+    )
 }
 
 /**

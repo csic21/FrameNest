@@ -36,6 +36,7 @@ import com.framenest.feature.subtitle.SubtitleSelectionKeys
 import com.framenest.feature.subtitle.SubtitleUiState
 import com.framenest.player.CredentialRedactor
 import com.framenest.player.MediaSource
+import com.framenest.player.PlaybackRates
 import com.framenest.player.PlayerController
 import com.framenest.player.PlayerError
 import com.framenest.player.PlayerErrorMapper
@@ -474,6 +475,43 @@ class PlayerViewModel(
 
     fun previewSeekTo(positionMs: Long) {
         controller.seekTo(positionMs, fast = true)
+    }
+
+    /**
+     * Relative skip (e.g. ±10s from double-tap). Clamped to media bounds.
+     * Uses precise seek so paused scrub still paints a new frame.
+     */
+    fun skipBy(deltaMs: Long) {
+        val state = controller.state.value
+        val phase = state.phase
+        if (phase == PlayerState.Phase.Error ||
+            phase == PlayerState.Phase.Idle ||
+            phase == PlayerState.Phase.Preparing
+        ) {
+            return
+        }
+        val target = SkipSeekMath.targetPositionMs(
+            positionMs = state.positionMs,
+            durationMs = state.durationMs,
+            deltaMs = deltaMs,
+        )
+        // User navigated explicitly — do not let a pending resume seek pull them back.
+        resumeSeekGate.markFired()
+        startPositionMs = 0L
+        controller.seekTo(target, fast = false)
+    }
+
+    fun selectAudioTrack(trackId: Int) {
+        controller.selectAudioTrack(trackId)
+    }
+
+    fun setPlaybackRate(rate: Float) {
+        controller.setPlaybackRate(rate)
+    }
+
+    fun cyclePlaybackRate() {
+        val next = PlaybackRates.next(controller.state.value.playbackRate)
+        controller.setPlaybackRate(next)
     }
 
     /** Cycle BestFit → FitScreen → Fill → 16:9 → 4:3 → Original. */

@@ -97,6 +97,24 @@
     <string name="player_scale_16_9">16:9</string>
     <string name="player_scale_4_3">4:3</string>
     <string name="player_scale_original">原始</string>
+    <string name="player_audio_tracks">音轨</string>
+    <string name="player_audio_tracks_cd">音轨选择</string>
+    <string name="player_audio_none">未发现音轨</string>
+    <string name="player_playback_rate">倍速</string>
+    <string name="player_playback_rate_cd">倍速：%1$s，点击切换</string>
+    <string name="player_skip_back">快退 10 秒</string>
+    <string name="player_skip_forward">快进 10 秒</string>
+    <string name="player_skip_back_label">−10s</string>
+    <string name="player_skip_forward_label">+10s</string>
+    <string name="player_lock_controls">锁定控制</string>
+    <string name="player_unlock_controls">解锁控制</string>
+    <string name="player_lock_controls_cd">锁定控制，防止误触</string>
+    <string name="player_unlock_controls_cd">解锁控制</string>
+    <string name="player_orientation_lock">锁定方向</string>
+    <string name="player_orientation_unlock">解锁方向</string>
+    <string name="player_orientation_lock_cd">锁定屏幕方向</string>
+    <string name="player_orientation_unlock_cd">允许屏幕旋转</string>
+    <string name="player_locked_hint">已锁定 · 点按显示解锁</string>
 
     <!-- Browse a11y -->
     <string name="browse_loading_cd">正在加载目录</string>

@@ -32,7 +32,7 @@ FN-00～FN-09 已封板。**0.3.1-internal** 已落地一批后处理；剩余�
 1. 真 NAS 勾完 `docs/NAS-ACCEPTANCE-CHECKLIST.md`  
 2. 完整 MS-SRVS share 枚举（需额外 RPC 依赖）  
 3. App Bundle / Play 分发  
-4. 播放页音轨 UI、更多字幕编码  
+4. ~~播放页音轨 UI~~（FN-16 已落地；仍可选更多字幕编码）
 5. CI instrumented 矩阵（phone + tablet）  
 6. Room schema export + 正式 migration  
 7. 网络安全配置（cleartext 局域网可选）  

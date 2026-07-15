@@ -129,6 +129,7 @@ class VlcPlayerController(
     private var subtitleDelayMs: Long = 0L
     private var subtitleFontRelSize: Int = DEFAULT_SUBTITLE_FONT_REL_SIZE
     private var videoScaleMode: VideoScaleMode = VideoScaleMode.BestFit
+    private var playbackRate: Float = PlaybackRates.DEFAULT
 
     private val eventListener = MediaPlayer.EventListener { event ->
         if (released) return@EventListener
@@ -393,6 +394,7 @@ class VlcPlayerController(
                 subtitleDelayMs = subtitleDelayMs,
                 subtitleFontRelSize = subtitleFontRelSize,
                 videoScaleMode = videoScaleMode,
+                playbackRate = playbackRate,
             )
         }
         tryStartPendingIfReady()
@@ -421,6 +423,7 @@ class VlcPlayerController(
                 subtitleDelayMs = subtitleDelayMs,
                 subtitleFontRelSize = subtitleFontRelSize,
                 videoScaleMode = videoScaleMode,
+                playbackRate = playbackRate,
             )
         }
         // Clear after libVLC has delivered any async EndReached from stop().
@@ -490,6 +493,7 @@ class VlcPlayerController(
         } else {
             Log.i(TAG, "play() phase=$phase time=$time length=$length")
         }
+        applyPlaybackRate(player)
         player.play()
         _state.update { it.copy(phase = PlayerState.Phase.Playing, error = null) }
     }
@@ -623,6 +627,15 @@ class VlcPlayerController(
         if (player.setAudioTrack(trackId)) {
             _state.update { it.copy(selectedAudioTrackId = trackId) }
         }
+    }
+
+    override fun setPlaybackRate(rate: Float) {
+        if (released) return
+        val clamped = PlaybackRates.clamp(rate)
+        playbackRate = clamped
+        applyPlaybackRate(mediaPlayer)
+        _state.update { it.copy(playbackRate = clamped) }
+        Log.i(TAG, "playbackRate=$clamped")
     }
 
     override fun selectSubtitleTrack(trackId: Int) {
@@ -828,7 +841,14 @@ class VlcPlayerController(
             phase = PlayerState.Phase.Idle,
             hwDecoderRequested = enableHwDecoder,
             videoScaleMode = videoScaleMode,
+            playbackRate = playbackRate,
         )
+    }
+
+    private fun applyPlaybackRate(player: MediaPlayer?) {
+        if (player == null) return
+        runCatching { player.setRate(playbackRate) }
+            .onFailure { t -> Log.w(TAG, "setRate failed: ${t.message}") }
     }
 
     private fun applyVideoScale(player: MediaPlayer) {
@@ -913,6 +933,8 @@ class VlcPlayerController(
             player.media = media
             // MediaPlayer retains; release local ref.
             media.release()
+            // Re-apply rate after setMedia; some demuxes reset rate to 1.0.
+            applyPlaybackRate(player)
             player.play()
         } catch (t: Throwable) {
             media.release()
