@@ -3,8 +3,8 @@ package com.framenest.smb
 import com.framenest.BuildConfig
 
 /**
- * Defaults loaded from gitignored `smb.local.properties` via BuildConfig.
- * Password is only for the local spike harness — never log it.
+ * Non-sensitive empty defaults for the debug spike.
+ * NAS details are entered at runtime and are never compiled into BuildConfig.
  */
 object SmbBuildConfigDefaults {
     fun host(): String = BuildConfig.SMB_HOST

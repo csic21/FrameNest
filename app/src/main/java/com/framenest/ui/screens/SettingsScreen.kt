@@ -104,7 +104,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             Triple(
                 container.voskModelInstaller.languageStatuses(),
                 container.cacheMaintenance.approximateListenModelBytes(),
-                container.cacheMaintenance.approximateTotalBytes(),
+                container.cacheMaintenance.approximateDiskCacheBytes(),
             )
         }
         voskStatuses = snapshot.first
@@ -215,11 +215,12 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         OutlinedButton(
             onClick = {
                 scope.launch {
-                    val result = withContext(Dispatchers.IO) {
-                        container.cacheMaintenance.clearListenTranslateCache()
+                    val (result, remainingDiskBytes) = withContext(Dispatchers.IO) {
+                        val cleared = container.cacheMaintenance.clearListenTranslateCache()
+                        cleared to container.cacheMaintenance.approximateDiskCacheBytes()
                     }
                     listenTranslateBytes = 0L
-                    cacheBytes = result.remainingApproxBytes
+                    cacheBytes = remainingDiskBytes
                     statusMessage =
                         listenTranslateClearedTemplate.format(formatBytes(result.freedApproxBytes))
                     DiagnosticLog.info(

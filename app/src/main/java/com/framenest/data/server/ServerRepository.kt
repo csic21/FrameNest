@@ -5,6 +5,7 @@ import com.framenest.core.model.SavedServer
 import com.framenest.smb.SmbClient
 import com.framenest.smb.SmbCredentials
 import com.framenest.smb.SmbException
+import com.framenest.smb.SmbErrorMapper
 import com.framenest.smb.SmbjClient
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -60,7 +61,15 @@ class ServerRepository(
             credentialAlias = alias,
             defaultShare = defaultShare?.trim()?.ifEmpty { null },
         )
-        serverDao.upsert(ServerEntity.fromModel(model, createdAtMs = now, updatedAtMs = now))
+        try {
+            serverDao.upsert(ServerEntity.fromModel(model, createdAtMs = now, updatedAtMs = now))
+        } catch (t: Throwable) {
+            // Do not leave an orphaned credential when Room rejects the insert.
+            runCatching { credentialStore.deletePassword(alias) }
+                .exceptionOrNull()
+                ?.let(t::addSuppressed)
+            throw t
+        }
         model
     }
 
@@ -79,8 +88,12 @@ class ServerRepository(
     ): SavedServer = withContext(ioDispatcher) {
         val existing = serverDao.getById(id)
             ?: throw IllegalArgumentException("Server not found: $id")
-        if (newPassword != null && newPassword.isNotEmpty()) {
-            credentialStore.savePassword(existing.credentialAlias, newPassword)
+        val passwordToSave = newPassword?.takeIf { it.isNotEmpty() }
+        val changesPassword = passwordToSave != null
+        val previousPassword = if (changesPassword) {
+            credentialStore.getPassword(existing.credentialAlias)
+        } else {
+            null
         }
         val model = SavedServer(
             id = id,
@@ -92,20 +105,46 @@ class ServerRepository(
             credentialAlias = existing.credentialAlias,
             defaultShare = defaultShare?.trim()?.ifEmpty { null },
         )
-        serverDao.upsert(
-            ServerEntity.fromModel(
-                model,
-                createdAtMs = existing.createdAtMs,
-                updatedAtMs = timeSource(),
-            ),
-        )
-        model
+        try {
+            if (changesPassword) {
+                credentialStore.savePassword(existing.credentialAlias, passwordToSave)
+            }
+            serverDao.upsert(
+                ServerEntity.fromModel(
+                    model,
+                    createdAtMs = existing.createdAtMs,
+                    updatedAtMs = timeSource(),
+                ),
+            )
+            model
+        } catch (t: Throwable) {
+            if (changesPassword) {
+                runCatching {
+                    if (previousPassword == null) {
+                        credentialStore.deletePassword(existing.credentialAlias)
+                    } else {
+                        credentialStore.savePassword(existing.credentialAlias, previousPassword)
+                    }
+                }.exceptionOrNull()?.let(t::addSuppressed)
+            }
+            throw t
+        } finally {
+            previousPassword?.fill('\u0000')
+        }
     }
 
     suspend fun deleteServer(id: String) = withContext(ioDispatcher) {
         val existing = serverDao.getById(id) ?: return@withContext
-        credentialStore.deletePassword(existing.credentialAlias)
         serverDao.deleteById(id)
+        try {
+            credentialStore.deletePassword(existing.credentialAlias)
+        } catch (t: Throwable) {
+            // Keep Room and credential storage pointing at the same logical server.
+            runCatching { serverDao.upsert(existing) }
+                .exceptionOrNull()
+                ?.let(t::addSuppressed)
+            throw t
+        }
     }
 
     /**
@@ -132,10 +171,14 @@ class ServerRepository(
             DiagnosticLog.info("SmbTest", "connect ok host=${host.trim()} port=$port")
             Result.success(Unit)
         } catch (e: SmbException) {
-            DiagnosticLog.warn("SmbTest", "connect failed: ${e.error} ${e.message}")
+            DiagnosticLog.warn(
+                "SmbTest",
+                "connect failed category=${e.error.javaClass.simpleName} " +
+                    SmbErrorMapper.safeMessage(e),
+            )
             Result.failure(e)
         } catch (t: Throwable) {
-            DiagnosticLog.warn("SmbTest", "connect failed: ${t.message}")
+            DiagnosticLog.warn("SmbTest", "connect failed: ${SmbErrorMapper.safeMessage(t)}")
             Result.failure(t)
         } finally {
             runCatching { client.close() }

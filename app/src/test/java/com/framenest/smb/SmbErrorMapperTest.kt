@@ -10,6 +10,8 @@ import org.junit.Test
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import java.io.PrintWriter
+import java.io.StringWriter
 
 class SmbErrorMapperTest {
 
@@ -76,12 +78,42 @@ class SmbErrorMapperTest {
 
     @Test
     fun redactSecretsStripsPasswordAssignments() {
-        val raw = "failed password=super-secret user=demo smb://u:p@host/share"
+        val raw = "failed password=super-secret user=demo smb://u:p@host/share smb://user@host/"
         val redacted = SmbErrorMapper.redactSecrets(raw)
         assertFalse(redacted.contains("super-secret"))
         assertTrue(redacted.contains("password=***"))
         assertFalse(redacted.contains("smb://u:p@"))
         assertTrue(redacted.contains("smb://***@"))
+        assertFalse(redacted.contains("smb://user@"))
+    }
+
+    @Test
+    fun redactSecretsStripsQuotedPasswordsContainingSpaces() {
+        val redacted = SmbErrorMapper.redactSecrets(
+            "password=\"two words\" passwd: 'another secret' host=nas",
+        )
+
+        assertFalse(redacted.contains("two words"))
+        assertFalse(redacted.contains("another secret"))
+        assertTrue(redacted.contains("host=nas"))
+    }
+
+    @Test
+    fun sanitizedThrowableRedactsWholeCauseChainAndKeepsTypeAndStack() {
+        val cause = IllegalArgumentException("password=cause-secret smb://u:p@nas/share")
+        val error = IllegalStateException("open smb://domain;user:top-secret@nas/share", cause)
+        val sanitized = SmbLog.sanitizeThrowable(error)
+        val output = StringWriter().also { writer ->
+            sanitized.printStackTrace(PrintWriter(writer))
+        }.toString()
+
+        assertFalse(output.contains("cause-secret"))
+        assertFalse(output.contains("top-secret"))
+        assertFalse(output.contains("domain;user"))
+        assertTrue(output.contains("java.lang.IllegalStateException"))
+        assertTrue(output.contains("java.lang.IllegalArgumentException"))
+        assertTrue(output.contains("password=***"))
+        assertTrue(output.contains("sanitizedThrowableRedactsWholeCauseChain"))
     }
 
     @Test

@@ -49,7 +49,8 @@ transient 状态位（`awaitingFirstFramePause` / `holdForUserPlay` /
    `play()` 例外（`endedWhileHolding` 需 read-after-reset 例外）加注释。
 5. **`ResumeSeekGate`**：抽出可测纯类，`shouldFire/markFired/reset/hasFired`；
    `play()` 主动 latch。`retry()` **不**盲目恢复 `request.startPositionMs`：若 gate
-   已 fired，改用 `lastSavedPositionMs` / 当前 position 作为重开起点；若未 fired，
+   已 fired，须在关闭媒体前快照当前 position，并优先以它作为重开起点，
+   `lastSavedPositionMs` 仅作回退；若未 fired，
    保留原 `startPositionMs`（含 history 派生），避免「播到中段 → 报错 → 重试被拽回
    入口 resume」与「open 失败但 history 起点被 request=0 抹掉」。
 6. **进度单点互斥写**：`lastSavedPositionMs` 加 `@Volatile`；`onLeaveOrBackground` 经
@@ -59,6 +60,8 @@ transient 状态位（`awaitingFirstFramePause` / `holdForUserPlay` /
    先 `finishSeekPreview("surface-refresh")`。
 8. **open 互斥**：新增 `openJob`；init / retry / fallback 三处入共享槽，再入先
    `cancel()` 旧的。
+9. **短视频完成判定**：绝对“剩余 30 秒”规则只用于至少 60 秒的视频；更短视频按
+   90% 比例或真实 Ended 判定，避免只打开首帧就被记为已看完。
 
 复用已有结构与约束：未改 `PlayerController` 接口签名、未改 libVLC 选项、未改产品
 交互、未加新依赖；VM 处仍用 `(controller as? VlcPlayerController)?.closeCurrentMedia`
@@ -79,7 +82,7 @@ transient 状态位（`awaitingFirstFramePause` / `holdForUserPlay` /
   或主线程方法内读写。
 - 新增常量 `FRAME_SETTLE_MS`（200ms）；如遇更大延迟场景，优先调它而非
   `SEEK_PREVIEW_TIMEOUT_MS`。
-- `ResumeSeekGate.reset()` 必须在 retry 重新 open 前 reset；引入对 `request
-  .startPositionMs` 作为重试起点的依赖（之前 retry 失去 start position）。
+- `ResumeSeekGate.reset()` 必须在 retry 重新 open 前 reset；retry 必须先快照 live
+  position 再调用 `closeCurrentMedia()`，否则 state 会被重置为 0。
 - `play()` / `retry()` 现在必调 `resumeSeekGate.markFired()` / `reset()`。
 - transient flag 集中在 `resetTransientFlags` 后，扩展要及时维护该函数。

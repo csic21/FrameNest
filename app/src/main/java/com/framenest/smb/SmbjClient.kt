@@ -287,7 +287,13 @@ class SmbjClient(
             relative,
             EnumSet.of(AccessMask.FILE_READ_DATA, AccessMask.FILE_READ_ATTRIBUTES),
             null,
-            EnumSet.of(SMB2ShareAccess.FILE_SHARE_READ),
+            // A read handle should not prevent another NAS client from replacing,
+            // writing, or deleting the file while FrameNest is reading it.
+            EnumSet.of(
+                SMB2ShareAccess.FILE_SHARE_READ,
+                SMB2ShareAccess.FILE_SHARE_WRITE,
+                SMB2ShareAccess.FILE_SHARE_DELETE,
+            ),
             SMB2CreateDisposition.FILE_OPEN,
             null,
         )

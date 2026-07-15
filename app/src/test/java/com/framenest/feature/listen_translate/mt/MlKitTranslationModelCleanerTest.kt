@@ -1,0 +1,20 @@
+package com.framenest.feature.listen_translate.mt
+
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class MlKitTranslationModelCleanerTest {
+
+    @Test
+    fun deleteEachModel_deletesEveryDownloadedPack() = runBlocking {
+        val deleted = mutableListOf<String>()
+
+        val count = deleteEachModel(linkedSetOf("en", "zh", "ja")) { model ->
+            deleted += model
+        }
+
+        assertEquals(3, count)
+        assertEquals(listOf("en", "zh", "ja"), deleted)
+    }
+}

@@ -57,6 +57,12 @@ class PlaybackHistoryRepository(
     suspend fun delete(identity: PlaybackIdentity) {
         dao.delete(identity.serverId, identity.share, identity.normalizedPath())
     }
+
+    /** Remove all recent/resume entries that can no longer open after server deletion. */
+    suspend fun purgeServer(serverId: String) {
+        require(serverId.isNotBlank()) { "serverId is blank" }
+        dao.deleteByServerId(serverId)
+    }
 }
 
 /**

@@ -55,6 +55,20 @@ class PlaybackHistoryRepositoryTest {
         repo.saveProgress(PlaybackIdentity("s1", "other", "a.mp4"), "a", 3L, 10L)
         assertEquals(3, dao.rows.size)
     }
+
+    @Test
+    fun purgeServer_removesOnlyMatchingServerRows() = runBlocking {
+        val dao = FakePlaybackHistoryDao()
+        val repo = PlaybackHistoryRepository(dao, timeSource = { 4_000L })
+        repo.saveProgress(PlaybackIdentity("s1", "media", "a.mp4"), "a", 1L, 100L)
+        repo.saveProgress(PlaybackIdentity("s1", "other", "b.mp4"), "b", 2L, 100L)
+        repo.saveProgress(PlaybackIdentity("s2", "media", "a.mp4"), "a", 3L, 100L)
+
+        repo.purgeServer("s1")
+
+        assertEquals(1, dao.rows.size)
+        assertTrue(dao.rows.keys.single().startsWith("s2|"))
+    }
 }
 
 private class FakePlaybackHistoryDao : PlaybackHistoryDao {
@@ -78,6 +92,10 @@ private class FakePlaybackHistoryDao : PlaybackHistoryDao {
 
     override suspend fun delete(serverId: String, share: String, path: String) {
         rows.remove(key(serverId, share, path))
+    }
+
+    override suspend fun deleteByServerId(serverId: String) {
+        rows.keys.removeAll { it.startsWith("$serverId|") }
     }
 
     override suspend fun clearAll() {

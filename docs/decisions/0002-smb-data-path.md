@@ -32,7 +32,7 @@ FrameNest MVP 需要在家庭局域网内稳定访问 SMB2/3 NAS，并让下列�
 - 包：`com.framenest.smb` + 隔离 harness `com.framenest.smb.spike.SmbSpikeActivity`
 - 单元测试覆盖：错误分类（auth / network / not-found / permission / disconnected）、路径排序、凭证脱敏、`SmbClient` fake 随机读契约、benchmark 采样点
 - `./gradlew assembleDebug testDebugUnitTest`：**通过**
-- 真实 NAS：本环境**未配置** `smb.local.properties`，故 first-byte / 吞吐 / seek 墙钟数据未在设备上采集。Harness 已就绪，步骤见下方。
+- 真实 NAS：本环境**未连接真实 NAS**，故 first-byte / 吞吐 / seek 墙钟数据未在设备上采集。Harness 已就绪，连接信息仅在运行时输入，步骤见下方。
 
 ### 能力对照（API 级，SMBJ）
 
@@ -86,7 +86,7 @@ FrameNest MVP 需要在家庭局域网内稳定访问 SMB2/3 NAS，并让下列�
 6. **安全**  
    - 密码：`CharArray` / Keystore（FN-04），从不写 URL、日志、fixtures、截图、提交  
    - 日志：仅 `SmbCredentials.safeSummary()` 与 `SmbErrorMapper.redactSecrets`  
-   - 本地 NAS 配置：`smb.local.properties`（gitignore）→ `BuildConfig` 预填 spike  
+   - NAS 配置仅在 debug spike 运行时输入；禁止经 `BuildConfig` 编译进 APK
 
 ## 未选择的方案
 
@@ -125,10 +125,9 @@ FrameNest MVP 需要在家庭局域网内稳定访问 SMB2/3 NAS，并让下列�
 ### 本地 NAS 实测步骤（补齐 partial 验收）
 
 ```bash
-cp smb.local.properties.example smb.local.properties
-# 编辑 host/user/password/share/testFile — 勿提交该文件
+# 在 debug spike 页面运行时输入 host/user/password/share/testFile。
 ./gradlew assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/debug/app-universal-debug.apk
 adb shell am start -n com.framenest/.smb.spike.SmbSpikeActivity
 # Connect → List dir → Random read → Run benchmark → Disconnect
 # 将脱敏后的 benchmark 行贴回本决策「证据」或 FN-05 handoff

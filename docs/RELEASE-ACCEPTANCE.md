@@ -40,13 +40,14 @@
 
 | 变体 | 路径 | 备注 |
 |---|---|---|
-| debug | `app/build/outputs/apk/debug/app-debug.apk` | 内部测试；含 debug 符号 |
+| debug universal | `app/build/outputs/apk/debug/app-universal-debug.apk` | 内部测试；含 arm64-v8a / x86_64 与 debug 符号 |
+| debug arm64 | `app/build/outputs/apk/debug/app-arm64-v8a-debug.apk` | 真机测试用较小分包 |
 | internal 命名 | versionName `0.3.0-internal` | 未单独 productFlavor；以 versionName 区分 |
 
 ## 安全审查（仓库 / 产物）
 
 - [x] 无密钥文件提交
-- [x] `smb.local.properties` gitignore
+- [x] NAS 凭证只在 App 运行时输入，不由本地属性注入 BuildConfig / APK
 - [x] 诊断导出脱敏
 - [x] Spike Activity `exported=false`
 - [x] Room 无密码列

@@ -1,24 +1,8 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
-
-// Optional local NAS settings for the debug SMB spike harness.
-// File is gitignored — never commit real hosts or passwords.
-val smbLocalProps = Properties().apply {
-    val file = rootProject.file("smb.local.properties")
-    if (file.exists()) {
-        file.inputStream().use { load(it) }
-    }
-}
-
-fun smbProp(key: String, default: String = ""): String =
-    smbLocalProps.getProperty(key, default)
-        .replace("\\", "\\\\")
-        .replace("\"", "\\\"")
 
 android {
     namespace = "com.framenest"
@@ -35,15 +19,16 @@ android {
             useSupportLibrary = true
         }
 
-        // Pre-fill debug spike UI only; empty defaults keep CI / clean builds safe.
-        buildConfigField("String", "SMB_HOST", "\"${smbProp("smb.host")}\"")
-        buildConfigField("int", "SMB_PORT", smbProp("smb.port", "445").ifBlank { "445" })
-        buildConfigField("String", "SMB_USERNAME", "\"${smbProp("smb.username")}\"")
-        buildConfigField("String", "SMB_PASSWORD", "\"${smbProp("smb.password")}\"")
-        buildConfigField("String", "SMB_DOMAIN", "\"${smbProp("smb.domain")}\"")
-        buildConfigField("String", "SMB_SHARE", "\"${smbProp("smb.share")}\"")
-        buildConfigField("String", "SMB_PATH", "\"${smbProp("smb.path", "/")}\"")
-        buildConfigField("String", "SMB_TEST_FILE", "\"${smbProp("smb.testFile")}\"")
+        // Never compile local NAS details into a distributable APK. The debug
+        // spike accepts runtime input; these constants only preserve safe defaults.
+        buildConfigField("String", "SMB_HOST", "\"\"")
+        buildConfigField("int", "SMB_PORT", "445")
+        buildConfigField("String", "SMB_USERNAME", "\"\"")
+        buildConfigField("String", "SMB_PASSWORD", "\"\"")
+        buildConfigField("String", "SMB_DOMAIN", "\"\"")
+        buildConfigField("String", "SMB_SHARE", "\"\"")
+        buildConfigField("String", "SMB_PATH", "\"/\"")
+        buildConfigField("String", "SMB_TEST_FILE", "\"\"")
     }
 
     // Per-ABI APKs shrink install size (libVLC is the bulk).

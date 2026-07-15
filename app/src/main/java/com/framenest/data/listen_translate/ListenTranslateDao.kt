@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -12,7 +13,11 @@ interface ListenTranslateDao {
 
     // --- jobs ---
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    /**
+     * Room's UPDATE-or-INSERT upsert preserves the existing parent row. Using
+     * INSERT OR REPLACE here would delete it first and cascade-delete every cue.
+     */
+    @Upsert
     suspend fun upsertJob(entity: ListenTranslateJobEntity)
 
     @Query(

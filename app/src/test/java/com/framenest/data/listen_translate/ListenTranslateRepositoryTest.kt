@@ -194,7 +194,7 @@ class ListenTranslateRepositoryTest {
 }
 
 /** In-memory [ListenTranslateDao] for unit tests. */
-private class FakeListenTranslateDao : ListenTranslateDao {
+internal class FakeListenTranslateDao : ListenTranslateDao {
     val jobRows = linkedMapOf<String, ListenTranslateJobEntity>()
     val cueRows = mutableListOf<ListenTranslateCueEntity>()
     private var nextCueId = 1L

@@ -59,7 +59,14 @@ class ListenTranslateSession(
     }
 
     fun setEnabled(enabled: Boolean) {
-        _ui.update { it.copy(enabled = enabled, errorMessage = null) }
+        // Preserve a preparation/processing failure when the caller disables the
+        // session as part of failure cleanup. A fresh enable attempt clears it.
+        _ui.update {
+            it.copy(
+                enabled = enabled,
+                errorMessage = if (enabled) null else it.errorMessage,
+            )
+        }
         if (enabled) {
             activate()
         } else {
@@ -267,9 +274,6 @@ class ListenTranslateSession(
                     sourceLang = langs.sourceLang,
                     targetLang = langs.targetLang,
                 )
-                result.retryableErrorMessage?.let { message ->
-                    throw ListenWindowStageException(message)
-                }
                 var speechCoversWindow = false
                 if (result.textSrc.isNotBlank() || result.textTgt.isNotBlank()) {
                     val cueStart = (result.cueStartMs ?: startMs).coerceIn(startMs, endMs)
@@ -285,6 +289,14 @@ class ListenTranslateSession(
                         rev = 1,
                         contentKey = contentKey,
                     )
+                    // Make ASR text visible even when the following MT stage failed.
+                    // A source-only cue deliberately does not satisfy needsFill(), so
+                    // the same window remains eligible for the retry backoff below.
+                    cachedCues = repository.listCues(identity, langs)
+                    refreshActiveCue()
+                }
+                result.retryableErrorMessage?.let { message ->
+                    throw ListenWindowStageException(message)
                 }
                 if (!speechCoversWindow) {
                     // Persist the whole attempted window, including silence. Writing this

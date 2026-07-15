@@ -81,6 +81,7 @@ fun ServersRoute(
             serverRepository = serverRepository,
             appContext = context.applicationContext,
             listenTranslateRepository = container.listenTranslateRepository,
+            playbackHistoryRepository = container.historyRepository,
         ),
     )
     val state by viewModel.uiState.collectAsStateWithLifecycle()

@@ -121,10 +121,83 @@ class ServerRepositoryTest {
         val names = repo.observeServers().first().map { it.name }
         assertEquals(listOf("Alpha", "Beta"), names)
     }
+
+    @Test
+    fun addServer_roomFailureRemovesOrphanCredential() = runTest(dispatcher) {
+        val dao = FakeServerDao().apply { failUpsert = true }
+        val store = RecordingCredentialStore()
+        val repo = ServerRepository(dao, store, ioDispatcher = dispatcher)
+
+        assertFails { repo.addServer("Home", "nas", 445, "u", password = "pw".toCharArray()) }
+
+        assertFalse(store.hasPassword(store.lastCreatedAlias!!))
+    }
+
+    @Test
+    fun updateServer_roomFailureRestoresPreviousCredential() = runTest(dispatcher) {
+        val dao = FakeServerDao()
+        val store = RecordingCredentialStore()
+        val repo = ServerRepository(dao, store, ioDispatcher = dispatcher)
+        val saved = repo.addServer("Home", "nas", 445, "u", password = "old".toCharArray())
+        dao.failUpsert = true
+
+        assertFails {
+            repo.updateServer(
+                saved.id,
+                "Changed",
+                "nas",
+                445,
+                "u",
+                newPassword = "new".toCharArray(),
+            )
+        }
+
+        assertEquals("old", String(store.getPassword(saved.credentialAlias)!!))
+        assertEquals("Home", repo.getServer(saved.id)!!.name)
+    }
+
+    @Test
+    fun deleteServer_credentialFailureRestoresRoomRow() = runTest(dispatcher) {
+        val dao = FakeServerDao()
+        val store = RecordingCredentialStore()
+        val repo = ServerRepository(dao, store, ioDispatcher = dispatcher)
+        val saved = repo.addServer("Home", "nas", 445, "u", password = "pw".toCharArray())
+        store.failDelete = true
+
+        assertFails { repo.deleteServer(saved.id) }
+
+        assertEquals(saved, repo.getServer(saved.id))
+        assertTrue(store.hasPassword(saved.credentialAlias))
+    }
+
+    @Test
+    fun deleteServer_roomFailureLeavesCredentialUntouched() = runTest(dispatcher) {
+        val dao = FakeServerDao()
+        val store = RecordingCredentialStore()
+        val repo = ServerRepository(dao, store, ioDispatcher = dispatcher)
+        val saved = repo.addServer("Home", "nas", 445, "u", password = "pw".toCharArray())
+        dao.failDelete = true
+
+        assertFails { repo.deleteServer(saved.id) }
+
+        assertTrue(store.hasPassword(saved.credentialAlias))
+        assertEquals(saved, repo.getServer(saved.id))
+    }
+
+    private suspend fun assertFails(block: suspend () -> Unit) {
+        try {
+            block()
+            throw AssertionError("Expected failure")
+        } catch (_: TestFailure) {
+            // expected
+        }
+    }
 }
 
 private class FakeServerDao : ServerDao {
     private val map = ConcurrentHashMap<String, ServerEntity>()
+    var failUpsert: Boolean = false
+    var failDelete: Boolean = false
 
     override fun observeAll(): kotlinx.coroutines.flow.Flow<List<ServerEntity>> =
         kotlinx.coroutines.flow.flow {
@@ -137,6 +210,7 @@ private class FakeServerDao : ServerDao {
     override suspend fun getById(id: String): ServerEntity? = map[id]
 
     override suspend fun upsert(entity: ServerEntity) {
+        if (failUpsert) throw TestFailure()
         map[entity.id] = entity
     }
 
@@ -145,8 +219,27 @@ private class FakeServerDao : ServerDao {
     }
 
     override suspend fun deleteById(id: String) {
+        if (failDelete) throw TestFailure()
         map.remove(id)
     }
+}
+
+private class TestFailure : RuntimeException("test failure")
+
+private class RecordingCredentialStore : CredentialStore {
+    private val delegate = InMemoryCredentialStore()
+    var lastCreatedAlias: String? = null
+    var failDelete: Boolean = false
+
+    override fun createAlias(): String = delegate.createAlias().also { lastCreatedAlias = it }
+    override fun savePassword(alias: String, password: CharArray) =
+        delegate.savePassword(alias, password)
+    override fun getPassword(alias: String): CharArray? = delegate.getPassword(alias)
+    override fun deletePassword(alias: String) {
+        if (failDelete) throw TestFailure()
+        delegate.deletePassword(alias)
+    }
+    override fun hasPassword(alias: String): Boolean = delegate.hasPassword(alias)
 }
 
 private class FakeSmbClient(

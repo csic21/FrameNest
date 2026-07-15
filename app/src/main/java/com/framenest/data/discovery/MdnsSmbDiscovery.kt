@@ -6,7 +6,6 @@ import android.net.nsd.NsdServiceInfo
 import android.os.Build
 import java.net.InetAddress
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -22,30 +21,46 @@ class MdnsSmbDiscovery(
     private val nsd: NsdManager? =
         appContext.getSystemService(Context.NSD_SERVICE) as? NsdManager
 
-    /** Shared executor for API 34+ resolve callbacks (must not reverse-DNS on main). */
-    private val resolveExecutor: Executor =
-        Executors.newSingleThreadExecutor { r ->
-            Thread(r, "mdns-smb-resolve").apply { isDaemon = true }
-        }
-
-    fun start(onFound: (DiscoveredHost) -> Unit): Session {
+    fun start(
+        onFound: (DiscoveredHost) -> Unit,
+        onStartFailed: (errorCode: Int?) -> Unit = {},
+    ): Session {
         val manager = nsd
         if (manager == null) {
+            onStartFailed(null)
             return Session.inactive()
+        }
+        // Executor lifetime matches this discovery session, avoiding a leaked
+        // thread for every time the discovery dialog is opened.
+        val resolveExecutor = Executors.newSingleThreadExecutor { r ->
+            Thread(r, "mdns-smb-resolve").apply { isDaemon = true }
         }
         val active = AtomicBoolean(true)
         val resolving = ConcurrentHashMap.newKeySet<String>()
         val discoveryListener = object : NsdManager.DiscoveryListener {
-            override fun onStartDiscoveryFailed(serviceType: String?, errorCode: Int) = Unit
-            override fun onStopDiscoveryFailed(serviceType: String?, errorCode: Int) = Unit
+            override fun onStartDiscoveryFailed(serviceType: String?, errorCode: Int) {
+                if (active.compareAndSet(true, false)) {
+                    runCatching { manager.stopServiceDiscovery(this) }
+                    resolveExecutor.shutdownNow()
+                    onStartFailed(errorCode)
+                }
+            }
+
+            override fun onStopDiscoveryFailed(serviceType: String?, errorCode: Int) {
+                active.set(false)
+                resolveExecutor.shutdownNow()
+            }
             override fun onDiscoveryStarted(serviceType: String?) = Unit
-            override fun onDiscoveryStopped(serviceType: String?) = Unit
+            override fun onDiscoveryStopped(serviceType: String?) {
+                active.set(false)
+                resolveExecutor.shutdownNow()
+            }
 
             override fun onServiceFound(serviceInfo: NsdServiceInfo) {
                 if (!active.get()) return
                 val key = "${serviceInfo.serviceName}|${serviceInfo.serviceType}"
                 if (!resolving.add(key)) return
-                resolve(manager, serviceInfo, active, onFound) {
+                resolve(manager, serviceInfo, resolveExecutor, active, onFound) {
                     resolving.remove(key)
                 }
             }
@@ -60,9 +75,13 @@ class MdnsSmbDiscovery(
                     if (active.compareAndSet(true, false)) {
                         runCatching { manager.stopServiceDiscovery(discoveryListener) }
                     }
+                    resolveExecutor.shutdownNow()
                 },
             )
         } catch (_: Exception) {
+            active.set(false)
+            resolveExecutor.shutdownNow()
+            onStartFailed(null)
             Session.inactive()
         }
     }
@@ -70,6 +89,7 @@ class MdnsSmbDiscovery(
     private fun resolve(
         manager: NsdManager,
         serviceInfo: NsdServiceInfo,
+        resolveExecutor: java.util.concurrent.Executor,
         active: AtomicBoolean,
         onFound: (DiscoveredHost) -> Unit,
         onDone: () -> Unit,

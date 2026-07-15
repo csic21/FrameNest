@@ -11,6 +11,7 @@ import com.framenest.data.discovery.DiscoveryMerge
 import com.framenest.data.discovery.DiscoveryPhase
 import com.framenest.data.discovery.DiscoverySource
 import com.framenest.data.discovery.LanDiscoveryCoordinator
+import com.framenest.data.history.PlaybackHistoryRepository
 import com.framenest.data.listen_translate.ListenTranslateRepository
 import com.framenest.data.server.ServerRepository
 import com.framenest.data.server.SmbUiMessages
@@ -63,6 +64,7 @@ class ServersViewModel(
     private val serverRepository: ServerRepository,
     private val discovery: LanDiscoveryCoordinator,
     private val listenTranslateRepository: ListenTranslateRepository? = null,
+    private val playbackHistoryRepository: PlaybackHistoryRepository? = null,
 ) : ViewModel() {
 
     private val serversFlow: StateFlow<List<SavedServer>> = serverRepository
@@ -73,6 +75,7 @@ class ServersViewModel(
     val uiState: StateFlow<ServersUiState> = _ui.asStateFlow()
 
     private var eventsJob: Job? = null
+    private var editorVersion: Long = 0L
 
     init {
         viewModelScope.launch {
@@ -92,6 +95,7 @@ class ServersViewModel(
     }
 
     fun openAddEditor() {
+        editorVersion++
         _ui.update {
             it.copy(
                 editor = ServerEditorState(isPasswordRequired = true),
@@ -101,6 +105,7 @@ class ServersViewModel(
     }
 
     fun openEditEditor(server: SavedServer) {
+        editorVersion++
         _ui.update {
             it.copy(
                 editor = ServerEditorState(
@@ -120,13 +125,17 @@ class ServersViewModel(
     }
 
     fun dismissEditor() {
+        editorVersion++
         _ui.update { it.copy(editor = null) }
     }
 
     fun updateEditor(transform: (ServerEditorState) -> ServerEditorState) {
+        editorVersion++
         _ui.update { state ->
             val editor = state.editor ?: return@update state
-            state.copy(editor = transform(editor).copy(formError = null))
+            state.copy(
+                editor = applyServerEditorChange(editor, transform),
+            )
         }
     }
 
@@ -166,6 +175,10 @@ class ServersViewModel(
                                         mdnsRunning = true,
                                         statusMessage = d.statusMessage
                                             ?: "正在通过 mDNS 发现 SMB 设备…",
+                                    )
+                                    DiscoveryPhase.MDNS_FAILED -> d.copy(
+                                        mdnsRunning = false,
+                                        statusMessage = "mDNS 发现启动失败，可尝试端口探测",
                                     )
                                     DiscoveryPhase.PORT_SCAN_RUNNING -> d.copy(
                                         portScanRunning = true,
@@ -222,6 +235,7 @@ class ServersViewModel(
 
     fun selectDiscoveredHost(host: DiscoveredHost) {
         stopDiscoveryInternal(keepDialog = false)
+        editorVersion++
         _ui.update {
             it.copy(
                 discovery = LanDiscoveryUiState(),
@@ -247,16 +261,24 @@ class ServersViewModel(
 
     fun testEditorConnection() {
         val editor = _ui.value.editor ?: return
+        val requestVersion = ++editorVersion
         val parsed = parseEditor(editor) ?: return
         viewModelScope.launch {
-            _ui.update {
-                it.copy(
-                    editor = it.editor?.copy(
+            _ui.update { state ->
+                if (editorVersion != requestVersion || state.editor != editor) {
+                    state
+                } else {
+                    state.copy(
+                        editor = state.editor.copy(
                         isTesting = true,
                         testMessage = null,
                         testSucceeded = false,
                     ),
                 )
+                }
+            }
+            if (editorVersion != requestVersion || _ui.value.editor != editor) {
+                return@launch
             }
             val result = if (editor.password.isNotEmpty()) {
                 val passwordChars = editor.password.toCharArray()
@@ -276,13 +298,16 @@ class ServersViewModel(
             } else {
                 Result.failure(IllegalArgumentException("请输入密码"))
             }
-            _ui.update {
+            _ui.update { state ->
+                if (editorVersion != requestVersion || state.editor == null) {
+                    return@update state
+                }
                 val msg = result.fold(
                     onSuccess = { "连接成功" },
                     onFailure = { err -> SmbUiMessages.fromThrowable(err) },
                 )
-                it.copy(
-                    editor = it.editor?.copy(
+                state.copy(
+                    editor = state.editor.copy(
                         isTesting = false,
                         testSucceeded = result.isSuccess,
                         testMessage = msg,
@@ -295,6 +320,8 @@ class ServersViewModel(
     fun saveEditor() {
         val editor = _ui.value.editor ?: return
         val parsed = parseEditor(editor) ?: return
+        // A save supersedes any in-flight test for this draft.
+        editorVersion++
         viewModelScope.launch {
             _ui.update { it.copy(editor = it.editor?.copy(isSaving = true, formError = null)) }
             try {
@@ -311,16 +338,19 @@ class ServersViewModel(
                         }
                         return@launch
                     }
-                    val saved = serverRepository.addServer(
-                        name = parsed.name,
-                        host = parsed.host,
-                        port = parsed.port,
-                        username = parsed.username,
-                        domain = parsed.domain,
-                        defaultShare = parsed.defaultShare,
-                        password = password,
-                    )
-                    password.fill('\u0000')
+                    val saved = try {
+                        serverRepository.addServer(
+                            name = parsed.name,
+                            host = parsed.host,
+                            port = parsed.port,
+                            username = parsed.username,
+                            domain = parsed.domain,
+                            defaultShare = parsed.defaultShare,
+                            password = password,
+                        )
+                    } finally {
+                        password.fill('\u0000')
+                    }
                     _ui.update {
                         it.copy(
                             editor = null,
@@ -332,17 +362,20 @@ class ServersViewModel(
                     val newPassword = editor.password
                         .takeIf { it.isNotEmpty() }
                         ?.toCharArray()
-                    val saved = serverRepository.updateServer(
-                        id = editor.editingId,
-                        name = parsed.name,
-                        host = parsed.host,
-                        port = parsed.port,
-                        username = parsed.username,
-                        domain = parsed.domain,
-                        defaultShare = parsed.defaultShare,
-                        newPassword = newPassword,
-                    )
-                    newPassword?.fill('\u0000')
+                    val saved = try {
+                        serverRepository.updateServer(
+                            id = editor.editingId,
+                            name = parsed.name,
+                            host = parsed.host,
+                            port = parsed.port,
+                            username = parsed.username,
+                            domain = parsed.domain,
+                            defaultShare = parsed.defaultShare,
+                            newPassword = newPassword,
+                        )
+                    } finally {
+                        newPassword?.fill('\u0000')
+                    }
                     _ui.update {
                         it.copy(
                             editor = null,
@@ -369,13 +402,22 @@ class ServersViewModel(
             _ui.update { it.copy(isDeleting = true, actionError = null) }
             try {
                 serverRepository.deleteServer(id)
-                // Drop listen-translate jobs for this server (decision 0005 cleanup).
-                listenTranslateRepository?.purgeServer(id)
+                val cleanupFailed = listOfNotNull(
+                    playbackHistoryRepository
+                        ?.let { runCatching { it.purgeServer(id) }.exceptionOrNull() },
+                    listenTranslateRepository
+                        ?.let { runCatching { it.purgeServer(id) }.exceptionOrNull() },
+                ).isNotEmpty()
                 _ui.update { state ->
                     state.copy(
                         isDeleting = false,
                         selectedServerId = state.selectedServerId
                             ?.takeIf { it != id },
+                        actionError = if (cleanupFailed) {
+                            "服务器已删除，但部分本地播放记录清理失败"
+                        } else {
+                            null
+                        },
                     )
                 }
             } catch (t: Throwable) {
@@ -411,7 +453,7 @@ class ServersViewModel(
         val name = editor.name.trim()
         val host = editor.host.trim()
         val username = editor.username.trim()
-        val port = editor.port.trim().toIntOrNull() ?: SavedServer.DEFAULT_PORT
+        val port = parseServerPort(editor.port)
         if (name.isEmpty() || host.isEmpty() || username.isEmpty()) {
             _ui.update {
                 it.copy(
@@ -420,7 +462,7 @@ class ServersViewModel(
             }
             return null
         }
-        if (port !in 1..65535) {
+        if (port == null || port !in 1..65535) {
             _ui.update {
                 it.copy(editor = it.editor?.copy(formError = "端口必须在 1–65535"))
             }
@@ -441,6 +483,7 @@ class ServersViewModel(
         private val appContext: Context,
         private val discovery: LanDiscoveryCoordinator = LanDiscoveryCoordinator(appContext),
         private val listenTranslateRepository: ListenTranslateRepository? = null,
+        private val playbackHistoryRepository: PlaybackHistoryRepository? = null,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -449,6 +492,7 @@ class ServersViewModel(
                     serverRepository,
                     discovery,
                     listenTranslateRepository,
+                    playbackHistoryRepository,
                 ) as T
             }
             error("Unknown ViewModel: ${modelClass.name}")
@@ -464,3 +508,17 @@ fun discoverySourceLabel(sources: Set<DiscoverySource>): String {
     }
     return parts.joinToString(" · ").ifEmpty { "LAN" }
 }
+
+/** Strict form parsing: only a valid explicit TCP port is accepted. */
+internal fun parseServerPort(raw: String): Int? =
+    raw.trim().toIntOrNull()?.takeIf { it in 1..65535 }
+
+internal fun applyServerEditorChange(
+    editor: ServerEditorState,
+    transform: (ServerEditorState) -> ServerEditorState,
+): ServerEditorState = transform(editor).copy(
+    isTesting = false,
+    testMessage = null,
+    testSucceeded = false,
+    formError = null,
+)

@@ -180,4 +180,12 @@ class SubtitleMatcherEmbeddedScoreTest {
                 SubtitleMatcher.embeddedTrackLanguageScore("und", prefs),
         )
     }
+
+    @Test
+    fun doesNotMatchShortLanguageCodeInsideUnrelatedWord() {
+        assertEquals(0, SubtitleMatcher.embeddedTrackLanguageScore("French", listOf("en")))
+        assertTrue(
+            SubtitleMatcher.embeddedTrackLanguageScore("English commentary", listOf("en")) > 0,
+        )
+    }
 }

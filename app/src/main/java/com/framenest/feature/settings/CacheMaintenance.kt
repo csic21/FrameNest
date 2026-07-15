@@ -6,6 +6,7 @@ import com.framenest.data.listen_translate.ListenTranslateRepository
 import com.framenest.data.listen_translate.model.ListenModelManager
 import com.framenest.data.thumbnail.ThumbnailRepository
 import com.framenest.feature.listen_translate.asr.VoskModelInstaller
+import com.framenest.feature.listen_translate.mt.MlKitTranslationModelCleaner
 import java.io.File
 import kotlinx.coroutines.runBlocking
 
@@ -24,6 +25,8 @@ class CacheMaintenance(
     private val listenTranslateRepository: ListenTranslateRepository? = null,
     private val listenModelManager: ListenModelManager? = null,
     private val voskModelInstaller: VoskModelInstaller? = null,
+    private val mlKitTranslationModelCleaner: MlKitTranslationModelCleaner =
+        MlKitTranslationModelCleaner(),
 ) {
     fun clearAllCaches(): CacheClearResult {
         val before = approximateTotalBytes()
@@ -60,12 +63,13 @@ class CacheMaintenance(
         )
     }
 
-    /** Clear only on-device model packs under filesDir/listen_models (JSON + Vosk). */
+    /** Clear JSON/Vosk packs and ML Kit translation models from app-private storage. */
     fun clearListenModels(): CacheClearResult {
         val before = approximateTotalBytes()
         runBlocking {
             listenModelManager?.deleteAll()
             voskModelInstaller?.deleteAll()
+            mlKitTranslationModelCleaner.deleteAll()
         }
         val after = approximateTotalBytes()
         return CacheClearResult(

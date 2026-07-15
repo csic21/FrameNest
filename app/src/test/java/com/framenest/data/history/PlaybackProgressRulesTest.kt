@@ -55,8 +55,9 @@ class PlaybackProgressRulesTest {
     }
 
     @Test
-    fun shortVideo_remainingRuleDominates() {
-        // 20s video: watching 5s leaves 15s remaining → completed
-        assertTrue(PlaybackProgressRules.isCompleted(5_000L, 20_000L))
+    fun shortVideo_requiresFractionInsteadOfCompletingAtOpen() {
+        assertFalse(PlaybackProgressRules.isCompleted(0L, 20_000L))
+        assertFalse(PlaybackProgressRules.isCompleted(5_000L, 20_000L))
+        assertTrue(PlaybackProgressRules.isCompleted(18_000L, 20_000L))
     }
 }

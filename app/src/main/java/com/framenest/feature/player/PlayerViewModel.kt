@@ -101,6 +101,7 @@ class PlayerViewModel(
 
     private val _subtitleUiState = MutableStateFlow(SubtitleUiState())
     val subtitleUiState: StateFlow<SubtitleUiState> = _subtitleUiState.asStateFlow()
+    private val subtitleSelectionGate = SubtitleSelectionGate()
 
     private val _siblingNavState = MutableStateFlow(SiblingNavUiState())
     val siblingNavState: StateFlow<SiblingNavUiState> = _siblingNavState.asStateFlow()
@@ -122,9 +123,20 @@ class PlayerViewModel(
     )
     val listenTranslateUiState: StateFlow<ListenTranslateUiState> = listenSession.uiState
 
-    private val audioFocus = PlayerAudioFocus(application) {
-        pauseFromSystem()
-    }
+    private var playPendingAudioFocus: Boolean = false
+    private val audioFocus = PlayerAudioFocus(
+        context = application,
+        onFocusLost = {
+            playPendingAudioFocus = false
+            pauseFromSystem()
+        },
+        onFocusGained = {
+            if (playPendingAudioFocus) {
+                playPendingAudioFocus = false
+                controller.play()
+            }
+        },
+    )
 
     private var smbClient: SmbjClient? = null
     private var progressJob: Job? = null
@@ -466,10 +478,20 @@ class PlayerViewModel(
         // does not drag the viewer back to the resume point.
         resumeSeekGate.markFired()
         startPositionMs = 0L
-        if (!audioFocus.request()) {
-            Log.w(TAG, "Audio focus not granted; playing anyway")
+        when (audioFocus.request()) {
+            AudioFocusRequestResult.Granted -> {
+                playPendingAudioFocus = false
+                controller.play()
+            }
+            AudioFocusRequestResult.Delayed -> {
+                playPendingAudioFocus = true
+                Log.i(TAG, "Audio focus delayed; waiting before playback")
+            }
+            AudioFocusRequestResult.Failed -> {
+                playPendingAudioFocus = false
+                Log.w(TAG, "Audio focus denied; playback not started")
+            }
         }
-        controller.play()
     }
 
     fun pause() {
@@ -634,6 +656,7 @@ class PlayerViewModel(
     }
 
     fun selectSubtitleOff() {
+        subtitleSelectionGate.advance()
         controller.disableSubtitles()
         _subtitleUiState.update {
             it.copy(selectedKey = SubtitleSelectionKeys.OFF, errorMessage = null)
@@ -641,6 +664,7 @@ class PlayerViewModel(
     }
 
     fun selectEmbeddedSubtitle(trackId: Int) {
+        subtitleSelectionGate.advance()
         controller.selectSubtitleTrack(trackId)
         _subtitleUiState.update {
             it.copy(
@@ -651,8 +675,13 @@ class PlayerViewModel(
     }
 
     fun selectExternalSubtitle(option: ExternalSubtitleOption) {
+        val selectionGeneration = subtitleSelectionGate.advance()
         viewModelScope.launch {
-            loadAndSelectExternal(option, userInitiated = true)
+            loadAndSelectExternal(
+                option = option,
+                userInitiated = true,
+                selectionGeneration = selectionGeneration,
+            )
         }
     }
 
@@ -677,6 +706,8 @@ class PlayerViewModel(
         // Replace any in-flight open so rapid retries do not overlap.
         openJob?.cancel()
         openJob = viewModelScope.launch {
+            // Snapshot before closeCurrentMedia(), which intentionally resets state to Idle/0.
+            val livePositionBeforeClose = controller.state.value.positionMs.takeIf { it > 0L }
             // Close proxy FD / media first so SmbRandomAccess can release cleanly,
             // then disconnect SMB off the main thread.
             (controller as? VlcPlayerController)?.closeCurrentMedia()
@@ -687,6 +718,7 @@ class PlayerViewModel(
             smbDirectFallbackUsed = false
             lastOpenUsedPathB = false
             subtitleBootstrapDone = false
+            subtitleSelectionGate.advance()
             // Re-arm resume seek for the fresh open — never blindly restore
             // request.startPositionMs:
             // - If the gate already fired (or the user pressed play), jump back to
@@ -695,8 +727,10 @@ class PlayerViewModel(
             // - If the open failed before fire, leave [startPositionMs] as-is so a
             //   history-derived start is not wiped when request.startPositionMs == 0.
             if (resumeSeekGate.hasFired) {
-                val live = controller.state.value.positionMs.takeIf { it > 0L } ?: 0L
-                startPositionMs = lastSavedPositionMs?.takeIf { it > 0L } ?: live
+                startPositionMs = retryResumePosition(
+                    livePositionMs = livePositionBeforeClose,
+                    lastSavedPositionMs = lastSavedPositionMs,
+                )
             }
             if (startPositionMs > 0L) {
                 resumeSeekGate.reset()
@@ -1025,10 +1059,11 @@ class PlayerViewModel(
     }
 
     private fun bootstrapSubtitles(state: PlayerState) {
+        val selectionGeneration = subtitleSelectionGate.snapshot()
         viewModelScope.launch {
             val smbParams = smbSubtitleParamsOrNull()
             if (smbParams == null) {
-                autoSelectEmbeddedOnly(state)
+                autoSelectEmbeddedOnly(state, selectionGeneration)
                 return@launch
             }
             _subtitleUiState.update {
@@ -1061,10 +1096,17 @@ class PlayerViewModel(
                         )
                     }
                     val best = options.firstOrNull()
+                    if (!subtitleSelectionGate.isCurrent(selectionGeneration)) {
+                        return@fold
+                    }
                     if (best != null) {
-                        loadAndSelectExternal(best, userInitiated = false)
+                        loadAndSelectExternal(
+                            option = best,
+                            userInitiated = false,
+                            selectionGeneration = selectionGeneration,
+                        )
                     } else {
-                        autoSelectEmbeddedOnly(controller.state.value)
+                        autoSelectEmbeddedOnly(controller.state.value, selectionGeneration)
                     }
                 },
                 onFailure = { err ->
@@ -1081,7 +1123,7 @@ class PlayerViewModel(
                             errorMessage = null,
                         )
                     }
-                    autoSelectEmbeddedOnly(controller.state.value)
+                    autoSelectEmbeddedOnly(controller.state.value, selectionGeneration)
                 },
             )
         }
@@ -1090,6 +1132,7 @@ class PlayerViewModel(
     private suspend fun loadAndSelectExternal(
         option: ExternalSubtitleOption,
         userInitiated: Boolean,
+        selectionGeneration: Long,
     ) {
         val smbParams = smbSubtitleParamsOrNull()
         if (smbParams == null) {
@@ -1118,6 +1161,8 @@ class PlayerViewModel(
             passwordCopy.fill('\u0000')
             smbParams.password.fill('\u0000')
         }
+
+        if (!subtitleSelectionGate.isCurrent(selectionGeneration)) return
 
         loadResult.fold(
             onSuccess = { loaded ->
@@ -1150,7 +1195,7 @@ class PlayerViewModel(
                         )
                     }
                     if (!userInitiated) {
-                        autoSelectEmbeddedOnly(controller.state.value)
+                        autoSelectEmbeddedOnly(controller.state.value, selectionGeneration)
                     }
                 }
             },
@@ -1165,13 +1210,14 @@ class PlayerViewModel(
                     )
                 }
                 if (!userInitiated) {
-                    autoSelectEmbeddedOnly(controller.state.value)
+                    autoSelectEmbeddedOnly(controller.state.value, selectionGeneration)
                 }
             },
         )
     }
 
-    private fun autoSelectEmbeddedOnly(state: PlayerState) {
+    private fun autoSelectEmbeddedOnly(state: PlayerState, selectionGeneration: Long) {
+        if (!subtitleSelectionGate.isCurrent(selectionGeneration)) return
         val tracks = state.subtitleTracks.filter { it.id >= 0 }
         if (tracks.isEmpty()) {
             controller.disableSubtitles()

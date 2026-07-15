@@ -11,16 +11,8 @@
    - **1080p H.264** 与（可选）**HEVC** 样本
    - 同目录 **UTF-8 `.srt`** 与可选 **内嵌字幕 MKV**
 
-可选：根目录 `smb.local.properties`（**勿提交**）预填 debug spike：
-
-```properties
-smb.host=192.168.x.x
-smb.port=445
-smb.username=...
-smb.password=...
-smb.share=media
-smb.path=/
-```
+如需使用 debug spike，请在设备上的 debug 页面运行时输入 NAS 信息。为避免凭证进入
+可分发 APK，构建过程不会从本机属性文件预填主机、用户名或密码。
 
 ## 场景勾选（PRODUCT）
 

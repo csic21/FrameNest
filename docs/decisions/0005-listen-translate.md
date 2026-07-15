@@ -94,6 +94,16 @@
 - 引擎：`ModelAwareListenTranslateEngine` 依赖核心包就绪；当前 ASR 仍为窗口占位文本，
   MT 使用 pack 内 `phraseEntries`；替换权重时保持 store API 即可。
 
+### 2026-07-15 accepted 修订（FN-14 稳定性）
+
+- `listen_translate_job` 的已有行必须原位更新；禁止用 SQLite
+  `INSERT OR REPLACE`。后者会先删除父行，并经 `ON DELETE CASCADE` 删除已缓存 cue。
+  Room 写入使用不触发 delete 的 `@Upsert`，内容或模型版本真正变化时仍显式删除 job。
+- ASR 已成功但 MT 失败时，先保存并显示 `text_src`，同时将 job 置为可理解的失败状态、
+  保留错误原因并对该窗口退避重试。仅有原文的 cue 不代表翻译窗口已完成。
+- 专用「清除听译模型」必须同时删除 legacy JSON 包、Vosk ASR 模型以及 ML Kit 已下载的
+  Translate 语言包；三者都只位于应用私有存储。普通「清理缓存」仍不删除模型。
+
 ## 后续可修订
 
 - 若未来 libVLC 4.x Android 绑定暴露音频回调，可再评估与路径 B 的取舍（新决策或修订本文件）。

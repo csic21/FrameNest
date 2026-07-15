@@ -467,7 +467,7 @@ private fun BrowseVideoThumbnail(
     val state by repository.observe(entry).collectAsStateWithLifecycle(
         initialValue = ThumbnailUiState.None,
     )
-    DisposableEffect(entry.stableKey()) {
+    DisposableEffect(entry, repository) {
         repository.retain(entry)
         onDispose { repository.release(entry) }
     }

@@ -46,6 +46,9 @@ interface PlaybackHistoryDao {
     )
     suspend fun delete(serverId: String, share: String, path: String)
 
+    @Query("DELETE FROM playback_history WHERE server_id = :serverId")
+    suspend fun deleteByServerId(serverId: String)
+
     @Query("DELETE FROM playback_history")
     suspend fun clearAll()
 }

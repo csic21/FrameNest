@@ -320,7 +320,7 @@ fun SmbSpikeScreen(modifier: Modifier = Modifier) {
 
 private fun initialHelp(): String = """
     Steps:
-    1. Copy smb.local.properties.example → smb.local.properties and rebuild, or type fields.
+    1. Type the NAS fields in this debug-only screen.
     2. Connect → List dir → Metadata / Random read → Benchmark.
     3. Disconnect and reconnect to verify session lifecycle.
     Data-path note: prefer SEEKABLE_SMB_DATASOURCE for player+thumbnails; see docs/decisions/0002-smb-data-path.md

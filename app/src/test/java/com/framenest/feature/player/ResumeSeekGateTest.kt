@@ -2,6 +2,7 @@ package com.framenest.feature.player
 
 import com.framenest.player.PlayerState
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -82,5 +83,12 @@ class ResumeSeekGateTest {
         assertFalse(gate.hasFired)
         gate.markFired()
         assertTrue(gate.hasFired)
+    }
+
+    @Test
+    fun `retry position prefers live snapshot before saved fallback`() {
+        assertEquals(42_000L, retryResumePosition(42_000L, 40_000L))
+        assertEquals(40_000L, retryResumePosition(0L, 40_000L))
+        assertEquals(0L, retryResumePosition(null, null))
     }
 }

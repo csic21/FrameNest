@@ -32,8 +32,50 @@ object SmbLog {
         }
     }
 
-    private fun sanitizeThrowable(error: Throwable): Throwable {
-        // Do not rethrow with password-bearing messages; keep type, redact message via cause chain logging.
-        return error
+    internal fun sanitizeThrowable(error: Throwable): Throwable {
+        return sanitizeThrowable(error, HashSet())
+    }
+
+    private fun sanitizeThrowable(
+        error: Throwable,
+        seen: MutableSet<Throwable>,
+    ): Throwable {
+        if (!seen.add(error)) {
+            return RedactedLogThrowable(
+                originalType = error.javaClass.name,
+                safeMessage = "[cyclic cause]",
+            ).also { it.stackTrace = error.stackTrace }
+        }
+        val sanitizedCause = error.cause
+            ?.takeUnless { it === error }
+            ?.let { sanitizeThrowable(it, seen) }
+        return RedactedLogThrowable(
+            originalType = error.javaClass.name,
+            safeMessage = error.message
+                ?.let(SmbErrorMapper::redactSecrets)
+                ?.take(500),
+            cause = sanitizedCause,
+        ).also { sanitized ->
+            sanitized.stackTrace = error.stackTrace
+            error.suppressed.forEach { suppressed ->
+                sanitized.addSuppressed(sanitizeThrowable(suppressed, seen))
+            }
+        }
+    }
+
+    /**
+     * Log-only throwable that retains the original type name and stack frames while
+     * ensuring Android's stack-trace formatter never sees an unsanitized message.
+     */
+    private class RedactedLogThrowable(
+        private val originalType: String,
+        private val safeMessage: String?,
+        cause: Throwable? = null,
+    ) : Throwable(safeMessage, cause, true, true) {
+        override fun toString(): String = if (safeMessage.isNullOrBlank()) {
+            originalType
+        } else {
+            "$originalType: $safeMessage"
+        }
     }
 }

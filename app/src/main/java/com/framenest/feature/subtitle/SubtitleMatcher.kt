@@ -101,13 +101,14 @@ object SubtitleMatcher {
     fun embeddedTrackLanguageScore(trackName: String, preferredLanguages: List<String>): Int {
         val preferred = preferredLanguages.map { normalizeLangToken(it) }.filter { it.isNotEmpty() }
         if (preferred.isEmpty()) return 0
-        val haystack = normalizeLangToken(trackName)
-        if (haystack.isEmpty()) return 0
+        val trackTokens = EMBEDDED_TRACK_TOKEN
+            .findAll(trackName.lowercase(Locale.ROOT).replace('_', '-'))
+            .map { normalizeLangToken(it.value) }
+            .filter { it.isNotEmpty() }
+            .toSet()
+        if (trackTokens.isEmpty()) return 0
         preferred.forEachIndexed { index, pref ->
-            if (haystack == pref ||
-                haystack.contains(pref) ||
-                tokenAliases(pref).any { alias -> haystack == alias || haystack.contains(alias) }
-            ) {
+            if (trackTokens.any { token -> token in tokenAliases(pref) }) {
                 return 1000 - index * 10
             }
         }
@@ -230,6 +231,8 @@ object SubtitleMatcher {
         }
         return set
     }
+
+    private val EMBEDDED_TRACK_TOKEN = Regex("""[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*""")
 }
 
 /**

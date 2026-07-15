@@ -4,8 +4,9 @@ package com.framenest.data.history
  * Pure rules for progress persistence and "completed" marking.
  *
  * Completion rule (documented for product + tests):
- * - Treat as completed when **remaining duration &lt; [COMPLETE_REMAINING_MS]**
- *   **or** position fraction **≥ [COMPLETE_FRACTION]** (90%),
+ * - Treat as completed when a sufficiently long video's remaining duration is
+ *   **&lt; [COMPLETE_REMAINING_MS]**, **or** position fraction is
+ *   **≥ [COMPLETE_FRACTION]** (90%),
  *   or position has reached/passed duration.
  * - Completed items resume from the start (position 0), not near EOF.
  */
@@ -15,6 +16,12 @@ object PlaybackProgressRules {
 
     /** Mark completed when watched at least 90% of duration. */
     const val COMPLETE_FRACTION: Double = 0.90
+
+    /**
+     * The absolute remaining-time rule only applies to videos at least this long.
+     * Otherwise a 20-second clip would be considered completed at position zero.
+     */
+    const val MIN_DURATION_FOR_REMAINING_RULE_MS: Long = COMPLETE_REMAINING_MS * 2
 
     /** Default interval for periodic progress saves while playing. */
     const val PERIODIC_SAVE_INTERVAL_MS: Long = 5_000L
@@ -27,7 +34,11 @@ object PlaybackProgressRules {
         val position = positionMs.coerceAtLeast(0L)
         if (position >= durationMs) return true
         val remaining = durationMs - position
-        if (remaining < COMPLETE_REMAINING_MS) return true
+        if (durationMs >= MIN_DURATION_FOR_REMAINING_RULE_MS &&
+            remaining < COMPLETE_REMAINING_MS
+        ) {
+            return true
+        }
         val fraction = position.toDouble() / durationMs.toDouble()
         return fraction >= COMPLETE_FRACTION
     }

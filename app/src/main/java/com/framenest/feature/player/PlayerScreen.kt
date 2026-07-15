@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -473,7 +474,9 @@ fun PlayerScreen(
                             onPrevious = siblingNav.previousPath?.let { p -> { openSibling(p) } },
                             onNext = siblingNav.nextPath?.let { p -> { openSibling(p) } },
                             overlay = false,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .navigationBarsPadding(),
                         )
                         if (showBottomPanels) {
                             PlayerBottomPanels(
@@ -1201,10 +1204,7 @@ private fun PlayerControls(
                 color = onBg,
                 modifier = Modifier.testTag("player_time"),
             )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
                     onClick = { onPrevious?.invoke() },
                     enabled = onPrevious != null,
@@ -1233,6 +1233,28 @@ private fun PlayerControls(
                         tint = if (onNext != null) onBg else onBgVariant,
                     )
                 }
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val playing = state.canPause
+            IconButton(
+                onClick = if (playing) onPause else onPlay,
+                enabled = playing || state.canPlay || state.phase == PlayerState.Phase.Error,
+                modifier = Modifier
+                    .minimumInteractiveComponentSize()
+                    .semantics { contentDescription = if (playing) pauseCd else playCd }
+                    .testTag(if (playing) "player_pause" else "player_play"),
+            ) {
+                Icon(
+                    if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                    tint = onBg,
+                )
+            }
                 IconButton(
                     onClick = onLockControls,
                     modifier = Modifier
@@ -1309,22 +1331,6 @@ private fun PlayerControls(
                         color = onBg,
                     )
                 }
-                val playing = state.canPause
-                IconButton(
-                    onClick = if (playing) onPause else onPlay,
-                    enabled = playing || state.canPlay || state.phase == PlayerState.Phase.Error,
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .semantics { contentDescription = if (playing) pauseCd else playCd }
-                        .testTag(if (playing) "player_pause" else "player_play"),
-                ) {
-                    Icon(
-                        if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = null,
-                        tint = onBg,
-                    )
-                }
-            }
         }
     }
 }

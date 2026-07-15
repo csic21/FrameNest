@@ -32,21 +32,37 @@ class LanDiscoveryCoordinator(
 
     private var mdnsSession: MdnsSmbDiscovery.Session? = null
     private var portJob: Job? = null
+    private var mdnsGeneration: Long = 0L
 
     fun startMdns(scope: CoroutineScope) {
         stopMdns()
-        val session = mdnsFactory(appContext).start { host ->
-            scope.launch {
-                _events.emit(DiscoveryEvent.Found(host))
-            }
-        }
+        val generation = ++mdnsGeneration
+        val session = mdnsFactory(appContext).start(
+            onFound = { host ->
+                scope.launch {
+                    if (generation == mdnsGeneration) {
+                        _events.emit(DiscoveryEvent.Found(host))
+                    }
+                }
+            },
+            onStartFailed = {
+                scope.launch {
+                    if (generation == mdnsGeneration) {
+                        _events.emit(DiscoveryEvent.Phase(DiscoveryPhase.MDNS_FAILED))
+                    }
+                }
+            },
+        )
         mdnsSession = session
         scope.launch {
-            _events.emit(DiscoveryEvent.Phase(DiscoveryPhase.MDNS_RUNNING))
+            if (generation == mdnsGeneration && session.isActive()) {
+                _events.emit(DiscoveryEvent.Phase(DiscoveryPhase.MDNS_RUNNING))
+            }
         }
     }
 
     fun stopMdns() {
+        mdnsGeneration++
         mdnsSession?.stop()
         mdnsSession = null
     }
@@ -105,6 +121,7 @@ sealed class DiscoveryEvent {
 
 enum class DiscoveryPhase {
     MDNS_RUNNING,
+    MDNS_FAILED,
     PORT_SCAN_RUNNING,
     PORT_SCAN_DONE,
 }

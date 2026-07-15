@@ -46,7 +46,7 @@ macOS 常见路径：`sdk.dir=/Users/<you>/Library/Android/sdk`。
 - `core-ktx` 1.18.0 / Lifecycle 2.10.0（与 compileSdk 36 对齐；更高 AndroidX 需 SDK 37）
 - **libVLC** 3.6.5（FN-01）；**SMBJ** 0.14.0 + Coroutines 1.10.2（FN-02）
 
-**尚未引入** Room 等持久化（FN-04+）。决策记录：
+Room、SMB 播放、缩略图、字幕、听译与设置持久化均已接入。关键决策记录：
 
 - [0001 播放内核](docs/decisions/0001-player-engine.md)
 - [0002 SMB 数据路径](docs/decisions/0002-smb-data-path.md)
@@ -80,13 +80,13 @@ adb shell am start -n com.framenest/.smb.spike.SmbSpikeActivity
 产物路径：
 
 ```text
-app/build/outputs/apk/debug/app-debug.apk
+app/build/outputs/apk/debug/app-universal-debug.apk
 ```
 
 安装到已连接设备：
 
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/debug/app-universal-debug.apk
 adb shell am start -n com.framenest/.MainActivity
 ```
 
@@ -103,7 +103,7 @@ adb shell am start -n com.framenest/.MainActivity
 ```bash
 ./gradlew assembleDebug
 # 通用包（含 arm64 + x86_64）
-adb install -r app/build/outputs/apk/debug/app-debug-universal.apk
+adb install -r app/build/outputs/apk/debug/app-universal-debug.apk
 # 或真机 arm64 分包更小：
-# adb install -r app/build/outputs/apk/debug/app-debug-arm64-v8a.apk
+# adb install -r app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
 ```

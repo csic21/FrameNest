@@ -10,15 +10,17 @@ import android.os.Build
  * Minimal correct audio focus for video playback.
  * Pause is requested on transient/permanent loss via [onFocusLost].
  */
-class PlayerAudioFocus(
+internal class PlayerAudioFocus(
     context: Context,
     private val onFocusLost: () -> Unit,
+    private val onFocusGained: () -> Unit,
 ) {
     private val audioManager =
         context.applicationContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
     private var focusRequest: AudioFocusRequest? = null
     private var hasFocus: Boolean = false
+    private var waitingForDelayedGain: Boolean = false
 
     private val listener = AudioManager.OnAudioFocusChangeListener { change ->
         when (change) {
@@ -27,16 +29,22 @@ class PlayerAudioFocus(
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK,
             -> {
                 hasFocus = false
+                waitingForDelayedGain = false
                 onFocusLost()
             }
             AudioManager.AUDIOFOCUS_GAIN -> {
+                val shouldStartPlayback = waitingForDelayedGain
                 hasFocus = true
+                waitingForDelayedGain = false
+                if (shouldStartPlayback) {
+                    onFocusGained()
+                }
             }
         }
     }
 
-    fun request(): Boolean {
-        if (hasFocus) return true
+    fun request(): AudioFocusRequestResult {
+        if (hasFocus) return AudioFocusRequestResult.Granted
         val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                 .setAudioAttributes(
@@ -58,8 +66,10 @@ class PlayerAudioFocus(
                 AudioManager.AUDIOFOCUS_GAIN,
             )
         }
-        hasFocus = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-        return hasFocus
+        val mapped = audioFocusRequestResult(result)
+        hasFocus = mapped == AudioFocusRequestResult.Granted
+        waitingForDelayedGain = mapped == AudioFocusRequestResult.Delayed
+        return mapped
     }
 
     fun abandon() {
@@ -71,5 +81,19 @@ class PlayerAudioFocus(
             audioManager.abandonAudioFocus(listener)
         }
         hasFocus = false
+        waitingForDelayedGain = false
     }
 }
+
+internal enum class AudioFocusRequestResult {
+    Granted,
+    Delayed,
+    Failed,
+}
+
+internal fun audioFocusRequestResult(result: Int): AudioFocusRequestResult =
+    when (result) {
+        AudioManager.AUDIOFOCUS_REQUEST_GRANTED -> AudioFocusRequestResult.Granted
+        AudioManager.AUDIOFOCUS_REQUEST_DELAYED -> AudioFocusRequestResult.Delayed
+        else -> AudioFocusRequestResult.Failed
+    }

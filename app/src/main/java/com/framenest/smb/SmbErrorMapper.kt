@@ -163,19 +163,19 @@ object SmbErrorMapper {
         return redactSecrets(raw).take(200)
     }
 
-    /**
-     * Strip password-like query fragments and `pass=` / `password=` assignments.
-     */
+    /** Strip SMB URI userinfo and password-like assignments. */
     fun redactSecrets(input: String): String {
         var out = input
         out = PASSWORD_ASSIGN.replace(out, "$1=***")
-        out = SMB_USER_INFO.replace(out, "smb://***@")
+        out = SMB_USER_INFO.replace(out, "$1***@")
         return out
     }
 
     private val PASSWORD_ASSIGN = Regex(
-        "(?i)(password|passwd|pwd|pass)\\s*[=:]\\s*[^\\s,;]+",
+        "(?i)(password|passwd|pwd|pass)\\s*[=:]\\s*(?:\"[^\"]*\"|'[^']*'|[^\\s,;]+)",
     )
-    private val SMB_USER_INFO = Regex("(?i)smb://[^/@\\s]+:[^@/\\s]+@")
+    // Userinfo may contain domain/username/password in several forms. Redact the
+    // whole authority prefix even if a malformed URL only contains a username.
+    private val SMB_USER_INFO = Regex("(?i)(smb://)[^/@\\s]+@")
     private val STATUS_TOKEN = Regex("STATUS_[A-Z0-9_]+")
 }
