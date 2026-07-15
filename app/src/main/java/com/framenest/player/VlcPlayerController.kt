@@ -153,7 +153,14 @@ class VlcPlayerController(
                 _state.update { it.copy(phase = PlayerState.Phase.Preparing, error = null) }
             }
             MediaPlayer.Event.Buffering -> {
-                // Keep Preparing until first frame; ignore mid-stream buffering noise.
+                // libVLC progress 0..100. Do not change phase — rebuffer stays Playing.
+                val snap = BufferingPolicy.fromEventProgress(event.buffering)
+                _state.update {
+                    it.copy(
+                        isBuffering = snap.isBuffering,
+                        bufferPercent = snap.percent,
+                    )
+                }
             }
             MediaPlayer.Event.Playing -> {
                 if (suppressAllTerminalEvents) return@handleEvent

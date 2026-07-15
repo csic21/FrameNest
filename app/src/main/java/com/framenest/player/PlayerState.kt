@@ -33,6 +33,16 @@ data class PlayerState(
      * Playback rate multiplier (1.0 = normal). Discrete steps in [PlaybackRates.ALL].
      */
     val playbackRate: Float = PlaybackRates.DEFAULT,
+    /**
+     * True while libVLC reports a Buffering event with progress &lt; 100%.
+     * Does not change [phase] — mid-stream rebuffer keeps [Phase.Playing].
+     */
+    val isBuffering: Boolean = false,
+    /**
+     * Buffer fill 0f..100f from [org.videolan.libvlc.MediaPlayer.Event.getBuffering].
+     * Meaningful only when [isBuffering] is true (or freshly cleared at 100).
+     */
+    val bufferPercent: Float = 0f,
     val hwDecoderRequested: Boolean = true,
     val error: PlayerError? = null,
 ) {

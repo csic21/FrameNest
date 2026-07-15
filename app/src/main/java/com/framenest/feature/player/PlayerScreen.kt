@@ -103,6 +103,7 @@ import com.framenest.feature.listen_translate.ListenTranslateUiState
 import com.framenest.feature.subtitle.ExternalSubtitleOption
 import com.framenest.feature.subtitle.SubtitleControls
 import com.framenest.feature.subtitle.SubtitleUiState
+import com.framenest.player.BufferingPolicy
 import com.framenest.player.PlaybackRates
 import com.framenest.player.PlayerController
 import com.framenest.player.PlayerState
@@ -813,17 +814,27 @@ private fun PlayerSurfaceStack(
                 )
             }
             else -> {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = Color.White)
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        text = stringResource(R.string.player_loading),
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.testTag("player_phase_loading"),
-                    )
-                }
+                BufferingIndicator(
+                    state = state,
+                    fallbackLabel = stringResource(R.string.player_loading),
+                    testTag = "player_phase_loading",
+                )
             }
+        }
+
+        // Mid-stream rebuffer / post-seek fill while a decoded frame is already up.
+        // Preparing uses the branch above; skip when locked so unlock chrome stays clean.
+        if (!controlsLocked &&
+            BufferingPolicy.showOverlay(state) &&
+            state.phase != PlayerState.Phase.Preparing &&
+            state.phase != PlayerState.Phase.Idle
+        ) {
+            BufferingIndicator(
+                state = state,
+                fallbackLabel = stringResource(R.string.player_buffering),
+                testTag = "player_buffering",
+                modifier = Modifier.align(Alignment.Center),
+            )
         }
 
         if (listenUi.enabled && listenUi.overlayText.isNotBlank() &&
@@ -852,6 +863,42 @@ private fun PlayerSurfaceStack(
                 ),
             )
         }
+    }
+}
+
+@Composable
+private fun BufferingIndicator(
+    state: PlayerState,
+    fallbackLabel: String,
+    testTag: String,
+    modifier: Modifier = Modifier,
+) {
+    val percent = state.bufferPercent.toInt().coerceIn(0, 100)
+    val label = if (state.isBuffering && percent > 0) {
+        stringResource(R.string.player_buffering_percent, percent)
+    } else {
+        fallbackLabel
+    }
+    val cd = if (state.isBuffering) {
+        stringResource(R.string.player_buffering_cd, percent)
+    } else {
+        label
+    }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .semantics { contentDescription = cd }
+            .testTag(testTag),
+    ) {
+        CircularProgressIndicator(color = Color.White)
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = label,
+            color = Color.White,
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
 }
 
@@ -1070,6 +1117,18 @@ private fun PlayerControls(
                 .semantics { contentDescription = statusCd }
                 .testTag("player_status"),
         )
+        if (state.isBuffering && state.phase == PlayerState.Phase.Playing) {
+            val pct = state.bufferPercent.toInt().coerceIn(0, 100)
+            Text(
+                text = stringResource(R.string.player_buffering_percent, pct),
+                style = MaterialTheme.typography.labelMedium,
+                color = onBgVariant,
+                maxLines = 1,
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .testTag("player_status_buffering"),
+            )
+        }
         if (autoNextArmed && siblingNav.nextName != null) {
             Text(
                 text = stringResource(R.string.player_auto_next_hint),
@@ -1316,6 +1375,10 @@ private fun phaseLabel(state: PlayerState): String {
         ) {
             append(" · ")
             append(stringResource(R.string.player_first_frame_ready))
+        }
+        if (state.isBuffering && state.phase == PlayerState.Phase.Playing) {
+            append(" · ")
+            append(stringResource(R.string.player_buffering))
         }
         state.error?.let { append(" · ${it.code}") }
     }

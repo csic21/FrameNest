@@ -328,3 +328,18 @@
 - 不改 SMB 协议层。
 
 验收：多视频目录可 prev/next；单文件按钮禁用；纯逻辑单测 + 编译通过。
+
+## FN-19：播放缓冲提示
+
+**依赖**：FN-05  
+**拥有路径**：`player/**`、`feature/player/**`、相关单测与交接  
+**目标**：弱网 / SMB seek 后给出可理解的缓冲进度，不改状态机主路径。
+
+工作内容：
+
+- 消费 libVLC `Buffering` 事件（0–100%）；写入 `PlayerState.isBuffering` / `bufferPercent`。
+- 不改 phase：播放中再缓冲仍保持 Playing。
+- 首帧前加载文案可带百分比；播放中显示中心缓冲指示与控制条状态行。
+- 纯逻辑单测 + 编译。
+
+验收：缓冲事件更新状态；100% 清除 isBuffering；Error 不盖缓冲层。

@@ -121,6 +121,9 @@
     <string name="player_next_episode_cd">下一集：%1$s</string>
     <string name="player_auto_next_hint">即将播放下一集…</string>
     <string name="player_sibling_position">%1$s</string>
+    <string name="player_buffering">缓冲中</string>
+    <string name="player_buffering_percent">缓冲中 %1$d%%</string>
+    <string name="player_buffering_cd">正在缓冲，%1$d 百分之</string>
 
     <!-- Browse a11y -->
     <string name="browse_loading_cd">正在加载目录</string>
