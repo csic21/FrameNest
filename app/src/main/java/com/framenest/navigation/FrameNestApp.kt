@@ -232,6 +232,15 @@ private fun FrameNestNavHost(
                 path = path,
                 container = container,
                 onBack = { navController.popBackStack() },
+                onOpenSibling = { siblingPath ->
+                    // Replace this player entry so Back returns to browse/recent,
+                    // not the previous episode in the same directory.
+                    val route = FrameNestRoutes.player(serverId, share, siblingPath)
+                    navController.navigate(route) {
+                        popUpTo(entry.id) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
             )
         }
 

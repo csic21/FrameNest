@@ -115,6 +115,12 @@
     <string name="player_orientation_lock_cd">锁定屏幕方向</string>
     <string name="player_orientation_unlock_cd">允许屏幕旋转</string>
     <string name="player_locked_hint">已锁定 · 点按显示解锁</string>
+    <string name="player_prev_episode">上一集</string>
+    <string name="player_next_episode">下一集</string>
+    <string name="player_prev_episode_cd">上一集：%1$s</string>
+    <string name="player_next_episode_cd">下一集：%1$s</string>
+    <string name="player_auto_next_hint">即将播放下一集…</string>
+    <string name="player_sibling_position">%1$s</string>
 
     <!-- Browse a11y -->
     <string name="browse_loading_cd">正在加载目录</string>

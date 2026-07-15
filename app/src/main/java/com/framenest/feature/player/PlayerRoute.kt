@@ -47,6 +47,7 @@ fun PlayerRoute(
     path: String,
     container: AppContainer,
     onBack: () -> Unit,
+    onOpenSibling: (siblingPath: String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var request by remember(serverId, share, path) { mutableStateOf<PlaybackRequest?>(null) }
@@ -113,6 +114,7 @@ fun PlayerRoute(
             PlayerScreen(
                 request = request!!,
                 onBack = onBack,
+                onOpenSibling = onOpenSibling,
                 modifier = modifier,
             )
         }

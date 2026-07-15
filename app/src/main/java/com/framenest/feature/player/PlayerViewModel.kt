@@ -47,6 +47,7 @@ import com.framenest.player.SmbSeekableMedia
 import com.framenest.player.VideoScaleMode
 import com.framenest.player.VlcPlayerController
 import com.framenest.smb.SmbException
+import com.framenest.smb.SmbPathUtils
 import com.framenest.smb.SmbjClient
 import com.framenest.smb.SmbCredentials as SmbSessionCredentials
 import java.io.File
@@ -101,6 +102,9 @@ class PlayerViewModel(
     private val _subtitleUiState = MutableStateFlow(SubtitleUiState())
     val subtitleUiState: StateFlow<SubtitleUiState> = _subtitleUiState.asStateFlow()
 
+    private val _siblingNavState = MutableStateFlow(SiblingNavUiState())
+    val siblingNavState: StateFlow<SiblingNavUiState> = _siblingNavState.asStateFlow()
+
     private val voskInstaller = VoskModelInstaller(application)
     private var realListenEngine: RealListenTranslateEngine? = null
     private var listenOnlySmbClient: SmbjClient? = null
@@ -144,6 +148,7 @@ class PlayerViewModel(
      */
     private val resumeSeekGate = ResumeSeekGate()
     private var subtitleBootstrapDone: Boolean = false
+    private var siblingBootstrapDone: Boolean = false
     private var preferredLanguages: List<String> = resolvePreferredLanguages(application)
     /**
      * After path B (Proxy FD) fails before first frame, retry once with libVLC
@@ -193,6 +198,10 @@ class PlayerViewModel(
                 if (state.firstFrameReady && !subtitleBootstrapDone) {
                     subtitleBootstrapDone = true
                     bootstrapSubtitles(state)
+                }
+                if (state.firstFrameReady && !siblingBootstrapDone) {
+                    siblingBootstrapDone = true
+                    loadSiblingPlaylist()
                 }
                 maybeFallbackSeekableSmbToDirect(state)
             }
@@ -512,6 +521,106 @@ class PlayerViewModel(
     fun cyclePlaybackRate() {
         val next = PlaybackRates.next(controller.state.value.playbackRate)
         controller.setPlaybackRate(next)
+    }
+
+    /**
+     * Load same-directory video siblings for prev/next. Safe to call multiple times;
+     * failures leave [siblingNavState] empty (no prev/next UI).
+     */
+    fun loadSiblingPlaylist() {
+        viewModelScope.launch {
+            _siblingNavState.value = _siblingNavState.value.copy(loading = true)
+            val playlist = runCatching { listSiblingPlaylist() }
+                .onFailure { t ->
+                    Log.w(
+                        TAG,
+                        "sibling list failed: ${CredentialRedactor.redact(t.message)}",
+                    )
+                }
+                .getOrDefault(SiblingPlaylist.Empty)
+            _siblingNavState.value = SiblingNavUiState.from(playlist, loading = false)
+        }
+    }
+
+    private suspend fun listSiblingPlaylist(): SiblingPlaylist = withContext(Dispatchers.IO) {
+        val path = request.identity.path
+        val names = listSiblingFileNames()
+        SiblingPlaylistFactory.build(currentPath = path, directoryFileNames = names)
+    }
+
+    /**
+     * Prefer the live playback SMB session (path B). Otherwise open a short-lived
+     * listing session from the request credentials (path A / fallback).
+     */
+    private fun listSiblingFileNames(): List<String> {
+        return when (val ds = request.dataSource) {
+            is PlaybackDataSource.SeekableSmb ->
+                listDirectoryFileNames(
+                    share = ds.share,
+                    parentPath = SmbPathUtils.parentOf(ds.path),
+                    host = ds.host,
+                    port = ds.port,
+                    username = ds.username,
+                    password = ds.password,
+                    domain = ds.domain,
+                    reuse = smbClient,
+                )
+            is PlaybackDataSource.DirectSmbUrl -> {
+                val chars = ds.password.toCharArray()
+                try {
+                    listDirectoryFileNames(
+                        share = ds.share,
+                        parentPath = SmbPathUtils.parentOf(ds.path),
+                        host = ds.host,
+                        port = ds.port ?: 445,
+                        username = ds.username,
+                        password = chars,
+                        domain = ds.domain.orEmpty(),
+                        reuse = listenOnlySmbClient ?: smbClient,
+                    )
+                } finally {
+                    chars.fill('\u0000')
+                }
+            }
+            is PlaybackDataSource.LocalFile,
+            is PlaybackDataSource.LocalRawResource,
+            -> emptyList()
+        }
+    }
+
+    private fun listDirectoryFileNames(
+        share: String,
+        parentPath: String,
+        host: String,
+        port: Int,
+        username: String,
+        password: CharArray,
+        domain: String,
+        reuse: SmbjClient?,
+    ): List<String> {
+        val live = reuse?.takeIf { it.isConnected }
+        if (live != null) {
+            return live.listDirectory(share, parentPath)
+                .filter { !it.isDirectory }
+                .map { it.name }
+        }
+        val client = SmbjClient()
+        val creds = SmbSessionCredentials(
+            host = host,
+            port = port,
+            username = username,
+            password = password.copyOf(),
+            domain = domain,
+        )
+        return try {
+            client.connect(creds)
+            client.listDirectory(share, parentPath)
+                .filter { !it.isDirectory }
+                .map { it.name }
+        } finally {
+            runCatching { client.close() }
+            creds.clearPassword()
+        }
     }
 
     /** Cycle BestFit → FitScreen → Fill → 16:9 → 4:3 → Original. */

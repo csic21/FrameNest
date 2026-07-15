@@ -41,6 +41,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ScreenLockRotation
 import androidx.compose.material.icons.filled.ScreenRotation
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.Button
@@ -129,6 +131,7 @@ import com.framenest.player.VideoScaleMode
 fun PlayerScreen(
     request: PlaybackRequest,
     onBack: () -> Unit,
+    onOpenSibling: (siblingPath: String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val app = LocalContext.current.applicationContext as Application
@@ -139,6 +142,7 @@ fun PlayerScreen(
     val state by vm.playerState.collectAsStateWithLifecycle()
     val subtitleUi by vm.subtitleUiState.collectAsStateWithLifecycle()
     val listenUi by vm.listenTranslateUiState.collectAsStateWithLifecycle()
+    val siblingNav by vm.siblingNavState.collectAsStateWithLifecycle()
     var showSubtitles by remember { mutableStateOf(false) }
     var showListenTranslate by remember { mutableStateOf(false) }
     var showAudioTracks by remember { mutableStateOf(false) }
@@ -146,6 +150,7 @@ fun PlayerScreen(
     var controlsLocked by remember { mutableStateOf(false) }
     var orientationLocked by remember { mutableStateOf(false) }
     var showUnlockHint by remember { mutableStateOf(false) }
+    var autoNextArmed by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
     val configuration = LocalConfiguration.current
     // Orientation chrome only — not a device-model / width-bucket check.
@@ -203,9 +208,34 @@ fun PlayerScreen(
         }
     }
 
+    // Continuous play: after natural end, auto-open next sibling if present.
+    // Cancelled if the user replays or leaves Ended before the delay elapses.
+    LaunchedEffect(state.phase, siblingNav.nextPath) {
+        if (state.phase == PlayerState.Phase.Ended && siblingNav.nextPath != null) {
+            autoNextArmed = true
+            delay(AUTO_NEXT_DELAY_MS)
+            if (vm.playerState.value.phase == PlayerState.Phase.Ended) {
+                val next = siblingNav.nextPath
+                if (next != null) {
+                    vm.onLeaveOrBackground()
+                    onOpenSibling(next)
+                }
+            }
+            autoNextArmed = false
+        } else {
+            autoNextArmed = false
+        }
+    }
+
     val leave: () -> Unit = {
         vm.onLeaveOrBackground()
         onBack()
+    }
+
+    val openSibling: (String) -> Unit = { siblingPath ->
+        autoNextArmed = false
+        vm.onLeaveOrBackground()
+        onOpenSibling(siblingPath)
     }
 
     val unlockControls: () -> Unit = {
@@ -367,6 +397,8 @@ fun PlayerScreen(
                         }
                         PlayerControls(
                             state = state,
+                            siblingNav = siblingNav,
+                            autoNextArmed = autoNextArmed,
                             onPlay = { vm.play() },
                             onPause = { vm.pause() },
                             onPreviewSeek = { vm.previewSeekTo(it) },
@@ -378,6 +410,8 @@ fun PlayerScreen(
                             onToggleOrientationLock = {
                                 orientationLocked = !orientationLocked
                             },
+                            onPrevious = siblingNav.previousPath?.let { p -> { openSibling(p) } },
+                            onNext = siblingNav.nextPath?.let { p -> { openSibling(p) } },
                             overlay = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -422,6 +456,8 @@ fun PlayerScreen(
                     if (showChrome) {
                         PlayerControls(
                             state = state,
+                            siblingNav = siblingNav,
+                            autoNextArmed = autoNextArmed,
                             onPlay = { vm.play() },
                             onPause = { vm.pause() },
                             onPreviewSeek = { vm.previewSeekTo(it) },
@@ -433,6 +469,8 @@ fun PlayerScreen(
                             onToggleOrientationLock = {
                                 orientationLocked = !orientationLocked
                             },
+                            onPrevious = siblingNav.previousPath?.let { p -> { openSibling(p) } },
+                            onNext = siblingNav.nextPath?.let { p -> { openSibling(p) } },
                             overlay = false,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -946,6 +984,8 @@ private fun ErrorOverlay(
 @Composable
 private fun PlayerControls(
     state: PlayerState,
+    siblingNav: SiblingNavUiState,
+    autoNextArmed: Boolean,
     onPlay: () -> Unit,
     onPause: () -> Unit,
     onPreviewSeek: (Long) -> Unit,
@@ -955,6 +995,8 @@ private fun PlayerControls(
     onLockControls: () -> Unit,
     orientationLocked: Boolean,
     onToggleOrientationLock: () -> Unit,
+    onPrevious: (() -> Unit)?,
+    onNext: (() -> Unit)?,
     overlay: Boolean,
     modifier: Modifier = Modifier,
 ) {
@@ -1003,6 +1045,15 @@ private fun PlayerControls(
         MaterialTheme.colorScheme.onSurfaceVariant
     }
 
+    val prevCd = stringResource(
+        R.string.player_prev_episode_cd,
+        siblingNav.previousName ?: "",
+    )
+    val nextCd = stringResource(
+        R.string.player_next_episode_cd,
+        siblingNav.nextName ?: "",
+    )
+
     Column(
         modifier = modifier
             .background(bg)
@@ -1019,6 +1070,28 @@ private fun PlayerControls(
                 .semantics { contentDescription = statusCd }
                 .testTag("player_status"),
         )
+        if (autoNextArmed && siblingNav.nextName != null) {
+            Text(
+                text = stringResource(R.string.player_auto_next_hint),
+                style = MaterialTheme.typography.labelMedium,
+                color = onBgVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .testTag("player_auto_next_hint"),
+            )
+        }
+        siblingNav.positionLabel?.let { label ->
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = onBgVariant,
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .testTag("player_sibling_position"),
+            )
+        }
         Slider(
             value = displayProgress,
             onValueChange = { fraction ->
@@ -1073,6 +1146,34 @@ private fun PlayerControls(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                IconButton(
+                    onClick = { onPrevious?.invoke() },
+                    enabled = onPrevious != null,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .semantics { contentDescription = prevCd }
+                        .testTag("player_prev_episode"),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.SkipPrevious,
+                        contentDescription = stringResource(R.string.player_prev_episode),
+                        tint = if (onPrevious != null) onBg else onBgVariant,
+                    )
+                }
+                IconButton(
+                    onClick = { onNext?.invoke() },
+                    enabled = onNext != null,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .semantics { contentDescription = nextCd }
+                        .testTag("player_next_episode"),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.SkipNext,
+                        contentDescription = stringResource(R.string.player_next_episode),
+                        tint = if (onNext != null) onBg else onBgVariant,
+                    )
+                }
                 IconButton(
                     onClick = onLockControls,
                     modifier = Modifier
@@ -1182,6 +1283,8 @@ internal fun shouldPreviewScrubSeek(
 
 private const val SCRUB_PREVIEW_INTERVAL_MS = 120L
 private const val SCRUB_PREVIEW_MIN_DELTA_MS = 500L
+/** Delay before auto-opening the next same-directory video after Ended. */
+private const val AUTO_NEXT_DELAY_MS = 1_500L
 
 @Composable
 private fun videoScaleLabel(mode: VideoScaleMode): String = when (mode) {
