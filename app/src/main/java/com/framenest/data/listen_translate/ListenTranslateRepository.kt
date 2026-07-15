@@ -66,7 +66,11 @@ class ListenTranslateRepository(
             lang.sourceLang,
             lang.targetLang,
         )
-        if (existing != null && shouldInvalidate(existing.contentKey, contentKey)) {
+        if (existing != null &&
+            (shouldInvalidate(existing.contentKey, contentKey) ||
+                shouldInvalidateModel(existing.asrModel, asrModel) ||
+                shouldInvalidateModel(existing.mtModel, mtModel))
+        ) {
             dao.deleteJob(
                 identity.serverId,
                 identity.share,
@@ -294,9 +298,12 @@ class ListenTranslateRepository(
     }
 
     private fun shouldInvalidate(storedKey: String, incomingKey: String): Boolean {
-        if (incomingKey.isBlank() || storedKey.isBlank()) return false
+        if (incomingKey.isBlank()) return false
         return storedKey != incomingKey
     }
+
+    private fun shouldInvalidateModel(storedModel: String, incomingModel: String): Boolean =
+        incomingModel.isNotBlank() && storedModel != incomingModel
 
     companion object {
         const val DEFAULT_MAX_JOBS: Int = 100

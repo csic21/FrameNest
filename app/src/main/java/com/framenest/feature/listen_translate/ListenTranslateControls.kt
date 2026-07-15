@@ -60,9 +60,8 @@ fun ListenTranslateControls(
                 style = MaterialTheme.typography.bodyMedium,
             )
             Switch(
-                checked = uiState.enabled,
+                checked = uiState.enabled || uiState.isInstallingModels,
                 onCheckedChange = onEnabledChange,
-                enabled = !uiState.isInstallingModels,
                 modifier = Modifier.testTag("listen_translate_enable"),
             )
         }
@@ -125,7 +124,7 @@ fun ListenTranslateControls(
         if (uiState.isInstallingModels) {
             Spacer(Modifier.height(8.dp))
             Text(
-                text = stringResource(R.string.listen_translate_installing),
+                text = uiState.message ?: stringResource(R.string.listen_translate_installing),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.testTag("listen_translate_installing"),
@@ -159,7 +158,7 @@ fun ListenTranslateControls(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag("listen_translate_status"),
             )
-            uiState.message?.let { msg ->
+            uiState.message?.takeUnless { uiState.isInstallingModels }?.let { msg ->
                 Text(
                     text = msg,
                     style = MaterialTheme.typography.bodySmall,

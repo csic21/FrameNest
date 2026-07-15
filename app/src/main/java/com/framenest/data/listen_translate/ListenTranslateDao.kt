@@ -97,7 +97,7 @@ interface ListenTranslateDao {
         SELECT * FROM listen_translate_cue
         WHERE server_id = :serverId AND share = :share AND path = :path
           AND source_lang = :sourceLang AND target_lang = :targetLang
-        ORDER BY start_ms ASC
+        ORDER BY start_ms ASC, rev ASC
         """,
     )
     fun observeCues(
@@ -113,7 +113,7 @@ interface ListenTranslateDao {
         SELECT * FROM listen_translate_cue
         WHERE server_id = :serverId AND share = :share AND path = :path
           AND source_lang = :sourceLang AND target_lang = :targetLang
-        ORDER BY start_ms ASC
+        ORDER BY start_ms ASC, rev ASC
         """,
     )
     suspend fun listCues(
@@ -130,7 +130,7 @@ interface ListenTranslateDao {
         WHERE server_id = :serverId AND share = :share AND path = :path
           AND source_lang = :sourceLang AND target_lang = :targetLang
           AND start_ms <= :timeMs AND end_ms > :timeMs
-        ORDER BY start_ms DESC
+        ORDER BY start_ms DESC, rev DESC
         LIMIT 1
         """,
     )

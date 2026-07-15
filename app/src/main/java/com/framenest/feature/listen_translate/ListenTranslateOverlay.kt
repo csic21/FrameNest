@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
@@ -22,12 +23,14 @@ import androidx.compose.ui.unit.dp
 fun ListenTranslateOverlay(
     text: String,
     modifier: Modifier = Modifier,
+    bottomPadding: Dp = 20.dp,
 ) {
     if (text.isBlank()) return
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 20.dp),
+            .padding(horizontal = 16.dp)
+            .padding(bottom = bottomPadding),
         contentAlignment = Alignment.BottomCenter,
     ) {
         Text(

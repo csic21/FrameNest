@@ -64,6 +64,25 @@ class ListenTranslateRepositoryTest {
     }
 
     @Test
+    fun newlyKnownContentKey_andModelUpgrade_invalidateLegacyCues() = runBlocking {
+        val dao = FakeListenTranslateDao()
+        val repo = ListenTranslateRepository(dao, timeSource = { 2_500L })
+
+        repo.ensureJob(identity, langs, asrModel = "vosk-old", mtModel = "mt-1")
+        repo.upsertCue(identity, langs, 0L, 1_000L, "old", "旧")
+        repo.ensureJob(
+            identity,
+            langs,
+            contentKey = ListenContentKey.of(100L, 20L),
+            asrModel = "vosk-new",
+            mtModel = "mt-1",
+        )
+
+        assertTrue(repo.listCues(identity, langs).isEmpty())
+        assertEquals("vosk-new", repo.getJob(identity, langs)?.asrModel)
+    }
+
+    @Test
     fun languagePair_isolation() = runBlocking {
         val dao = FakeListenTranslateDao()
         val repo = ListenTranslateRepository(dao, timeSource = { 3_000L })

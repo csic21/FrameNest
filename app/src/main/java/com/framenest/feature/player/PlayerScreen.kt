@@ -559,6 +559,7 @@ private fun PlayerSurfaceStack(
             ListenTranslateOverlay(
                 text = listenUi.overlayText,
                 modifier = Modifier.align(Alignment.BottomCenter),
+                bottomPadding = if (state.selectedSubtitleTrackId != null) 72.dp else 20.dp,
             )
         }
 

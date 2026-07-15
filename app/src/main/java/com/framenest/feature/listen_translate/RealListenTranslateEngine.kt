@@ -2,9 +2,11 @@ package com.framenest.feature.listen_translate
 
 import com.framenest.feature.listen_translate.asr.VoskAsrEngine
 import com.framenest.feature.listen_translate.asr.VoskModelInstaller
+import com.framenest.feature.listen_translate.asr.VoskWord
 import com.framenest.feature.listen_translate.audio.ListenAudioSource
 import com.framenest.feature.listen_translate.mt.MlKitMtEngine
 import java.io.File
+import kotlinx.coroutines.CancellationException
 
 /**
  * Product listen-translate engine (FN-14):
@@ -15,6 +17,7 @@ class RealListenTranslateEngine(
     private val vosk: VoskAsrEngine,
     private val mt: MlKitMtEngine,
     private val voskModels: VoskModelInstaller,
+    private val selectedAudioTrackOrdinal: () -> Int? = { null },
     private val asrModelLabel: () -> String = { "vosk-small" },
     private val mtModelLabel: () -> String = { "mlkit-translate" },
 ) : ListenTranslateEngine {
@@ -42,8 +45,16 @@ class RealListenTranslateEngine(
         vosk.ensureModel(modelDir, srcLang)
         mt.ensureModel(srcLang, tgtLang)
 
+        val decodeStartMs = (startMs - CONTEXT_PADDING_MS).coerceAtLeast(0L)
+        val decodeEndMs = endMs + CONTEXT_PADDING_MS
         val pcm = try {
-            audio.pcmWindow(startMs, endMs)
+            audio.pcmWindow(
+                startMs = decodeStartMs,
+                endMs = decodeEndMs,
+                preferredAudioTrackOrdinal = selectedAudioTrackOrdinal(),
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (t: Throwable) {
             throw IllegalStateException(
                 "音频解码失败: ${t.message?.take(120) ?: t.javaClass.simpleName}",
@@ -54,32 +65,81 @@ class RealListenTranslateEngine(
             return ListenWindowResult(textSrc = "", textTgt = "")
         }
 
-        val textSrc = try {
+        val recognition = try {
             vosk.recognize(pcm)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (t: Throwable) {
             throw IllegalStateException(
                 "ASR 失败: ${t.message?.take(120) ?: t.javaClass.simpleName}",
                 t,
             )
         }
+        val wordsInWindow = selectWordsForWindow(
+            words = recognition.words,
+            decodeStartMs = decodeStartMs,
+            windowStartMs = startMs,
+            windowEndMs = endMs,
+        )
+        val textSrc = if (wordsInWindow.isNotEmpty()) {
+            wordsInWindow.joinToString(" ") { it.text }.trim()
+        } else if (recognition.words.isEmpty()) {
+            recognition.text
+        } else {
+            ""
+        }
         if (textSrc.isBlank()) {
             return ListenWindowResult(textSrc = "", textTgt = "")
         }
 
+        val cueStartMs = wordsInWindow.firstOrNull()
+            ?.let { decodeStartMs + it.startMs }
+            ?.coerceIn(startMs, endMs)
+            ?: startMs
+        val cueEndMs = wordsInWindow.lastOrNull()
+            ?.let { decodeStartMs + it.endMs }
+            ?.coerceIn(cueStartMs, endMs)
+            ?: endMs
+
         val textTgt = try {
             mt.translate(textSrc, srcLang, tgtLang)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (t: Throwable) {
             // Still keep ASR text if MT fails.
             return ListenWindowResult(
                 textSrc = textSrc,
-                textTgt = "（翻译失败：${t.message?.take(80) ?: "error"}）",
+                textTgt = "",
+                cueStartMs = cueStartMs,
+                cueEndMs = cueEndMs,
+                retryableErrorMessage = "翻译失败：${t.message?.take(80) ?: "error"}",
             )
         }
-        return ListenWindowResult(textSrc = textSrc, textTgt = textTgt)
+        return ListenWindowResult(
+            textSrc = textSrc,
+            textTgt = textTgt,
+            cueStartMs = cueStartMs,
+            cueEndMs = cueEndMs,
+        )
     }
 
     fun close() {
+        audio.close()
         vosk.close()
         mt.close()
     }
+
+    private companion object {
+        const val CONTEXT_PADDING_MS = 750L
+    }
+}
+
+internal fun selectWordsForWindow(
+    words: List<VoskWord>,
+    decodeStartMs: Long,
+    windowStartMs: Long,
+    windowEndMs: Long,
+): List<VoskWord> = words.filter { word ->
+    val absoluteMidpoint = decodeStartMs + (word.startMs + word.endMs) / 2L
+    absoluteMidpoint in windowStartMs until windowEndMs
 }

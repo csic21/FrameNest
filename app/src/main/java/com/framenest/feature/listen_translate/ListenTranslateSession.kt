@@ -5,6 +5,7 @@ import com.framenest.data.listen_translate.ListenLanguagePair
 import com.framenest.data.listen_translate.ListenTranslateCue
 import com.framenest.data.listen_translate.ListenTranslateJobStatus
 import com.framenest.data.listen_translate.ListenTranslateRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -26,7 +27,7 @@ class ListenTranslateSession(
     private var engine: ListenTranslateEngine,
     private val scope: CoroutineScope,
     private val identity: PlaybackIdentity,
-    private val contentKey: String = "",
+    contentKey: String = "",
     private val windowMs: Long = ListenTranslateWindows.DEFAULT_WINDOW_MS,
     private val pollIntervalMs: Long = 500L,
 ) {
@@ -38,6 +39,9 @@ class ListenTranslateSession(
     }
 
     private val processMutex = Mutex()
+    private val retryPolicy = ListenWindowRetryPolicy()
+    private var contentKey: String = contentKey
+    private var activationJob: Job? = null
     private var pollJob: Job? = null
     private var observeJob: Job? = null
     private var cachedCues: List<ListenTranslateCue> = emptyList()
@@ -45,15 +49,25 @@ class ListenTranslateSession(
     private var lastDurationMs: Long = 0L
     private var isPlaying: Boolean = false
 
+    fun setContentKey(contentKey: String) {
+        val normalized = contentKey.trim()
+        if (normalized == this.contentKey) return
+        this.contentKey = normalized
+        if (_ui.value.enabled) {
+            activate()
+        }
+    }
+
     fun setEnabled(enabled: Boolean) {
         _ui.update { it.copy(enabled = enabled, errorMessage = null) }
         if (enabled) {
-            startObserving()
-            startPolling()
-            scope.launch { ensureJobAndRefresh() }
+            activate()
         } else {
+            activationJob?.cancel()
+            activationJob = null
             stopPolling()
             stopObserving()
+            retryPolicy.clear()
             _ui.update {
                 it.copy(
                     activeCue = null,
@@ -70,7 +84,7 @@ class ListenTranslateSession(
         if (next == _ui.value.sourceLang) return
         _ui.update { it.copy(sourceLang = next, activeCue = null, overlayText = "") }
         if (_ui.value.enabled) {
-            scope.launch { ensureJobAndRefresh() }
+            activate()
         }
     }
 
@@ -79,7 +93,7 @@ class ListenTranslateSession(
         if (next == _ui.value.targetLang) return
         _ui.update { it.copy(targetLang = next, activeCue = null, overlayText = "") }
         if (_ui.value.enabled) {
-            scope.launch { ensureJobAndRefresh() }
+            activate()
         }
     }
 
@@ -116,8 +130,19 @@ class ListenTranslateSession(
     }
 
     fun release() {
+        activationJob?.cancel()
+        activationJob = null
         stopPolling()
         stopObserving()
+    }
+
+    private fun activate() {
+        activationJob?.cancel()
+        stopPolling()
+        activationJob = scope.launch {
+            ensureJobAndRefresh()
+            if (_ui.value.enabled) startPolling()
+        }
     }
 
     private fun startObserving() {
@@ -218,6 +243,12 @@ class ListenTranslateSession(
 
     private suspend fun processWindow(startMs: Long, endMs: Long) {
         if (endMs <= startMs) return
+        val attemptKey = ListenWindowAttemptKey(
+            startMs = startMs,
+            endMs = endMs,
+            languages = _ui.value.languages,
+        )
+        if (!retryPolicy.canAttempt(attemptKey)) return
         processMutex.withLock {
             // Re-check under lock.
             if (!ListenTranslateWindows.needsFill(cachedCues, startMs, endMs)) return
@@ -236,16 +267,36 @@ class ListenTranslateSession(
                     sourceLang = langs.sourceLang,
                     targetLang = langs.targetLang,
                 )
-                // Silence / empty ASR: still advance coverage so we do not loop forever.
+                result.retryableErrorMessage?.let { message ->
+                    throw ListenWindowStageException(message)
+                }
+                var speechCoversWindow = false
                 if (result.textSrc.isNotBlank() || result.textTgt.isNotBlank()) {
+                    val cueStart = (result.cueStartMs ?: startMs).coerceIn(startMs, endMs)
+                    val cueEnd = (result.cueEndMs ?: endMs).coerceIn(cueStart, endMs)
+                    speechCoversWindow = cueStart == startMs && cueEnd == endMs
+                    repository.upsertCue(
+                        identity = identity,
+                        languages = langs,
+                        startMs = cueStart,
+                        endMs = cueEnd,
+                        textSrc = result.textSrc,
+                        textTgt = result.textTgt,
+                        rev = 1,
+                        contentKey = contentKey,
+                    )
+                }
+                if (!speechCoversWindow) {
+                    // Persist the whole attempted window, including silence. Writing this
+                    // after the speech cue means cancellation cannot hide completed text.
                     repository.upsertCue(
                         identity = identity,
                         languages = langs,
                         startMs = startMs,
                         endMs = endMs,
-                        textSrc = result.textSrc,
-                        textTgt = result.textTgt,
-                        rev = 1,
+                        textSrc = "",
+                        textTgt = "",
+                        rev = COVERAGE_REV,
                         contentKey = contentKey,
                     )
                 }
@@ -257,6 +308,7 @@ class ListenTranslateSession(
                     durationMs = lastDurationMs.takeIf { it > 0L },
                 )
                 cachedCues = repository.listCues(identity, langs)
+                retryPolicy.recordSuccess(attemptKey)
                 _ui.update {
                     it.copy(
                         isProcessing = false,
@@ -270,8 +322,15 @@ class ListenTranslateSession(
                     )
                 }
                 refreshActiveCue()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (t: Throwable) {
                 val msg = t.message?.take(160) ?: t.javaClass.simpleName
+                if (isNonRetryableListenFailure(t)) {
+                    retryPolicy.recordPermanentFailure(attemptKey)
+                } else {
+                    retryPolicy.recordFailure(attemptKey)
+                }
                 _ui.update {
                     it.copy(
                         isProcessing = false,
@@ -291,4 +350,54 @@ class ListenTranslateSession(
             }
         }
     }
+
+    private companion object {
+        const val COVERAGE_REV = 0
+    }
 }
+
+internal data class ListenWindowAttemptKey(
+    val startMs: Long,
+    val endMs: Long,
+    val languages: ListenLanguagePair,
+)
+
+/** In-memory retry backoff; successful and silent windows persist as coverage cues. */
+internal class ListenWindowRetryPolicy(
+    private val nowMs: () -> Long = { System.nanoTime() / 1_000_000L },
+    private val baseDelayMs: Long = 2_000L,
+    private val maxDelayMs: Long = 60_000L,
+) {
+    private data class Failure(val count: Int, val retryAtMs: Long)
+
+    private val failures = mutableMapOf<ListenWindowAttemptKey, Failure>()
+
+    fun canAttempt(key: ListenWindowAttemptKey): Boolean =
+        failures[key]?.let { nowMs() >= it.retryAtMs } ?: true
+
+    fun recordSuccess(key: ListenWindowAttemptKey) {
+        failures.remove(key)
+    }
+
+    fun recordFailure(key: ListenWindowAttemptKey) {
+        val count = (failures[key]?.count ?: 0) + 1
+        val shift = (count - 1).coerceAtMost(20)
+        val delayMs = (baseDelayMs * (1L shl shift)).coerceAtMost(maxDelayMs)
+        failures[key] = Failure(count = count, retryAtMs = nowMs() + delayMs)
+    }
+
+    fun recordPermanentFailure(key: ListenWindowAttemptKey) {
+        failures[key] = Failure(count = Int.MAX_VALUE, retryAtMs = Long.MAX_VALUE)
+    }
+
+    fun clear() {
+        failures.clear()
+    }
+}
+
+internal fun isNonRetryableListenFailure(error: Throwable): Boolean =
+    generateSequence(error) { it.cause }.any {
+        it is UnsupportedOperationException || it is ModelsNotReadyException
+    }
+
+private class ListenWindowStageException(message: String) : IllegalStateException(message)

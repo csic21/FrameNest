@@ -2,12 +2,12 @@ package com.framenest.feature.listen_translate.asr
 
 import com.framenest.player.audio.PcmAudioMath
 import java.io.File
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.Recognizer
 
@@ -32,25 +32,19 @@ class VoskAsrEngine {
         }
     }
 
-    suspend fun recognize(pcm16kMono: ShortArray): String = withContext(Dispatchers.IO) {
+    suspend fun recognize(pcm16kMono: ShortArray): VoskRecognition = withContext(Dispatchers.IO) {
         mutex.withLock {
             val m = model ?: error("Vosk model not loaded")
-            if (pcm16kMono.isEmpty()) return@withLock ""
+            if (pcm16kMono.isEmpty()) return@withLock VoskRecognition.EMPTY
             val rms = PcmAudioMath.rmsNormalized(pcm16kMono)
-            if (rms < 0.008f) return@withLock "" // near silence
+            if (rms < 0.008f) return@withLock VoskRecognition.EMPTY // near silence
             val rec = Recognizer(m, PcmAudioMath.TARGET_SAMPLE_RATE_HZ.toFloat())
             try {
-                val bytes = shortsToLeBytes(pcm16kMono)
-                // Feed in chunks to keep native buffer modest.
-                var offset = 0
-                val chunk = 8000 * 2 // 0.5s of 16-bit mono
-                while (offset < bytes.size) {
-                    val len = minOf(chunk, bytes.size - offset)
-                    val slice = bytes.copyOfRange(offset, offset + len)
-                    rec.acceptWaveForm(slice, slice.size)
-                    offset += len
-                }
-                parseText(rec.finalResult)
+                rec.setWords(true)
+                rec.acceptWaveForm(pcm16kMono, pcm16kMono.size)
+                parseResult(rec.finalResult)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } finally {
                 runCatching { rec.close() }
             }
@@ -72,25 +66,43 @@ class VoskAsrEngine {
         loadedLang = null
     }
 
-    private fun shortsToLeBytes(samples: ShortArray): ByteArray {
-        val out = ByteArray(samples.size * 2)
-        val bb = ByteBuffer.wrap(out).order(ByteOrder.LITTLE_ENDIAN)
-        for (s in samples) bb.putShort(s)
-        return out
-    }
-
-    private fun parseText(json: String?): String {
-        if (json.isNullOrBlank()) return ""
-        // {"text" : "hello world"} or partial results
-        val key = "\"text\""
-        val idx = json.indexOf(key)
-        if (idx < 0) return ""
-        val colon = json.indexOf(':', idx + key.length)
-        if (colon < 0) return ""
-        val firstQuote = json.indexOf('"', colon + 1)
-        if (firstQuote < 0) return ""
-        val secondQuote = json.indexOf('"', firstQuote + 1)
-        if (secondQuote < 0) return ""
-        return json.substring(firstQuote + 1, secondQuote).trim()
+    private fun parseResult(json: String?): VoskRecognition {
+        if (json.isNullOrBlank()) return VoskRecognition.EMPTY
+        val root = JSONObject(json)
+        val text = root.optString("text").trim()
+        val result = root.optJSONArray("result") ?: return VoskRecognition(text, emptyList())
+        val words = buildList {
+            for (index in 0 until result.length()) {
+                val item = result.optJSONObject(index) ?: continue
+                val word = item.optString("word").trim()
+                val startSeconds = item.optDouble("start", Double.NaN)
+                val endSeconds = item.optDouble("end", Double.NaN)
+                if (word.isNotEmpty() && startSeconds.isFinite() && endSeconds.isFinite()) {
+                    add(
+                        VoskWord(
+                            text = word,
+                            startMs = (startSeconds * 1_000.0).toLong().coerceAtLeast(0L),
+                            endMs = (endSeconds * 1_000.0).toLong().coerceAtLeast(0L),
+                        ),
+                    )
+                }
+            }
+        }
+        return VoskRecognition(text, words)
     }
 }
+
+data class VoskRecognition(
+    val text: String,
+    val words: List<VoskWord>,
+) {
+    companion object {
+        val EMPTY = VoskRecognition("", emptyList())
+    }
+}
+
+data class VoskWord(
+    val text: String,
+    val startMs: Long,
+    val endMs: Long,
+)

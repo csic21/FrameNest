@@ -35,8 +35,9 @@ object ListenTranslateWindows {
 
     fun cueAt(cues: List<ListenTranslateCue>, positionMs: Long): ListenTranslateCue? {
         val pos = positionMs.coerceAtLeast(0L)
-        return cues.lastOrNull { it.startMs <= pos && pos < it.endMs }
-            ?: cues.lastOrNull { it.startMs <= pos && it.endMs >= pos }
+        val priority = compareBy<ListenTranslateCue> { it.startMs }.thenBy { it.rev }
+        return cues.filter { it.startMs <= pos && pos < it.endMs }.maxWithOrNull(priority)
+            ?: cues.filter { it.startMs <= pos && it.endMs >= pos }.maxWithOrNull(priority)
     }
 
     /**
@@ -49,7 +50,10 @@ object ListenTranslateWindows {
     ): Boolean {
         if (endMs <= startMs) return false
         val covering = cues.any { cue ->
-            cue.startMs <= startMs && cue.endMs >= endMs
+            val translationComplete = cue.textSrc.isBlank() ||
+                cue.textTgt.isNotBlank() ||
+                cue.languages.sourceLang.equals(cue.languages.targetLang, ignoreCase = true)
+            cue.startMs <= startMs && cue.endMs >= endMs && translationComplete
         }
         return !covering
     }
@@ -66,6 +70,7 @@ object ListenTranslateWindows {
                 when {
                     cue.textSrc.isBlank() -> cue.textTgt
                     cue.textTgt.isBlank() -> cue.textSrc
+                    cue.textSrc == cue.textTgt -> cue.textSrc
                     else -> "${cue.textSrc}\n${cue.textTgt}"
                 }
             }

@@ -11,6 +11,7 @@ import com.framenest.core.model.PlaybackDataSource
 import com.framenest.core.model.PlaybackRequest
 import com.framenest.data.history.PlaybackHistoryRepository
 import com.framenest.data.history.PlaybackProgressRules
+import com.framenest.data.listen_translate.ListenContentKey
 import com.framenest.data.listen_translate.ListenTranslateRepository
 import com.framenest.data.server.AppDatabase
 import com.framenest.feature.listen_translate.ListenDisplayMode
@@ -47,11 +48,15 @@ import com.framenest.player.VlcPlayerController
 import com.framenest.smb.SmbException
 import com.framenest.smb.SmbjClient
 import com.framenest.smb.SmbCredentials as SmbSessionCredentials
+import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -63,6 +68,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Product player session: open media (path B preferred), first-frame paused,
@@ -94,17 +101,19 @@ class PlayerViewModel(
     val subtitleUiState: StateFlow<SubtitleUiState> = _subtitleUiState.asStateFlow()
 
     private val voskInstaller = VoskModelInstaller(application)
-    private val voskAsr = VoskAsrEngine()
-    private val mlKitMt = MlKitMtEngine()
     private var realListenEngine: RealListenTranslateEngine? = null
     private var listenOnlySmbClient: SmbjClient? = null
+    private var listenPrepareJob: Job? = null
+    private var listenPrepareGeneration: Long = 0L
+    private val listenPrepareMutex = Mutex()
+    private var listenRestartPendingAfterSourceChange = false
 
     private val listenSession = ListenTranslateSession(
         repository = listenTranslateRepository,
         engine = PendingListenEngine,
         scope = viewModelScope,
         identity = request.identity,
-        contentKey = "",
+        contentKey = initialListenContentKey(application, request),
     )
     val listenTranslateUiState: StateFlow<ListenTranslateUiState> = listenSession.uiState
 
@@ -191,37 +200,68 @@ class PlayerViewModel(
 
     fun setListenTranslateEnabled(enabled: Boolean) {
         if (!enabled) {
+            listenRestartPendingAfterSourceChange = false
+            listenPrepareGeneration += 1L
+            listenPrepareJob?.cancel()
+            listenPrepareJob = null
             listenSession.setEnabled(false)
+            listenSession.setInstallingModels(installing = false)
             return
         }
-        viewModelScope.launch {
-            enableRealListenTranslate()
-        }
+        listenRestartPendingAfterSourceChange = false
+        restartListenPreparation()
     }
 
     fun setListenSourceLang(code: String) {
+        val restart = listenSession.uiState.value.let { it.enabled || it.isInstallingModels }
+        if (restart) listenSession.setEnabled(false)
         listenSession.setSourceLang(code)
-        // Re-download ASR model if already enabled.
-        if (listenSession.uiState.value.enabled) {
-            viewModelScope.launch { enableRealListenTranslate() }
-        }
+        if (restart) restartListenPreparation()
     }
 
     fun setListenTargetLang(code: String) {
+        val restart = listenSession.uiState.value.let { it.enabled || it.isInstallingModels }
+        if (restart) listenSession.setEnabled(false)
         listenSession.setTargetLang(code)
-        if (listenSession.uiState.value.enabled) {
-            viewModelScope.launch { enableRealListenTranslate() }
-        }
+        if (restart) restartListenPreparation()
     }
 
     fun setListenDisplayMode(mode: ListenDisplayMode) {
         listenSession.setDisplayMode(mode)
     }
 
-    private suspend fun enableRealListenTranslate() {
+    private fun restartListenPreparation() {
+        if (listenSession.uiState.value.enabled) {
+            listenSession.setEnabled(false)
+        }
         val sourceLang = listenSession.uiState.value.sourceLang
         val targetLang = listenSession.uiState.value.targetLang
+        val generation = ++listenPrepareGeneration
+        listenPrepareJob?.cancel()
+        listenSession.setInstallingModels(
+            installing = true,
+            message = "正在切换到 $sourceLang→$targetLang…",
+            error = null,
+        )
+        listenPrepareJob = viewModelScope.launch {
+            enableRealListenTranslate(generation, sourceLang, targetLang)
+        }
+    }
+
+    private suspend fun enableRealListenTranslate(
+        generation: Long,
+        sourceLang: String,
+        targetLang: String,
+    ) = listenPrepareMutex.withLock {
+        currentCoroutineContext().ensureActive()
+        if (generation != listenPrepareGeneration) return@withLock
+        val previous = realListenEngine
+        realListenEngine = null
+        withContext(Dispatchers.IO) {
+            runCatching { previous?.close() }
+        }
         val asrReady = voskInstaller.isInstalled(sourceLang)
+        listenSession.setModelsReady(false)
         listenSession.setInstallingModels(
             installing = true,
             message = if (asrReady) {
@@ -232,37 +272,89 @@ class PlayerViewModel(
             },
             error = null,
         )
-        val prepared = runCatching {
+        var pendingAudio: ListenAudioSource? = null
+        var pendingAsr: VoskAsrEngine? = null
+        var pendingMt: MlKitMtEngine? = null
+        val prepared = try {
             withContext(Dispatchers.IO) {
                 ensureSmbConnectedForListen()
                 val audio = buildListenAudioSource()
                     ?: error("当前片源暂不支持听译音频（需要本地文件或 SMB 随机读）")
+                pendingAudio = audio
+                var lastProgressPercent = -1
                 voskInstaller.ensureInstalled(sourceLang) { p ->
-                    // progress callback on IO; UI message is approximate
-                    if (p >= 0.99f || p < 0.05f) return@ensureInstalled
+                    if (generation != listenPrepareGeneration) return@ensureInstalled
+                    val percent = (p * 100f).toInt().coerceIn(0, 100)
+                    if (percent != lastProgressPercent) {
+                        lastProgressPercent = percent
+                        listenSession.setInstallingModels(
+                            installing = true,
+                            message = "正在准备 Vosk($sourceLang)：$percent%",
+                        )
+                    }
                 }
-                mlKitMt.ensureModel(sourceLang, targetLang)
+                currentCoroutineContext().ensureActive()
+                val asr = VoskAsrEngine()
+                val mt = MlKitMtEngine()
+                pendingAsr = asr
+                pendingMt = mt
+                listenSession.setInstallingModels(
+                    installing = true,
+                    message = "正在载入本机 ASR 模型 $sourceLang…",
+                )
+                val modelDir = voskInstaller.modelDir(sourceLang)
+                    ?: error("Vosk($sourceLang) 模型安装不完整")
+                asr.ensureModel(modelDir, sourceLang)
+                listenSession.setInstallingModels(
+                    installing = true,
+                    message = "正在准备本机翻译模型 $sourceLang→$targetLang…",
+                )
+                mt.ensureModel(sourceLang, targetLang)
+                currentCoroutineContext().ensureActive()
                 val engine = RealListenTranslateEngine(
                     audio = audio,
-                    vosk = voskAsr,
-                    mt = mlKitMt,
+                    vosk = asr,
+                    mt = mt,
                     voskModels = voskInstaller,
-                    asrModelLabel = { "vosk-small-$sourceLang" },
-                    mtModelLabel = { "mlkit-$sourceLang-$targetLang" },
+                    selectedAudioTrackOrdinal = { selectedAudioTrackOrdinal() },
+                    asrModelLabel = {
+                        "vosk-${VoskModelInstaller.modelVersionTag(sourceLang) ?: sourceLang}"
+                    },
+                    mtModelLabel = { "mlkit-v1-$sourceLang-$targetLang" },
                 )
-                realListenEngine?.close()
+                if (generation != listenPrepareGeneration) {
+                    engine.close()
+                    throw CancellationException("stale listen-translate preparation")
+                }
                 realListenEngine = engine
                 listenSession.setEngine(engine)
+                pendingAudio = null
+                pendingAsr = null
+                pendingMt = null
             }
+            true
+        } catch (cancelled: CancellationException) {
+            runCatching { pendingAudio?.close() }
+            runCatching { pendingAsr?.close() }
+            runCatching { pendingMt?.close() }
+            throw cancelled
+        } catch (t: Throwable) {
+            runCatching { pendingAudio?.close() }
+            runCatching { pendingAsr?.close() }
+            runCatching { pendingMt?.close() }
+            if (generation == listenPrepareGeneration) {
+                val msg = t.message?.take(200) ?: "听译模型准备失败"
+                listenSession.setInstallingModels(
+                    installing = false,
+                    message = "听译未启动",
+                    error = msg,
+                )
+                listenSession.setModelsReady(false)
+                listenSession.setEnabled(false)
+            }
+            false
         }
-        if (prepared.isFailure) {
-            val msg = prepared.exceptionOrNull()?.message?.take(200)
-                ?: "听译模型准备失败"
-            listenSession.setInstallingModels(installing = false, error = msg)
-            listenSession.setModelsReady(false)
-            listenSession.setEnabled(false)
-            return
-        }
+        if (!prepared || generation != listenPrepareGeneration) return@withLock
         listenSession.setModelsReady(true)
         listenSession.setInstallingModels(
             installing = false,
@@ -279,14 +371,20 @@ class PlayerViewModel(
             is PlaybackDataSource.LocalRawResource ->
                 ListenAudioSources.forRaw(app, ds.resId)
             is PlaybackDataSource.SeekableSmb -> {
-                val client = smbClient ?: return null
-                ListenAudioSources.forSmb(app, client, ds.share, ds.path)
+                if (smbClient == null) return null
+                ListenAudioSources.forSmb(app, { smbClient }, ds.share, ds.path)
             }
             is PlaybackDataSource.DirectSmbUrl -> {
-                val client = listenOnlySmbClient ?: return null
-                ListenAudioSources.forSmb(app, client, ds.share, ds.path)
+                if (listenOnlySmbClient == null) return null
+                ListenAudioSources.forSmb(app, { listenOnlySmbClient }, ds.share, ds.path)
             }
         }
+    }
+
+    private fun selectedAudioTrackOrdinal(): Int? {
+        val state = controller.state.value
+        val selectedId = state.selectedAudioTrackId ?: return null
+        return state.audioTracks.indexOfFirst { it.id == selectedId }.takeIf { it >= 0 }
     }
 
     /**
@@ -295,7 +393,9 @@ class PlayerViewModel(
     private suspend fun ensureSmbConnectedForListen() = withContext(Dispatchers.IO) {
         when (val ds = request.dataSource) {
             is PlaybackDataSource.SeekableSmb -> {
-                if (smbClient != null) return@withContext
+                if (smbClient?.isConnected == true) return@withContext
+                runCatching { smbClient?.close() }
+                smbClient = null
                 val client = SmbjClient()
                 val creds = SmbSessionCredentials(
                     host = ds.host,
@@ -307,12 +407,15 @@ class PlayerViewModel(
                 try {
                     client.connect(creds)
                     smbClient = client
+                    updateListenContentKey(client, ds.share, ds.path)
                 } finally {
                     creds.clearPassword()
                 }
             }
             is PlaybackDataSource.DirectSmbUrl -> {
-                if (listenOnlySmbClient != null) return@withContext
+                if (listenOnlySmbClient?.isConnected == true) return@withContext
+                runCatching { listenOnlySmbClient?.close() }
+                listenOnlySmbClient = null
                 val client = SmbjClient()
                 val creds = SmbSessionCredentials(
                     host = ds.host,
@@ -324,12 +427,23 @@ class PlayerViewModel(
                 try {
                     client.connect(creds)
                     listenOnlySmbClient = client
+                    updateListenContentKey(client, ds.share, ds.path)
                 } finally {
                     creds.clearPassword()
                 }
             }
             else -> Unit
         }
+    }
+
+    private fun updateListenContentKey(client: SmbjClient, share: String, path: String) {
+        val metadata = runCatching { client.metadata(share, path) }.getOrNull() ?: return
+        listenSession.setContentKey(
+            ListenContentKey.of(
+                sizeBytes = metadata.sizeBytes,
+                modifiedTimeMs = metadata.lastModifiedEpochMs.takeIf { it > 0L },
+            ),
+        )
     }
 
     fun play() {
@@ -408,6 +522,7 @@ class PlayerViewModel(
     }
 
     fun retry() {
+        pauseListenForSourceChange()
         // Replace any in-flight open so rapid retries do not overlap.
         openJob?.cancel()
         openJob = viewModelScope.launch {
@@ -517,6 +632,26 @@ class PlayerViewModel(
             return
         }
         controller.prepare(mediaSource)
+        restartListenAfterSourceChangeIfNeeded()
+    }
+
+    private fun restartListenAfterSourceChangeIfNeeded() {
+        val wasEnabled = listenSession.uiState.value.enabled
+        if (!listenRestartPendingAfterSourceChange && !wasEnabled) return
+        listenRestartPendingAfterSourceChange = false
+        if (wasEnabled) listenSession.setEnabled(false)
+        restartListenPreparation()
+    }
+
+    private fun pauseListenForSourceChange() {
+        val state = listenSession.uiState.value
+        if (!state.enabled && !state.isInstallingModels) return
+        listenRestartPendingAfterSourceChange = true
+        listenPrepareGeneration += 1L
+        listenPrepareJob?.cancel()
+        listenPrepareJob = null
+        listenSession.setEnabled(false)
+        listenSession.setInstallingModels(installing = false)
     }
 
     private fun injectError(error: PlayerError) {
@@ -547,6 +682,7 @@ class PlayerViewModel(
             return
         }
         val dataSource = request.dataSource as? PlaybackDataSource.SeekableSmb ?: return
+        pauseListenForSourceChange()
         smbDirectFallbackUsed = true
         lastOpenUsedPathB = false
         // Cancel any in-flight open before starting the fallback so the two never overlap.
@@ -573,6 +709,7 @@ class PlayerViewModel(
                 return@launch
             }
             controller.prepare(direct)
+            restartListenAfterSourceChangeIfNeeded()
         }
     }
 
@@ -656,6 +793,15 @@ class PlayerViewModel(
             client.connect(sessionCreds)
             val randomAccess = client.openRandomAccess(dataSource.share, dataSource.path)
             val size = randomAccess.size
+            val metadata = runCatching {
+                client.metadata(dataSource.share, dataSource.path)
+            }.getOrNull()
+            listenSession.setContentKey(
+                ListenContentKey.of(
+                    sizeBytes = size,
+                    modifiedTimeMs = metadata?.lastModifiedEpochMs?.takeIf { it > 0L },
+                ),
+            )
             // Always prefer path B (SMBJ + ProxyFileDescriptor). Large files use
             // UNKNOWN_LENGTH + Media(FileDescriptor) in SmbSeekableMedia / VlcPlayerController
             // so seek stays byte-accurate. Path A (direct smb://) often reports duration
@@ -974,6 +1120,9 @@ class PlayerViewModel(
         val history = historyRepository
 
         listenSession.release()
+        listenPrepareGeneration += 1L
+        listenPrepareJob?.cancel()
+        listenPrepareJob = null
         val listenEngine = realListenEngine
         realListenEngine = null
         stopProgressLoop()
@@ -983,8 +1132,6 @@ class PlayerViewModel(
         leaveSaveJob = null
 
         val player = controller
-        val asr = voskAsr
-        val mt = mlKitMt
         val clients = listOfNotNull(smbClient, listenOnlySmbClient)
         smbClient = null
         listenOnlySmbClient = null
@@ -1019,8 +1166,6 @@ class PlayerViewModel(
                 // Order: stop player / close proxy AFD, then SMB sessions.
                 runCatching { player.release() }
                 runCatching { listenEngine?.close() }
-                runCatching { asr.close() }
-                runCatching { mt.close() }
                 clients.forEach { client ->
                     runCatching { client.disconnect() }
                     runCatching { client.close() }
@@ -1069,6 +1214,30 @@ class PlayerViewModel(
 
     companion object {
         private const val TAG = "FrameNestPlayerVM"
+
+        private fun initialListenContentKey(
+            application: Application,
+            request: PlaybackRequest,
+        ): String = when (val source = request.dataSource) {
+            is PlaybackDataSource.LocalFile -> {
+                val file = File(source.path)
+                ListenContentKey.of(
+                    sizeBytes = file.length().takeIf { file.isFile },
+                    modifiedTimeMs = file.lastModified().takeIf { it > 0L },
+                )
+            }
+            is PlaybackDataSource.LocalRawResource -> runCatching {
+                application.resources.openRawResourceFd(source.resId).use { afd ->
+                    ListenContentKey.of(
+                        sizeBytes = afd.length.takeIf { it >= 0L },
+                        modifiedTimeMs = null,
+                    )
+                }
+            }.getOrDefault("")
+            is PlaybackDataSource.SeekableSmb,
+            is PlaybackDataSource.DirectSmbUrl,
+            -> ""
+        }
 
         private object PendingListenEngine : ListenTranslateEngine {
             override val asrModelId: String = "pending"

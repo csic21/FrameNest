@@ -55,6 +55,24 @@ class ListenTranslateWindowsTest {
         val cues = listOf(cue(0, 3_000, "a", "A"))
         assertFalse(ListenTranslateWindows.needsFill(cues, 0, 3_000))
         assertTrue(ListenTranslateWindows.needsFill(cues, 3_000, 6_000))
+        assertTrue(
+            ListenTranslateWindows.needsFill(
+                listOf(cue(0, 3_000, "source only", "")),
+                0,
+                3_000,
+            ),
+        )
+    }
+
+    @Test
+    fun blankCoverage_preventsRefill_butSpeechCueWinsOverlay() {
+        val cues = listOf(
+            cue(0, 3_000, "", "", rev = 0),
+            cue(0, 1_800, "hello", "你好"),
+        )
+        assertFalse(ListenTranslateWindows.needsFill(cues, 0, 3_000))
+        assertEquals("hello", ListenTranslateWindows.cueAt(cues, 1_000L)?.textSrc)
+        assertEquals("", ListenTranslateWindows.cueAt(cues, 2_500L)?.textSrc)
     }
 
     @Test
@@ -63,10 +81,14 @@ class ListenTranslateWindowsTest {
         assertEquals("src", ListenTranslateWindows.formatOverlay(c, ListenDisplayMode.SourceOnly))
         assertEquals("tgt", ListenTranslateWindows.formatOverlay(c, ListenDisplayMode.TargetOnly))
         assertEquals("src\ntgt", ListenTranslateWindows.formatOverlay(c, ListenDisplayMode.Bilingual))
+        assertEquals(
+            "same",
+            ListenTranslateWindows.formatOverlay(cue(0, 1_000, "same", "same"), ListenDisplayMode.Bilingual),
+        )
         assertEquals("", ListenTranslateWindows.formatOverlay(null, ListenDisplayMode.Bilingual))
     }
 
-    private fun cue(start: Long, end: Long, src: String, tgt: String) =
+    private fun cue(start: Long, end: Long, src: String, tgt: String, rev: Int = 1) =
         ListenTranslateCue(
             id = start,
             identity = identity,
@@ -75,6 +97,6 @@ class ListenTranslateWindowsTest {
             endMs = end,
             textSrc = src,
             textTgt = tgt,
-            rev = 1,
+            rev = rev,
         )
 }

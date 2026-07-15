@@ -34,11 +34,11 @@ object SmbSeekableMedia {
         debugLabel: String = "smb-seekable",
         ioThread: HandlerThread? = null,
     ): SeekableOpenResult {
+        val storage = context.applicationContext.getSystemService(StorageManager::class.java)
+            ?: throw IOException("StorageManager unavailable")
         val ownsThread = ioThread == null
         val thread = ioThread ?: HandlerThread("smb-pfd-io").also { it.start() }
         val handler = Handler(thread.looper)
-        val storage = context.applicationContext.getSystemService(StorageManager::class.java)
-            ?: throw IOException("StorageManager unavailable")
 
         val closed = AtomicBoolean(false)
         val totalSize = randomAccess.size.coerceAtLeast(0L)
@@ -83,11 +83,18 @@ object SmbSeekableMedia {
             }
         }
 
-        val pfd = storage.openProxyFileDescriptor(
-            ParcelFileDescriptor.MODE_READ_ONLY,
-            callback,
-            handler,
-        )
+        val pfd = try {
+            storage.openProxyFileDescriptor(
+                ParcelFileDescriptor.MODE_READ_ONLY,
+                callback,
+                handler,
+            )
+        } catch (t: Throwable) {
+            closed.set(true)
+            runCatching { randomAccess.close() }
+            if (ownsThread) thread.quitSafely()
+            throw t
+        }
         // For files ≥ 4GiB, a fixed AFD length can overflow/mis-handle in libVLC's
         // nativeNewFromFdWithOffsetLength and produce "stream: read error" / cannot peek.
         // UNKNOWN_LENGTH + Media(FileDescriptor) lets VLC size via fstat/onGetSize.

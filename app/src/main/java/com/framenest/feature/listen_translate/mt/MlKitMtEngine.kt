@@ -18,6 +18,7 @@ class MlKitMtEngine {
     private val translators = ConcurrentHashMap<String, Translator>()
 
     suspend fun ensureModel(sourceLang: String, targetLang: String) {
+        if (sourceLang.equals(targetLang, ignoreCase = true)) return
         translatorFor(sourceLang, targetLang)
     }
 

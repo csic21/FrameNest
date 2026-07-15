@@ -1,6 +1,7 @@
 package com.framenest.player.audio
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -20,5 +21,13 @@ class PcmWindowDecoderClipTest {
         assertEquals(1, mono.size)
         assertEquals(2000.toShort(), mono[0])
     }
-}
 
+    @Test
+    fun chooseAudioTrack_usesSelectedOrdinal_andFallsBackSafely() {
+        val extractorTracks = listOf(1, 3, 5)
+        assertEquals(3, chooseAudioTrack(extractorTracks, preferredAudioTrackOrdinal = 1))
+        assertEquals(1, chooseAudioTrack(extractorTracks, preferredAudioTrackOrdinal = 99))
+        assertEquals(1, chooseAudioTrack(extractorTracks, preferredAudioTrackOrdinal = null))
+        assertNull(chooseAudioTrack(emptyList(), preferredAudioTrackOrdinal = 0))
+    }
+}

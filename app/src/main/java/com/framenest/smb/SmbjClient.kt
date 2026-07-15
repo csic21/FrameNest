@@ -3,6 +3,7 @@ package com.framenest.smb
 import com.hierynomus.msdtyp.AccessMask
 import com.hierynomus.msfscc.FileAttributes
 import com.hierynomus.msfscc.fileinformation.FileIdBothDirectoryInformation
+import com.hierynomus.msfscc.fileinformation.FileBasicInformation
 import com.hierynomus.msfscc.fileinformation.FileStandardInformation
 import com.hierynomus.mssmb2.SMB2CreateDisposition
 import com.hierynomus.mssmb2.SMB2ShareAccess
@@ -159,10 +160,11 @@ class SmbjClient(
                     } else {
                         openFile(share, relative).use { file ->
                             val standard = file.getFileInformation(FileStandardInformation::class.java)
+                            val basic = file.getFileInformation(FileBasicInformation::class.java)
                             SmbFileMetadata(
                                 path = relative,
                                 sizeBytes = standard.endOfFile,
-                                lastModifiedEpochMs = 0L,
+                                lastModifiedEpochMs = basic.lastWriteTime.toEpochMillis(),
                                 isDirectory = standard.isDirectory,
                             )
                         }

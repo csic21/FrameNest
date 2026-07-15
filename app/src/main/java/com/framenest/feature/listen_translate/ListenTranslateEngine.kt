@@ -23,6 +23,11 @@ interface ListenTranslateEngine {
 data class ListenWindowResult(
     val textSrc: String,
     val textTgt: String,
+    /** Optional speech bounds inside the requested window. */
+    val cueStartMs: Long? = null,
+    val cueEndMs: Long? = null,
+    /** Non-fatal stage failure: source text may be shown, but the window remains retryable. */
+    val retryableErrorMessage: String? = null,
 )
 
 /**

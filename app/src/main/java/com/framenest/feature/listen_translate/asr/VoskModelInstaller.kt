@@ -8,8 +8,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.zip.ZipInputStream
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.yield
 
 /**
  * Downloads and unpacks small Vosk models into app-private storage.
@@ -50,65 +53,76 @@ class VoskModelInstaller(
     suspend fun ensureInstalled(
         langTag: String,
         onProgress: (Float) -> Unit = {},
-    ): File = withContext(Dispatchers.IO) {
-        val lang = langTag.lowercase()
-        val spec = SPECS[lang]
-            ?: error("暂不支持源语言「$lang」的离线 ASR（Vosk small 包）")
-        modelDir(lang)?.let {
-            onProgress(1f)
-            return@withContext it
-        }
+    ): File = INSTALL_MUTEX.withLock {
+        withContext(Dispatchers.IO) {
+            val lang = langTag.lowercase()
+            val spec = SPECS[lang]
+                ?: error("暂不支持源语言「$lang」的离线 ASR（Vosk small 包）")
+            modelDir(lang)?.let {
+                onProgress(1f)
+                return@withContext it
+            }
 
-        val langRoot = File(root, lang).also { it.mkdirs() }
-        val zipFile = File(langRoot, "${spec.folderName}.zip")
-        val unpackDir = File(langRoot, spec.folderName)
+            val langRoot = File(root, lang).also { it.mkdirs() }
+            val zipFile = File(langRoot, "${spec.folderName}.zip")
+            val unpackDir = File(langRoot, spec.folderName)
+            val stagingDir = File(langRoot, ".${spec.folderName}.staging")
 
-        try {
-            onProgress(0.02f)
-            download(spec.url, zipFile) { read, total ->
-                val p = if (total > 0) {
-                    (read.toDouble() / total.toDouble() * 0.85).toFloat()
-                } else {
-                    0.4f
+            try {
+                onProgress(0.02f)
+                download(spec.url, zipFile) { read, total ->
+                    val p = if (total > 0) {
+                        (read.toDouble() / total.toDouble() * 0.85).toFloat()
+                    } else {
+                        0.4f
+                    }
+                    onProgress(p.coerceIn(0.02f, 0.87f))
                 }
-                onProgress(p.coerceIn(0.02f, 0.87f))
+                onProgress(0.88f)
+                if (stagingDir.exists()) stagingDir.deleteRecursively()
+                stagingDir.mkdirs()
+                unzip(zipFile, stagingDir)
+                val stagedModel = File(stagingDir, spec.folderName)
+                if (!isCompleteVoskModel(stagedModel)) {
+                    error("Vosk 模型解压后校验失败（$lang）")
+                }
+                if (unpackDir.exists()) unpackDir.deleteRecursively()
+                if (!stagedModel.renameTo(unpackDir)) {
+                    stagedModel.copyRecursively(unpackDir, overwrite = true)
+                }
+                check(isCompleteVoskModel(unpackDir)) {
+                    "Vosk 模型安装未完整落盘（$lang）"
+                }
+                File(unpackDir, READY_MARKER).writeText(spec.folderName)
+                onProgress(1f)
+                unpackDir
+            } finally {
+                runCatching { if (zipFile.exists()) zipFile.delete() }
+                runCatching { File(zipFile.absolutePath + ".tmp").delete() }
+                runCatching { if (stagingDir.exists()) stagingDir.deleteRecursively() }
             }
-            onProgress(0.88f)
-            if (unpackDir.exists()) unpackDir.deleteRecursively()
-            unzip(zipFile, langRoot)
-            // Zip usually contains top-level folderName/
-            val ready = File(langRoot, spec.folderName)
-            if (!isReady(ready)) {
-                error("Vosk 模型解压后校验失败（$lang）")
-            }
-            onProgress(1f)
-            ready
-        } finally {
-            runCatching { if (zipFile.exists()) zipFile.delete() }
         }
     }
 
-    fun deleteAll() {
-        if (root.exists()) root.deleteRecursively()
-        root.mkdirs()
+    suspend fun deleteAll() = INSTALL_MUTEX.withLock {
+        withContext(Dispatchers.IO) {
+            if (root.exists()) root.deleteRecursively()
+            root.mkdirs()
+        }
     }
 
     private fun isReady(dir: File): Boolean {
-        if (!dir.isDirectory) return false
-        // Typical Vosk small model markers.
-        return File(dir, "am/final.mdl").isFile ||
-            File(dir, "conf/model.conf").isFile ||
-            File(dir, "ivector").isDirectory
+        return isCompleteVoskModel(dir)
     }
 
-    private fun download(
+    private suspend fun download(
         url: String,
         dest: File,
         onBytes: (read: Long, total: Long) -> Unit,
     ) {
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 30_000
-            readTimeout = 120_000
+            readTimeout = 30_000
             instanceFollowRedirects = true
             requestMethod = "GET"
         }
@@ -124,11 +138,15 @@ class VoskModelInstaller(
                         val buf = ByteArray(64 * 1024)
                         var readTotal = 0L
                         while (true) {
+                            currentCoroutineContext().ensureActive()
                             val n = bis.read(buf)
                             if (n < 0) break
                             out.write(buf, 0, n)
                             readTotal += n
                             onBytes(readTotal, total)
+                        }
+                        if (total > 0L && readTotal != total) {
+                            error("Vosk 模型下载不完整：$readTotal/$total bytes")
                         }
                     }
                 }
@@ -143,18 +161,24 @@ class VoskModelInstaller(
         }
     }
 
-    private fun unzip(zipFile: File, destDir: File) {
+    private suspend fun unzip(zipFile: File, destDir: File) {
+        val destinationRoot = destDir.canonicalFile
         ZipInputStream(BufferedInputStream(zipFile.inputStream())).use { zis ->
             var entry = zis.nextEntry
             val buf = ByteArray(64 * 1024)
             while (entry != null) {
-                val outFile = File(destDir, entry.name)
+                currentCoroutineContext().ensureActive()
+                val outFile = File(destinationRoot, entry.name).canonicalFile
+                check(outFile.path.startsWith(destinationRoot.path + File.separator)) {
+                    "Vosk 模型压缩包包含非法路径"
+                }
                 if (entry.isDirectory) {
                     outFile.mkdirs()
                 } else {
                     outFile.parentFile?.mkdirs()
                     FileOutputStream(outFile).use { out ->
                         while (true) {
+                            currentCoroutineContext().ensureActive()
                             val n = zis.read(buf)
                             if (n < 0) break
                             out.write(buf, 0, n)
@@ -176,6 +200,8 @@ class VoskModelInstaller(
 
     companion object {
         private const val BASE = "https://alphacephei.com/vosk/models"
+        private const val READY_MARKER = ".ready"
+        private val INSTALL_MUTEX = Mutex()
 
         /**
          * Recommended for Settings one-tap install (covers common 中↔英 listening).
@@ -226,6 +252,9 @@ class VoskModelInstaller(
 
         fun supportedSourceLanguages(): Set<String> = SPECS.keys
 
+        fun modelVersionTag(langTag: String): String? =
+            SPECS[langTag.lowercase()]?.folderName
+
         fun isRecommendedReady(statuses: List<VoskLanguageStatus>): Boolean {
             val installed = statuses.filter { it.installed }.map { it.langTag }.toSet()
             return RECOMMENDED_LANGS.all { it in installed }
@@ -240,3 +269,9 @@ data class VoskLanguageStatus(
     val approxBytes: Long,
     val folderName: String,
 )
+
+internal fun isCompleteVoskModel(dir: File): Boolean =
+    dir.isDirectory &&
+        File(dir, "am/final.mdl").isFile &&
+        File(dir, "conf/model.conf").isFile &&
+        File(dir, "graph").isDirectory

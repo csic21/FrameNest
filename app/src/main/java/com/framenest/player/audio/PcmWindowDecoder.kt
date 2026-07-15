@@ -3,6 +3,7 @@ package com.framenest.player.audio
 import android.content.Context
 import android.content.res.AssetFileDescriptor
 import android.media.MediaCodec
+import android.media.MediaCodecList
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import androidx.annotation.RawRes
@@ -10,6 +11,8 @@ import java.io.FileDescriptor
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 /**
@@ -22,8 +25,9 @@ class PcmWindowDecoder {
         path: String,
         startMs: Long,
         endMs: Long,
+        preferredAudioTrackOrdinal: Int? = null,
     ): ShortArray = withContext(Dispatchers.IO) {
-        decode(startMs, endMs) { it.setDataSource(path) }
+        decode(startMs, endMs, preferredAudioTrackOrdinal) { it.setDataSource(path) }
     }
 
     suspend fun decodeRaw(
@@ -31,10 +35,11 @@ class PcmWindowDecoder {
         @RawRes resId: Int,
         startMs: Long,
         endMs: Long,
+        preferredAudioTrackOrdinal: Int? = null,
     ): ShortArray = withContext(Dispatchers.IO) {
         val afd = context.resources.openRawResourceFd(resId)
         try {
-            decode(startMs, endMs) {
+            decode(startMs, endMs, preferredAudioTrackOrdinal) {
                 it.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
             }
         } finally {
@@ -49,9 +54,11 @@ class PcmWindowDecoder {
         afd: AssetFileDescriptor,
         startMs: Long,
         endMs: Long,
+        preferredAudioTrackOrdinal: Int? = null,
     ): ShortArray = withContext(Dispatchers.IO) {
-        decode(startMs, endMs) {
-            it.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+        decode(startMs, endMs, preferredAudioTrackOrdinal) {
+            // The framework overload handles UNKNOWN_LENGTH by using the whole FD.
+            it.setDataSource(afd)
         }
     }
 
@@ -61,15 +68,21 @@ class PcmWindowDecoder {
         length: Long,
         startMs: Long,
         endMs: Long,
+        preferredAudioTrackOrdinal: Int? = null,
     ): ShortArray = withContext(Dispatchers.IO) {
-        decode(startMs, endMs) {
-            it.setDataSource(fd, offset, length)
+        decode(startMs, endMs, preferredAudioTrackOrdinal) {
+            if (length < 0L) {
+                it.setDataSource(fd)
+            } else {
+                it.setDataSource(fd, offset, length)
+            }
         }
     }
 
-    private fun decode(
+    private suspend fun decode(
         startMs: Long,
         endMs: Long,
+        preferredAudioTrackOrdinal: Int?,
         configure: (MediaExtractor) -> Unit,
     ): ShortArray {
         require(endMs > startMs) { "endMs > startMs" }
@@ -80,30 +93,43 @@ class PcmWindowDecoder {
         var codec: MediaCodec? = null
         try {
             configure(extractor)
-            val track = selectAudioTrack(extractor) ?: return ShortArray(0)
+            val track = selectAudioTrack(extractor, preferredAudioTrackOrdinal)
+                ?: return ShortArray(0)
             extractor.selectTrack(track)
             val format = extractor.getTrackFormat(track)
             val mime = format.getString(MediaFormat.KEY_MIME) ?: return ShortArray(0)
             var sampleRate = format.getIntegerOr(MediaFormat.KEY_SAMPLE_RATE, 44_100)
             var channels = format.getIntegerOr(MediaFormat.KEY_CHANNEL_COUNT, 1)
 
-            codec = MediaCodec.createDecoderByType(mime)
+            val codecName = MediaCodecList(MediaCodecList.REGULAR_CODECS)
+                .findDecoderForFormat(format)
+                ?: throw UnsupportedOperationException(
+                    "设备不支持听译音轨编码 $mime（视频仍可继续播放）",
+                )
+            codec = MediaCodec.createByCodecName(codecName)
             codec.configure(format, null, null, 0)
             codec.start()
 
             // Seek near start (closest previous sync).
             extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
 
-            val mono16k = ArrayList<Short>(
-                (((endMs - startMs).coerceAtLeast(1L) * PcmAudioMath.TARGET_SAMPLE_RATE_HZ) / 1000L)
-                    .toInt()
-                    .coerceAtLeast(1),
-            )
+            val pcmChunks = ArrayList<ShortArray>()
+            var totalSamples = 0
             val info = MediaCodec.BufferInfo()
             var inputDone = false
             var outputDone = false
+            var pcmEncoding = format.getIntegerOr(
+                MediaFormat.KEY_PCM_ENCODING,
+                /* AudioFormat.ENCODING_PCM_16BIT */ 2,
+            )
+            val maxDecodeMs = (10_000L + (endMs - startMs) * 5L).coerceAtMost(60_000L)
+            val deadlineNs = System.nanoTime() + maxDecodeMs * 1_000_000L
 
             while (!outputDone) {
+                currentCoroutineContext().ensureActive()
+                check(System.nanoTime() <= deadlineNs) {
+                    "PCM decoder timed out for ${startMs}ms..${endMs}ms"
+                }
                 if (!inputDone) {
                     val inIndex = codec.dequeueInputBuffer(10_000)
                     if (inIndex >= 0) {
@@ -132,19 +158,22 @@ class PcmWindowDecoder {
                         val of = codec.outputFormat
                         sampleRate = of.getIntegerOr(MediaFormat.KEY_SAMPLE_RATE, sampleRate)
                         channels = of.getIntegerOr(MediaFormat.KEY_CHANNEL_COUNT, channels)
+                        pcmEncoding = of.getIntegerOr(MediaFormat.KEY_PCM_ENCODING, pcmEncoding)
                     }
                     else -> if (outIndex >= 0) {
                         val pts = info.presentationTimeUs
-                        if (info.size > 0 && pts + infoSizeUs(info, sampleRate, channels) >= startUs) {
+                        if (info.size > 0 &&
+                            pts + infoSizeUs(info, sampleRate, channels, pcmEncoding) >= startUs
+                        ) {
                             if (pts < endUs) {
                                 val outBuf = codec.getOutputBuffer(outIndex)!!
                                 val chunk = ByteArray(info.size)
                                 outBuf.position(info.offset)
                                 outBuf.limit(info.offset + info.size)
                                 outBuf.get(chunk)
-                                val pcmEncoding = codec.outputFormat.getIntegerOr(
+                                pcmEncoding = codec.outputFormat.getIntegerOr(
                                     MediaFormat.KEY_PCM_ENCODING,
-                                    /* ENCODING_PCM_16BIT */ 2,
+                                    pcmEncoding,
                                 )
                                 val mono = when (pcmEncoding) {
                                     // AudioFormat.ENCODING_PCM_FLOAT = 4
@@ -163,7 +192,10 @@ class PcmWindowDecoder {
                                     clipped,
                                     sampleRate.coerceAtLeast(1),
                                 )
-                                for (s in r16) mono16k.add(s)
+                                if (r16.isNotEmpty()) {
+                                    pcmChunks += r16
+                                    totalSamples += r16.size
+                                }
                             }
                         }
                         codec.releaseOutputBuffer(outIndex, false)
@@ -176,7 +208,13 @@ class PcmWindowDecoder {
                     }
                 }
             }
-            return mono16k.toShortArray()
+            val mono16k = ShortArray(totalSamples)
+            var destination = 0
+            for (chunk in pcmChunks) {
+                chunk.copyInto(mono16k, destinationOffset = destination)
+                destination += chunk.size
+            }
+            return mono16k
         } finally {
             runCatching { codec?.stop() }
             runCatching { codec?.release() }
@@ -184,22 +222,31 @@ class PcmWindowDecoder {
         }
     }
 
-    private fun selectAudioTrack(extractor: MediaExtractor): Int? {
+    private fun selectAudioTrack(
+        extractor: MediaExtractor,
+        preferredAudioTrackOrdinal: Int?,
+    ): Int? {
+        val audioTracks = mutableListOf<Int>()
         for (i in 0 until extractor.trackCount) {
             val mime = extractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME) ?: continue
-            if (mime.startsWith("audio/")) return i
+            if (mime.startsWith("audio/")) audioTracks += i
         }
-        return null
+        return chooseAudioTrack(audioTracks, preferredAudioTrackOrdinal)
     }
 
     private fun MediaFormat.getIntegerOr(key: String, default: Int): Int =
         if (containsKey(key)) getInteger(key) else default
 
-    private fun infoSizeUs(info: MediaCodec.BufferInfo, sampleRate: Int, channels: Int): Long {
-        // Rough duration of this buffer for 16-bit PCM.
-        val bytesPerSample = 2 * channels.coerceAtLeast(1)
-        if (bytesPerSample <= 0 || sampleRate <= 0 || info.size <= 0) return 0L
-        val frames = info.size / bytesPerSample
+    private fun infoSizeUs(
+        info: MediaCodec.BufferInfo,
+        sampleRate: Int,
+        channels: Int,
+        pcmEncoding: Int,
+    ): Long {
+        val bytesPerChannel = if (pcmEncoding == 4) 4 else 2
+        val bytesPerFrame = bytesPerChannel * channels.coerceAtLeast(1)
+        if (bytesPerFrame <= 0 || sampleRate <= 0 || info.size <= 0) return 0L
+        val frames = info.size / bytesPerFrame
         return frames * 1_000_000L / sampleRate
     }
 
@@ -243,4 +290,13 @@ class PcmWindowDecoder {
         }
         return out
     }
+}
+
+internal fun chooseAudioTrack(
+    extractorTrackIndices: List<Int>,
+    preferredAudioTrackOrdinal: Int?,
+): Int? {
+    if (extractorTrackIndices.isEmpty()) return null
+    val ordinal = preferredAudioTrackOrdinal ?: 0
+    return extractorTrackIndices.getOrNull(ordinal) ?: extractorTrackIndices.first()
 }
