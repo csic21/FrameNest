@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.res.Configuration
 import android.media.AudioManager
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.View
 import android.view.Window
@@ -52,6 +53,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -277,6 +279,7 @@ fun PlayerScreen(
                             state = state,
                             onPlay = { vm.play() },
                             onPause = { vm.pause() },
+                            onPreviewSeek = { vm.previewSeekTo(it) },
                             onSeek = { vm.seekTo(it) },
                             onCycleVideoScale = { vm.cycleVideoScaleMode() },
                             overlay = true,
@@ -303,6 +306,7 @@ fun PlayerScreen(
                             state = state,
                             onPlay = { vm.play() },
                             onPause = { vm.pause() },
+                            onPreviewSeek = { vm.previewSeekTo(it) },
                             onSeek = { vm.seekTo(it) },
                             onCycleVideoScale = { vm.cycleVideoScaleMode() },
                             overlay = false,
@@ -689,6 +693,7 @@ private fun PlayerControls(
     state: PlayerState,
     onPlay: () -> Unit,
     onPause: () -> Unit,
+    onPreviewSeek: (Long) -> Unit,
     onSeek: (Long) -> Unit,
     onCycleVideoScale: () -> Unit,
     overlay: Boolean,
@@ -697,10 +702,12 @@ private fun PlayerControls(
     val duration = state.durationMs.coerceAtLeast(0L)
     val position = state.positionMs.coerceIn(0L, if (duration > 0) duration else state.positionMs)
     val progress = if (duration > 0) position.toFloat() / duration.toFloat() else 0f
-    // Scrub locally while dragging; seek once on release. Continuous seek-on-drag freezes
-    // short/SMB clips while TimeChanged keeps ticking (frozen frame + running clock).
+    // Keep the thumb local and issue bounded fast previews while playing. A precise
+    // seek still runs once on release; paused scrubbing avoids repeated play/pause.
     var scrubbing by remember { mutableStateOf(false) }
     var scrubFraction by remember { mutableFloatStateOf(0f) }
+    var lastPreviewAtMs by remember { mutableLongStateOf(0L) }
+    var lastPreviewPositionMs by remember { mutableLongStateOf(-1L) }
     val displayProgress = if (scrubbing) scrubFraction else progress
     val displayPosition = if (scrubbing && duration > 0L) {
         (scrubFraction * duration).toLong().coerceIn(0L, duration)
@@ -746,17 +753,31 @@ private fun PlayerControls(
         Slider(
             value = displayProgress,
             onValueChange = { fraction ->
-                // Local scrub only — do not pause. pause→seek→play freezes many SMB/HW
-                // paths (clock jumps, last frame sticks). Seek once on release while
-                // still playing so the decoder keeps painting.
                 scrubbing = true
                 scrubFraction = fraction.coerceIn(0f, 1f)
+                if (duration > 0L && state.phase == PlayerState.Phase.Playing) {
+                    val targetMs = (scrubFraction * duration).toLong().coerceIn(0L, duration)
+                    val nowMs = SystemClock.uptimeMillis()
+                    if (shouldPreviewScrubSeek(
+                            nowMs = nowMs,
+                            targetMs = targetMs,
+                            lastPreviewAtMs = lastPreviewAtMs,
+                            lastPreviewPositionMs = lastPreviewPositionMs,
+                        )
+                    ) {
+                        onPreviewSeek(targetMs)
+                        lastPreviewAtMs = nowMs
+                        lastPreviewPositionMs = targetMs
+                    }
+                }
             },
             onValueChangeFinished = {
                 if (duration > 0L) {
                     onSeek((scrubFraction * duration).toLong())
                 }
                 scrubbing = false
+                lastPreviewAtMs = 0L
+                lastPreviewPositionMs = -1L
             },
             enabled = (state.isSeekable || duration > 0) &&
                 state.phase != PlayerState.Phase.Error &&
@@ -803,30 +824,39 @@ private fun PlayerControls(
                         color = onBg,
                     )
                 }
+                val playing = state.canPause
                 IconButton(
-                    onClick = onPlay,
-                    enabled = state.canPlay || state.phase == PlayerState.Phase.Error,
+                    onClick = if (playing) onPause else onPlay,
+                    enabled = playing || state.canPlay || state.phase == PlayerState.Phase.Error,
                     modifier = Modifier
                         .minimumInteractiveComponentSize()
-                        .semantics { contentDescription = playCd }
-                        .testTag("player_play"),
+                        .semantics { contentDescription = if (playing) pauseCd else playCd }
+                        .testTag(if (playing) "player_pause" else "player_play"),
                 ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = onBg)
-                }
-                IconButton(
-                    onClick = onPause,
-                    enabled = state.canPause,
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .semantics { contentDescription = pauseCd }
-                        .testTag("player_pause"),
-                ) {
-                    Icon(Icons.Filled.Pause, contentDescription = null, tint = onBg)
+                    Icon(
+                        if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        tint = onBg,
+                    )
                 }
             }
         }
     }
 }
+
+internal fun shouldPreviewScrubSeek(
+    nowMs: Long,
+    targetMs: Long,
+    lastPreviewAtMs: Long,
+    lastPreviewPositionMs: Long,
+): Boolean {
+    if (lastPreviewAtMs <= 0L || lastPreviewPositionMs < 0L) return true
+    return nowMs - lastPreviewAtMs >= SCRUB_PREVIEW_INTERVAL_MS &&
+        abs(targetMs - lastPreviewPositionMs) >= SCRUB_PREVIEW_MIN_DELTA_MS
+}
+
+private const val SCRUB_PREVIEW_INTERVAL_MS = 120L
+private const val SCRUB_PREVIEW_MIN_DELTA_MS = 500L
 
 @Composable
 private fun videoScaleLabel(mode: VideoScaleMode): String = when (mode) {

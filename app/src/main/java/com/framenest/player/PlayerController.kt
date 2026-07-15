@@ -26,8 +26,11 @@ interface PlayerController {
 
     fun pause()
 
-    /** Seek to [positionMs]; no-op if not seekable. */
-    fun seekTo(positionMs: Long)
+    /**
+     * Seek to [positionMs]; no-op if not seekable.
+     * [fast] allows a keyframe-oriented preview while scrubbing; the final seek stays precise.
+     */
+    fun seekTo(positionMs: Long, fast: Boolean = false)
 
     fun selectAudioTrack(trackId: Int)
 

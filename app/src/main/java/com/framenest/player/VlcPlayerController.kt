@@ -506,7 +506,7 @@ class VlcPlayerController(
         }
     }
 
-    override fun seekTo(positionMs: Long) {
+    override fun seekTo(positionMs: Long, fast: Boolean) {
         if (released) return
         val player = mediaPlayer ?: return
         val phase = _state.value.phase
@@ -524,20 +524,21 @@ class VlcPlayerController(
         val clamped = positionMs.coerceIn(0L, if (duration > 0) duration else positionMs)
         // Cancel any in-flight pause-scrub preview before a new seek.
         cancelSeekPreview(/* pausePlayer = */ false)
-        // Precise seek (fast=false). Property setter also uses false; call explicitly
-        // for the return value and logging.
-        val applied = runCatching { player.setTime(clamped, /* fast = */ false) }
+        // Fast seeks are throttled previews while actively playing. The release seek
+        // uses fast=false so the final position remains precise.
+        val applied = runCatching { player.setTime(clamped, fast) }
             .getOrDefault(-1L)
         val position = if (applied >= 0L) applied else clamped
         _state.update { it.copy(positionMs = position) }
         Log.i(
             TAG,
             "seekTo target=$clamped applied=$applied seekable=${player.isSeekable} " +
-                "phase=$phase playing=${player.isPlaying}",
+                "phase=$phase playing=${player.isPlaying} fast=$fast",
         )
         // While paused / first-frame Ready, setTime alone does not paint a new frame
         // (HW decoder holds the last surface). Briefly play then re-pause.
-        val needFramePreview = _state.value.firstFrameReady &&
+        val needFramePreview = !fast &&
+            _state.value.firstFrameReady &&
             !player.isPlaying &&
             phase != PlayerState.Phase.Playing
         if (needFramePreview) {

@@ -472,6 +472,10 @@ class PlayerViewModel(
         controller.seekTo(positionMs)
     }
 
+    fun previewSeekTo(positionMs: Long) {
+        controller.seekTo(positionMs, fast = true)
+    }
+
     /** Cycle BestFit → FitScreen → Fill → 16:9 → 4:3 → Original. */
     fun cycleVideoScaleMode() {
         val next = controller.state.value.videoScaleMode.next()
