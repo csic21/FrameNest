@@ -403,7 +403,6 @@ fun PlayerScreen(
                             autoNextArmed = autoNextArmed,
                             onPlay = { vm.play() },
                             onPause = { vm.pause() },
-                            onPreviewSeek = { vm.previewSeekTo(it) },
                             onSeek = { vm.seekTo(it) },
                             onCycleVideoScale = { vm.cycleVideoScaleMode() },
                             onCyclePlaybackRate = { vm.cyclePlaybackRate() },
@@ -462,7 +461,6 @@ fun PlayerScreen(
                             autoNextArmed = autoNextArmed,
                             onPlay = { vm.play() },
                             onPause = { vm.pause() },
-                            onPreviewSeek = { vm.previewSeekTo(it) },
                             onSeek = { vm.seekTo(it) },
                             onCycleVideoScale = { vm.cycleVideoScaleMode() },
                             onCyclePlaybackRate = { vm.cyclePlaybackRate() },
@@ -1038,7 +1036,6 @@ private fun PlayerControls(
     autoNextArmed: Boolean,
     onPlay: () -> Unit,
     onPause: () -> Unit,
-    onPreviewSeek: (Long) -> Unit,
     onSeek: (Long) -> Unit,
     onCycleVideoScale: () -> Unit,
     onCyclePlaybackRate: () -> Unit,
@@ -1053,12 +1050,11 @@ private fun PlayerControls(
     val duration = state.durationMs.coerceAtLeast(0L)
     val position = state.positionMs.coerceIn(0L, if (duration > 0) duration else state.positionMs)
     val progress = if (duration > 0) position.toFloat() / duration.toFloat() else 0f
-    // Keep the thumb local and issue bounded fast previews while playing. A precise
-    // seek still runs once on release; paused scrubbing avoids repeated play/pause.
+    // Keep the thumb local while dragging and issue exactly one seek on
+    // release. This gives local and SMB files the same seek behavior and avoids
+    // overlapping random reads on the NAS.
     var scrubbing by remember { mutableStateOf(false) }
     var scrubFraction by remember { mutableFloatStateOf(0f) }
-    var lastPreviewAtMs by remember { mutableLongStateOf(0L) }
-    var lastPreviewPositionMs by remember { mutableLongStateOf(-1L) }
     val displayProgress = if (scrubbing) scrubFraction else progress
     val displayPosition = if (scrubbing && duration > 0L) {
         (scrubFraction * duration).toLong().coerceIn(0L, duration)
@@ -1159,29 +1155,16 @@ private fun PlayerControls(
             onValueChange = { fraction ->
                 scrubbing = true
                 scrubFraction = fraction.coerceIn(0f, 1f)
-                if (duration > 0L && state.phase == PlayerState.Phase.Playing) {
-                    val targetMs = (scrubFraction * duration).toLong().coerceIn(0L, duration)
-                    val nowMs = SystemClock.uptimeMillis()
-                    if (shouldPreviewScrubSeek(
-                            nowMs = nowMs,
-                            targetMs = targetMs,
-                            lastPreviewAtMs = lastPreviewAtMs,
-                            lastPreviewPositionMs = lastPreviewPositionMs,
-                        )
-                    ) {
-                        onPreviewSeek(targetMs)
-                        lastPreviewAtMs = nowMs
-                        lastPreviewPositionMs = targetMs
-                    }
-                }
             },
             onValueChangeFinished = {
-                if (duration > 0L) {
-                    onSeek((scrubFraction * duration).toLong())
-                }
+                if (!scrubbing) return@Slider
+                val targetMs = scrubSeekTargetMs(duration, scrubFraction)
+                // End local scrub state before dispatching. onSeek synchronously
+                // changes playback phase; dispatching first can recompose/disable
+                // this Slider while it still owns the gesture and invoke finish
+                // repeatedly with intermediate fractions.
                 scrubbing = false
-                lastPreviewAtMs = 0L
-                lastPreviewPositionMs = -1L
+                if (duration > 0L) onSeek(targetMs)
             },
             enabled = (state.isSeekable || duration > 0) &&
                 state.phase != PlayerState.Phase.Error &&
@@ -1335,19 +1318,10 @@ private fun PlayerControls(
     }
 }
 
-internal fun shouldPreviewScrubSeek(
-    nowMs: Long,
-    targetMs: Long,
-    lastPreviewAtMs: Long,
-    lastPreviewPositionMs: Long,
-): Boolean {
-    if (lastPreviewAtMs <= 0L || lastPreviewPositionMs < 0L) return true
-    return nowMs - lastPreviewAtMs >= SCRUB_PREVIEW_INTERVAL_MS &&
-        abs(targetMs - lastPreviewPositionMs) >= SCRUB_PREVIEW_MIN_DELTA_MS
+internal fun scrubSeekTargetMs(durationMs: Long, fraction: Float): Long {
+    if (durationMs <= 0L) return 0L
+    return (fraction.coerceIn(0f, 1f) * durationMs).toLong().coerceIn(0L, durationMs)
 }
-
-private const val SCRUB_PREVIEW_INTERVAL_MS = 120L
-private const val SCRUB_PREVIEW_MIN_DELTA_MS = 500L
 /** Delay before auto-opening the next same-directory video after Ended. */
 private const val AUTO_NEXT_DELAY_MS = 1_500L
 

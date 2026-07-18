@@ -95,15 +95,10 @@ object SmbSeekableMedia {
             if (ownsThread) thread.quitSafely()
             throw t
         }
-        // For files ≥ 4GiB, a fixed AFD length can overflow/mis-handle in libVLC's
-        // nativeNewFromFdWithOffsetLength and produce "stream: read error" / cannot peek.
-        // UNKNOWN_LENGTH + Media(FileDescriptor) lets VLC size via fstat/onGetSize.
-        val afdLength =
-            if (totalSize >= FOUR_GIB) {
-                AssetFileDescriptor.UNKNOWN_LENGTH
-            } else {
-                totalSize
-            }
+        // Keep one descriptor contract for every SMB file size. VLC receives the bare
+        // FileDescriptor and discovers its size through fstat/onGetSize; declaring a
+        // fixed AFD length for only smaller files creates an unnecessary 4 GiB split.
+        val afdLength = AssetFileDescriptor.UNKNOWN_LENGTH
         val afd = AssetFileDescriptor(pfd, 0L, afdLength)
         android.util.Log.i(
             "FrameNestPlayer",
@@ -117,8 +112,6 @@ object SmbSeekableMedia {
             assetFileDescriptor = afd,
         )
     }
-
-    private const val FOUR_GIB = 1L shl 32
 
     data class SeekableOpenResult(
         val mediaSource: MediaSource.SeekableDescriptor,

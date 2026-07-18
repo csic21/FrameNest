@@ -43,7 +43,6 @@ import com.framenest.player.PlayerErrorMapper
 import com.framenest.player.PlayerState
 import com.framenest.player.SmbCredentials
 import com.framenest.player.SmbMediaUri
-import com.framenest.player.SmbSeekableMedia
 import com.framenest.player.VideoScaleMode
 import com.framenest.player.VlcPlayerController
 import com.framenest.smb.SmbException
@@ -74,7 +73,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Product player session: open media (path B preferred), first-frame paused,
+ * Product player session: open remote media through libVLC direct SMB, first-frame paused,
  * progress save, retry, release coordination, subtitle selection (FN-06),
  * and listen-translate (FN-14: Vosk ASR + ML Kit MT).
  */
@@ -138,13 +137,8 @@ class PlayerViewModel(
         },
     )
 
-    private var smbClient: SmbjClient? = null
     private var progressJob: Job? = null
-    /**
-     * Outstanding open lifecycle (initial [loadResumeAndOpen] or SMB path-B→A fallback).
-     * Cancelling an in-flight open before starting the next prevents the two from
-     * overlapping when an error + retry race into [maybeFallbackSeekableSmbToDirect].
-     */
+    /** Outstanding open lifecycle; retry replaces any in-flight open. */
     private var openJob: Job? = null
     /** Volatile: read on a background teardown thread to skip a duplicate save. */
     @Volatile
@@ -162,14 +156,6 @@ class PlayerViewModel(
     private var subtitleBootstrapDone: Boolean = false
     private var siblingBootstrapDone: Boolean = false
     private var preferredLanguages: List<String> = resolvePreferredLanguages(application)
-    /**
-     * After path B (Proxy FD) fails before first frame, retry once with libVLC
-     * direct `smb://` (path A). Avoids permanent OpenFailed on demux/imem issues.
-     */
-    private var smbDirectFallbackUsed: Boolean = false
-    /** True when the last successful open used path B seekable descriptor. */
-    private var lastOpenUsedPathB: Boolean = false
-
     init {
         openJob = viewModelScope.launch {
             loadResumeAndOpen()
@@ -187,26 +173,6 @@ class PlayerViewModel(
                     saveProgressNow(force = true)
                     stopProgressLoop()
                 }
-                // After first frame ready, seek to resume position exactly once per open.
-                if (resumeSeekGate.shouldFire(state.firstFrameReady, state.phase, startPositionMs)) {
-                    val target = startPositionMs
-                    startPositionMs = 0L
-                    val duration = state.durationMs
-                    // Re-apply completion rule with the real media length so a bad
-                    // history row (duration 0 / wrong length) does not seek to EOF.
-                    val safeTarget = if (duration > 0L &&
-                        PlaybackProgressRules.isCompleted(target, duration)
-                    ) {
-                        0L
-                    } else if (duration > 0L) {
-                        target.coerceIn(0L, (duration - 1_000L).coerceAtLeast(0L))
-                    } else {
-                        target
-                    }
-                    if (safeTarget > 0L) {
-                        controller.seekTo(safeTarget)
-                    }
-                }
                 if (state.firstFrameReady && !subtitleBootstrapDone) {
                     subtitleBootstrapDone = true
                     bootstrapSubtitles(state)
@@ -215,7 +181,6 @@ class PlayerViewModel(
                     siblingBootstrapDone = true
                     loadSiblingPlaylist()
                 }
-                maybeFallbackSeekableSmbToDirect(state)
             }
         }
     }
@@ -393,8 +358,8 @@ class PlayerViewModel(
             is PlaybackDataSource.LocalRawResource ->
                 ListenAudioSources.forRaw(app, ds.resId)
             is PlaybackDataSource.SeekableSmb -> {
-                if (smbClient == null) return null
-                ListenAudioSources.forSmb(app, { smbClient }, ds.share, ds.path)
+                if (listenOnlySmbClient == null) return null
+                ListenAudioSources.forSmb(app, { listenOnlySmbClient }, ds.share, ds.path)
             }
             is PlaybackDataSource.DirectSmbUrl -> {
                 if (listenOnlySmbClient == null) return null
@@ -415,9 +380,10 @@ class PlayerViewModel(
     private suspend fun ensureSmbConnectedForListen() = withContext(Dispatchers.IO) {
         when (val ds = request.dataSource) {
             is PlaybackDataSource.SeekableSmb -> {
-                if (smbClient?.isConnected == true) return@withContext
-                runCatching { smbClient?.close() }
-                smbClient = null
+                // Never reuse the playback client: SMBJ can return the same cached
+                // DiskShare, and closing an auxiliary handle would break VLC reads.
+                runCatching { listenOnlySmbClient?.close() }
+                listenOnlySmbClient = null
                 val client = SmbjClient()
                 val creds = SmbSessionCredentials(
                     host = ds.host,
@@ -428,14 +394,12 @@ class PlayerViewModel(
                 )
                 try {
                     client.connect(creds)
-                    smbClient = client
-                    updateListenContentKey(client, ds.share, ds.path)
+                    listenOnlySmbClient = client
                 } finally {
                     creds.clearPassword()
                 }
             }
             is PlaybackDataSource.DirectSmbUrl -> {
-                if (listenOnlySmbClient?.isConnected == true) return@withContext
                 runCatching { listenOnlySmbClient?.close() }
                 listenOnlySmbClient = null
                 val client = SmbjClient()
@@ -449,23 +413,12 @@ class PlayerViewModel(
                 try {
                     client.connect(creds)
                     listenOnlySmbClient = client
-                    updateListenContentKey(client, ds.share, ds.path)
                 } finally {
                     creds.clearPassword()
                 }
             }
             else -> Unit
         }
-    }
-
-    private fun updateListenContentKey(client: SmbjClient, share: String, path: String) {
-        val metadata = runCatching { client.metadata(share, path) }.getOrNull() ?: return
-        listenSession.setContentKey(
-            ListenContentKey.of(
-                sizeBytes = metadata.sizeBytes,
-                modifiedTimeMs = metadata.lastModifiedEpochMs.takeIf { it > 0L },
-            ),
-        )
     }
 
     fun play() {
@@ -504,13 +457,9 @@ class PlayerViewModel(
         controller.seekTo(positionMs)
     }
 
-    fun previewSeekTo(positionMs: Long) {
-        controller.seekTo(positionMs, fast = true)
-    }
-
     /**
      * Relative skip (e.g. ±10s from double-tap). Clamped to media bounds.
-     * Uses precise seek so paused scrub still paints a new frame.
+     * Uses the same single-seek policy as the slider.
      */
     fun skipBy(deltaMs: Long) {
         val state = controller.state.value
@@ -529,7 +478,7 @@ class PlayerViewModel(
         // User navigated explicitly — do not let a pending resume seek pull them back.
         resumeSeekGate.markFired()
         startPositionMs = 0L
-        controller.seekTo(target, fast = false)
+        controller.seekTo(target)
     }
 
     fun selectAudioTrack(trackId: Int) {
@@ -570,10 +519,7 @@ class PlayerViewModel(
         SiblingPlaylistFactory.build(currentPath = path, directoryFileNames = names)
     }
 
-    /**
-     * Prefer the live playback SMB session (path B). Otherwise open a short-lived
-     * listing session from the request credentials (path A / fallback).
-     */
+    /** Use a short-lived listing session so playback/read handles remain isolated. */
     private fun listSiblingFileNames(): List<String> {
         return when (val ds = request.dataSource) {
             is PlaybackDataSource.SeekableSmb ->
@@ -585,7 +531,6 @@ class PlayerViewModel(
                     username = ds.username,
                     password = ds.password,
                     domain = ds.domain,
-                    reuse = smbClient,
                 )
             is PlaybackDataSource.DirectSmbUrl -> {
                 val chars = ds.password.toCharArray()
@@ -598,7 +543,6 @@ class PlayerViewModel(
                         username = ds.username,
                         password = chars,
                         domain = ds.domain.orEmpty(),
-                        reuse = listenOnlySmbClient ?: smbClient,
                     )
                 } finally {
                     chars.fill('\u0000')
@@ -618,14 +562,9 @@ class PlayerViewModel(
         username: String,
         password: CharArray,
         domain: String,
-        reuse: SmbjClient?,
     ): List<String> {
-        val live = reuse?.takeIf { it.isConnected }
-        if (live != null) {
-            return live.listDirectory(share, parentPath)
-                .filter { !it.isDirectory }
-                .map { it.name }
-        }
+        // Directory enumeration gets its own connection. SMBJ caches DiskShare by
+        // name, so using the playback/listen client could close an active read handle.
         val client = SmbjClient()
         val creds = SmbSessionCredentials(
             host = host,
@@ -714,9 +653,6 @@ class PlayerViewModel(
             withContext(Dispatchers.IO) {
                 teardownMediaResources()
             }
-            // Manual retry may try path B again, then auto-fallback can re-arm once.
-            smbDirectFallbackUsed = false
-            lastOpenUsedPathB = false
             subtitleBootstrapDone = false
             subtitleSelectionGate.advance()
             // Re-arm resume seek for the fresh open — never blindly restore
@@ -802,7 +738,7 @@ class PlayerViewModel(
 
     private suspend fun openSource() {
         val mediaSource = try {
-            resolveMediaSource(request.dataSource, forceDirectSmb = false)
+            resolveMediaSource(request.dataSource)
         } catch (se: SmbException) {
             val err = PlayerErrorMapper.fromSmb(se.error)
             Log.w(TAG, "SMB open failed code=${err.code} msg=${err.message}")
@@ -816,7 +752,12 @@ class PlayerViewModel(
             injectError(err)
             return
         }
-        controller.prepare(mediaSource)
+        // Pass resume into the controller once. Direct SMB retains it until play(),
+        // then applies one fast/keyframe seek instead of a precise paused seek.
+        val initialPositionMs = startPositionMs.coerceAtLeast(0L)
+        controller.prepare(mediaSource, initialPositionMs)
+        resumeSeekGate.markFired()
+        startPositionMs = 0L
         restartListenAfterSourceChangeIfNeeded()
     }
 
@@ -851,75 +792,16 @@ class PlayerViewModel(
         }
     }
 
-    /**
-     * Path B (SMBJ + ProxyFileDescriptor) sometimes ends demux before any Vout
-     * ("Playback ended before a video frame was ready") or hits imem read errors.
-     * Fall back once to path A (libVLC direct smb:// + option credentials).
-     */
-    private fun maybeFallbackSeekableSmbToDirect(state: PlayerState) {
-        if (smbDirectFallbackUsed || !lastOpenUsedPathB) return
-        if (state.phase != PlayerState.Phase.Error) return
-        if (state.firstFrameReady) return
-        val err = state.error ?: return
-        if (err.code != PlayerError.Code.OpenFailed &&
-            err.code != PlayerError.Code.PlaybackError
-        ) {
-            return
-        }
-        val dataSource = request.dataSource as? PlaybackDataSource.SeekableSmb ?: return
-        pauseListenForSourceChange()
-        smbDirectFallbackUsed = true
-        lastOpenUsedPathB = false
-        // Cancel any in-flight open before starting the fallback so the two never overlap.
-        openJob?.cancel()
-        openJob = viewModelScope.launch {
-            Log.w(
-                TAG,
-                "path B failed before first frame (${err.code}); " +
-                    "falling back to libVLC direct smb://",
-            )
-            (controller as? VlcPlayerController)?.closeCurrentMedia()
-            withContext(Dispatchers.IO) {
-                teardownMediaResources()
-            }
-            val direct = try {
-                withContext(Dispatchers.IO) {
-                    openDirectSmb(dataSource)
-                }
-            } catch (se: SmbException) {
-                injectError(PlayerErrorMapper.fromSmb(se.error))
-                return@launch
-            } catch (t: Throwable) {
-                injectError(PlayerErrorMapper.fromThrowable(t))
-                return@launch
-            }
-            controller.prepare(direct)
-            restartListenAfterSourceChangeIfNeeded()
-        }
-    }
-
-    private suspend fun resolveMediaSource(
-        dataSource: PlaybackDataSource,
-        forceDirectSmb: Boolean,
-    ): MediaSource =
+    private suspend fun resolveMediaSource(dataSource: PlaybackDataSource): MediaSource =
         when (dataSource) {
             is PlaybackDataSource.LocalRawResource -> {
-                lastOpenUsedPathB = false
                 MediaSource.RawResource(dataSource.resId)
             }
             is PlaybackDataSource.LocalFile -> {
-                lastOpenUsedPathB = false
                 MediaSource.LocalFile(dataSource.path)
             }
-            is PlaybackDataSource.SeekableSmb -> withContext(Dispatchers.IO) {
-                if (forceDirectSmb) {
-                    openDirectSmb(dataSource)
-                } else {
-                    openSeekableSmb(dataSource)
-                }
-            }
+            is PlaybackDataSource.SeekableSmb -> openProductSmb(dataSource)
             is PlaybackDataSource.DirectSmbUrl -> {
-                lastOpenUsedPathB = false
                 openDirectSmbUrl(dataSource)
             }
         }
@@ -943,73 +825,22 @@ class PlayerViewModel(
         return MediaSource.Smb(uri = uri, credentials = creds)
     }
 
-    private fun openDirectSmb(dataSource: PlaybackDataSource.SeekableSmb): MediaSource {
-        lastOpenUsedPathB = false
-        teardownSmbClientOnly()
+    /** One direct libVLC SMB product path for every file size; credentials stay out of the URI. */
+    private fun openProductSmb(dataSource: PlaybackDataSource.SeekableSmb): MediaSource {
         val uri = SmbMediaUri.build(
             host = dataSource.host,
+            port = dataSource.port,
             share = dataSource.share,
             path = dataSource.path,
-            port = dataSource.port,
         )
-        val passwordString = String(dataSource.password)
         return MediaSource.Smb(
             uri = uri,
             credentials = SmbCredentials(
                 username = dataSource.username,
-                password = passwordString,
+                password = String(dataSource.password),
                 domain = dataSource.domain.ifEmpty { null },
             ),
         )
-    }
-
-    private fun openSeekableSmb(dataSource: PlaybackDataSource.SeekableSmb): MediaSource {
-        teardownSmbClientOnly()
-        val client = SmbjClient()
-        smbClient = client
-        val sessionCreds = SmbSessionCredentials(
-            host = dataSource.host,
-            port = dataSource.port,
-            username = dataSource.username,
-            password = dataSource.password.copyOf(),
-            domain = dataSource.domain,
-        )
-        try {
-            client.connect(sessionCreds)
-            val randomAccess = client.openRandomAccess(dataSource.share, dataSource.path)
-            val size = randomAccess.size
-            val metadata = runCatching {
-                client.metadata(dataSource.share, dataSource.path)
-            }.getOrNull()
-            listenSession.setContentKey(
-                ListenContentKey.of(
-                    sizeBytes = size,
-                    modifiedTimeMs = metadata?.lastModifiedEpochMs?.takeIf { it > 0L },
-                ),
-            )
-            // Always prefer path B (SMBJ + ProxyFileDescriptor). Large files use
-            // UNKNOWN_LENGTH + Media(FileDescriptor) in SmbSeekableMedia / VlcPlayerController
-            // so seek stays byte-accurate. Path A (direct smb://) often reports duration
-            // but does not refresh frames on seek — only used as open-failure fallback.
-            Log.i(
-                TAG,
-                "SMB path B open size=$size share=${dataSource.share} " +
-                    "path=${dataSource.path.trimStart('/')}",
-            )
-            val opened = SmbSeekableMedia.open(
-                context = getApplication(),
-                randomAccess = randomAccess,
-                debugLabel = "smb://${dataSource.share}/${dataSource.path.trimStart('/')}",
-            )
-            lastOpenUsedPathB = true
-            return opened.mediaSource
-        } catch (t: Throwable) {
-            teardownSmbClientOnly()
-            lastOpenUsedPathB = false
-            throw t
-        } finally {
-            sessionCreds.clearPassword()
-        }
     }
 
     private fun ensureProgressLoop() {
@@ -1288,12 +1119,6 @@ class PlayerViewModel(
     }
 
     private fun teardownSmbClientOnly() {
-        val client = smbClient
-        smbClient = null
-        if (client != null) {
-            runCatching { client.disconnect() }
-            runCatching { client.close() }
-        }
         val listenClient = listenOnlySmbClient
         listenOnlySmbClient = null
         if (listenClient != null) {
@@ -1329,8 +1154,7 @@ class PlayerViewModel(
         leaveSaveJob = null
 
         val player = controller
-        val clients = listOfNotNull(smbClient, listenOnlySmbClient)
-        smbClient = null
+        val clients = listOfNotNull(listenOnlySmbClient)
         listenOnlySmbClient = null
         val subtitles = subtitleLoader
 

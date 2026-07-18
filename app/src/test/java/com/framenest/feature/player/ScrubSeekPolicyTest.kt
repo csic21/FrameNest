@@ -1,15 +1,14 @@
 package com.framenest.feature.player
 
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ScrubSeekPolicyTest {
     @Test
-    fun `preview seek is bounded by time and target movement`() {
-        assertTrue(shouldPreviewScrubSeek(1_000L, 10_000L, 0L, -1L))
-        assertFalse(shouldPreviewScrubSeek(1_100L, 12_000L, 1_000L, 10_000L))
-        assertFalse(shouldPreviewScrubSeek(1_200L, 10_400L, 1_000L, 10_000L))
-        assertTrue(shouldPreviewScrubSeek(1_200L, 10_500L, 1_000L, 10_000L))
+    fun `release target is precise and clamped`() {
+        assertEquals(60_000L, scrubSeekTargetMs(120_000L, 0.5f))
+        assertEquals(0L, scrubSeekTargetMs(120_000L, -0.2f))
+        assertEquals(120_000L, scrubSeekTargetMs(120_000L, 1.2f))
+        assertEquals(0L, scrubSeekTargetMs(0L, 0.5f))
     }
 }

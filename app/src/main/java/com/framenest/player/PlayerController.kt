@@ -19,18 +19,19 @@ interface PlayerController {
 
     fun detachVideoLayout()
 
-    /** Prepare media, decode first frame, then hold pause ([PlayerState.firstFrameReady]). */
-    fun prepare(source: MediaSource)
+    /**
+     * Prepare media with a pending [startPositionMs], decode the first frame, then hold
+     * pause ([PlayerState.firstFrameReady]). The controller applies the pending position
+     * using the source's stable seek mode when playback starts.
+     */
+    fun prepare(source: MediaSource, startPositionMs: Long = 0L)
 
     fun play()
 
     fun pause()
 
-    /**
-     * Seek to [positionMs]; no-op if not seekable.
-     * [fast] allows a keyframe-oriented preview while scrubbing; the final seek stays precise.
-     */
-    fun seekTo(positionMs: Long, fast: Boolean = false)
+    /** Seek once to [positionMs]; remote SMB may snap to a nearby keyframe. */
+    fun seekTo(positionMs: Long)
 
     fun selectAudioTrack(trackId: Int)
 
