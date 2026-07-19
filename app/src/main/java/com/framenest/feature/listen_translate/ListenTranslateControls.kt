@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.framenest.R
+import com.framenest.data.listen_translate.ListenTranslateJobStatus
 
 @Composable
 fun ListenTranslateControls(
@@ -135,8 +136,15 @@ fun ListenTranslateControls(
             uiState.errorMessage != null
         ) {
             Spacer(Modifier.height(8.dp))
+            val statusLabel = when (uiState.status) {
+                ListenTranslateJobStatus.Idle -> stringResource(R.string.listen_translate_status_idle)
+                ListenTranslateJobStatus.Running -> stringResource(R.string.listen_translate_status_running)
+                ListenTranslateJobStatus.Partial -> stringResource(R.string.listen_translate_status_partial)
+                ListenTranslateJobStatus.Complete -> stringResource(R.string.listen_translate_status_complete)
+                ListenTranslateJobStatus.Failed -> stringResource(R.string.listen_translate_status_failed)
+            }
             val statusLine = buildString {
-                append(stringResource(R.string.listen_translate_status, uiState.status.name))
+                append(stringResource(R.string.listen_translate_status, statusLabel))
                 if (uiState.isProcessing) append(" · …")
                 if (uiState.modelsReady) {
                     append(" · ")

@@ -174,7 +174,7 @@
 
     <!-- Listen-translate (FN-12) -->
     <string name="listen_translate_title">听译字幕</string>
-    <string name="listen_translate_hint">本机听译：Vosk 离线识别 + ML Kit 翻译。请先在「设置 → 听译模型」安装并确认状态；播放页开启时若缺模型会再下载。结果不写 NAS。</string>
+    <string name="listen_translate_hint">本机听译 Beta：Vosk small 离线识别 + ML Kit 翻译。适合清晰对白的辅助理解，噪声、多人重叠或专有名词可能明显出错。结果不写 NAS。</string>
     <string name="listen_translate_enable">开启听译</string>
     <string name="listen_translate_source_lang">源语言</string>
     <string name="listen_translate_target_lang">目标语言</string>
@@ -183,12 +183,19 @@
     <string name="listen_translate_mode_tgt">译文</string>
     <string name="listen_translate_mode_both">双语</string>
     <string name="listen_translate_status">状态：%1$s</string>
+    <string name="listen_translate_status_idle">未开始</string>
+    <string name="listen_translate_status_running">识别中</string>
+    <string name="listen_translate_status_partial">已生成部分字幕</string>
+    <string name="listen_translate_status_complete">已完成</string>
+    <string name="listen_translate_status_failed">失败</string>
     <string name="listen_translate_covered">已覆盖至 %1$d 秒</string>
     <string name="listen_translate_installing">正在安装本机模型…</string>
     <string name="listen_translate_models_ready">模型已就绪</string>
 
     <string name="settings_listen_models_row">听译模型（本机）</string>
-    <string name="settings_listen_models_hint">在此安装与查看各语言 Vosk ASR（约 40–80MB/语种，存应用私有目录）。听译时源语言需已安装对应 ASR；翻译走 ML Kit（按语言对下载）。可装推荐中+英，或点每行「安装」单独装其它语言。需联网；卸载应用后删除。</string>
+    <string name="settings_listen_models_hint">在此安装与查看各语言 Vosk small ASR（约 40–80MB/语种，存应用私有目录）。下载可断点续传并做完整性校验；翻译包由 ML Kit 管理。默认仅 Wi-Fi/有线网络；卸载应用后删除。</string>
+    <string name="settings_model_mobile_data">允许移动网络下载模型</string>
+    <string name="settings_model_mobile_data_hint">单个 ASR 包约 40–80MB，翻译包另外计算。</string>
     <string name="settings_listen_models_size">Vosk 模型约占用 %1$s</string>
     <string name="settings_listen_models_ready_yes">推荐模型：已就绪（中文 + 英文 ASR）</string>
     <string name="settings_listen_models_ready_no">推荐模型：未就绪 — 可一键安装中+英，或按语言单独安装</string>
@@ -231,4 +238,3 @@
     <string name="settings_diagnostics_failed">导出失败</string>
     <string name="settings_diagnostics_share">分享诊断日志</string>
 </resources>
-

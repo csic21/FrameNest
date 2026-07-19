@@ -359,3 +359,21 @@
 
 验收：自动收起与布局决策有纯逻辑单测；手机/平板配置可编译；
 unit test、lint、debug/release assemble 通过。
+
+## FN-21：听译模型交付可靠性
+
+**依赖**：FN-14、FN-20  
+**拥有路径**：`feature/listen_translate/asr/**`、`feature/listen_translate/mt/**`、
+`feature/listen_translate/ListenTranslateControls.kt`、`data/settings/UserPreferences.kt`、
+`ui/screens/SettingsScreen.kt`听译模型区、相关文案/测试/交接  
+**目标**：大模型下载可恢复、可校验，默认不意外消耗移动流量，并如实告知当前听译质量边界。
+
+工作内容：
+
+- Vosk ZIP 使用 `.part` 断点续传，安装前核对长度、ZIP CRC、目录结构与固定 SHA-256。
+- 模型下载默认仅非计费网络；设置可显式允许移动网络，Vosk/ML Kit 共用同一策略。
+- 下载失败保留可恢复的部分文件，清理模型时一并删除；日志不包含 URL 参数或凭证。
+- 将听译状态本地化，文案明确 Vosk small + ML Kit 是 Beta，不宣称通用精准字幕。
+
+验收：续传决策、SHA-256 校验、网络策略有单测；所有自动检查通过；
+不做真机移动网络切换与真模型下载验收。

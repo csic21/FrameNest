@@ -14,6 +14,7 @@ import com.framenest.data.history.PlaybackProgressRules
 import com.framenest.data.listen_translate.ListenContentKey
 import com.framenest.data.listen_translate.ListenTranslateRepository
 import com.framenest.data.server.AppDatabase
+import com.framenest.data.settings.UserPreferences
 import com.framenest.feature.listen_translate.ListenDisplayMode
 import com.framenest.feature.listen_translate.ListenTranslateEngine
 import com.framenest.feature.listen_translate.ListenTranslateSession
@@ -106,6 +107,7 @@ class PlayerViewModel(
     val siblingNavState: StateFlow<SiblingNavUiState> = _siblingNavState.asStateFlow()
 
     private val voskInstaller = VoskModelInstaller(application)
+    private val userPreferences = UserPreferences(application)
     private var realListenEngine: RealListenTranslateEngine? = null
     private var listenOnlySmbClient: SmbjClient? = null
     private var listenPrepareJob: Job? = null
@@ -269,7 +271,11 @@ class PlayerViewModel(
                     ?: error("当前片源暂不支持听译音频（需要本地文件或 SMB 随机读）")
                 pendingAudio = audio
                 var lastProgressPercent = -1
-                voskInstaller.ensureInstalled(sourceLang) { p ->
+                val allowMeteredDownloads = userPreferences.allowMeteredModelDownloads()
+                voskInstaller.ensureInstalled(
+                    langTag = sourceLang,
+                    allowMeteredDownloads = allowMeteredDownloads,
+                ) { p ->
                     if (generation != listenPrepareGeneration) return@ensureInstalled
                     val percent = (p * 100f).toInt().coerceIn(0, 100)
                     if (percent != lastProgressPercent) {
@@ -282,7 +288,7 @@ class PlayerViewModel(
                 }
                 currentCoroutineContext().ensureActive()
                 val asr = VoskAsrEngine()
-                val mt = MlKitMtEngine()
+                val mt = MlKitMtEngine(allowMeteredDownloads = allowMeteredDownloads)
                 pendingAsr = asr
                 pendingMt = mt
                 listenSession.setInstallingModels(

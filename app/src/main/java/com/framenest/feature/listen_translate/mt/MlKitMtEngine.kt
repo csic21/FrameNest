@@ -14,7 +14,9 @@ import kotlinx.coroutines.withContext
  * On-device MT via Google ML Kit Translate.
  * Language packs are downloaded into ML Kit's private storage (app-scoped).
  */
-class MlKitMtEngine {
+class MlKitMtEngine(
+    private val allowMeteredDownloads: Boolean = false,
+) {
     private val translators = ConcurrentHashMap<String, Translator>()
 
     suspend fun ensureModel(sourceLang: String, targetLang: String) {
@@ -48,7 +50,9 @@ class MlKitMtEngine {
             .setTargetLanguage(tgt)
             .build()
         val translator = Translation.getClient(options)
-        val conditions = DownloadConditions.Builder().build()
+        val conditions = DownloadConditions.Builder().apply {
+            if (!allowMeteredDownloads) requireWifi()
+        }.build()
         translator.downloadModelIfNeeded(conditions).await()
         translators[key] = translator
         return translator

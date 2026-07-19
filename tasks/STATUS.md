@@ -25,6 +25,7 @@
 | FN-18 同目录连播 | 已完成 | agent | → main | FN-05, FN-17 | [FN-18](handoffs/FN-18.md) |
 | FN-19 缓冲提示 | 已完成 | agent | → main | FN-05 | [FN-19](handoffs/FN-19.md) |
 | FN-20 播放器产品体验 | 已完成 | agent | `agent/FN-20-player-product-polish` | FN-16..FN-19 | [FN-20](handoffs/FN-20.md) |
+| FN-21 听译模型交付 | 已完成 | agent | `agent/FN-21-model-delivery-hardening` | FN-14, FN-20 | [FN-21](handoffs/FN-21.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。

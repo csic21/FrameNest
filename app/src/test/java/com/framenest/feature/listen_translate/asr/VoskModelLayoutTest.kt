@@ -28,4 +28,26 @@ class VoskModelLayoutTest {
             VoskModelInstaller.modelVersionTag("EN"),
         )
     }
+
+    @Test
+    fun resumePlan_appendsOnlyWhenServerHonorsRange() {
+        assertEquals(
+            ResumeDownloadPlan(startBytes = 12_345L, append = true),
+            resumeDownloadPlan(existingBytes = 12_345L, responseCode = 206),
+        )
+        assertEquals(
+            ResumeDownloadPlan(startBytes = 0L, append = false),
+            resumeDownloadPlan(existingBytes = 12_345L, responseCode = 200),
+        )
+    }
+
+    @Test
+    fun sha256_matchesKnownDigest() {
+        val archive = temp.newFile("archive.zip").apply { writeText("abc") }
+        assertEquals(
+            "ba7816bf8f01cfea414140de5dae2223" +
+                "b00361a396177a9cb410ff61f20015ad",
+            sha256(archive),
+        )
+    }
 }

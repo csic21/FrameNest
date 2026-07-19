@@ -20,6 +20,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
@@ -72,6 +73,9 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var languagePreset by remember { mutableStateOf(prefs.subtitleLanguagePreset()) }
     var thumbConcurrency by remember { mutableStateOf(prefs.thumbnailConcurrency()) }
+    var allowMeteredModelDownloads by remember {
+        mutableStateOf(prefs.allowMeteredModelDownloads())
+    }
 
     // Resolve strings at composition time (lint: avoid Context.getString in callbacks).
     val cacheClearedTemplate = stringResource(R.string.settings_cache_cleared)
@@ -249,6 +253,34 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.widthIn(max = FrameNestDimens.ReadableContentMaxWidth),
         )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.settings_model_mobile_data),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    text = stringResource(R.string.settings_model_mobile_data_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = allowMeteredModelDownloads,
+                onCheckedChange = { allow ->
+                    allowMeteredModelDownloads = allow
+                    prefs.setAllowMeteredModelDownloads(allow)
+                },
+                enabled = !modelsInstalling,
+                modifier = Modifier.testTag("settings_model_mobile_data"),
+            )
+        }
         Spacer(Modifier.height(8.dp))
         val recommendedReady = VoskModelInstaller.isRecommendedReady(voskStatuses)
         Text(
@@ -316,7 +348,10 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                         installStep = "Vosk ${status.langTag}"
                         val result = runCatching {
                             withContext(Dispatchers.IO) {
-                                container.voskModelInstaller.ensureInstalled(status.langTag) { p ->
+                                container.voskModelInstaller.ensureInstalled(
+                                    langTag = status.langTag,
+                                    allowMeteredDownloads = allowMeteredModelDownloads,
+                                ) { p ->
                                     installProgress = p.coerceIn(0f, 1f)
                                 }
                             }
@@ -367,7 +402,10 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                             val base = index.toFloat() / (langs.size + 1)
                             val span = 1f / (langs.size + 1)
                             withContext(Dispatchers.IO) {
-                                container.voskModelInstaller.ensureInstalled(lang) { p ->
+                                container.voskModelInstaller.ensureInstalled(
+                                    langTag = lang,
+                                    allowMeteredDownloads = allowMeteredModelDownloads,
+                                ) { p ->
                                     installProgress = (base + p * span).coerceIn(0f, 0.92f)
                                 }
                             }
@@ -375,7 +413,9 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                         installStep = "ML Kit zh↔en"
                         installProgress = 0.93f
                         withContext(Dispatchers.IO) {
-                            val mt = MlKitMtEngine()
+                            val mt = MlKitMtEngine(
+                                allowMeteredDownloads = allowMeteredModelDownloads,
+                            )
                             try {
                                 mt.ensureModel("zh", "en")
                                 installProgress = 0.96f
@@ -435,7 +475,10 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                                 val base = index.toFloat() / missingLangs.size
                                 val span = 1f / missingLangs.size
                                 withContext(Dispatchers.IO) {
-                                    container.voskModelInstaller.ensureInstalled(lang) { p ->
+                                    container.voskModelInstaller.ensureInstalled(
+                                        langTag = lang,
+                                        allowMeteredDownloads = allowMeteredModelDownloads,
+                                    ) { p ->
                                         installProgress = (base + p * span).coerceIn(0f, 1f)
                                     }
                                 }
