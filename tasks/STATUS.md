@@ -26,6 +26,7 @@
 | FN-19 缓冲提示 | 已完成 | agent | → main | FN-05 | [FN-19](handoffs/FN-19.md) |
 | FN-20 播放器产品体验 | 已完成 | agent | `agent/FN-20-player-product-polish` | FN-16..FN-19 | [FN-20](handoffs/FN-20.md) |
 | FN-21 听译模型交付 | 已完成 | agent | `agent/FN-21-model-delivery-hardening` | FN-14, FN-20 | [FN-21](handoffs/FN-21.md) |
+| FN-22 SMB/缩略图性能 | 已完成 | agent | `agent/FN-22-smb-thumbnail-performance` | FN-07, FN-09, FN-21 | [FN-22](handoffs/FN-22.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。
@@ -34,10 +35,12 @@
 
 | 产物 | 路径 | 约大小 |
 |---|---|---|
-| Debug universal | `app/build/outputs/apk/debug/app-universal-debug.apk` | ~129MB |
-| Debug arm64 | `app/build/outputs/apk/debug/app-arm64-v8a-debug.apk` | ~74MB |
-| Debug x86_64 | `app/build/outputs/apk/debug/app-x86_64-debug.apk` | ~79MB |
-| Release | `app/build/outputs/apk/release/` | minify 已启用 |
+| Debug universal | `app/build/outputs/apk/debug/app-universal-debug.apk` | 168.7MB |
+| Debug arm64 | `app/build/outputs/apk/debug/app-arm64-v8a-debug.apk` | 93.9MB |
+| Debug x86_64 | `app/build/outputs/apk/debug/app-x86_64-debug.apk` | 100.9MB |
+| Release universal | `app/build/outputs/apk/release/app-universal-release-unsigned.apk` | 146.8MB |
+| Release arm64 | `app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk` | 72.0MB |
+| Release x86_64 | `app/build/outputs/apk/release/app-x86_64-release-unsigned.apk` | 79.0MB |
 
 NAS 验收勾选：`docs/NAS-ACCEPTANCE-CHECKLIST.md`  
 后续 backlog：`docs/POST-MVP.md`

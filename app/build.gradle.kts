@@ -44,7 +44,7 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
-            // Emulator + modern phones for local debug.
+            // Keep the universal debug APK limited to the two supported ABIs.
             ndk {
                 abiFilters += listOf("arm64-v8a", "x86_64")
             }
@@ -56,8 +56,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            // Match the split outputs; Play/App Bundle delivery still installs one ABI.
             ndk {
-                abiFilters += listOf("arm64-v8a")
+                abiFilters += listOf("arm64-v8a", "x86_64")
             }
         }
     }
@@ -76,9 +77,6 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "META-INF/versions/9/previous-compilation-data.bin"
-        }
-        jniLibs {
-            keepDebugSymbols += "**/*.so"
         }
     }
 }

@@ -40,7 +40,7 @@
 
 | 变体 | 路径 | 备注 |
 |---|---|---|
-| debug universal | `app/build/outputs/apk/debug/app-universal-debug.apk` | 内部测试；含 arm64-v8a / x86_64 与 debug 符号 |
+| debug universal | `app/build/outputs/apk/debug/app-universal-debug.apk` | 内部测试；含 arm64-v8a / x86_64，原生库不再全局保留 debug 符号 |
 | debug arm64 | `app/build/outputs/apk/debug/app-arm64-v8a-debug.apk` | 真机测试用较小分包 |
 | internal 命名 | versionName `0.3.0-internal` | 未单独 productFlavor；以 versionName 区分 |
 

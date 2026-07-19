@@ -377,3 +377,21 @@ unit test、lint、debug/release assemble 通过。
 
 验收：续传决策、SHA-256 校验、网络策略有单测；所有自动检查通过；
 不做真机移动网络切换与真模型下载验收。
+
+## FN-22：SMB 列表性能与发布包体收口
+
+**依赖**：FN-07、FN-09、FN-21  
+**拥有路径**：`data/thumbnail/**`、`data/server/BrowseRepository.kt`、
+`app/build.gradle.kts`、`AndroidManifest.xml`、备份规则、包体/性能文档、相关测试与交接  
+**目标**：减少浏览和缩略图队列的重复 SMB 认证/连接，并清理发布包中不必要的本地符号。
+
+工作内容：
+
+- 每个缩略图 worker 复用自己的 SMB 会话；服务器切换、配置变更、断线或 worker 取消时关闭。
+- 连续目录浏览复用同一服务器会话；连接类错误后废弃，下次刷新重连。
+- 密码仅在新建连接时短暂取出并立即清零，不进入日志或会话 key。
+- 发布包不再对所有 `.so` 全局保留 debug symbols；重新记录各 ABI 实际产物大小。
+- 显式禁止云备份与设备迁移导出应用数据，保持 SMB 凭证/模型/历史的本机边界。
+
+验收：会话复用/切换决策有单测；unit test、lint、debug/release assemble 通过；
+记录包体对比；不做真 NAS 延迟和吞吐实测。

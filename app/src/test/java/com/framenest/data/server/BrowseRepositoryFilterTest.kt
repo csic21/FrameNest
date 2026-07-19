@@ -47,12 +47,15 @@ class BrowseRepositoryFilterTest {
             SmbEntry("readme.txt", "readme.txt", false, 1, 0),
             SmbEntry("poster.jpg", "poster.jpg", false, 1, 0),
         )
+        var connectCount = 0
         val browseRepo = BrowseRepository(
             serverRepository = serverRepo,
             clientFactory = {
                 object : SmbClient {
                     override val isConnected: Boolean = true
-                    override fun connect(credentials: SmbCredentials) = Unit
+                    override fun connect(credentials: SmbCredentials) {
+                        connectCount++
+                    }
                     override fun listShares(knownShares: List<String>) = knownShares
                     override fun listDirectory(shareName: String, path: String) = listing
                     override fun metadata(shareName: String, path: String): SmbFileMetadata =
@@ -70,6 +73,9 @@ class BrowseRepositoryFilterTest {
         val names = (result as BrowseRepository.BrowseContent.Directory).entries.map { it.name }
         assertEquals(listOf("Movies", "clip.mkv", "clip.srt"), names)
         assertTrue(names.none { it.endsWith(".txt") || it.endsWith(".jpg") })
+
+        browseRepo.load("s1", RemoteLocation.shareRoot("media")).getOrThrow()
+        assertEquals(1, connectCount)
     }
 }
 

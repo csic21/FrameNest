@@ -12,20 +12,26 @@ import com.framenest.smb.SmbPathUtils
 import com.framenest.smb.SmbjClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
 
 /**
  * SMB browse operations for a saved server.
  *
- * Each call opens a short-lived session on [ioDispatcher] so 500-entry listings
- * never touch the main thread. Callers cancel the coroutine to abandon work.
+ * Listings run on [ioDispatcher]. Consecutive navigation on the same saved server
+ * reuses one serialized SMB session; configuration changes and SMB errors discard it.
  */
 class BrowseRepository(
     private val serverRepository: ServerRepository,
     private val clientFactory: () -> SmbClient = { SmbjClient() },
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
 ) {
+    private val sessionMutex = Mutex()
+    private var sessionKey: BrowseConnectionKey? = null
+    private var sessionClient: SmbClient? = null
+
     sealed class BrowseContent {
         data class Shares(val entries: List<RemoteEntry>) : BrowseContent()
         data class Directory(val entries: List<RemoteEntry>) : BrowseContent()
@@ -35,23 +41,22 @@ class BrowseRepository(
         serverId: String,
         location: RemoteLocation,
     ): Result<BrowseContent> = withContext(ioDispatcher) {
-        val server = serverRepository.getServer(serverId)
-            ?: return@withContext Result.failure(IllegalArgumentException("Server not found"))
-        val password = serverRepository.getPassword(server)
-            ?: return@withContext Result.failure(IllegalStateException("Missing credentials"))
+        sessionMutex.withLock {
+            loadWithSession(serverId, location)
+        }
+    }
 
-        val client = clientFactory()
-        val credentials = SmbCredentials(
-            host = server.host,
-            port = server.port,
-            username = server.username,
-            password = password,
-            domain = server.domain.orEmpty(),
-        )
+    private suspend fun loadWithSession(
+        serverId: String,
+        location: RemoteLocation,
+    ): Result<BrowseContent> {
+        val server = serverRepository.getServer(serverId)
+            ?: return Result.failure(IllegalArgumentException("Server not found"))
+        val requestedKey = BrowseConnectionKey.from(server)
         try {
-            client.connect(credentials)
+            val client = ensureSession(server, requestedKey)
             coroutineContext.ensureActive()
-            if (location.isShareList) {
+            return if (location.isShareList) {
                 Result.success(BrowseContent.Shares(listShares(client, server)))
             } else {
                 val relative = location.normalizedPath
@@ -61,14 +66,57 @@ class BrowseRepository(
                 Result.success(BrowseContent.Directory(filtered))
             }
         } catch (e: SmbException) {
-            Result.failure(e)
+            invalidateSession()
+            return Result.failure(e)
         } catch (t: Throwable) {
             if (t is kotlinx.coroutines.CancellationException) throw t
-            Result.failure(t)
+            return Result.failure(t)
+        }
+    }
+
+    private suspend fun ensureSession(
+        server: SavedServer,
+        requestedKey: BrowseConnectionKey,
+    ): SmbClient {
+        if (
+            !BrowseSessionReusePolicy.requiresNewSession(
+                current = sessionKey,
+                requested = requestedKey,
+                connected = sessionClient?.isConnected == true,
+            )
+        ) {
+            return checkNotNull(sessionClient)
+        }
+        invalidateSession()
+        val password = serverRepository.getPassword(server)
+            ?: error("Missing credentials")
+        val nextClient = clientFactory()
+        try {
+            nextClient.connect(
+                SmbCredentials(
+                    host = server.host,
+                    port = server.port,
+                    username = server.username,
+                    password = password,
+                    domain = server.domain.orEmpty(),
+                ),
+            )
+            sessionClient = nextClient
+            sessionKey = requestedKey
+            return nextClient
+        } catch (t: Throwable) {
+            runCatching { nextClient.close() }
+            throw t
         } finally {
-            runCatching { client.close() }
             password.fill('\u0000')
         }
+    }
+
+    private fun invalidateSession() {
+        val stale = sessionClient
+        sessionClient = null
+        sessionKey = null
+        runCatching { stale?.close() }
     }
 
     private fun listShares(client: SmbClient, server: SavedServer): List<RemoteEntry> {
@@ -148,4 +196,32 @@ class BrowseRepository(
                     .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name },
             )
     }
+}
+
+internal data class BrowseConnectionKey(
+    val serverId: String,
+    val host: String,
+    val port: Int,
+    val username: String,
+    val domain: String,
+    val credentialAlias: String,
+) {
+    companion object {
+        fun from(server: SavedServer): BrowseConnectionKey = BrowseConnectionKey(
+            serverId = server.id,
+            host = server.host,
+            port = server.port,
+            username = server.username,
+            domain = server.domain.orEmpty(),
+            credentialAlias = server.credentialAlias,
+        )
+    }
+}
+
+internal object BrowseSessionReusePolicy {
+    fun requiresNewSession(
+        current: BrowseConnectionKey?,
+        requested: BrowseConnectionKey,
+        connected: Boolean,
+    ): Boolean = !connected || current != requested
 }

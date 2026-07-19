@@ -6,6 +6,7 @@ import com.framenest.core.model.RemoteEntry
 import com.framenest.data.server.ServerRepository
 import com.framenest.smb.SmbClient
 import com.framenest.smb.SmbCredentials
+import com.framenest.smb.SmbRandomAccess
 import com.framenest.smb.SmbjClient
 import com.framenest.data.settings.UserPreferences
 import java.util.concurrent.ConcurrentHashMap
@@ -229,8 +230,13 @@ class ThumbnailRepository(
             workerJobs.removeAll { !it.isActive }
             while (workerJobs.size < desired) {
                 val job = scope.launch {
-                    for (work in queue) {
-                        processOne(work)
+                    val session = ThumbnailWorkerSession()
+                    try {
+                        for (work in queue) {
+                            processOne(work, session)
+                        }
+                    } finally {
+                        session.close()
                     }
                 }
                 workerJobs += job
@@ -242,7 +248,7 @@ class ThumbnailRepository(
         }
     }
 
-    private suspend fun processOne(work: QueuedWork) {
+    private suspend fun processOne(work: QueuedWork, session: ThumbnailWorkerSession) {
         val request = work.request
         val digest = request.key.digest()
         val workKey = QueuedWorkKey(work.generation, digest)
@@ -266,7 +272,7 @@ class ThumbnailRepository(
             }
 
             publish(work, ThumbnailUiState.Loading)
-            val success = generate(work)
+            val success = generate(work, session)
             if (!generation.isCurrent(work.generation)) return
             if (success) {
                 backoff[digest] = ThumbnailBackoff.afterSuccess()
@@ -289,22 +295,15 @@ class ThumbnailRepository(
         }
     }
 
-    private suspend fun generate(work: QueuedWork): Boolean {
+    private suspend fun generate(
+        work: QueuedWork,
+        session: ThumbnailWorkerSession,
+    ): Boolean {
         val request = work.request
-        val server = serverRepository.getServer(request.key.serverId) ?: return false
-        val password = serverRepository.getPassword(server) ?: return false
-        val client = clientFactory()
-        val credentials = SmbCredentials(
-            host = server.host,
-            port = server.port,
-            username = server.username,
-            password = password,
-            domain = server.domain.orEmpty(),
-        )
         return try {
-            client.connect(credentials)
+            val randomAccess = session.open(request) ?: return false
             coroutineContext.ensureActive()
-            client.openRandomAccess(request.share, request.path).use { raf ->
+            randomAccess.use { raf ->
                 coroutineContext.ensureActive()
                 val label = "thumb://${request.share}/${request.path.trimStart('/')}"
                 val result = extractor.extract(raf, debugLabel = label) ?: return false
@@ -336,12 +335,67 @@ class ThumbnailRepository(
             }
         } catch (t: Throwable) {
             if (t is CancellationException) throw t
+            session.invalidate()
             Log.w(TAG, "thumb generate failed: ${t.javaClass.simpleName}")
             false
-        } finally {
-            runCatching { client.close() }
-            password.fill('\u0000')
         }
+    }
+
+    /** One SMB session per extraction worker; never shared across parallel workers. */
+    private inner class ThumbnailWorkerSession : AutoCloseable {
+        private var key: ThumbnailConnectionKey? = null
+        private var client: SmbClient? = null
+
+        suspend fun open(request: ThumbnailRequest): SmbRandomAccess? {
+            val server = serverRepository.getServer(request.key.serverId) ?: return null
+            val requestedKey = ThumbnailConnectionKey(
+                serverId = server.id,
+                host = server.host,
+                port = server.port,
+                username = server.username,
+                domain = server.domain.orEmpty(),
+                credentialAlias = server.credentialAlias,
+            )
+            if (
+                ThumbnailSessionReusePolicy.requiresNewSession(
+                    current = key,
+                    requested = requestedKey,
+                    connected = client?.isConnected == true,
+                )
+            ) {
+                invalidate()
+                val password = serverRepository.getPassword(server) ?: return null
+                val nextClient = clientFactory()
+                try {
+                    nextClient.connect(
+                        SmbCredentials(
+                            host = server.host,
+                            port = server.port,
+                            username = server.username,
+                            password = password,
+                            domain = server.domain.orEmpty(),
+                        ),
+                    )
+                    client = nextClient
+                    key = requestedKey
+                } catch (t: Throwable) {
+                    runCatching { nextClient.close() }
+                    throw t
+                } finally {
+                    password.fill('\u0000')
+                }
+            }
+            return client?.openRandomAccess(request.share, request.path)
+        }
+
+        fun invalidate() {
+            val stale = client
+            client = null
+            key = null
+            runCatching { stale?.close() }
+        }
+
+        override fun close() = invalidate()
     }
 
     private fun publish(work: QueuedWork, state: ThumbnailUiState) {
@@ -388,4 +442,21 @@ class ThumbnailRepository(
         private const val TAG = "FrameNestThumb"
         private const val MAX_RETAINED_UI_STATES = 64
     }
+}
+
+internal data class ThumbnailConnectionKey(
+    val serverId: String,
+    val host: String,
+    val port: Int,
+    val username: String,
+    val domain: String,
+    val credentialAlias: String,
+)
+
+internal object ThumbnailSessionReusePolicy {
+    fun requiresNewSession(
+        current: ThumbnailConnectionKey?,
+        requested: ThumbnailConnectionKey,
+        connected: Boolean,
+    ): Boolean = !connected || current != requested
 }
