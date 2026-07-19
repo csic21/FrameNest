@@ -30,6 +30,7 @@ class ListenTranslateSession(
     contentKey: String = "",
     private val windowMs: Long = ListenTranslateWindows.DEFAULT_WINDOW_MS,
     private val pollIntervalMs: Long = 500L,
+    private val monotonicTimeMs: () -> Long = { System.nanoTime() / 1_000_000L },
 ) {
     private val _ui = MutableStateFlow(ListenTranslateUiState())
     val uiState: StateFlow<ListenTranslateUiState> = _ui.asStateFlow()
@@ -48,6 +49,8 @@ class ListenTranslateSession(
     private var lastPositionMs: Long = 0L
     private var lastDurationMs: Long = 0L
     private var isPlaying: Boolean = false
+    private var isBuffering: Boolean = false
+    private var processingRealtimeFactor: Double? = null
 
     fun setContentKey(contentKey: String) {
         val normalized = contentKey.trim()
@@ -81,6 +84,7 @@ class ListenTranslateSession(
                     overlayText = "",
                     isProcessing = false,
                     status = ListenTranslateJobStatus.Idle,
+                    prefetchLookAheadMs = 0L,
                 )
             }
         }
@@ -129,11 +133,27 @@ class ListenTranslateSession(
         _ui.update { it.copy(errorMessage = message, isInstallingModels = false) }
     }
 
-    fun onPlaybackTick(positionMs: Long, durationMs: Long, playing: Boolean) {
-        lastPositionMs = positionMs.coerceAtLeast(0L)
+    fun onPlaybackTick(
+        positionMs: Long,
+        durationMs: Long,
+        playing: Boolean,
+        buffering: Boolean = false,
+    ) {
+        val normalizedPosition = positionMs.coerceAtLeast(0L)
+        val farSeek = ListenPrefetchPolicy.isFarSeek(lastPositionMs, normalizedPosition, windowMs)
+        val enteredBuffering = buffering && !isBuffering
+        lastPositionMs = normalizedPosition
         lastDurationMs = durationMs.coerceAtLeast(0L)
         isPlaying = playing
+        isBuffering = buffering
         refreshActiveCue()
+        if (_ui.value.enabled && (farSeek || enteredBuffering)) {
+            // Cancel stale look-ahead immediately. The replacement poll either targets
+            // the new seek position or waits without touching SMB while buffering.
+            stopPolling()
+            _ui.update { it.copy(isProcessing = false) }
+            startPolling()
+        }
     }
 
     fun release() {
@@ -146,6 +166,7 @@ class ListenTranslateSession(
     private fun activate() {
         activationJob?.cancel()
         stopPolling()
+        processingRealtimeFactor = null
         activationJob = scope.launch {
             ensureJobAndRefresh()
             if (_ui.value.enabled) startPolling()
@@ -207,7 +228,6 @@ class ListenTranslateSession(
         }
         startObserving()
         refreshActiveCue()
-        maybeFillAroundPosition()
     }
 
     private fun refreshActiveCue() {
@@ -219,33 +239,26 @@ class ListenTranslateSession(
 
     private suspend fun maybeFillAroundPosition() {
         if (!_ui.value.enabled) return
-        val position = lastPositionMs
-        val duration = lastDurationMs
-        val (start, end) = ListenTranslateWindows.windowContaining(
-            positionMs = position,
-            windowMs = windowMs,
-            durationMs = duration,
-        )
-        if (!ListenTranslateWindows.needsFill(cachedCues, start, end)) {
-            // Prefetch next window while playing.
-            if (isPlaying) {
-                val nextStart = end
-                if (duration <= 0L || nextStart < duration) {
-                    val nextEnd = if (duration > 0L) {
-                        (nextStart + windowMs).coerceAtMost(duration)
-                    } else {
-                        nextStart + windowMs
-                    }
-                    if (nextEnd > nextStart &&
-                        ListenTranslateWindows.needsFill(cachedCues, nextStart, nextEnd)
-                    ) {
-                        processWindow(nextStart, nextEnd)
-                    }
-                }
-            }
+        if (isBuffering) {
+            _ui.update { it.copy(prefetchLookAheadMs = 0L) }
             return
         }
-        processWindow(start, end)
+        val position = lastPositionMs
+        val duration = lastDurationMs
+        val lookAheadMs = ListenPrefetchPolicy.lookAheadMs(
+            playing = isPlaying,
+            buffering = isBuffering,
+            realtimeFactor = processingRealtimeFactor,
+        )
+        _ui.update { it.copy(prefetchLookAheadMs = lookAheadMs) }
+        val next = ListenPrefetchPolicy.nextWindow(
+            cues = cachedCues,
+            positionMs = position,
+            durationMs = duration,
+            windowMs = windowMs,
+            lookAheadMs = lookAheadMs,
+        ) ?: return
+        processWindow(next.first, next.second)
     }
 
     private suspend fun processWindow(startMs: Long, endMs: Long) {
@@ -268,11 +281,17 @@ class ListenTranslateSession(
                 )
             }
             try {
+                val engineStartedAtMs = monotonicTimeMs()
                 val result = engine.processWindow(
                     startMs = startMs,
                     endMs = endMs,
                     sourceLang = langs.sourceLang,
                     targetLang = langs.targetLang,
+                )
+                processingRealtimeFactor = ListenPrefetchPolicy.updateRealtimeFactor(
+                    previous = processingRealtimeFactor,
+                    elapsedMs = monotonicTimeMs() - engineStartedAtMs,
+                    audioMs = endMs - startMs,
                 )
                 var speechCoversWindow = false
                 if (result.textSrc.isNotBlank() || result.textTgt.isNotBlank()) {
@@ -335,6 +354,7 @@ class ListenTranslateSession(
                 }
                 refreshActiveCue()
             } catch (cancelled: CancellationException) {
+                _ui.update { it.copy(isProcessing = false) }
                 throw cancelled
             } catch (t: Throwable) {
                 val msg = t.message?.take(160) ?: t.javaClass.simpleName

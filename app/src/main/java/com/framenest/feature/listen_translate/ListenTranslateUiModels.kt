@@ -53,6 +53,8 @@ data class ListenTranslateUiState(
     /** True while core ASR/MT packs are being installed into app-private storage. */
     val isInstallingModels: Boolean = false,
     val modelsReady: Boolean = false,
+    /** Current adaptive rolling-cache target; zero means playback pressure disabled prefetch. */
+    val prefetchLookAheadMs: Long = 0L,
 ) {
     val languages: ListenLanguagePair
         get() = ListenLanguagePair(sourceLang, targetLang).normalized()

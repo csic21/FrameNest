@@ -191,6 +191,7 @@
     <string name="listen_translate_covered">已覆盖至 %1$d 秒</string>
     <string name="listen_translate_installing">正在安装本机模型…</string>
     <string name="listen_translate_models_ready">模型已就绪</string>
+    <string name="listen_translate_prefetch">预生成未来 %1$d 秒</string>
 
     <string name="settings_listen_models_row">听译模型（本机）</string>
     <string name="settings_listen_models_hint">在此安装与查看各语言 Vosk small ASR（约 40–80MB/语种，存应用私有目录）。下载可断点续传并做完整性校验；翻译包由 ML Kit 管理。默认仅 Wi-Fi/有线网络；卸载应用后删除。</string>

@@ -150,6 +150,15 @@ fun ListenTranslateControls(
                     append(" · ")
                     append(stringResource(R.string.listen_translate_models_ready))
                 }
+                if (uiState.prefetchLookAheadMs > 0L) {
+                    append(" · ")
+                    append(
+                        stringResource(
+                            R.string.listen_translate_prefetch,
+                            uiState.prefetchLookAheadMs / 1_000L,
+                        ),
+                    )
+                }
                 if (uiState.coveredUntilMs > 0L) {
                     append(" · ")
                     append(

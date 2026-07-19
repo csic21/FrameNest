@@ -16,6 +16,7 @@ import com.framenest.data.listen_translate.ListenTranslateRepository
 import com.framenest.data.server.AppDatabase
 import com.framenest.data.settings.UserPreferences
 import com.framenest.feature.listen_translate.ListenDisplayMode
+import com.framenest.feature.listen_translate.ListenCacheVariant
 import com.framenest.feature.listen_translate.ListenTranslateEngine
 import com.framenest.feature.listen_translate.ListenTranslateSession
 import com.framenest.feature.listen_translate.ListenTranslateUiState
@@ -114,13 +115,14 @@ class PlayerViewModel(
     private var listenPrepareGeneration: Long = 0L
     private val listenPrepareMutex = Mutex()
     private var listenRestartPendingAfterSourceChange = false
+    private val listenBaseContentKey = initialListenContentKey(application, request)
 
     private val listenSession = ListenTranslateSession(
         repository = listenTranslateRepository,
         engine = PendingListenEngine,
         scope = viewModelScope,
         identity = request.identity,
-        contentKey = initialListenContentKey(application, request),
+        contentKey = ListenCacheVariant.contentKey(listenBaseContentKey, null),
     )
     val listenTranslateUiState: StateFlow<ListenTranslateUiState> = listenSession.uiState
 
@@ -164,10 +166,17 @@ class PlayerViewModel(
         }
         viewModelScope.launch {
             controller.state.collect { state ->
+                listenSession.setContentKey(
+                    ListenCacheVariant.contentKey(
+                        listenBaseContentKey,
+                        selectedAudioTrackOrdinal(state),
+                    ),
+                )
                 listenSession.onPlaybackTick(
                     positionMs = state.positionMs,
                     durationMs = state.durationMs,
                     playing = state.phase == PlayerState.Phase.Playing,
+                    buffering = state.isBuffering,
                 )
                 if (state.phase == PlayerState.Phase.Playing) {
                     ensureProgressLoop()
@@ -374,10 +383,14 @@ class PlayerViewModel(
         }
     }
 
-    private fun selectedAudioTrackOrdinal(): Int? {
-        val state = controller.state.value
+    private fun selectedAudioTrackOrdinal(
+        state: PlayerState = controller.state.value,
+    ): Int? {
         val selectedId = state.selectedAudioTrackId ?: return null
-        return state.audioTracks.indexOfFirst { it.id == selectedId }.takeIf { it >= 0 }
+        return state.audioTracks
+            .filter { it.id >= 0 }
+            .indexOfFirst { it.id == selectedId }
+            .takeIf { it >= 0 }
     }
 
     /**
@@ -488,6 +501,12 @@ class PlayerViewModel(
     }
 
     fun selectAudioTrack(trackId: Int) {
+        val state = controller.state.value
+        val ordinal = state.audioTracks
+            .filter { it.id >= 0 }
+            .indexOfFirst { it.id == trackId }
+            .takeIf { it >= 0 }
+        listenSession.setContentKey(ListenCacheVariant.contentKey(listenBaseContentKey, ordinal))
         controller.selectAudioTrack(trackId)
     }
 

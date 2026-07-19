@@ -5,6 +5,10 @@ import com.framenest.data.listen_translate.FakeListenTranslateDao
 import com.framenest.data.listen_translate.ListenLanguagePair
 import com.framenest.data.listen_translate.ListenTranslateJobStatus
 import com.framenest.data.listen_translate.ListenTranslateRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -12,6 +16,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ListenTranslateSessionTest {
 
     @Test
@@ -76,6 +81,150 @@ class ListenTranslateSessionTest {
         session.setEnabled(false)
 
         assertEquals("模型下载失败", session.uiState.value.errorMessage)
+        session.release()
+    }
+
+    @Test
+    fun fastPipeline_prefetchesContiguousThirtySecondCache() = runTest {
+        val identity = PlaybackIdentity("server", "media", "movie.mkv")
+        val repository = ListenTranslateRepository(FakeListenTranslateDao())
+        val processed = mutableListOf<Pair<Long, Long>>()
+        var monotonicMs = 0L
+        val engine = object : ListenTranslateEngine {
+            override val asrModelId = "asr-test"
+            override val mtModelId = "mt-test"
+
+            override suspend fun processWindow(
+                startMs: Long,
+                endMs: Long,
+                sourceLang: String,
+                targetLang: String,
+            ): ListenWindowResult {
+                processed += startMs to endMs
+                monotonicMs += 1_500L // 0.5x realtime for a 3-second window.
+                return ListenWindowResult(textSrc = "", textTgt = "")
+            }
+        }
+        val session = ListenTranslateSession(
+            repository = repository,
+            engine = engine,
+            scope = this,
+            identity = identity,
+            pollIntervalMs = 100L,
+            monotonicTimeMs = { monotonicMs },
+        )
+
+        session.onPlaybackTick(0L, 60_000L, playing = true)
+        session.setEnabled(true)
+        advanceTimeBy(1_200L)
+        runCurrent()
+
+        assertEquals((0L until 30_000L step 3_000L).toList(), processed.map { it.first })
+        assertEquals(30_000L, session.uiState.value.coveredUntilMs)
+        assertEquals(30_000L, session.uiState.value.prefetchLookAheadMs)
+        session.release()
+    }
+
+    @Test
+    fun buffering_cancelsInFlightLookAhead() = runTest {
+        val identity = PlaybackIdentity("server", "media", "movie.mkv")
+        val languages = ListenLanguagePair("en", "zh")
+        val repository = ListenTranslateRepository(FakeListenTranslateDao())
+        repository.ensureJob(
+            identity = identity,
+            languages = languages,
+            asrModel = "asr-test",
+            mtModel = "mt-test",
+        )
+        repository.upsertCue(identity, languages, 0L, 3_000L, "", "", rev = 0)
+        var cancelled = false
+        val engine = object : ListenTranslateEngine {
+            override val asrModelId = "asr-test"
+            override val mtModelId = "mt-test"
+
+            override suspend fun processWindow(
+                startMs: Long,
+                endMs: Long,
+                sourceLang: String,
+                targetLang: String,
+            ): ListenWindowResult = try {
+                delay(10_000L)
+                ListenWindowResult("late", "迟到")
+            } catch (cause: CancellationException) {
+                cancelled = true
+                throw cause
+            }
+        }
+        val session = ListenTranslateSession(
+            repository = repository,
+            engine = engine,
+            scope = this,
+            identity = identity,
+            pollIntervalMs = 100L,
+        )
+
+        session.onPlaybackTick(0L, 60_000L, playing = true)
+        session.setEnabled(true)
+        runCurrent()
+        session.onPlaybackTick(100L, 60_000L, playing = true, buffering = true)
+        runCurrent()
+
+        assertTrue(cancelled)
+        assertEquals(0L, session.uiState.value.prefetchLookAheadMs)
+        assertFalse(session.uiState.value.isProcessing)
+        session.release()
+    }
+
+    @Test
+    fun farSeek_cancelsOldLookAheadAndTargetsNewPosition() = runTest {
+        val identity = PlaybackIdentity("server", "media", "movie.mkv")
+        val languages = ListenLanguagePair("en", "zh")
+        val repository = ListenTranslateRepository(FakeListenTranslateDao())
+        repository.ensureJob(
+            identity = identity,
+            languages = languages,
+            asrModel = "asr-test",
+            mtModel = "mt-test",
+        )
+        repository.upsertCue(identity, languages, 0L, 3_000L, "", "", rev = 0)
+        val starts = mutableListOf<Long>()
+        var cancellationCount = 0
+        val engine = object : ListenTranslateEngine {
+            override val asrModelId = "asr-test"
+            override val mtModelId = "mt-test"
+
+            override suspend fun processWindow(
+                startMs: Long,
+                endMs: Long,
+                sourceLang: String,
+                targetLang: String,
+            ): ListenWindowResult {
+                starts += startMs
+                return try {
+                    delay(10_000L)
+                    ListenWindowResult("late", "迟到")
+                } catch (cause: CancellationException) {
+                    cancellationCount++
+                    throw cause
+                }
+            }
+        }
+        val session = ListenTranslateSession(
+            repository = repository,
+            engine = engine,
+            scope = this,
+            identity = identity,
+            pollIntervalMs = 100L,
+        )
+
+        session.onPlaybackTick(0L, 60_000L, playing = true)
+        session.setEnabled(true)
+        runCurrent()
+        session.onPlaybackTick(30_000L, 60_000L, playing = true)
+        runCurrent()
+
+        assertEquals(listOf(3_000L, 30_000L), starts)
+        assertEquals(1, cancellationCount)
         session.release()
     }
 }

@@ -27,6 +27,7 @@
 | FN-20 播放器产品体验 | 已完成 | agent | `agent/FN-20-player-product-polish` | FN-16..FN-19 | [FN-20](handoffs/FN-20.md) |
 | FN-21 听译模型交付 | 已完成 | agent | `agent/FN-21-model-delivery-hardening` | FN-14, FN-20 | [FN-21](handoffs/FN-21.md) |
 | FN-22 SMB/缩略图性能 | 已完成 | agent | `agent/FN-22-smb-thumbnail-performance` | FN-07, FN-09, FN-21 | [FN-22](handoffs/FN-22.md) |
+| FN-23 自适应预翻译 | 已完成 | agent | `agent/FN-23-adaptive-listen-prefetch` | FN-14, FN-21, FN-22 | [FN-23](handoffs/FN-23.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。

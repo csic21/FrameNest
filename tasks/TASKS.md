@@ -395,3 +395,21 @@ unit test、lint、debug/release assemble 通过。
 
 验收：会话复用/切换决策有单测；unit test、lint、debug/release assemble 通过；
 记录包体对比；不做真 NAS 延迟和吞吐实测。
+
+## FN-23：播放优先的自适应预翻译缓存
+
+**依赖**：FN-14、FN-21、FN-22  
+**拥有路径**：`feature/listen_translate/**`、`feature/player/PlayerViewModel.kt`、
+`data/listen_translate/**`的最小调用、相关文案/测试/交接  
+**目标**：利用文件可随机读特性，在不抢播放缓冲的前提下预先生成未来字幕并持久化。
+
+工作内容：
+
+- 当前位置缺口永远最高优先级；命中后向前扫描第一个未缓存窗口。
+- 根据 ASR+MT 实测处理时间的平滑实时因子，自动选择 30s / 12s / 0s 领先范围。
+- 播放缓冲时立即取消预取；远距离 seek 取消旧窗口并转向新位置。
+- 预翻译文字继续写 Room，PCM 不落盘；再次进入、回拖或跳转可直接命中。
+- 将选中音轨 ordinal 加入 `contentKey`，音轨变更时不复用错误字幕。
+
+验收：预取范围、窗口选择、实时因子、seek/缓冲取消和音轨 key 有纯逻辑测试；
+全量自动检查通过；真机发热、实时因子与 NAS 带宽影响留待发布验收。
