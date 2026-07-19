@@ -58,6 +58,23 @@ object ListenTranslateWindows {
         return !covering
     }
 
+    /**
+     * Legacy and audible-but-unrecognized blank coverage may be retried only when
+     * the playhead is inside that exact window. Confirmed silence remains cached.
+     */
+    fun needsBlankRecoveryAt(
+        cues: List<ListenTranslateCue>,
+        positionMs: Long,
+        startMs: Long,
+        endMs: Long,
+    ): Boolean {
+        val active = cueAt(cues, positionMs) ?: return false
+        if (active.textSrc.isNotBlank() || active.textTgt.isNotBlank()) return false
+        if (active.startMs > startMs || active.endMs < endMs) return false
+        return active.rev == ListenCoverageRev.LEGACY_BLANK ||
+            active.rev == ListenCoverageRev.UNRECOGNIZED_SPEECH
+    }
+
     fun formatOverlay(
         cue: ListenTranslateCue?,
         mode: ListenDisplayMode,
@@ -76,4 +93,10 @@ object ListenTranslateWindows {
             }
         }
     }
+}
+
+internal object ListenCoverageRev {
+    const val LEGACY_BLANK: Int = 0
+    const val CONFIRMED_SILENCE: Int = 1
+    const val UNRECOGNIZED_SPEECH: Int = 2
 }

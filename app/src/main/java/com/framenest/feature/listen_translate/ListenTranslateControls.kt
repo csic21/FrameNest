@@ -163,11 +163,18 @@ fun ListenTranslateControls(
                     append(" · ")
                     append(
                         stringResource(
-                            R.string.listen_translate_covered,
+                            R.string.listen_translate_scanned,
                             uiState.coveredUntilMs / 1000L,
                         ),
                     )
                 }
+                append(" · ")
+                append(
+                    stringResource(
+                        R.string.listen_translate_generated_count,
+                        uiState.generatedCueCount,
+                    ),
+                )
             }
             Text(
                 text = statusLine,
@@ -181,6 +188,25 @@ fun ListenTranslateControls(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            if (uiState.errorMessage == null) {
+                val blankMessage = when (uiState.lastBlankReason) {
+                    ListenBlankReason.EmptyPcm ->
+                        stringResource(R.string.listen_translate_blank_no_audio)
+                    ListenBlankReason.NearSilence ->
+                        stringResource(R.string.listen_translate_blank_silence)
+                    ListenBlankReason.UnrecognizedSpeech ->
+                        stringResource(R.string.listen_translate_blank_unrecognized)
+                    null -> null
+                }
+                blankMessage?.let { message ->
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.testTag("listen_translate_blank_reason"),
+                    )
+                }
             }
             uiState.errorMessage?.let { err ->
                 Text(

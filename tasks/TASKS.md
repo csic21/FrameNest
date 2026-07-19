@@ -469,3 +469,25 @@ unit test、lint、debug/release assemble 通过。
 验收：单元测试、lint、Release 构建通过；真机覆盖安装后 SMB 根目录可返回，Vosk
 不再报 `org.vosk.LibVosk`，ML Kit 可进入本机翻译模型准备阶段，且无新的
 `com.framenest` crash；不记录或导出 NAS 地址、用户名、密码。
+
+## FN-27：听译空结果诊断与恢复
+
+**依赖**：FN-23、FN-26
+**拥有路径**：`feature/listen_translate/**`、`feature/player/PlayerViewModel.kt`、
+`player/audio/PcmWindowDecoder.kt`、
+相关决策/文案、测试与交接记录
+**目标**：避免无音频或 ASR 空结果被误报为“已生成字幕”，并让当前播放窗口
+能从旧空白缓存中恢复。
+
+工作内容：
+
+- 区分 PCM 为空、近静音与有声但 Vosk 未识别三种空结果。
+- PCM 为空时显示可操作错误且不写入覆盖；静音可作为已扫描窗口缓存。
+- 远程容器无法解码时区分“未发现音轨”与“音轨未输出 PCM”，为回退路径提供证据。
+- SMB 听译改用 `MediaDataSource.readAt()` 直接对接已有随机读，避开部分机型
+  `MediaExtractor` 无法从代理 FD 探测音轨的问题。
+- 当前播放窗口命中历史空白覆盖时允许有界重试，不对预取静音无限重复识别。
+- 状态面板分开“已扫描至”和“已生成 N 条”，并提示最近空结果原因。
+
+验收：空结果分类、当前窗口恢复、预取边界和状态文案有自动测试；
+unit test、lint、debug/release assemble 通过；不导出 PCM 或 NAS 信息。

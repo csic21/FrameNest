@@ -61,8 +61,13 @@ class RealListenTranslateEngine(
                 t,
             )
         }
-        if (pcm.isEmpty()) {
-            return ListenWindowResult(textSrc = "", textTgt = "")
+        when (val blankReason = listenPcmBlankReason(pcm)) {
+            null -> Unit
+            else -> return ListenWindowResult(
+                textSrc = "",
+                textTgt = "",
+                blankReason = blankReason,
+            )
         }
 
         val recognition = try {
@@ -89,7 +94,11 @@ class RealListenTranslateEngine(
             ""
         }
         if (textSrc.isBlank()) {
-            return ListenWindowResult(textSrc = "", textTgt = "")
+            return ListenWindowResult(
+                textSrc = "",
+                textTgt = "",
+                blankReason = ListenBlankReason.UnrecognizedSpeech,
+            )
         }
 
         val cueStartMs = wordsInWindow.firstOrNull()
@@ -132,6 +141,12 @@ class RealListenTranslateEngine(
     private companion object {
         const val CONTEXT_PADDING_MS = 750L
     }
+}
+
+internal fun listenPcmBlankReason(pcm16kMono: ShortArray): ListenBlankReason? = when {
+    pcm16kMono.isEmpty() -> ListenBlankReason.EmptyPcm
+    VoskAsrEngine.isNearSilence(pcm16kMono) -> ListenBlankReason.NearSilence
+    else -> null
 }
 
 internal fun selectWordsForWindow(

@@ -1,13 +1,15 @@
 package com.framenest.feature.listen_translate.audio
 
 import android.content.Context
-import android.content.res.AssetFileDescriptor
+import android.media.MediaDataSource
 import androidx.annotation.RawRes
-import com.framenest.player.SmbSeekableMedia
 import com.framenest.player.audio.PcmAudioMath
 import com.framenest.player.audio.PcmWindowDecoder
 import com.framenest.smb.SmbClient
+import com.framenest.smb.SmbRandomAccess
 import java.io.Closeable
+import java.io.IOException
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -58,20 +60,20 @@ class RawListenAudioSource(
 }
 
 /**
- * Keeps one read-only SMB proxy descriptor for the ASR session and replaces it when the
- * player's SMB client reconnects. This avoids reopening the NAS file every few seconds.
+ * Keeps one read-only SMB random-access handle for the ASR session and replaces it when the
+ * dedicated client reconnects. This avoids reopening the NAS file every few seconds.
  * Credentials never logged.
  */
 class SmbListenAudioSource(
-    private val context: Context,
     private val clientProvider: () -> SmbClient?,
+    private val reconnectClient: suspend () -> SmbClient?,
     private val share: String,
     private val path: String,
     private val decoder: PcmWindowDecoder = PcmWindowDecoder(),
 ) : ListenAudioSource {
     private val mutex = Mutex()
     private var openedClient: SmbClient? = null
-    private var opened: SmbSeekableMedia.SeekableOpenResult? = null
+    private var opened: SmbRandomAccess? = null
 
     override suspend fun pcmWindow(
         startMs: Long,
@@ -80,29 +82,61 @@ class SmbListenAudioSource(
     ): ShortArray =
         mutex.withLock {
             withContext(Dispatchers.IO) {
-                val client = clientProvider() ?: error("SMB 听译会话未连接")
-                if (openedClient !== client) {
-                    closeOpened()
-                }
+                val client = clientProvider() ?: reconnectClient()
+                    ?: error("SMB 听译会话未连接")
                 try {
-                    val current = opened ?: open(client).also {
-                        opened = it
-                        openedClient = client
-                    }
-                    decoder.decodeAfd(
-                        current.assetFileDescriptor,
-                        startMs,
-                        endMs,
-                        preferredAudioTrackOrdinal,
-                    )
+                    decodeWindow(client, startMs, endMs, preferredAudioTrackOrdinal)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (t: Throwable) {
                     closeOpened()
-                    throw t
+                    if (!isRetryableSmbAudioFailure(t)) throw t
+                    val replacement = reconnectClient() ?: throw t
+                    try {
+                        decodeWindow(
+                            replacement,
+                            startMs,
+                            endMs,
+                            preferredAudioTrackOrdinal,
+                        )
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (retryFailure: Throwable) {
+                        closeOpened()
+                        throw retryFailure
+                    }
                 }
             }
         }
+
+    private suspend fun decodeWindow(
+        client: SmbClient,
+        startMs: Long,
+        endMs: Long,
+        preferredAudioTrackOrdinal: Int?,
+    ): ShortArray {
+        if (openedClient !== client) closeOpened()
+        val randomAccess = opened ?: open(client).also {
+            opened = it
+            openedClient = client
+        }
+        // MediaExtractor closes its MediaDataSource when released. Rotate only the
+        // lightweight wrapper and retain the underlying SMB file handle for read-ahead.
+        val mediaSource = SmbRandomAccessMediaDataSource(
+            randomAccess = randomAccess,
+            closeRandomAccessOnClose = false,
+        )
+        return try {
+            decoder.decodeMediaDataSource(
+                source = mediaSource,
+                startMs = startMs,
+                endMs = endMs,
+                preferredAudioTrackOrdinal = preferredAudioTrackOrdinal,
+            )
+        } finally {
+            runCatching { mediaSource.close() }
+        }
+    }
 
     override fun close() {
         runBlocking {
@@ -110,25 +144,44 @@ class SmbListenAudioSource(
         }
     }
 
-    private fun open(client: SmbClient): SmbSeekableMedia.SeekableOpenResult {
-        val randomAccess = client.openRandomAccess(share, path)
-        return try {
-            SmbSeekableMedia.open(
-                context = context,
-                randomAccess = randomAccess,
-                debugLabel = "listen-pcm",
-            )
-        } catch (t: Throwable) {
-            runCatching { randomAccess.close() }
-            throw t
+    private fun open(client: SmbClient): SmbRandomAccess =
+        client.openRandomAccess(share, path)
+
+    private fun closeOpened() {
+        val source = opened
+        opened = null
+        openedClient = null
+        runCatching { source?.close() }
+    }
+}
+
+/** Bridges SMBJ random reads directly into MediaExtractor without a proxy FD. */
+internal class SmbRandomAccessMediaDataSource(
+    private val randomAccess: SmbRandomAccess,
+    private val closeRandomAccessOnClose: Boolean = true,
+) : MediaDataSource() {
+    private val closed = AtomicBoolean(false)
+    private val length = randomAccess.size.coerceAtLeast(0L)
+
+    @Synchronized
+    @Throws(IOException::class)
+    override fun readAt(position: Long, buffer: ByteArray, offset: Int, size: Int): Int {
+        if (closed.get()) throw IOException("SMB audio source is closed")
+        if (position < 0L || size < 0) throw IOException("Invalid media read")
+        if (size == 0) return 0
+        if (position >= length) return -1
+        return randomAccess.readAt(position, buffer, offset, size).let { read ->
+            if (read == 0) -1 else read
         }
     }
 
-    private fun closeOpened() {
-        val afd: AssetFileDescriptor? = opened?.assetFileDescriptor
-        opened = null
-        openedClient = null
-        runCatching { afd?.close() }
+    override fun getSize(): Long = length
+
+    @Synchronized
+    override fun close() {
+        if (closed.compareAndSet(false, true) && closeRandomAccessOnClose) {
+            randomAccess.close()
+        }
     }
 }
 
@@ -201,16 +254,27 @@ object ListenAudioSources {
         CachingListenAudioSource(RawListenAudioSource(context.applicationContext, resId))
 
     fun forSmb(
-        context: Context,
         clientProvider: () -> SmbClient?,
+        reconnectClient: suspend () -> SmbClient?,
         share: String,
         path: String,
     ): ListenAudioSource = CachingListenAudioSource(
         SmbListenAudioSource(
-            context.applicationContext,
             clientProvider,
+            reconnectClient,
             share,
             path,
         ),
     )
 }
+
+internal fun isRetryableSmbAudioFailure(error: Throwable): Boolean =
+    generateSequence(error) { it.cause }.any { cause ->
+        cause is IOException ||
+            cause.message?.let { message ->
+                message.contains("broken pipe", ignoreCase = true) ||
+                    message.contains("connection reset", ignoreCase = true) ||
+                    message.contains("socket closed", ignoreCase = true) ||
+                    message.contains("disconnected", ignoreCase = true)
+            } == true
+    }

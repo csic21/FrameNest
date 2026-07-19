@@ -28,7 +28,15 @@ data class ListenWindowResult(
     val cueEndMs: Long? = null,
     /** Non-fatal stage failure: source text may be shown, but the window remains retryable. */
     val retryableErrorMessage: String? = null,
+    /** Why an otherwise successful window produced no cue. */
+    val blankReason: ListenBlankReason? = null,
 )
+
+enum class ListenBlankReason {
+    EmptyPcm,
+    NearSilence,
+    UnrecognizedSpeech,
+}
 
 /**
  * Deterministic offline stub so UI/Room can be demoed without models.

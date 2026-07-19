@@ -48,4 +48,22 @@ class ListenWindowRetryPolicyTest {
             ),
         )
     }
+
+    @Test
+    fun recoverableBlank_isRetriedOnceThenStops() {
+        var now = 0L
+        val policy = ListenWindowRetryPolicy(
+            nowMs = { now },
+            baseDelayMs = 100L,
+            maxRecoverableBlankAttempts = 2,
+        )
+        val key = ListenWindowAttemptKey(0L, 3_000L, ListenLanguagePair("ja", "zh"))
+
+        policy.recordRecoverableBlank(key)
+        assertFalse(policy.canAttempt(key))
+        now = 100L
+        assertTrue(policy.canAttempt(key))
+        policy.recordRecoverableBlank(key)
+        assertFalse(policy.canAttempt(key))
+    }
 }

@@ -2,6 +2,7 @@ package com.framenest.feature.listen_translate
 
 import com.framenest.feature.listen_translate.asr.VoskWord
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class RealListenTranslateWindowTest {
@@ -22,5 +23,12 @@ class RealListenTranslateWindowTest {
         )
 
         assertEquals(listOf("inside"), selected.map { it.text })
+    }
+
+    @Test
+    fun pcmBlankReason_distinguishesMissingAudioFromSilence() {
+        assertEquals(ListenBlankReason.EmptyPcm, listenPcmBlankReason(shortArrayOf()))
+        assertEquals(ListenBlankReason.NearSilence, listenPcmBlankReason(ShortArray(16_000)))
+        assertNull(listenPcmBlankReason(ShortArray(16_000) { 2_000 }))
     }
 }

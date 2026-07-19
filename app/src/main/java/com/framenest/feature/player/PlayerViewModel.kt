@@ -374,11 +374,27 @@ class PlayerViewModel(
                 ListenAudioSources.forRaw(app, ds.resId)
             is PlaybackDataSource.SeekableSmb -> {
                 if (listenOnlySmbClient == null) return null
-                ListenAudioSources.forSmb(app, { listenOnlySmbClient }, ds.share, ds.path)
+                ListenAudioSources.forSmb(
+                    clientProvider = { listenOnlySmbClient },
+                    reconnectClient = {
+                        ensureSmbConnectedForListen()
+                        listenOnlySmbClient
+                    },
+                    share = ds.share,
+                    path = ds.path,
+                )
             }
             is PlaybackDataSource.DirectSmbUrl -> {
                 if (listenOnlySmbClient == null) return null
-                ListenAudioSources.forSmb(app, { listenOnlySmbClient }, ds.share, ds.path)
+                ListenAudioSources.forSmb(
+                    clientProvider = { listenOnlySmbClient },
+                    reconnectClient = {
+                        ensureSmbConnectedForListen()
+                        listenOnlySmbClient
+                    },
+                    share = ds.share,
+                    path = ds.path,
+                )
             }
         }
     }

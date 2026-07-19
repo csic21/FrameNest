@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.res.AssetFileDescriptor
 import android.media.MediaCodec
 import android.media.MediaCodecList
+import android.media.MediaDataSource
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import androidx.annotation.RawRes
@@ -79,6 +80,16 @@ class PcmWindowDecoder {
         }
     }
 
+    /** Decode from an app-provided random-access source (for example SMB). */
+    suspend fun decodeMediaDataSource(
+        source: MediaDataSource,
+        startMs: Long,
+        endMs: Long,
+        preferredAudioTrackOrdinal: Int? = null,
+    ): ShortArray = withContext(Dispatchers.IO) {
+        decode(startMs, endMs, preferredAudioTrackOrdinal) { it.setDataSource(source) }
+    }
+
     private suspend fun decode(
         startMs: Long,
         endMs: Long,
@@ -94,10 +105,11 @@ class PcmWindowDecoder {
         try {
             configure(extractor)
             val track = selectAudioTrack(extractor, preferredAudioTrackOrdinal)
-                ?: return ShortArray(0)
+                ?: error("系统解码器未从当前容器识别到音轨")
             extractor.selectTrack(track)
             val format = extractor.getTrackFormat(track)
-            val mime = format.getString(MediaFormat.KEY_MIME) ?: return ShortArray(0)
+            val mime = format.getString(MediaFormat.KEY_MIME)
+                ?: error("系统解码器识别到音轨，但没有返回编码格式")
             var sampleRate = format.getIntegerOr(MediaFormat.KEY_SAMPLE_RATE, 44_100)
             var channels = format.getIntegerOr(MediaFormat.KEY_CHANNEL_COUNT, 1)
 
@@ -213,6 +225,9 @@ class PcmWindowDecoder {
             for (chunk in pcmChunks) {
                 chunk.copyInto(mono16k, destinationOffset = destination)
                 destination += chunk.size
+            }
+            check(mono16k.isNotEmpty()) {
+                "系统解码器已打开音轨 $mime，但未输出 PCM"
             }
             return mono16k
         } finally {

@@ -179,6 +179,7 @@ class ListenTranslateSession(
             val langs = _ui.value.languages
             repository.observeCues(identity, langs).collect { cues ->
                 cachedCues = cues
+                updateCueSummary()
                 refreshActiveCue()
             }
         }
@@ -223,6 +224,7 @@ class ListenTranslateSession(
             it.copy(
                 status = job.status,
                 coveredUntilMs = job.coveredUntilMs,
+                generatedCueCount = generatedCueCount(),
                 message = "模型：${engine.asrModelId} / ${engine.mtModelId}（本机）",
             )
         }
@@ -251,17 +253,36 @@ class ListenTranslateSession(
             realtimeFactor = processingRealtimeFactor,
         )
         _ui.update { it.copy(prefetchLookAheadMs = lookAheadMs) }
-        val next = ListenPrefetchPolicy.nextWindow(
+        val current = ListenTranslateWindows.windowContaining(position, windowMs, duration)
+        val recoverCurrent = ListenTranslateWindows.needsBlankRecoveryAt(
             cues = cachedCues,
             positionMs = position,
-            durationMs = duration,
-            windowMs = windowMs,
-            lookAheadMs = lookAheadMs,
-        ) ?: return
-        processWindow(next.first, next.second)
+            startMs = current.first,
+            endMs = current.second,
+        )
+        val next = if (recoverCurrent) {
+            current
+        } else {
+            ListenPrefetchPolicy.nextWindow(
+                cues = cachedCues,
+                positionMs = position,
+                durationMs = duration,
+                windowMs = windowMs,
+                lookAheadMs = lookAheadMs,
+            )
+        } ?: return
+        processWindow(
+            startMs = next.first,
+            endMs = next.second,
+            allowBlankRecovery = recoverCurrent && next == current,
+        )
     }
 
-    private suspend fun processWindow(startMs: Long, endMs: Long) {
+    private suspend fun processWindow(
+        startMs: Long,
+        endMs: Long,
+        allowBlankRecovery: Boolean = false,
+    ) {
         if (endMs <= startMs) return
         val attemptKey = ListenWindowAttemptKey(
             startMs = startMs,
@@ -271,7 +292,8 @@ class ListenTranslateSession(
         if (!retryPolicy.canAttempt(attemptKey)) return
         processMutex.withLock {
             // Re-check under lock.
-            if (!ListenTranslateWindows.needsFill(cachedCues, startMs, endMs)) return
+            val needsFill = ListenTranslateWindows.needsFill(cachedCues, startMs, endMs)
+            if (!needsFill && !allowBlankRecovery) return
             val langs = _ui.value.languages
             _ui.update {
                 it.copy(
@@ -288,6 +310,12 @@ class ListenTranslateSession(
                     sourceLang = langs.sourceLang,
                     targetLang = langs.targetLang,
                 )
+                if (result.blankReason == ListenBlankReason.EmptyPcm) {
+                    _ui.update { it.copy(lastBlankReason = ListenBlankReason.EmptyPcm) }
+                    throw ListenWindowStageException(
+                        "当前音轨未读取到音频，请切换音轨或重新打开视频后重试",
+                    )
+                }
                 processingRealtimeFactor = ListenPrefetchPolicy.updateRealtimeFactor(
                     previous = processingRealtimeFactor,
                     elapsedMs = monotonicTimeMs() - engineStartedAtMs,
@@ -312,6 +340,7 @@ class ListenTranslateSession(
                     // A source-only cue deliberately does not satisfy needsFill(), so
                     // the same window remains eligible for the retry backoff below.
                     cachedCues = repository.listCues(identity, langs)
+                    updateCueSummary()
                     refreshActiveCue()
                 }
                 result.retryableErrorMessage?.let { message ->
@@ -327,7 +356,14 @@ class ListenTranslateSession(
                         endMs = endMs,
                         textSrc = "",
                         textTgt = "",
-                        rev = COVERAGE_REV,
+                        rev = when (result.blankReason) {
+                            ListenBlankReason.NearSilence -> ListenCoverageRev.CONFIRMED_SILENCE
+                            ListenBlankReason.UnrecognizedSpeech ->
+                                ListenCoverageRev.UNRECOGNIZED_SPEECH
+                            // Engines predating blank diagnostics treated empty text as
+                            // a successful silent window. Preserve that contract.
+                            else -> ListenCoverageRev.CONFIRMED_SILENCE
+                        },
                         contentKey = contentKey,
                     )
                 }
@@ -339,12 +375,19 @@ class ListenTranslateSession(
                     durationMs = lastDurationMs.takeIf { it > 0L },
                 )
                 cachedCues = repository.listCues(identity, langs)
-                retryPolicy.recordSuccess(attemptKey)
+                updateCueSummary()
+                if (result.blankReason == ListenBlankReason.UnrecognizedSpeech) {
+                    retryPolicy.recordRecoverableBlank(attemptKey)
+                } else {
+                    retryPolicy.recordSuccess(attemptKey)
+                }
                 _ui.update {
                     it.copy(
                         isProcessing = false,
                         status = ListenTranslateJobStatus.Partial,
                         coveredUntilMs = endMs.coerceAtLeast(it.coveredUntilMs),
+                        generatedCueCount = generatedCueCount(),
+                        lastBlankReason = result.blankReason,
                         message = if (result.textSrc.isBlank()) {
                             it.message
                         } else {
@@ -383,8 +426,11 @@ class ListenTranslateSession(
         }
     }
 
-    private companion object {
-        const val COVERAGE_REV = 0
+    private fun generatedCueCount(): Int =
+        cachedCues.count { it.textSrc.isNotBlank() || it.textTgt.isNotBlank() }
+
+    private fun updateCueSummary() {
+        _ui.update { it.copy(generatedCueCount = generatedCueCount()) }
     }
 }
 
@@ -399,6 +445,7 @@ internal class ListenWindowRetryPolicy(
     private val nowMs: () -> Long = { System.nanoTime() / 1_000_000L },
     private val baseDelayMs: Long = 2_000L,
     private val maxDelayMs: Long = 60_000L,
+    private val maxRecoverableBlankAttempts: Int = 2,
 ) {
     private data class Failure(val count: Int, val retryAtMs: Long)
 
@@ -416,6 +463,17 @@ internal class ListenWindowRetryPolicy(
         val shift = (count - 1).coerceAtMost(20)
         val delayMs = (baseDelayMs * (1L shl shift)).coerceAtMost(maxDelayMs)
         failures[key] = Failure(count = count, retryAtMs = nowMs() + delayMs)
+    }
+
+    fun recordRecoverableBlank(key: ListenWindowAttemptKey) {
+        val count = (failures[key]?.count ?: 0) + 1
+        if (count >= maxRecoverableBlankAttempts) {
+            recordPermanentFailure(key)
+        } else {
+            val shift = (count - 1).coerceAtMost(20)
+            val delayMs = (baseDelayMs * (1L shl shift)).coerceAtMost(maxDelayMs)
+            failures[key] = Failure(count = count, retryAtMs = nowMs() + delayMs)
+        }
     }
 
     fun recordPermanentFailure(key: ListenWindowAttemptKey) {

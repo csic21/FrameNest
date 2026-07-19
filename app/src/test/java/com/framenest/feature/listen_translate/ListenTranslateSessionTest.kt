@@ -20,6 +20,60 @@ import org.junit.Test
 class ListenTranslateSessionTest {
 
     @Test
+    fun legacyBlankAtCurrentPlayhead_isRecoveredAndCounted() = runTest {
+        val identity = PlaybackIdentity("server", "media", "movie.mkv")
+        val languages = ListenLanguagePair("ja", "zh")
+        val repository = ListenTranslateRepository(FakeListenTranslateDao())
+        repository.ensureJob(
+            identity = identity,
+            languages = languages,
+            asrModel = "asr-test",
+            mtModel = "mt-test",
+        )
+        repository.upsertCue(
+            identity,
+            languages,
+            0L,
+            3_000L,
+            "",
+            "",
+            rev = ListenCoverageRev.LEGACY_BLANK,
+        )
+        var calls = 0
+        val engine = object : ListenTranslateEngine {
+            override val asrModelId = "asr-test"
+            override val mtModelId = "mt-test"
+
+            override suspend fun processWindow(
+                startMs: Long,
+                endMs: Long,
+                sourceLang: String,
+                targetLang: String,
+            ): ListenWindowResult {
+                calls++
+                return ListenWindowResult("こんにちは", "你好")
+            }
+        }
+        val session = ListenTranslateSession(
+            repository = repository,
+            engine = engine,
+            scope = this,
+            identity = identity,
+            pollIntervalMs = 60_000L,
+        )
+
+        session.onPlaybackTick(1_000L, 10_000L, playing = false)
+        session.setSourceLang("ja")
+        session.setEnabled(true)
+        runCurrent()
+
+        assertEquals(1, calls)
+        assertEquals(1, session.uiState.value.generatedCueCount)
+        assertEquals("こんにちは\n你好", session.uiState.value.overlayText)
+        session.release()
+    }
+
+    @Test
     fun translationFailure_persistsSourceCue_andKeepsWindowRetryable() = runTest {
         val identity = PlaybackIdentity("server", "media", "movie.mkv")
         val languages = ListenLanguagePair("en", "zh")
@@ -136,7 +190,15 @@ class ListenTranslateSessionTest {
             asrModel = "asr-test",
             mtModel = "mt-test",
         )
-        repository.upsertCue(identity, languages, 0L, 3_000L, "", "", rev = 0)
+        repository.upsertCue(
+            identity,
+            languages,
+            0L,
+            3_000L,
+            "",
+            "",
+            rev = ListenCoverageRev.CONFIRMED_SILENCE,
+        )
         var cancelled = false
         val engine = object : ListenTranslateEngine {
             override val asrModelId = "asr-test"
@@ -186,7 +248,15 @@ class ListenTranslateSessionTest {
             asrModel = "asr-test",
             mtModel = "mt-test",
         )
-        repository.upsertCue(identity, languages, 0L, 3_000L, "", "", rev = 0)
+        repository.upsertCue(
+            identity,
+            languages,
+            0L,
+            3_000L,
+            "",
+            "",
+            rev = ListenCoverageRev.CONFIRMED_SILENCE,
+        )
         val starts = mutableListOf<Long>()
         var cancellationCount = 0
         val engine = object : ListenTranslateEngine {

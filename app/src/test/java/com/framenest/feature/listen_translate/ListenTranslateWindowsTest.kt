@@ -76,6 +76,34 @@ class ListenTranslateWindowsTest {
     }
 
     @Test
+    fun onlyLegacyOrUnrecognizedBlankAtPlayhead_requestsRecovery() {
+        val legacy = listOf(cue(0, 3_000, "", "", ListenCoverageRev.LEGACY_BLANK))
+        val silence = listOf(cue(0, 3_000, "", "", ListenCoverageRev.CONFIRMED_SILENCE))
+        val unrecognized = listOf(
+            cue(0, 3_000, "", "", ListenCoverageRev.UNRECOGNIZED_SPEECH),
+        )
+
+        assertTrue(ListenTranslateWindows.needsBlankRecoveryAt(legacy, 1_000L, 0L, 3_000L))
+        assertFalse(ListenTranslateWindows.needsBlankRecoveryAt(silence, 1_000L, 0L, 3_000L))
+        assertTrue(
+            ListenTranslateWindows.needsBlankRecoveryAt(
+                unrecognized,
+                1_000L,
+                0L,
+                3_000L,
+            ),
+        )
+        assertFalse(
+            ListenTranslateWindows.needsBlankRecoveryAt(
+                listOf(cue(0, 3_000, "speech", "译文")),
+                1_000L,
+                0L,
+                3_000L,
+            ),
+        )
+    }
+
+    @Test
     fun formatOverlay_modes() {
         val c = cue(0, 1_000, "src", "tgt")
         assertEquals("src", ListenTranslateWindows.formatOverlay(c, ListenDisplayMode.SourceOnly))

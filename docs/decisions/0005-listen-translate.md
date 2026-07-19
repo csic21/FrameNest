@@ -104,6 +104,20 @@
 - 专用「清除听译模型」必须同时删除 legacy JSON 包、Vosk ASR 模型以及 ML Kit 已下载的
   Translate 语言包；三者都只位于应用私有存储。普通「清理缓存」仍不删除模型。
 
+### 2026-07-19 accepted 修订（FN-27 SMB PCM 真机收口）
+
+- 部分 Android 机型的 `MediaExtractor` 无法从 `ProxyFileDescriptorCallback` 代理 FD
+  探测超大远程 MP4 的音轨，即使显式传入文件长度仍返回零音轨。
+- SMB 听译第二路改用 `MediaDataSource.readAt()` 直接桥接 `SmbRandomAccess`；
+  不经 localhost HTTP、不下载整部媒体，也不在 URI 中暴露凭证。
+- `MediaExtractor.release()` 会关闭传入的 `MediaDataSource`；每次解码轮换非拥有型
+  包装，底层 SMB 随机读句柄由听译会话统一关闭。连接类错误允许重建
+  专用 SMB 会话后重试一次。
+- Vosk 改为 250ms 流式分块输入，同时收集句尾 `result` 和最后
+  `finalResult`，避免将已完成句子误判为空结果。
+- 真机证据：修订前状态为零字幕/无音轨；改用 `MediaDataSource` 与流式
+  Vosk 后，同一媒体的本地缓存字幕计数从 1 增长到 2，无新崩溃。
+
 ## 后续可修订
 
 - 若未来 libVLC 4.x Android 绑定暴露音频回调，可再评估与路径 B 的取舍（新决策或修订本文件）。

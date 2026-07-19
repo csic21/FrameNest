@@ -55,6 +55,10 @@ data class ListenTranslateUiState(
     val modelsReady: Boolean = false,
     /** Current adaptive rolling-cache target; zero means playback pressure disabled prefetch. */
     val prefetchLookAheadMs: Long = 0L,
+    /** Number of cached, non-blank subtitle cues for the selected language pair. */
+    val generatedCueCount: Int = 0,
+    /** Most recent reason an attempted window produced no subtitle. */
+    val lastBlankReason: ListenBlankReason? = null,
 ) {
     val languages: ListenLanguagePair
         get() = ListenLanguagePair(sourceLang, targetLang).normalized()

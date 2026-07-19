@@ -185,10 +185,14 @@
     <string name="listen_translate_status">状态：%1$s</string>
     <string name="listen_translate_status_idle">未开始</string>
     <string name="listen_translate_status_running">识别中</string>
-    <string name="listen_translate_status_partial">已生成部分字幕</string>
+    <string name="listen_translate_status_partial">已扫描部分片段</string>
     <string name="listen_translate_status_complete">已完成</string>
     <string name="listen_translate_status_failed">失败</string>
-    <string name="listen_translate_covered">已覆盖至 %1$d 秒</string>
+    <string name="listen_translate_scanned">最远扫描到 %1$d 秒</string>
+    <string name="listen_translate_generated_count">已生成 %1$d 条字幕</string>
+    <string name="listen_translate_blank_no_audio">当前音轨未读取到音频，请切换音轨或重新打开视频。</string>
+    <string name="listen_translate_blank_silence">最近窗口接近静音，未生成字幕。</string>
+    <string name="listen_translate_blank_unrecognized">检测到声音，但 Vosk 未识别出可用对白，当前窗口会有界重试。</string>
     <string name="listen_translate_installing">正在安装本机模型…</string>
     <string name="listen_translate_models_ready">模型已就绪</string>
     <string name="listen_translate_prefetch">预生成未来 %1$d 秒</string>

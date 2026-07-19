@@ -36,13 +36,28 @@ class VoskAsrEngine {
         mutex.withLock {
             val m = model ?: error("Vosk model not loaded")
             if (pcm16kMono.isEmpty()) return@withLock VoskRecognition.EMPTY
-            val rms = PcmAudioMath.rmsNormalized(pcm16kMono)
-            if (rms < 0.008f) return@withLock VoskRecognition.EMPTY // near silence
+            if (isNearSilence(pcm16kMono)) return@withLock VoskRecognition.EMPTY
             val rec = Recognizer(m, PcmAudioMath.TARGET_SAMPLE_RATE_HZ.toFloat())
             try {
                 rec.setWords(true)
-                rec.acceptWaveForm(pcm16kMono, pcm16kMono.size)
-                parseResult(rec.finalResult)
+                val completed = mutableListOf<VoskRecognition>()
+                val chunk = ShortArray(STREAM_CHUNK_SAMPLES)
+                var offset = 0
+                while (offset < pcm16kMono.size) {
+                    val count = minOf(chunk.size, pcm16kMono.size - offset)
+                    pcm16kMono.copyInto(
+                        destination = chunk,
+                        destinationOffset = 0,
+                        startIndex = offset,
+                        endIndex = offset + count,
+                    )
+                    if (rec.acceptWaveForm(chunk, count)) {
+                        completed += parseResult(rec.result)
+                    }
+                    offset += count
+                }
+                completed += parseResult(rec.finalResult)
+                mergeVoskRecognitions(completed)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } finally {
@@ -90,6 +105,23 @@ class VoskAsrEngine {
         }
         return VoskRecognition(text, words)
     }
+
+    companion object {
+        internal const val MIN_SPEECH_RMS: Float = 0.008f
+        private const val STREAM_CHUNK_SAMPLES: Int = 4_000 // 250 ms at 16 kHz
+
+        internal fun isNearSilence(pcm16kMono: ShortArray): Boolean =
+            PcmAudioMath.rmsNormalized(pcm16kMono) < MIN_SPEECH_RMS
+    }
+}
+
+internal fun mergeVoskRecognitions(parts: List<VoskRecognition>): VoskRecognition {
+    val nonBlank = parts.filter { it.text.isNotBlank() || it.words.isNotEmpty() }
+    if (nonBlank.isEmpty()) return VoskRecognition.EMPTY
+    return VoskRecognition(
+        text = nonBlank.joinToString(" ") { it.text }.trim(),
+        words = nonBlank.flatMap { it.words },
+    )
 }
 
 data class VoskRecognition(
