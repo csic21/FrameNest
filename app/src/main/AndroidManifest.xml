@@ -20,6 +20,7 @@
         android:theme="@style/Theme.FrameNest">
         <activity
             android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
             android:exported="true"
             android:theme="@style/Theme.FrameNest">
             <intent-filter>

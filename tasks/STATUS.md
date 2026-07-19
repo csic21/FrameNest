@@ -32,6 +32,7 @@
 | FN-25 Release 启动崩溃修复 | 已完成 | agent | `agent/FN-25-release-startup-fix` | FN-14, FN-21, FN-24 | [FN-25](handoffs/FN-25.md) |
 | FN-26 Release 反射/JNI 兼容 | 已完成 | agent | `agent/FN-26-release-smb-r8-fix` | FN-22, FN-25 | [FN-26](handoffs/FN-26.md) |
 | FN-27 听译空结果诊断与恢复 | 已完成 | agent | `agent/FN-27-listen-empty-retry` | FN-23, FN-26 | [FN-27](handoffs/FN-27.md) |
+| FN-28 播放器旋转续播与画布恢复 | 已完成 | agent | `agent/FN-28-rotation-surface-recovery` | FN-05, FN-15, FN-20 | [FN-28](handoffs/FN-28.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。

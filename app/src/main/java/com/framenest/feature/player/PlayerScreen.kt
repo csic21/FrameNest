@@ -66,6 +66,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,6 +77,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -110,6 +112,7 @@ import com.framenest.feature.subtitle.SubtitleUiState
 import com.framenest.player.BufferingPolicy
 import com.framenest.player.PlaybackRates
 import com.framenest.player.PlayerController
+import com.framenest.player.PlayerRotationPolicy
 import com.framenest.player.PlayerState
 import com.framenest.player.PlayerTrack
 import com.framenest.player.VideoScaleMode
@@ -139,7 +142,9 @@ fun PlayerScreen(
     onOpenSibling: (siblingPath: String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val app = LocalContext.current.applicationContext as Application
+    val context = LocalContext.current
+    val app = context.applicationContext as Application
+    val activity = remember(context) { context.findActivity() }
     val vm: PlayerViewModel = viewModel(
         key = "${request.identity.serverId}|${request.identity.share}|${request.identity.path}",
         factory = PlayerViewModel.Factory(app, request),
@@ -166,7 +171,15 @@ fun PlayerScreen(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 // Pause + save when app backgrounds; leave path also saves via BackHandler.
-                Lifecycle.Event.ON_STOP -> vm.onLeaveOrBackground()
+                Lifecycle.Event.ON_STOP -> {
+                    if (
+                        PlayerRotationPolicy.shouldPauseOnStop(
+                            isChangingConfigurations = activity?.isChangingConfigurations == true,
+                        )
+                    ) {
+                        vm.onLeaveOrBackground()
+                    }
+                }
                 else -> Unit
             }
         }
@@ -375,21 +388,37 @@ fun PlayerScreen(
                 .background(Color.Black)
                 .testTag(if (landscape) "player_landscape_shell" else "player_portrait_shell"),
         ) {
+            var portraitControlsHeightPx by remember { mutableIntStateOf(0) }
+            val portraitControlsHeight = with(LocalDensity.current) {
+                portraitControlsHeightPx.toDp()
+            }
+
+            // This call stays at one stable composition position. Changing orientation
+            // only changes its bounds; it never disposes the AndroidView/VLC surface.
+            PlayerSurfaceStack(
+                controller = vm.controller,
+                state = state,
+                listenUi = listenUi,
+                chromeVisible = showChrome,
+                controlsLocked = controlsLocked,
+                onToggleChrome = onToggleChrome,
+                onSkipBy = { vm.skipBy(it) },
+                onPlay = { vm.play() },
+                onRetry = { vm.retry() },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (!landscape && showChrome && portraitControlsHeightPx > 0) {
+                            Modifier.padding(bottom = portraitControlsHeight)
+                        } else {
+                            Modifier
+                        },
+                    ),
+            )
+
             if (landscape) {
                 // Full-window surface: top/bottom chrome float above and never
                 // change the video layout bounds when toggled.
-                PlayerSurfaceStack(
-                    controller = vm.controller,
-                    state = state,
-                    listenUi = listenUi,
-                    chromeVisible = showChrome,
-                    controlsLocked = controlsLocked,
-                    onToggleChrome = onToggleChrome,
-                    onSkipBy = { vm.skipBy(it) },
-                    onPlay = { vm.play() },
-                    onRetry = { vm.retry() },
-                    modifier = Modifier.fillMaxSize(),
-                )
                 if (showChrome) {
                     PlayerTopBar(
                         title = vm.displayName,
@@ -431,67 +460,42 @@ fun PlayerScreen(
                         )
                     }
                 }
-                if (controlsLocked && showUnlockHint) {
-                    LockedUnlockOverlay(
-                        onUnlock = unlockControls,
+            } else {
+                if (showChrome) {
+                    PlayerControls(
+                        state = state,
+                        siblingNav = siblingNav,
+                        autoNextArmed = autoNextArmed,
+                        onPlay = { vm.play() },
+                        onPause = { vm.pause() },
+                        onSeek = { vm.seekTo(it) },
+                        onCycleVideoScale = { vm.cycleVideoScaleMode() },
+                        onCyclePlaybackRate = { vm.cyclePlaybackRate() },
+                        onLockControls = lockControls,
+                        orientationLocked = orientationLocked,
+                        onToggleOrientationLock = {
+                            orientationLocked = !orientationLocked
+                        },
+                        onPrevious = siblingNav.previousPath?.let { p -> { openSibling(p) } },
+                        onNext = siblingNav.nextPath?.let { p -> { openSibling(p) } },
+                        overlay = false,
+                        onUserInteraction = markChromeInteraction,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(bottom = 32.dp),
+                            .fillMaxWidth()
+                            .onSizeChanged { portraitControlsHeightPx = it.height }
+                            .navigationBarsPadding(),
                     )
                 }
-            } else {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                    ) {
-                        PlayerSurfaceStack(
-                            controller = vm.controller,
-                            state = state,
-                            listenUi = listenUi,
-                            chromeVisible = showChrome,
-                            controlsLocked = controlsLocked,
-                            onToggleChrome = onToggleChrome,
-                            onSkipBy = { vm.skipBy(it) },
-                            onPlay = { vm.play() },
-                            onRetry = { vm.retry() },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                        if (controlsLocked && showUnlockHint) {
-                            LockedUnlockOverlay(
-                                onUnlock = unlockControls,
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .padding(bottom = 24.dp),
-                            )
-                        }
-                    }
-                    if (showChrome) {
-                        PlayerControls(
-                            state = state,
-                            siblingNav = siblingNav,
-                            autoNextArmed = autoNextArmed,
-                            onPlay = { vm.play() },
-                            onPause = { vm.pause() },
-                            onSeek = { vm.seekTo(it) },
-                            onCycleVideoScale = { vm.cycleVideoScaleMode() },
-                            onCyclePlaybackRate = { vm.cyclePlaybackRate() },
-                            onLockControls = lockControls,
-                            orientationLocked = orientationLocked,
-                            onToggleOrientationLock = {
-                                orientationLocked = !orientationLocked
-                            },
-                            onPrevious = siblingNav.previousPath?.let { p -> { openSibling(p) } },
-                            onNext = siblingNav.nextPath?.let { p -> { openSibling(p) } },
-                            overlay = false,
-                            onUserInteraction = markChromeInteraction,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .navigationBarsPadding(),
-                        )
-                    }
-                }
+            }
+
+            if (controlsLocked && showUnlockHint) {
+                LockedUnlockOverlay(
+                    onUnlock = unlockControls,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = if (landscape) 32.dp else 24.dp),
+                )
             }
         }
     }

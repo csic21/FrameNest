@@ -5,12 +5,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.viewinterop.AndroidView
 import com.framenest.player.PlayerController
 
@@ -38,19 +39,16 @@ fun VlcVideoSurface(
     controller: PlayerController,
     modifier: Modifier = Modifier,
 ) {
-    val configuration = LocalConfiguration.current
-    var lastWidth by remember(controller) { mutableIntStateOf(0) }
-    var lastHeight by remember(controller) { mutableIntStateOf(0) }
+    var surfaceSize by remember(controller) { mutableStateOf(IntSize.Zero) }
+    var refreshAtSize by remember(controller) { mutableStateOf<IntSize?>(null) }
 
-    // Only when orientation / window size class actually changes — and only after
-    // a frame is ready so prepare is not interrupted by surface rebuilds.
-    LaunchedEffect(
-        controller,
-        configuration.orientation,
-        configuration.screenWidthDp,
-        configuration.screenHeightDp,
-    ) {
-        if (controller.state.value.firstFrameReady) {
+    // A rotation may report several intermediate constraints. Wait until the next
+    // frame and refresh only the last real size, never both orientation and size.
+    LaunchedEffect(controller, refreshAtSize) {
+        if (refreshAtSize != null) {
+            withFrameNanos { }
+        }
+        if (refreshAtSize != null && controller.state.value.firstFrameReady) {
             controller.refreshVideoSurfaces()
         }
     }
@@ -59,12 +57,11 @@ fun VlcVideoSurface(
         AndroidView(
             modifier = modifier.onSizeChanged { size ->
                 if (size.width <= 0 || size.height <= 0) return@onSizeChanged
-                if (size.width == lastWidth && size.height == lastHeight) return@onSizeChanged
-                lastWidth = size.width
-                lastHeight = size.height
-                if (controller.state.value.firstFrameReady) {
-                    controller.refreshVideoSurfaces()
+                if (size == surfaceSize) return@onSizeChanged
+                if (surfaceSize != IntSize.Zero) {
+                    refreshAtSize = size
                 }
+                surfaceSize = size
             },
             factory = { context ->
                 FrameLayout(context).also { container ->
@@ -74,7 +71,7 @@ fun VlcVideoSurface(
             onRelease = {
                 // Detach video output only — do not stop/release the player here.
                 // Player lifecycle is owned by PlayerViewModel.onCleared.
-                controller.detachVideoLayout()
+                controller.detachVideoLayout(it)
             },
         )
     }

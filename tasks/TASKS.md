@@ -491,3 +491,21 @@ unit test、lint、debug/release assemble 通过。
 
 验收：空结果分类、当前窗口恢复、预取边界和状态文案有自动测试；
 unit test、lint、debug/release assemble 通过；不导出 PCM 或 NAS 信息。
+
+## FN-28：播放器旋转续播与画布恢复
+
+**依赖**：FN-05、FN-15、FN-20  
+**拥有路径**：`feature/player/PlayerScreen.kt`、`feature/player/VlcVideoSurface.kt`、
+`player/PlayerController.kt`、`player/VlcPlayerController.kt`、Manifest 的旋转接线、
+相关测试与交接记录  
+**目标**：横竖屏切换时保持原播放状态，并确保 VLC 视频画布绑定当前窗口，避免继续播放黑屏。
+
+工作内容：
+
+- 配置变化不按退到后台处理，旋转前正在播放则旋转后继续播放。
+- 横竖布局共用同一个 Compose/AndroidView Surface 宿主，不在布局分支切换时 detach/attach。
+- Activity 确实重建时，不复用属于旧 Activity 的 `VLCVideoLayout`。
+- Surface 尺寸稳定后只刷新一次视频输出，避免方向与尺寸变化重复刷新。
+
+验收：生命周期与宿主匹配策略有自动测试；unit test、lint、debug/release assemble 通过；
+真机竖屏→横屏→竖屏播放状态和画面正常，不清除现有应用数据。

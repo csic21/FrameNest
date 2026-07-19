@@ -17,7 +17,7 @@ interface PlayerController {
      */
     fun attachVideoLayout(container: ViewGroup)
 
-    fun detachVideoLayout()
+    fun detachVideoLayout(container: ViewGroup)
 
     /**
      * Prepare media with a pending [startPositionMs], decode the first frame, then hold

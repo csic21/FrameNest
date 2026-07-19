@@ -331,11 +331,16 @@ class VlcPlayerController(
     private fun obtainVideoLayout(container: ViewGroup): VLCVideoLayout {
         val hostContext = container.context
         val existing = videoLayout
-        if (existing != null && isActivityContext(existing.context)) {
+        val existingActivity = existing?.context?.findActivity()
+        val hostActivity = hostContext.findActivity()
+        if (
+            existing != null &&
+            !PlayerRotationPolicy.shouldRecreateVideoLayout(existingActivity, hostActivity)
+        ) {
             return existing
         }
         if (existing != null) {
-            Log.i(TAG, "Recreating VLCVideoLayout with Activity context for scale modes")
+            Log.i(TAG, "Recreating VLCVideoLayout for the current Activity window")
             if (viewsAttached) {
                 runCatching { mediaPlayer?.detachViews() }
                 viewsAttached = false
@@ -346,25 +351,28 @@ class VlcPlayerController(
         return VLCVideoLayout(hostContext).also { videoLayout = it }
     }
 
-    private fun isActivityContext(context: Context): Boolean {
-        var current: Context? = context
+    private fun Context.findActivity(): Activity? {
+        var current: Context? = this
         while (current is ContextWrapper) {
-            if (current is Activity) return true
+            if (current is Activity) return current
             current = current.baseContext
         }
-        return false
+        return current as? Activity
     }
 
-    override fun detachVideoLayout() {
+    override fun detachVideoLayout(container: ViewGroup) {
         if (released) return
+        // AndroidView replacement can attach the shared VLC layout to its new host
+        // before the old host's onRelease arrives. Never let that stale callback
+        // detach the newly attached surface.
+        val layout = videoLayout
+        if (!PlayerRotationPolicy.shouldDetachVideoLayout(layout?.parent, container)) return
         val player = mediaPlayer
         if (player != null && viewsAttached) {
             runCatching { player.detachViews() }
             viewsAttached = false
         }
-        videoLayout?.let { layout ->
-            (layout.parent as? ViewGroup)?.removeView(layout)
-        }
+        container.removeView(layout)
     }
 
     override fun prepare(source: MediaSource, startPositionMs: Long) {
@@ -899,7 +907,7 @@ class VlcPlayerController(
             return
         }
         val layoutCtx = videoLayout?.context
-        if (layoutCtx != null && !isActivityContext(layoutCtx)) {
+        if (layoutCtx != null && layoutCtx.findActivity() == null) {
             Log.w(
                 TAG,
                 "applyVideoScale: VLCVideoLayout has non-Activity context; " +
