@@ -413,3 +413,21 @@ unit test、lint、debug/release assemble 通过。
 
 验收：预取范围、窗口选择、实时因子、seek/缓冲取消和音轨 key 有纯逻辑测试；
 全量自动检查通过；真机发热、实时因子与 NAS 带宽影响留待发布验收。
+
+## FN-24：应用图标焕新
+
+**依赖**：FN-03  
+**拥有路径**：`app/src/main/res/drawable/ic_launcher_*`、
+`app/src/main/res/mipmap-*/ic_launcher*`、`app/src/main/res/mipmap-anydpi-v26/ic_launcher*`、
+图标源稿与交接记录  
+**目标**：建立更年轻、易识别且符合 Android 自适应图标规范的 FrameNest 品牌图标。
+
+工作内容：
+
+- 使用原创的「播放 + 流动环带/画框」符号，传达视频播放与 FrameNest 品牌含义。
+- 采用高饱和渐变与轻盈气泡感；仅借鉴现代音乐应用的宽泛视觉语言，不复刻现有商标。
+- 同步更新 Android 自适应前景/背景，以及各密度的旧版方形和圆形图标。
+- 保证主体位于安全区，小尺寸下轮廓仍清晰，无文字和细碎装饰。
+
+验收：资源检查、单元测试、lint 与 debug assemble 通过；生成手机/平板尺寸的资源，
+真机启动器观感留待发布验收。

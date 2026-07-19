@@ -1,45 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Fallback vector mark (PNG mipmaps are primary). Viewport 108 with safe zone ~18–90. -->
+<!-- Flat fallback for tooling; launcher mipmaps contain the full dimensional mark. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Soft double frame -->
+    <path
+        android:fillColor="#090909"
+        android:pathData="M31,23 H70 C77,23 80,27 80,34 V46 C80,51 83,53 88,54 C94,55 97,60 97,67 V73 C97,85 88,93 75,94 L34,88 C25,87 21,79 21,70 V36 C21,28 25,23 31,23 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M38,34 H69 V45 H48 V51 H38 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M38,52 H68 C76,52 81,58 81,66 V69 C81,76 76,81 68,82 L38,78 Z" />
+    <path
+        android:fillColor="#090909"
+        android:pathData="M52,59 L68,67 L52,75 Z" />
     <path
         android:fillColor="#00000000"
-        android:pathData="M34,32h40c4.4,0 8,3.6 8,8v32c0,4.4 -3.6,8 -8,8H34c-4.4,0 -8,-3.6 -8,-8V40c0,-4.4 3.6,-8 8,-8z"
-        android:strokeWidth="5"
-        android:strokeColor="#FFFFFF" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M38,36h32c2.2,0 4,1.8 4,4v28c0,2.2 -1.8,4 -4,4H38c-2.2,0 -4,-1.8 -4,-4V40c0,-2.2 1.8,-4 4,-4z"
-        android:strokeWidth="2.5"
-        android:strokeColor="#E8F4FC" />
-
-    <!-- Teal play -->
-    <path
-        android:fillColor="#2A9D8F"
-        android:pathData="M48,42 L68,54 L48,66 Z" />
-
-    <!-- Nest arcs under frame -->
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M30,74 C40,86 68,86 78,74"
-        android:strokeWidth="3.2"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M34,70 C44,80 64,80 74,70"
-        android:strokeWidth="2.4"
-        android:strokeColor="#D0E8F5"
-        android:strokeLineCap="round" />
-    <path
-        android:fillColor="#00000000"
-        android:pathData="M38,78 C46,88 62,88 70,78"
-        android:strokeWidth="2.2"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round" />
+        android:pathData="M39,84 C53,86 69,83 78,78"
+        android:strokeColor="#FF5A4F"
+        android:strokeLineCap="round"
+        android:strokeWidth="3" />
 </vector>
