@@ -6,9 +6,12 @@ import kotlinx.coroutines.tasks.await
 
 /** Removes every downloaded ML Kit translation pack from app-private storage. */
 class MlKitTranslationModelCleaner(
-    private val remoteModelManager: RemoteModelManager = RemoteModelManager.getInstance(),
+    private val remoteModelManagerProvider: () -> RemoteModelManager = {
+        RemoteModelManager.getInstance()
+    },
 ) {
     suspend fun deleteAll(): Int {
+        val remoteModelManager = remoteModelManagerProvider()
         val models = remoteModelManager
             .getDownloadedModels(TranslateRemoteModel::class.java)
             .await()

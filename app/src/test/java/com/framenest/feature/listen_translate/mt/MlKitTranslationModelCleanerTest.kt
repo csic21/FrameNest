@@ -7,6 +7,20 @@ import org.junit.Test
 class MlKitTranslationModelCleanerTest {
 
     @Test
+    fun constructor_defersRemoteModelManagerInitialization() {
+        var providerCalls = 0
+
+        MlKitTranslationModelCleaner(
+            remoteModelManagerProvider = {
+                providerCalls += 1
+                error("provider must not run during construction")
+            },
+        )
+
+        assertEquals(0, providerCalls)
+    }
+
+    @Test
     fun deleteEachModel_deletesEveryDownloadedPack() = runBlocking {
         val deleted = mutableListOf<String>()
 

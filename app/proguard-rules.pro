@@ -19,6 +19,11 @@
 -keep @androidx.room.Entity class *
 -dontwarn androidx.room.paging.**
 
+# ML Kit's RemoteModelManager builds Firebase JSON encoders at runtime. R8 class
+# merging can corrupt the anonymous encoder implementations and crash app startup.
+-keep class com.google.firebase.encoders.** { *; }
+-keepattributes Signature,*Annotation*,InnerClasses,EnclosingMethod
+
 # Optional annotations / APIs referenced by Tink & mbassador (compile-only)
 -dontwarn com.google.errorprone.annotations.**
 -dontwarn javax.annotation.**

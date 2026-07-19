@@ -431,3 +431,20 @@ unit test、lint、debug/release assemble 通过。
 
 验收：资源检查、单元测试、lint 与 debug assemble 通过；生成手机/平板尺寸的资源，
 真机启动器观感留待发布验收。
+
+## FN-25：Release 启动崩溃修复
+
+**依赖**：FN-14、FN-21、FN-24  
+**拥有路径**：`feature/listen_translate/mt/MlKitTranslationModelCleaner.kt`、
+`app/proguard-rules.pro`、相关测试与交接记录  
+**目标**：修复 R8 压缩后的 Release 在 Application 初始化 ML Kit 时立即崩溃的问题。
+
+工作内容：
+
+- 将 `RemoteModelManager` 改为首次执行模型清理时才初始化，不阻塞或破坏应用启动。
+- 保留 Firebase Encoder 的运行时实现，避免 R8 优化破坏 ML Kit 内部编码器。
+- 添加最小单元测试，确保构造模型清理器不会立即触发 ML Kit 初始化。
+- 构建、签名并覆盖安装 arm64 Release，在无线连接的真机上验证首页可启动。
+
+验收：单元测试、lint、Release 构建通过；Release 真机启动后进程保持存活且 crash buffer
+不新增 `com.framenest` 启动异常；不卸载、不清除现有应用数据。
