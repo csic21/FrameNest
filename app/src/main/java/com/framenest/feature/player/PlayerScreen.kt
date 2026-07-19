@@ -16,6 +16,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -52,6 +53,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -76,6 +78,7 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -153,6 +156,7 @@ fun PlayerScreen(
     var orientationLocked by remember { mutableStateOf(false) }
     var showUnlockHint by remember { mutableStateOf(false) }
     var autoNextArmed by remember { mutableStateOf(false) }
+    var chromeInteractionVersion by remember { mutableLongStateOf(0L) }
     val lifecycleOwner = LocalLifecycleOwner.current
     val configuration = LocalConfiguration.current
     // Orientation chrome only — not a device-model / width-bucket check.
@@ -272,12 +276,41 @@ fun PlayerScreen(
     val showBottomPanels =
         showChrome && (showListenTranslate || showSubtitles || showAudioTracks)
 
+    val markChromeInteraction: () -> Unit = {
+        if (!controlsLocked) {
+            chromeVisible = true
+            chromeInteractionVersion++
+        }
+    }
+
+    // Normal players get out of the way during playback. Any new interaction
+    // restarts the timer; modal controls, paused/error states and lock mode opt out.
+    LaunchedEffect(
+        state.phase,
+        chromeVisible,
+        controlsLocked,
+        showBottomPanels,
+        chromeInteractionVersion,
+    ) {
+        if (
+            PlayerChromePolicy.shouldAutoHide(
+                phase = state.phase,
+                chromeVisible = chromeVisible,
+                controlsLocked = controlsLocked,
+                panelOpen = showBottomPanels,
+            )
+        ) {
+            delay(PlayerChromePolicy.AUTO_HIDE_MS)
+            chromeVisible = false
+        }
+    }
+
     val toggleListen: () -> Unit = {
         showListenTranslate = !showListenTranslate
         if (showListenTranslate) {
             showSubtitles = false
             showAudioTracks = false
-            chromeVisible = true
+            markChromeInteraction()
         }
     }
     val toggleSubtitles: () -> Unit = {
@@ -285,7 +318,7 @@ fun PlayerScreen(
         if (showSubtitles) {
             showListenTranslate = false
             showAudioTracks = false
-            chromeVisible = true
+            markChromeInteraction()
         }
     }
     val toggleAudioTracks: () -> Unit = {
@@ -293,7 +326,7 @@ fun PlayerScreen(
         if (showAudioTracks) {
             showListenTranslate = false
             showSubtitles = false
-            chromeVisible = true
+            markChromeInteraction()
         }
     }
     val onToggleChrome: () -> Unit = {
@@ -301,7 +334,9 @@ fun PlayerScreen(
             showUnlockHint = true
         } else {
             chromeVisible = !chromeVisible
-            if (!chromeVisible) {
+            if (chromeVisible) {
+                chromeInteractionVersion++
+            } else {
                 showSubtitles = false
                 showListenTranslate = false
                 showAudioTracks = false
@@ -374,29 +409,6 @@ fun PlayerScreen(
                             .fillMaxWidth()
                             .testTag("player_landscape_bottom_chrome"),
                     ) {
-                        if (showBottomPanels) {
-                            PlayerBottomPanels(
-                                showListenTranslate = showListenTranslate,
-                                showSubtitles = showSubtitles,
-                                showAudioTracks = showAudioTracks,
-                                listenUi = listenUi,
-                                subtitleUi = subtitleUi,
-                                embeddedTracks = state.subtitleTracks.filter { it.id >= 0 },
-                                audioTracks = state.audioTracks.filter { it.id >= 0 },
-                                selectedAudioTrackId = state.selectedAudioTrackId,
-                                onListenEnabled = { vm.setListenTranslateEnabled(it) },
-                                onSourceLang = { vm.setListenSourceLang(it) },
-                                onTargetLang = { vm.setListenTargetLang(it) },
-                                onDisplayMode = { vm.setListenDisplayMode(it) },
-                                onSelectOff = { vm.selectSubtitleOff() },
-                                onSelectEmbedded = { vm.selectEmbeddedSubtitle(it) },
-                                onSelectExternal = { vm.selectExternalSubtitle(it) },
-                                onDelayDeltaMs = { vm.adjustSubtitleDelayMs(it) },
-                                onFontRelSize = { vm.setSubtitleFontRelSize(it) },
-                                onSelectAudio = { vm.selectAudioTrack(it) },
-                                overlay = true,
-                            )
-                        }
                         PlayerControls(
                             state = state,
                             siblingNav = siblingNav,
@@ -414,6 +426,7 @@ fun PlayerScreen(
                             onPrevious = siblingNav.previousPath?.let { p -> { openSibling(p) } },
                             onNext = siblingNav.nextPath?.let { p -> { openSibling(p) } },
                             overlay = true,
+                            onUserInteraction = markChromeInteraction,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -472,35 +485,49 @@ fun PlayerScreen(
                             onPrevious = siblingNav.previousPath?.let { p -> { openSibling(p) } },
                             onNext = siblingNav.nextPath?.let { p -> { openSibling(p) } },
                             overlay = false,
+                            onUserInteraction = markChromeInteraction,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .navigationBarsPadding(),
                         )
-                        if (showBottomPanels) {
-                            PlayerBottomPanels(
-                                showListenTranslate = showListenTranslate,
-                                showSubtitles = showSubtitles,
-                                showAudioTracks = showAudioTracks,
-                                listenUi = listenUi,
-                                subtitleUi = subtitleUi,
-                                embeddedTracks = state.subtitleTracks.filter { it.id >= 0 },
-                                audioTracks = state.audioTracks.filter { it.id >= 0 },
-                                selectedAudioTrackId = state.selectedAudioTrackId,
-                                onListenEnabled = { vm.setListenTranslateEnabled(it) },
-                                onSourceLang = { vm.setListenSourceLang(it) },
-                                onTargetLang = { vm.setListenTargetLang(it) },
-                                onDisplayMode = { vm.setListenDisplayMode(it) },
-                                onSelectOff = { vm.selectSubtitleOff() },
-                                onSelectEmbedded = { vm.selectEmbeddedSubtitle(it) },
-                                onSelectExternal = { vm.selectExternalSubtitle(it) },
-                                onDelayDeltaMs = { vm.adjustSubtitleDelayMs(it) },
-                                onFontRelSize = { vm.setSubtitleFontRelSize(it) },
-                                onSelectAudio = { vm.selectAudioTrack(it) },
-                                overlay = false,
-                            )
-                        }
                     }
                 }
+            }
+        }
+    }
+
+    if (showBottomPanels) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                showListenTranslate = false
+                showSubtitles = false
+                showAudioTracks = false
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.testTag("player_settings_sheet"),
+        ) {
+            Column(modifier = Modifier.navigationBarsPadding()) {
+                PlayerBottomPanels(
+                    showListenTranslate = showListenTranslate,
+                    showSubtitles = showSubtitles,
+                    showAudioTracks = showAudioTracks,
+                    listenUi = listenUi,
+                    subtitleUi = subtitleUi,
+                    embeddedTracks = state.subtitleTracks.filter { it.id >= 0 },
+                    audioTracks = state.audioTracks.filter { it.id >= 0 },
+                    selectedAudioTrackId = state.selectedAudioTrackId,
+                    onListenEnabled = { vm.setListenTranslateEnabled(it) },
+                    onSourceLang = { vm.setListenSourceLang(it) },
+                    onTargetLang = { vm.setListenTargetLang(it) },
+                    onDisplayMode = { vm.setListenDisplayMode(it) },
+                    onSelectOff = { vm.selectSubtitleOff() },
+                    onSelectEmbedded = { vm.selectEmbeddedSubtitle(it) },
+                    onSelectExternal = { vm.selectExternalSubtitle(it) },
+                    onDelayDeltaMs = { vm.adjustSubtitleDelayMs(it) },
+                    onFontRelSize = { vm.setSubtitleFontRelSize(it) },
+                    onSelectAudio = { vm.selectAudioTrack(it) },
+                    overlay = false,
+                )
             }
         }
     }
@@ -601,17 +628,19 @@ private fun PlayerTopBar(
             }
         },
         actions = {
+            val listenCd = stringResource(R.string.listen_translate_title)
             val audioTracksCd = stringResource(R.string.player_audio_tracks_cd)
+            val subtitlesCd = stringResource(R.string.subtitle_section_title)
             IconButton(
                 onClick = onToggleListen,
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
-                    .semantics { contentDescription = "player_listen_translate" }
+                    .semantics { contentDescription = listenCd }
                     .testTag("player_listen_translate"),
             ) {
                 Icon(
                     imageVector = Icons.Filled.Translate,
-                    contentDescription = stringResource(R.string.listen_translate_title),
+                    contentDescription = null,
                 )
             }
             IconButton(
@@ -623,19 +652,19 @@ private fun PlayerTopBar(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Audiotrack,
-                    contentDescription = stringResource(R.string.player_audio_tracks),
+                    contentDescription = null,
                 )
             }
             IconButton(
                 onClick = onToggleSubtitles,
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
-                    .semantics { contentDescription = "player_subtitles" }
+                    .semantics { contentDescription = subtitlesCd }
                     .testTag("player_subtitles"),
             ) {
                 Icon(
                     imageVector = Icons.Filled.ClosedCaption,
-                    contentDescription = stringResource(R.string.subtitle_section_title),
+                    contentDescription = null,
                 )
             }
         },
@@ -1045,6 +1074,7 @@ private fun PlayerControls(
     onPrevious: (() -> Unit)?,
     onNext: (() -> Unit)?,
     overlay: Boolean,
+    onUserInteraction: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val duration = state.durationMs.coerceAtLeast(0L)
@@ -1153,6 +1183,7 @@ private fun PlayerControls(
         Slider(
             value = displayProgress,
             onValueChange = { fraction ->
+                onUserInteraction()
                 scrubbing = true
                 scrubFraction = fraction.coerceIn(0f, 1f)
             },
@@ -1189,7 +1220,10 @@ private fun PlayerControls(
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
-                    onClick = { onPrevious?.invoke() },
+                    onClick = {
+                        onUserInteraction()
+                        onPrevious?.invoke()
+                    },
                     enabled = onPrevious != null,
                     modifier = Modifier
                         .minimumInteractiveComponentSize()
@@ -1203,7 +1237,10 @@ private fun PlayerControls(
                     )
                 }
                 IconButton(
-                    onClick = { onNext?.invoke() },
+                    onClick = {
+                        onUserInteraction()
+                        onNext?.invoke()
+                    },
                     enabled = onNext != null,
                     modifier = Modifier
                         .minimumInteractiveComponentSize()
@@ -1218,103 +1255,224 @@ private fun PlayerControls(
                 }
             }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val playing = state.canPause
-            IconButton(
-                onClick = if (playing) onPause else onPlay,
-                enabled = playing || state.canPlay || state.phase == PlayerState.Phase.Error,
-                modifier = Modifier
-                    .minimumInteractiveComponentSize()
-                    .semantics { contentDescription = if (playing) pauseCd else playCd }
-                    .testTag(if (playing) "player_pause" else "player_play"),
-            ) {
-                Icon(
-                    if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = null,
-                    tint = onBg,
-                )
-            }
-                IconButton(
-                    onClick = onLockControls,
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .semantics { contentDescription = lockCd }
-                        .testTag("player_lock_controls"),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Lock,
-                        contentDescription = stringResource(R.string.player_lock_controls),
-                        tint = onBg,
-                    )
-                }
-                IconButton(
-                    onClick = onToggleOrientationLock,
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .semantics { contentDescription = orientationCd }
-                        .testTag("player_orientation_lock"),
-                ) {
-                    Icon(
-                        imageVector = if (orientationLocked) {
-                            Icons.Filled.ScreenLockRotation
-                        } else {
-                            Icons.Filled.ScreenRotation
-                        },
-                        contentDescription = stringResource(
-                            if (orientationLocked) {
-                                R.string.player_orientation_unlock
-                            } else {
-                                R.string.player_orientation_lock
-                            },
-                        ),
-                        tint = onBg,
-                    )
-                }
-                TextButton(
-                    onClick = onCyclePlaybackRate,
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .semantics { contentDescription = rateCd }
-                        .testTag("player_playback_rate"),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Speed,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = onBg,
-                    )
-                    Spacer(Modifier.size(4.dp))
-                    Text(
-                        text = rateLabel,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = onBg,
-                    )
-                }
-                TextButton(
-                    onClick = onCycleVideoScale,
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .semantics { contentDescription = scaleCd }
-                        .testTag("player_video_scale"),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.AspectRatio,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = onBg,
-                    )
-                    Spacer(Modifier.size(4.dp))
-                    Text(
-                        text = scaleLabel,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = onBg,
-                    )
-                }
+        PlayerActionButtons(
+            playing = state.canPause,
+            playEnabled = state.canPause || state.canPlay || state.phase == PlayerState.Phase.Error,
+            orientationLocked = orientationLocked,
+            rateLabel = rateLabel,
+            rateCd = rateCd,
+            scaleLabel = scaleLabel,
+            scaleCd = scaleCd,
+            playCd = playCd,
+            pauseCd = pauseCd,
+            lockCd = lockCd,
+            orientationCd = orientationCd,
+            onBg = onBg,
+            onPlay = onPlay,
+            onPause = onPause,
+            onLockControls = onLockControls,
+            onToggleOrientationLock = onToggleOrientationLock,
+            onCyclePlaybackRate = onCyclePlaybackRate,
+            onCycleVideoScale = onCycleVideoScale,
+            onUserInteraction = onUserInteraction,
+        )
+    }
+}
+
+@Composable
+private fun PlayerActionButtons(
+    playing: Boolean,
+    playEnabled: Boolean,
+    orientationLocked: Boolean,
+    rateLabel: String,
+    rateCd: String,
+    scaleLabel: String,
+    scaleCd: String,
+    playCd: String,
+    pauseCd: String,
+    lockCd: String,
+    orientationCd: String,
+    onBg: Color,
+    onPlay: () -> Unit,
+    onPause: () -> Unit,
+    onLockControls: () -> Unit,
+    onToggleOrientationLock: () -> Unit,
+    onCyclePlaybackRate: () -> Unit,
+    onCycleVideoScale: () -> Unit,
+    onUserInteraction: () -> Unit,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val fontScale = LocalDensity.current.fontScale
+        val twoRows = PlayerControlLayoutPolicy.useTwoActionRows(
+            widthDp = maxWidth.value,
+            fontScale = fontScale,
+        )
+        val primary: @Composable () -> Unit = {
+            PlayerPlayAction(
+                playing = playing,
+                enabled = playEnabled,
+                contentDescription = if (playing) pauseCd else playCd,
+                tint = onBg,
+                onClick = {
+                    onUserInteraction()
+                    if (playing) onPause() else onPlay()
+                },
+            )
+            PlayerLockAction(
+                contentDescription = lockCd,
+                tint = onBg,
+                onClick = {
+                    onUserInteraction()
+                    onLockControls()
+                },
+            )
+            PlayerOrientationAction(
+                orientationLocked = orientationLocked,
+                contentDescription = orientationCd,
+                tint = onBg,
+                onClick = {
+                    onUserInteraction()
+                    onToggleOrientationLock()
+                },
+            )
         }
+        val secondary: @Composable () -> Unit = {
+            PlayerTextAction(
+                label = rateLabel,
+                contentDescription = rateCd,
+                icon = Icons.Filled.Speed,
+                testTag = "player_playback_rate",
+                tint = onBg,
+                onClick = {
+                    onUserInteraction()
+                    onCyclePlaybackRate()
+                },
+            )
+            PlayerTextAction(
+                label = scaleLabel,
+                contentDescription = scaleCd,
+                icon = Icons.Filled.AspectRatio,
+                testTag = "player_video_scale",
+                tint = onBg,
+                onClick = {
+                    onUserInteraction()
+                    onCycleVideoScale()
+                },
+            )
+        }
+
+        if (twoRows) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) { primary() }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) { secondary() }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                primary()
+                secondary()
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayerPlayAction(
+    playing: Boolean,
+    enabled: Boolean,
+    contentDescription: String,
+    tint: Color,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .minimumInteractiveComponentSize()
+            .semantics { this.contentDescription = contentDescription }
+            .testTag(if (playing) "player_pause" else "player_play"),
+    ) {
+        Icon(
+            if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+            contentDescription = null,
+            tint = tint,
+        )
+    }
+}
+
+@Composable
+private fun PlayerLockAction(
+    contentDescription: String,
+    tint: Color,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .minimumInteractiveComponentSize()
+            .semantics { this.contentDescription = contentDescription }
+            .testTag("player_lock_controls"),
+    ) {
+        Icon(Icons.Filled.Lock, contentDescription = null, tint = tint)
+    }
+}
+
+@Composable
+private fun PlayerOrientationAction(
+    orientationLocked: Boolean,
+    contentDescription: String,
+    tint: Color,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .minimumInteractiveComponentSize()
+            .semantics { this.contentDescription = contentDescription }
+            .testTag("player_orientation_lock"),
+    ) {
+        Icon(
+            imageVector = if (orientationLocked) {
+                Icons.Filled.ScreenLockRotation
+            } else {
+                Icons.Filled.ScreenRotation
+            },
+            contentDescription = null,
+            tint = tint,
+        )
+    }
+}
+
+@Composable
+private fun PlayerTextAction(
+    label: String,
+    contentDescription: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    testTag: String,
+    tint: Color,
+    onClick: () -> Unit,
+) {
+    TextButton(
+        onClick = onClick,
+        modifier = Modifier
+            .minimumInteractiveComponentSize()
+            .semantics { this.contentDescription = contentDescription }
+            .testTag(testTag),
+    ) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = tint)
+        Spacer(Modifier.size(4.dp))
+        Text(text = label, style = MaterialTheme.typography.labelLarge, color = tint)
     }
 }
 
