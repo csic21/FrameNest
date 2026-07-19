@@ -448,3 +448,24 @@ unit test、lint、debug/release assemble 通过。
 
 验收：单元测试、lint、Release 构建通过；Release 真机启动后进程保持存活且 crash buffer
 不新增 `com.framenest` 启动异常；不卸载、不清除现有应用数据。
+
+## FN-26：Release 反射与 JNI 兼容修复
+
+**依赖**：FN-22、FN-25  
+**拥有路径**：`app/proguard-rules.pro`、`feature/player/PlayerViewModel.kt`、
+相关测试、验证与交接记录  
+**目标**：修复 R8 裁剪第三方运行时入口后，Release 无法建立 SMBJ 会话、加载 Vosk
+或初始化 ML Kit 翻译器的问题。
+
+工作内容：
+
+- 保留 SMBJ 事件总线 mbassador 的运行时反射入口。
+- 保留 Vosk 与 JNA 的 JNI/反射入口；底层类缺失时不向用户直接展示技术类名。
+- 保留 ML Kit 翻译的组件注册与内部工厂；初始化异常时不向用户展示混淆后类名。
+- 继续保持应用代码与其他依赖的 Release 压缩，不关闭全局混淆或资源收缩。
+- 构建、签名并覆盖安装 arm64 Release，保留服务器、凭证与历史数据。
+- 在当前真机/NAS 配置上重试浏览根目录，确认不再出现缺少 `SubscriptionContext` 构造函数。
+
+验收：单元测试、lint、Release 构建通过；真机覆盖安装后 SMB 根目录可返回，Vosk
+不再报 `org.vosk.LibVosk`，ML Kit 可进入本机翻译模型准备阶段，且无新的
+`com.framenest` crash；不记录或导出 NAS 地址、用户名、密码。

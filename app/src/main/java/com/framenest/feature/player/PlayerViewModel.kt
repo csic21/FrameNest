@@ -345,7 +345,7 @@ class PlayerViewModel(
             runCatching { pendingAsr?.close() }
             runCatching { pendingMt?.close() }
             if (generation == listenPrepareGeneration) {
-                val msg = t.message?.take(200) ?: "听译模型准备失败"
+                val msg = listenTranslatePreparationError(t)
                 listenSession.setInstallingModels(
                     installing = false,
                     message = "听译未启动",
@@ -1311,5 +1311,16 @@ class PlayerViewModel(
             val db = AppDatabase.createInMemory(application)
             return ListenTranslateRepository(db.listenTranslateDao())
         }
+    }
+}
+
+internal fun listenTranslatePreparationError(error: Throwable): String {
+    val detail = error.message?.take(200)
+    return when {
+        error is NoClassDefFoundError && detail?.contains("org.vosk", ignoreCase = true) == true ->
+            "本机语音识别组件加载失败，请更新应用后重试"
+        error is NullPointerException && detail?.contains("null object reference", ignoreCase = true) == true ->
+            "本机翻译组件初始化失败，请更新应用后重试"
+        else -> detail?.takeIf { it.isNotBlank() } ?: "听译模型准备失败"
     }
 }
