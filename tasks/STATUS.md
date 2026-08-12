@@ -24,16 +24,16 @@
 | FN-17 锁屏与方向锁 | 已完成 | agent | → main | FN-08, FN-16 | [FN-17](handoffs/FN-17.md) |
 | FN-18 同目录连播 | 已完成 | agent | → main | FN-05, FN-17 | [FN-18](handoffs/FN-18.md) |
 | FN-19 缓冲提示 | 已完成 | agent | → main | FN-05 | [FN-19](handoffs/FN-19.md) |
-| FN-20 播放器产品体验 | 已完成 | agent | `agent/FN-20-player-product-polish` | FN-16..FN-19 | [FN-20](handoffs/FN-20.md) |
-| FN-21 听译模型交付 | 已完成 | agent | `agent/FN-21-model-delivery-hardening` | FN-14, FN-20 | [FN-21](handoffs/FN-21.md) |
-| FN-22 SMB/缩略图性能 | 已完成 | agent | `agent/FN-22-smb-thumbnail-performance` | FN-07, FN-09, FN-21 | [FN-22](handoffs/FN-22.md) |
-| FN-23 自适应预翻译 | 已完成 | agent | `agent/FN-23-adaptive-listen-prefetch` | FN-14, FN-21, FN-22 | [FN-23](handoffs/FN-23.md) |
-| FN-24 应用图标焕新 | 已完成 | agent | `agent/FN-24-app-icon-refresh` | FN-03 | [FN-24](handoffs/FN-24.md) |
-| FN-25 Release 启动崩溃修复 | 已完成 | agent | `agent/FN-25-release-startup-fix` | FN-14, FN-21, FN-24 | [FN-25](handoffs/FN-25.md) |
-| FN-26 Release 反射/JNI 兼容 | 已完成 | agent | `agent/FN-26-release-smb-r8-fix` | FN-22, FN-25 | [FN-26](handoffs/FN-26.md) |
-| FN-27 听译空结果诊断与恢复 | 已完成 | agent | `agent/FN-27-listen-empty-retry` | FN-23, FN-26 | [FN-27](handoffs/FN-27.md) |
-| FN-28 播放器旋转续播与画布恢复 | 已完成 | agent | `agent/FN-28-rotation-surface-recovery` | FN-05, FN-15, FN-20 | [FN-28](handoffs/FN-28.md) |
-| FN-29 锁屏后听译 SMB 音频自动恢复 | 已完成 | agent | `agent/FN-29-smb-listen-reconnect` | FN-27, FN-28 | [FN-29](handoffs/FN-29.md) |
+| FN-20 播放器产品体验 | 已完成 | agent | → main | FN-16..FN-19 | [FN-20](handoffs/FN-20.md) |
+| FN-21 听译模型交付 | 已完成 | agent | → main | FN-14, FN-20 | [FN-21](handoffs/FN-21.md) |
+| FN-22 SMB/缩略图性能 | 已完成 | agent | → main | FN-07, FN-09, FN-21 | [FN-22](handoffs/FN-22.md) |
+| FN-23 自适应预翻译 | 已完成 | agent | → main | FN-14, FN-21, FN-22 | [FN-23](handoffs/FN-23.md) |
+| FN-24 应用图标焕新 | 已完成 | agent | → main | FN-03 | [FN-24](handoffs/FN-24.md) |
+| FN-25 Release 启动崩溃修复 | 已完成 | agent | → main | FN-14, FN-21, FN-24 | [FN-25](handoffs/FN-25.md) |
+| FN-26 Release 反射/JNI 兼容 | 已完成 | agent | → main | FN-22, FN-25 | [FN-26](handoffs/FN-26.md) |
+| FN-27 听译空结果诊断与恢复 | 已完成 | agent | → main | FN-23, FN-26 | [FN-27](handoffs/FN-27.md) |
+| FN-28 播放器旋转续播与画布恢复 | 已完成 | agent | → main | FN-05, FN-15, FN-20 | [FN-28](handoffs/FN-28.md) |
+| FN-29 锁屏后听译 SMB 音频自动恢复 | 已完成 | agent | → main | FN-27, FN-28 | [FN-29](handoffs/FN-29.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。
