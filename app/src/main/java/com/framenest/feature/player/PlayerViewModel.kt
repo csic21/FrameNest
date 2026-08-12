@@ -149,6 +149,8 @@ class PlayerViewModel(
     private var lastSavedPositionMs: Long? = null
     /** Background progress save kicked by [onLeaveOrBackground]; cancelled in [onCleared]. */
     private var leaveSaveJob: Job? = null
+    /** Preserved before an explicit route exit releases the controller immediately. */
+    private var exitStateSnapshot: PlayerState? = null
     private var startPositionMs: Long = request.startPositionMs
     /**
      * One-shot latch for the resume-position seek. Replacing `startPositionMs > 0`
@@ -760,6 +762,18 @@ class PlayerViewModel(
         }
     }
 
+    /**
+     * Explicit destination exit. Snapshot/save first, then synchronously stop and detach
+     * video output so Navigation's pop cannot retain a live SurfaceView. Native VLC
+     * release remains off-main inside [VlcPlayerController.release].
+     */
+    fun onLeave() {
+        if (exitStateSnapshot != null) return
+        onLeaveOrBackground()
+        exitStateSnapshot = controller.state.value
+        controller.release()
+    }
+
     private fun pauseFromSystem() {
         val phase = controller.state.value.phase
         if (phase == PlayerState.Phase.Playing) {
@@ -1171,7 +1185,7 @@ class PlayerViewModel(
     override fun onCleared() {
         // Snapshot everything needed for background teardown. Do not block the main
         // thread here — popBackStack animation runs concurrently with onCleared.
-        val stateSnapshot = controller.state.value
+        val stateSnapshot = exitStateSnapshot ?: controller.state.value
         val shouldSave =
             stateSnapshot.phase != PlayerState.Phase.Idle &&
                 stateSnapshot.phase != PlayerState.Phase.Error &&

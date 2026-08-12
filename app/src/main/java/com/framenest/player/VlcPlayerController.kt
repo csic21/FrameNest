@@ -74,6 +74,12 @@ class VlcPlayerController(
      */
     private var holdForUserPlay: Boolean = false
     /**
+     * The latest user/system playback intent. libVLC's pause call is toggle-like, so
+     * delayed Playing/Paused events must be reconciled against intent instead of
+     * blindly becoming the UI source of truth.
+     */
+    private var playRequested: Boolean = false
+    /**
      * Set when [MediaPlayer.Event.EndReached] arrives while still holding for the user
      * (stale EOF after first-frame pause). [play] restarts from 0 instead of no-op.
      */
@@ -127,6 +133,7 @@ class VlcPlayerController(
      * and the preview runnables removed via [cancelSeekPreview].
      */
     private fun resetTransientFlags(opening: Boolean) {
+        playRequested = false
         awaitingFirstFramePause = opening
         holdForUserPlay = opening
         endedWhileHolding = false
@@ -175,18 +182,40 @@ class VlcPlayerController(
             }
             MediaPlayer.Event.Playing -> {
                 if (suppressAllTerminalEvents) return@handleEvent
+                // Seek-preview playback is internal and must run long enough to paint
+                // the target frame before finishSeekPreview() pauses it again.
+                if (seekPreviewActive) {
+                    Log.i(TAG, "Playing ignored (seek preview)")
+                    return@handleEvent
+                }
                 // Hold first-frame gate until user explicitly calls play(): late Playing
-                // events after Vout+pause must not flip Ready → Playing (then → Paused).
+                // events after Vout+pause must not flip Ready → Playing or leave the
+                // native player running behind a paused UI.
                 if (awaitingFirstFramePause || holdForUserPlay) {
+                    if (
+                        PlaybackIntentPolicy.shouldForcePauseOnPlayingEvent(
+                            firstFrameReady = _state.value.firstFrameReady,
+                            playRequested = playRequested,
+                            seekPreviewActive = seekPreviewActive,
+                        )
+                    ) {
+                        pauseNativeIfPlaying("first-frame hold")
+                    }
                     Log.i(
                         TAG,
                         "Playing ignored (awaitingFirst=$awaitingFirstFramePause holdForUser=$holdForUserPlay)",
                     )
                     return@handleEvent
                 }
-                // Seek-preview play is internal — keep UI in Paused/Ready.
-                if (seekPreviewActive) {
-                    Log.i(TAG, "Playing ignored (seek preview)")
+                if (
+                    PlaybackIntentPolicy.shouldForcePauseOnPlayingEvent(
+                        firstFrameReady = _state.value.firstFrameReady,
+                        playRequested = playRequested,
+                        seekPreviewActive = seekPreviewActive,
+                    )
+                ) {
+                    pauseNativeIfPlaying("pause intent")
+                    Log.i(TAG, "Playing ignored (pause requested)")
                     return@handleEvent
                 }
                 _state.update {
@@ -198,6 +227,11 @@ class VlcPlayerController(
             }
             MediaPlayer.Event.Paused -> {
                 if (suppressAllTerminalEvents) return@handleEvent
+                if (!PlaybackIntentPolicy.shouldAcceptPausedEvent(playRequested)) {
+                    resumeNativeIfRequested("stale Paused event")
+                    Log.i(TAG, "Paused reconciled (play requested)")
+                    return@handleEvent
+                }
                 // Single-direction: only the Playing→Paused transition is driven by this
                 // event. The first-frame Ready state is set by [onFirstVout], not here;
                 // re-deriving phase from a stale Paused (e.g. after seek-preview while
@@ -505,6 +539,7 @@ class VlcPlayerController(
         // the atOrPastEnd check below so a stale EOF while holding for the user can
         // still trigger restart-from-0. The other flags are cleared inline.
         cancelSeekPreview(pausePlayer = false)
+        playRequested = true
         awaitingFirstFramePause = false
         holdForUserPlay = false
         pauseAfterFirstFramePhase = null
@@ -545,7 +580,12 @@ class VlcPlayerController(
         if (released) return
         val player = mediaPlayer ?: return
         if (_state.value.phase != PlayerState.Phase.Playing) return
-        player.pause()
+        playRequested = false
+        // MediaPlayer.pause() is toggle-like. Never call it when native playback is
+        // already paused, otherwise the UI pause action can resume the video.
+        if (player.isPlaying) {
+            player.pause()
+        }
         _state.update {
             it.copy(
                 phase = if (it.firstFrameReady) PlayerState.Phase.Paused else it.phase,
@@ -1170,7 +1210,9 @@ class VlcPlayerController(
         // user taps play (see play()).
         awaitingFirstFramePause = false
         val player = mediaPlayer
-        player?.pause()
+        if (player?.isPlaying == true) {
+            player.pause()
+        }
         refreshTracks()
         val length = player?.length?.coerceAtLeast(0L) ?: 0L
         val time = player?.time?.coerceAtLeast(0L) ?: 0L
@@ -1197,6 +1239,22 @@ class VlcPlayerController(
             if (released || !viewsAttached) return@post
             val p = mediaPlayer ?: return@post
             applyVideoScale(p)
+        }
+    }
+
+    private fun pauseNativeIfPlaying(reason: String) {
+        val player = mediaPlayer ?: return
+        if (player.isPlaying) {
+            runCatching { player.pause() }
+                .onFailure { t -> Log.w(TAG, "pause failed ($reason): ${t.message}") }
+        }
+    }
+
+    private fun resumeNativeIfRequested(reason: String) {
+        val player = mediaPlayer ?: return
+        if (playRequested && !player.isPlaying) {
+            runCatching { player.play() }
+                .onFailure { t -> Log.w(TAG, "play failed ($reason): ${t.message}") }
         }
     }
 

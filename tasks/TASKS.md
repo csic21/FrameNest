@@ -527,3 +527,20 @@ unit test、lint、debug/release assemble 通过；不导出 PCM 或 NAS 信息�
 
 验收：断连分类与非重试错误边界有自动测试；相关 unit test、lint、debug/release assemble
 通过；可用真机完成锁屏→解锁→当前窗口继续生成字幕，不清数据、不记录 NAS 信息。
+
+## FN-30：播放首帧与退出生命周期修复
+
+**依赖**：FN-05、FN-20、FN-28
+**拥有路径**：`player/**`、`feature/player/**`、`navigation/FrameNestApp.kt`
+的播放器退出转场、相关测试与交接记录
+**目标**：保证进入播放页后真实暂停在首帧，返回时立即停止画面并及时释放解码资源。
+
+工作内容：
+
+- 用播放意图约束 libVLC 的异步 Playing/Paused 事件，防止暂停状态下视频继续运行。
+- 显式退出时先保存进度快照，立即停止并拆除 VLC Surface，耗时的本地清理保持在后台。
+- 播放页回退不使用默认淡出，避免已退出的 SurfaceView 残留在浏览页上。
+- 不改 SMB 数据路径、不引入新依赖。
+
+验收：首帧暂停与迟到事件约束有纯逻辑测试；返回时无播放页残影；连续进出
+20 次不累积活动播放器；unit test、lint、debug/release assemble 通过。

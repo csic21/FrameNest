@@ -236,7 +236,7 @@ fun PlayerScreen(
             if (vm.playerState.value.phase == PlayerState.Phase.Ended) {
                 val next = siblingNav.nextPath
                 if (next != null) {
-                    vm.onLeaveOrBackground()
+                    vm.onLeave()
                     onOpenSibling(next)
                 }
             }
@@ -247,13 +247,13 @@ fun PlayerScreen(
     }
 
     val leave: () -> Unit = {
-        vm.onLeaveOrBackground()
+        vm.onLeave()
         onBack()
     }
 
     val openSibling: (String) -> Unit = { siblingPath ->
         autoNextArmed = false
-        vm.onLeaveOrBackground()
+        vm.onLeave()
         onOpenSibling(siblingPath)
     }
 
