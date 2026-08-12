@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Flat fallback for tooling; launcher mipmaps contain the full dimensional mark. -->
+<!-- Flat vector fallback; generated launcher mipmaps contain the color-gradient mark. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -7,21 +7,25 @@
     android:viewportHeight="108">
 
     <path
-        android:fillColor="#090909"
-        android:pathData="M31,23 H70 C77,23 80,27 80,34 V46 C80,51 83,53 88,54 C94,55 97,60 97,67 V73 C97,85 88,93 75,94 L34,88 C25,87 21,79 21,70 V36 C21,28 25,23 31,23 Z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M38,34 H69 V45 H48 V51 H38 Z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M38,52 H68 C76,52 81,58 81,66 V69 C81,76 76,81 68,82 L38,78 Z" />
-    <path
-        android:fillColor="#090909"
-        android:pathData="M52,59 L68,67 L52,75 Z" />
+        android:fillColor="#00000000"
+        android:pathData="M30,65 C27,65 25,63 25,60 V37 C25,30 30,25 37,25 H68 C75,25 80,30 80,37 V65"
+        android:strokeColor="#63D5D3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="7" />
     <path
         android:fillColor="#00000000"
-        android:pathData="M39,84 C53,86 69,83 78,78"
-        android:strokeColor="#FF5A4F"
+        android:pathData="M28,65 C31,78 57,87 79,66"
+        android:strokeColor="#2DCEB2"
         android:strokeLineCap="round"
-        android:strokeWidth="3" />
+        android:strokeWidth="7" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M30,73 C43,60 67,60 78,72"
+        android:strokeColor="#80DAFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="5.5" />
+    <path
+        android:fillColor="#FF6B5C"
+        android:pathData="M46.5,38 C44.7,36.9 42.5,38.1 42.5,40.2 V59.8 C42.5,61.9 44.7,63.1 46.5,62 L65.2,50.2 C66.9,49.1 66.9,46.9 65.2,45.8 Z" />
 </vector>
