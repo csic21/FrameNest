@@ -581,3 +581,24 @@ unit test、lint、debug/release assemble 通过；不导出 PCM 或 NAS 信息�
 
 验收：快速滚过一批条目并全部释放后，新可见任务可直接成为下一个待处理项；
 unit test、lint、debug/release assemble 通过；无真机时不虚报滚动帧率或 NAS 出图毫秒。
+
+## FN-33：品牌 Logo 与应用主题统一
+
+**依赖**：FN-24  
+**拥有路径**：`design/app-icon/**`、`docs/brand/**`、Android launcher 资源、
+`ui/theme/**`、品牌决策记录、相关测试与交接记录  
+**目标**：将用户确认的蓝紫旋转影框 Logo 正式接入项目，并让手机/平板界面使用一致、
+可访问的深靛蓝与蓝紫品牌体系。
+
+工作内容：
+
+- 将确认稿保存为品牌母版并建立确定性生成流程，生成自适应前景/背景、旧版方形/圆形、
+  Android 13 单色主题、Play Store 与品牌源稿。
+- 浅色/深色 Material 3 色彩角色与 Logo 保持亲缘，显式覆盖常用 container、surface、
+  outline 角色；浅色按钮使用满足白字对比度的加深主色。
+- 默认关闭系统动态取色，避免 Android 12+ 壁纸色完全覆盖品牌；不改播放器叠层、错误色
+  与诊断页等功能性黑白/红色。
+- 更新已接受的品牌决策，记录 Logo、主题角色与可访问性边界。
+
+验收：Logo 在 48 px、圆形遮罩和单色主题下可辨识；主题关键前景/背景组合满足对比度；
+手机/平板相关 Compose 测试、unit test、lint、debug/release assemble 通过。
