@@ -35,6 +35,7 @@
 | FN-28 播放器旋转续播与画布恢复 | 已完成 | agent | → main | FN-05, FN-15, FN-20 | [FN-28](handoffs/FN-28.md) |
 | FN-29 锁屏后听译 SMB 音频自动恢复 | 已完成 | agent | → main | FN-27, FN-28 | [FN-29](handoffs/FN-29.md) |
 | FN-30 播放首帧与退出生命周期 | 已完成 | Codex | main | FN-05, FN-20, FN-28 | [FN-30](handoffs/FN-30.md) |
+| FN-31 大目录浏览内存与无障碍优化 | 已完成 | Codex | `agent/FN-31-browse-memory-a11y` | FN-07, FN-08, FN-22 | [FN-31](handoffs/FN-31.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。

@@ -305,6 +305,12 @@ private fun BrowseList(
     LazyColumn(modifier = modifier) {
         items(entries, key = { it.stableKey() }) { entry ->
             val tag = "browse_item_${entry.stableKey()}"
+            val typeLabel = entrySupportingText(entry)
+            val entryDescription = stringResource(
+                R.string.browse_entry_cd,
+                entry.name,
+                typeLabel,
+            )
             ListItem(
                 headlineContent = {
                     Text(
@@ -315,7 +321,7 @@ private fun BrowseList(
                 },
                 supportingContent = {
                     Text(
-                        text = entrySupportingText(entry),
+                        text = typeLabel,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -332,7 +338,7 @@ private fun BrowseList(
                     .heightIn(min = FrameNestDimens.MinTouchTarget)
                     .minimumInteractiveComponentSize()
                     .testTag(tag)
-                    .semantics { contentDescription = tag }
+                    .semantics { contentDescription = entryDescription }
                     .clickable { onOpenEntry(entry) },
             )
         }
@@ -374,6 +380,11 @@ private fun BrowseGridCell(
 ) {
     val tag = "browse_item_${entry.stableKey()}"
     val typeLabel = entrySupportingText(entry)
+    val entryDescription = stringResource(
+        R.string.browse_entry_cd,
+        entry.name,
+        typeLabel,
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -382,7 +393,7 @@ private fun BrowseGridCell(
             .clickable(onClick = onOpen)
             .testTag(tag)
             .semantics {
-                contentDescription = "$tag, $typeLabel"
+                contentDescription = entryDescription
             },
     ) {
         Box(
@@ -480,7 +491,7 @@ private fun BrowseVideoThumbnail(
             is ThumbnailUiState.Ready -> {
                 Image(
                     bitmap = s.bitmap.asImageBitmap(),
-                    contentDescription = stringResource(R.string.browse_type_video),
+                    contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()

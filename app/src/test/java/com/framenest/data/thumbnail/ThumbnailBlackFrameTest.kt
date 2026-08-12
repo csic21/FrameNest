@@ -37,4 +37,34 @@ class ThumbnailBlackFrameTest {
             assertTrue(pixels.contains(sample))
         }
     }
+
+    @Test
+    fun randomAccessSampleGrid_readsOnlyFixedGridFor4kFrame() {
+        val coordinates = mutableListOf<Pair<Int, Int>>()
+
+        val samples = ThumbnailBlackFrame.sampleGrid(
+            width = 3840,
+            height = 2160,
+            samplesPerSide = 8,
+        ) { x, y ->
+            coordinates += x to y
+            (y shl 16) or x
+        }
+
+        assertEquals(64, samples.size)
+        assertEquals(64, coordinates.size)
+        assertEquals(240 to 135, coordinates.first())
+        assertEquals(3600 to 2025, coordinates.last())
+        assertEquals(coordinates.distinct().size, coordinates.size)
+    }
+
+    @Test
+    fun randomAccessSampleGrid_preservesBlackFrameDecision() {
+        val samples = ThumbnailBlackFrame.sampleGrid(
+            width = 1920,
+            height = 1080,
+        ) { _, _ -> 0xFF000000.toInt() }
+
+        assertTrue(ThumbnailBlackFrame.isBlackFrame(samples))
+    }
 }

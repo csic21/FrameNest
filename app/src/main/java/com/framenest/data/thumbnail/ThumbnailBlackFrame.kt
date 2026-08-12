@@ -44,9 +44,7 @@ object ThumbnailBlackFrame {
         return 0.299 * r + 0.587 * g + 0.114 * b
     }
 
-    /**
-     * Sample a grid from a full width×height ARGB buffer (row-major).
-     */
+    /** Sample a grid from a full width×height ARGB buffer (row-major). */
     fun sampleGrid(
         pixels: IntArray,
         width: Int,
@@ -54,7 +52,24 @@ object ThumbnailBlackFrame {
         samplesPerSide: Int = 8,
     ): IntArray {
         require(width > 0 && height > 0) { "invalid size" }
-        require(pixels.size >= width * height) { "buffer too small" }
+        require(pixels.size.toLong() >= width.toLong() * height.toLong()) { "buffer too small" }
+        return sampleGrid(width, height, samplesPerSide) { x, y -> pixels[y * width + x] }
+    }
+
+    /**
+     * Sample a fixed-size grid without first copying the complete frame.
+     *
+     * A 4K ARGB frame contains more than eight million pixels, so allocating a full
+     * [IntArray] just to inspect 64 points briefly adds roughly 32 MiB per candidate.
+     * Callers backed by a bitmap or another random-access image should use this overload.
+     */
+    inline fun sampleGrid(
+        width: Int,
+        height: Int,
+        samplesPerSide: Int = 8,
+        pixelAt: (x: Int, y: Int) -> Int,
+    ): IntArray {
+        require(width > 0 && height > 0) { "invalid size" }
         val n = samplesPerSide.coerceAtLeast(1)
         val out = IntArray(n * n)
         var i = 0
@@ -62,7 +77,7 @@ object ThumbnailBlackFrame {
             val y = ((gy + 0.5) * height / n).toInt().coerceIn(0, height - 1)
             for (gx in 0 until n) {
                 val x = ((gx + 0.5) * width / n).toInt().coerceIn(0, width - 1)
-                out[i++] = pixels[y * width + x]
+                out[i++] = pixelAt(x, y)
             }
         }
         return out

@@ -89,9 +89,9 @@ class ThumbnailFrameExtractor(
         val w = bitmap.width
         val h = bitmap.height
         if (w <= 0 || h <= 0) return true
-        val pixels = IntArray(w * h)
-        bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
-        val samples = ThumbnailBlackFrame.sampleGrid(pixels, w, h, samplesPerSide = 8)
+        val samples = ThumbnailBlackFrame.sampleGrid(w, h, samplesPerSide = 8) { x, y ->
+            bitmap.getPixel(x, y)
+        }
         return ThumbnailBlackFrame.isBlackFrame(samples)
     }
 
