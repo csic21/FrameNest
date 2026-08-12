@@ -48,11 +48,6 @@ class ThumbnailRepository(
         val request: ThumbnailRequest,
     )
 
-    private data class QueuedWorkKey(
-        val generation: Long,
-        val digest: String,
-    )
-
     private data class ScheduledRetry(
         val token: Any,
         val job: Job,
@@ -64,12 +59,12 @@ class ThumbnailRepository(
     private val backoff = ConcurrentHashMap<String, ThumbnailBackoffState>()
     private val interestCounts = ConcurrentHashMap<String, Int>()
     private val interestedRequests = ConcurrentHashMap<String, ThumbnailRequest>()
-    private val queuedWork = ConcurrentHashMap.newKeySet<QueuedWorkKey>()
+    private val workQueue = ThumbnailWorkQueue<QueuedWork>()
     private val scheduledRetries = ConcurrentHashMap<String, ScheduledRetry>()
     private val generation = ThumbnailCacheGeneration()
     private val cacheMutationLock = Any()
 
-    private val queue = Channel<QueuedWork>(Channel.UNLIMITED)
+    private val workAvailable = Channel<Unit>(Channel.CONFLATED)
     private val workerLock = Any()
     private val workerJobs = mutableListOf<Job>()
 
@@ -145,6 +140,7 @@ class ThumbnailRepository(
         if (remaining == null) {
             interestedRequests.remove(digest)
             scheduledRetries.remove(digest)?.job?.cancel()
+            workQueue.cancelPending(ThumbnailWorkKey(generation.current(), digest))
             uiStates.remove(digest)?.value = ThumbnailUiState.None
         }
     }
@@ -166,10 +162,7 @@ class ThumbnailRepository(
             workerJobs.forEach { it.cancel() }
             workerJobs.clear()
         }
-        while (queue.tryReceive().isSuccess) {
-            // Discard queued work from the invalidated generation.
-        }
-        queuedWork.clear()
+        workQueue.clear()
         backoff.clear()
         uiStates.values.forEach { flow ->
             flow.value = ThumbnailUiState.None
@@ -191,7 +184,7 @@ class ThumbnailRepository(
             workerJobs.forEach { it.cancel() }
             workerJobs.clear()
         }
-        queue.close()
+        workAvailable.close()
         scope.cancel()
     }
 
@@ -203,11 +196,11 @@ class ThumbnailRepository(
     private fun enqueue(request: ThumbnailRequest, workGeneration: Long) {
         if (!generation.isCurrent(workGeneration)) return
         val digest = request.key.digest()
-        val key = QueuedWorkKey(workGeneration, digest)
-        if (!queuedWork.add(key)) return
-        val result = queue.trySend(QueuedWork(workGeneration, request))
+        val key = ThumbnailWorkKey(workGeneration, digest)
+        if (!workQueue.offer(key, QueuedWork(workGeneration, request))) return
+        val result = workAvailable.trySend(Unit)
         if (result.isFailure) {
-            queuedWork.remove(key)
+            workQueue.cancelPending(key)
             Log.w(TAG, "thumbnail queue send failed")
             return
         }
@@ -232,8 +225,11 @@ class ThumbnailRepository(
                 val job = scope.launch {
                     val session = ThumbnailWorkerSession()
                     try {
-                        for (work in queue) {
-                            processOne(work, session)
+                        for (ignored in workAvailable) {
+                            val scheduled = workQueue.takeNext() ?: continue
+                            signalNextWorkerIfPending()
+                            processOne(scheduled.first, scheduled.second, session)
+                            signalNextWorkerIfPending()
                         }
                     } finally {
                         session.close()
@@ -248,10 +244,17 @@ class ThumbnailRepository(
         }
     }
 
-    private suspend fun processOne(work: QueuedWork, session: ThumbnailWorkerSession) {
+    private fun signalNextWorkerIfPending() {
+        if (workQueue.hasPending()) workAvailable.trySend(Unit)
+    }
+
+    private suspend fun processOne(
+        workKey: ThumbnailWorkKey,
+        work: QueuedWork,
+        session: ThumbnailWorkerSession,
+    ) {
         val request = work.request
         val digest = request.key.digest()
-        val workKey = QueuedWorkKey(work.generation, digest)
         var requeueAfterCancellation = false
         try {
             if (!generation.isCurrent(work.generation)) return
@@ -290,7 +293,7 @@ class ThumbnailRepository(
                 generation.isCurrent(work.generation) && (interestCounts[digest] ?: 0) > 0
             throw cancelled
         } finally {
-            queuedWork.remove(workKey)
+            workQueue.finish(workKey)
             if (requeueAfterCancellation) enqueue(request, work.generation)
         }
     }
