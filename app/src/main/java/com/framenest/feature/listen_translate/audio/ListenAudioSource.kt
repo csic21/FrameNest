@@ -6,6 +6,8 @@ import androidx.annotation.RawRes
 import com.framenest.player.audio.PcmAudioMath
 import com.framenest.player.audio.PcmWindowDecoder
 import com.framenest.smb.SmbClient
+import com.framenest.smb.SmbError
+import com.framenest.smb.SmbException
 import com.framenest.smb.SmbRandomAccess
 import java.io.Closeable
 import java.io.IOException
@@ -270,11 +272,20 @@ object ListenAudioSources {
 
 internal fun isRetryableSmbAudioFailure(error: Throwable): Boolean =
     generateSequence(error) { it.cause }.any { cause ->
+        val smbError = (cause as? SmbException)?.error
         cause is IOException ||
-            cause.message?.let { message ->
-                message.contains("broken pipe", ignoreCase = true) ||
-                    message.contains("connection reset", ignoreCase = true) ||
-                    message.contains("socket closed", ignoreCase = true) ||
-                    message.contains("disconnected", ignoreCase = true)
-            } == true
+            smbError is SmbError.Disconnected ||
+            smbError is SmbError.Network ||
+            cause.javaClass.simpleName.contains("NotConnected", ignoreCase = true) ||
+            cause.message.isSmbConnectionFailureMessage()
     }
+
+private fun String?.isSmbConnectionFailureMessage(): Boolean =
+    this?.let { message ->
+        message.contains("broken pipe", ignoreCase = true) ||
+            message.contains("connection reset", ignoreCase = true) ||
+            message.contains("socket closed", ignoreCase = true) ||
+            message.contains("disconnected", ignoreCase = true) ||
+            message.contains("not connected", ignoreCase = true) ||
+            message.contains("notconnected", ignoreCase = true)
+    } == true

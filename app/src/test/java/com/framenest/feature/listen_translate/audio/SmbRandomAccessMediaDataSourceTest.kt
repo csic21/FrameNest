@@ -1,6 +1,8 @@
 package com.framenest.feature.listen_translate.audio
 
 import com.framenest.smb.SmbRandomAccess
+import com.framenest.smb.SmbError
+import com.framenest.smb.SmbException
 import java.io.IOException
 import java.net.SocketException
 import org.junit.Assert.assertArrayEquals
@@ -60,8 +62,28 @@ class SmbRandomAccessMediaDataSourceTest {
                 IllegalStateException("java.net.SocketException: Broken pipe"),
             ),
         )
+        assertTrue(
+            isRetryableSmbAudioFailure(
+                SmbException(SmbError.Disconnected("Not connected")),
+            ),
+        )
+        assertTrue(
+            isRetryableSmbAudioFailure(
+                SmbException(SmbError.Network("Connection unavailable after wake")),
+            ),
+        )
+        assertTrue(
+            isRetryableSmbAudioFailure(
+                IllegalStateException("Transport endpoint is not connected"),
+            ),
+        )
+        assertTrue(isRetryableSmbAudioFailure(NotConnectedException()))
+        assertTrue(!isRetryableSmbAudioFailure(SmbException(SmbError.Auth())))
+        assertTrue(!isRetryableSmbAudioFailure(SmbException(SmbError.NotFound())))
         assertTrue(!isRetryableSmbAudioFailure(IllegalStateException("unsupported codec")))
     }
+
+    private class NotConnectedException : IllegalStateException()
 
     private class FakeRandomAccess(
         private val bytes: ByteArray,

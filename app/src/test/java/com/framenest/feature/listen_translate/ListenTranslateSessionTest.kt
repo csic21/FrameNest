@@ -139,6 +139,53 @@ class ListenTranslateSessionTest {
     }
 
     @Test
+    fun reopeningAfterTransientFailure_clearsBackoffAndRetriesCurrentWindow() = runTest {
+        val identity = PlaybackIdentity("server", "media", "movie.mkv")
+        val repository = ListenTranslateRepository(FakeListenTranslateDao())
+        var disconnected = true
+        var calls = 0
+        val engine = object : ListenTranslateEngine {
+            override val asrModelId = "asr-test"
+            override val mtModelId = "mt-test"
+
+            override suspend fun processWindow(
+                startMs: Long,
+                endMs: Long,
+                sourceLang: String,
+                targetLang: String,
+            ): ListenWindowResult {
+                calls++
+                if (disconnected) error("Not connected")
+                return ListenWindowResult("recovered", "已恢复")
+            }
+        }
+        val session = ListenTranslateSession(
+            repository = repository,
+            engine = engine,
+            scope = this,
+            identity = identity,
+            pollIntervalMs = 60_000L,
+        )
+
+        session.onPlaybackTick(positionMs = 0L, durationMs = 3_000L, playing = false)
+        session.setEnabled(true)
+        runCurrent()
+        assertEquals(ListenTranslateJobStatus.Failed, session.uiState.value.status)
+        assertEquals(1, calls)
+
+        session.setEnabled(false)
+        disconnected = false
+        session.setEnabled(true)
+        runCurrent()
+
+        assertEquals(2, calls)
+        assertEquals(ListenTranslateJobStatus.Partial, session.uiState.value.status)
+        assertEquals("recovered\n已恢复", session.uiState.value.overlayText)
+        assertEquals(null, session.uiState.value.errorMessage)
+        session.release()
+    }
+
+    @Test
     fun fastPipeline_prefetchesContiguousThirtySecondCache() = runTest {
         val identity = PlaybackIdentity("server", "media", "movie.mkv")
         val repository = ListenTranslateRepository(FakeListenTranslateDao())

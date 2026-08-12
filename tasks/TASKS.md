@@ -509,3 +509,21 @@ unit test、lint、debug/release assemble 通过；不导出 PCM 或 NAS 信息�
 
 验收：生命周期与宿主匹配策略有自动测试；unit test、lint、debug/release assemble 通过；
 真机竖屏→横屏→竖屏播放状态和画面正常，不清除现有应用数据。
+
+## FN-29：锁屏后听译 SMB 音频自动恢复
+
+**依赖**：FN-27、FN-28
+**拥有路径**：`feature/listen_translate/audio/**`、相关听译重试测试与交接记录
+**目标**：设备锁屏导致听译专用 SMB 会话失效后，解锁或下次打开听译可继续获取音频，
+不影响播放器主连接和已有字幕缓存。
+
+工作内容：
+
+- 将结构化 `SmbError.Disconnected` / `SmbError.Network` 识别为可重连音频错误。
+- 兼容 SMBJ / 系统包装后的 `Not connected`、`Transport endpoint is not connected`
+  等断连文本，不把认证、文件不存在或解码器错误误判为可重试。
+- 当前 PCM 窗口断连时关闭旧随机读句柄，重建听译专用 SMB 会话并立即重试一次；
+  仍失败时沿用会话级指数退避，之后继续补当前窗口。
+
+验收：断连分类与非重试错误边界有自动测试；相关 unit test、lint、debug/release assemble
+通过；可用真机完成锁屏→解锁→当前窗口继续生成字幕，不清数据、不记录 NAS 信息。
