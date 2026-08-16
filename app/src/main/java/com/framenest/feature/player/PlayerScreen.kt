@@ -1040,7 +1040,7 @@ private fun ErrorOverlay(
 }
 
 @Composable
-private fun PlayerControls(
+internal fun PlayerControls(
     state: PlayerState,
     siblingNav: SiblingNavUiState,
     autoNextArmed: Boolean,
@@ -1087,7 +1087,15 @@ private fun PlayerControls(
     val playCd = stringResource(R.string.player_play)
     val pauseCd = stringResource(R.string.player_pause)
     val seekCd = stringResource(R.string.player_seek)
-    val statusText = phaseLabel(state)
+    // Keep one status row through mid-stream buffering. Adding a second Text
+    // here changes the controls overlay height and makes its top edge jump over
+    // the video exactly when a seek starts filling again.
+    val statusText = if (state.isBuffering && state.phase == PlayerState.Phase.Playing) {
+        val pct = state.bufferPercent.toInt().coerceIn(0, 100)
+        stringResource(R.string.player_buffering_percent, pct)
+    } else {
+        phaseLabel(state)
+    }
     val statusCd = stringResource(R.string.player_status_cd, statusText)
 
     val bg = if (overlay) {
@@ -1127,18 +1135,6 @@ private fun PlayerControls(
                 .semantics { contentDescription = statusCd }
                 .testTag("player_status"),
         )
-        if (state.isBuffering && state.phase == PlayerState.Phase.Playing) {
-            val pct = state.bufferPercent.toInt().coerceIn(0, 100)
-            Text(
-                text = stringResource(R.string.player_buffering_percent, pct),
-                style = MaterialTheme.typography.labelMedium,
-                color = onBgVariant,
-                maxLines = 1,
-                modifier = Modifier
-                    .padding(top = 2.dp)
-                    .testTag("player_status_buffering"),
-            )
-        }
         if (autoNextArmed && siblingNav.nextName != null) {
             Text(
                 text = stringResource(R.string.player_auto_next_hint),
