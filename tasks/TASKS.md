@@ -642,3 +642,24 @@ assemble 通过；无真机时明确保留真实 SMB 返回帧时间验收，不
 
 验收：迁移验证通过；旧服务器与播放历史不丢失；听译 repository 回归测试约束普通
 `ensureJob` 只查询一次；unit test、lint、debug/release assemble 通过。
+
+## FN-36：听译 cue 缓存热路径优化
+
+**依赖**：FN-23、FN-35
+
+**拥有路径**：`feature/listen_translate/ListenTranslateSession.kt`、
+`ListenTranslateWindows.kt`、最小测试 fake/相关单测、性能文档与交接记录
+
+**目标**：连续听译和播放进度更新不重复加载整份 cue 列表，也不为每次当前字幕查找创建
+临时集合。
+
+工作内容：
+
+- 使用 `upsertCue` 返回的持久化 cue 原地更新会话的有序内存缓存；Room Flow 继续负责
+  最终一致性，不在每次窗口完成后再次 `listCues`。
+- 同范围 cue 按 repository 替换语义更新，保留重叠的语音片段与整窗覆盖记录。
+- `cueAt` 改为单次无中间集合扫描，保持“更晚 start、更高 rev 优先”和端点兼容行为。
+- 纯逻辑/会话测试覆盖排序、替换、重叠和连续 30 秒预取只做一次初始全量查询。
+
+验收：普通窗口完成后无新增全量 `listCues`；快速预取 10 个窗口仍只执行初始查询；
+字幕选择语义测试不回归；unit test、lint、debug/release assemble 通过。

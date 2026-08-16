@@ -35,10 +35,26 @@ object ListenTranslateWindows {
 
     fun cueAt(cues: List<ListenTranslateCue>, positionMs: Long): ListenTranslateCue? {
         val pos = positionMs.coerceAtLeast(0L)
-        val priority = compareBy<ListenTranslateCue> { it.startMs }.thenBy { it.rev }
-        return cues.filter { it.startMs <= pos && pos < it.endMs }.maxWithOrNull(priority)
-            ?: cues.filter { it.startMs <= pos && it.endMs >= pos }.maxWithOrNull(priority)
+        var bestExclusive: ListenTranslateCue? = null
+        var bestInclusive: ListenTranslateCue? = null
+        for (cue in cues) {
+            if (cue.startMs > pos) continue
+            if (pos < cue.endMs && hasHigherPriority(cue, bestExclusive)) {
+                bestExclusive = cue
+            }
+            if (pos <= cue.endMs && hasHigherPriority(cue, bestInclusive)) {
+                bestInclusive = cue
+            }
+        }
+        return bestExclusive ?: bestInclusive
     }
+
+    private fun hasHigherPriority(
+        candidate: ListenTranslateCue,
+        current: ListenTranslateCue?,
+    ): Boolean = current == null ||
+        candidate.startMs > current.startMs ||
+        (candidate.startMs == current.startMs && candidate.rev > current.rev)
 
     /**
      * True when no cue fully covers [startMs, endMs) (allowing tiny edge slack).
@@ -92,6 +108,34 @@ object ListenTranslateWindows {
                 }
             }
         }
+    }
+}
+
+/** Maintains the DAO's `start_ms ASC, rev ASC` order without reloading every cue. */
+internal object ListenCueCache {
+    fun upsert(
+        existing: List<ListenTranslateCue>,
+        incoming: ListenTranslateCue,
+    ): List<ListenTranslateCue> {
+        val result = ArrayList<ListenTranslateCue>(existing.size + 1)
+        var inserted = false
+        for (cue in existing) {
+            if (cue.startMs == incoming.startMs && cue.endMs == incoming.endMs) {
+                continue
+            }
+            if (!inserted && compare(incoming, cue) <= 0) {
+                result += incoming
+                inserted = true
+            }
+            result += cue
+        }
+        if (!inserted) result += incoming
+        return result
+    }
+
+    private fun compare(left: ListenTranslateCue, right: ListenTranslateCue): Int {
+        val start = left.startMs.compareTo(right.startMs)
+        return if (start != 0) start else left.rev.compareTo(right.rev)
     }
 }
 

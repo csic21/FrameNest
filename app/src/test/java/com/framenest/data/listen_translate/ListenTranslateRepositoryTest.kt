@@ -217,6 +217,7 @@ internal class FakeListenTranslateDao : ListenTranslateDao {
     private var nextCueId = 1L
     var getJobCount: Int = 0
     var upsertJobCount: Int = 0
+    var listCuesCount: Int = 0
     private val cueFlows =
         mutableMapOf<String, MutableStateFlow<List<ListenTranslateCueEntity>>>()
 
@@ -360,11 +361,13 @@ internal class FakeListenTranslateDao : ListenTranslateDao {
         path: String,
         sourceLang: String,
         targetLang: String,
-    ): List<ListenTranslateCueEntity> =
-        cueRows.filter {
+    ): List<ListenTranslateCueEntity> {
+        listCuesCount++
+        return cueRows.filter {
             it.serverId == serverId && it.share == share && it.path == path &&
                 it.sourceLang == sourceLang && it.targetLang == targetLang
-        }.sortedBy { it.startMs }
+        }.sortedWith(compareBy<ListenTranslateCueEntity> { it.startMs }.thenBy { it.rev })
+    }
 
     override suspend fun cueAt(
         serverId: String,

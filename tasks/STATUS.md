@@ -40,6 +40,7 @@
 | FN-33 品牌 Logo 与应用主题统一 | 已完成 | Codex | `agent/FN-33-brand-system` | FN-24 | [FN-33](handoffs/FN-33.md) |
 | FN-34 播放器返回不卡主线程 | 已完成 | Codex | `main` | FN-30 | [FN-34](handoffs/FN-34.md) |
 | FN-35 Room 数据迁移与听译写入减负 | 已完成 | Codex | `agent/FN-35-room-stability` | FN-11, FN-23 | [FN-35](handoffs/FN-35.md) |
+| FN-36 听译 cue 缓存热路径优化 | 已完成 | Codex | `agent/FN-36-listen-cache-hotpath` | FN-23, FN-35 | [FN-36](handoffs/FN-36.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。

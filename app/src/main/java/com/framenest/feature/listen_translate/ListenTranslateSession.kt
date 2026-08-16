@@ -326,7 +326,7 @@ class ListenTranslateSession(
                     val cueStart = (result.cueStartMs ?: startMs).coerceIn(startMs, endMs)
                     val cueEnd = (result.cueEndMs ?: endMs).coerceIn(cueStart, endMs)
                     speechCoversWindow = cueStart == startMs && cueEnd == endMs
-                    repository.upsertCue(
+                    val persistedSpeech = repository.upsertCue(
                         identity = identity,
                         languages = langs,
                         startMs = cueStart,
@@ -336,10 +336,10 @@ class ListenTranslateSession(
                         rev = 1,
                         contentKey = contentKey,
                     )
+                    cachedCues = ListenCueCache.upsert(cachedCues, persistedSpeech)
                     // Make ASR text visible even when the following MT stage failed.
                     // A source-only cue deliberately does not satisfy needsFill(), so
                     // the same window remains eligible for the retry backoff below.
-                    cachedCues = repository.listCues(identity, langs)
                     updateCueSummary()
                     refreshActiveCue()
                 }
@@ -349,7 +349,7 @@ class ListenTranslateSession(
                 if (!speechCoversWindow) {
                     // Persist the whole attempted window, including silence. Writing this
                     // after the speech cue means cancellation cannot hide completed text.
-                    repository.upsertCue(
+                    val persistedCoverage = repository.upsertCue(
                         identity = identity,
                         languages = langs,
                         startMs = startMs,
@@ -366,6 +366,7 @@ class ListenTranslateSession(
                         },
                         contentKey = contentKey,
                     )
+                    cachedCues = ListenCueCache.upsert(cachedCues, persistedCoverage)
                 }
                 repository.updateProgress(
                     identity = identity,
@@ -374,7 +375,6 @@ class ListenTranslateSession(
                     status = ListenTranslateJobStatus.Partial,
                     durationMs = lastDurationMs.takeIf { it > 0L },
                 )
-                cachedCues = repository.listCues(identity, langs)
                 updateCueSummary()
                 if (result.blankReason == ListenBlankReason.UnrecognizedSpeech) {
                     retryPolicy.recordRecoverableBlank(attemptKey)

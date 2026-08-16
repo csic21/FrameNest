@@ -51,6 +51,34 @@ class ListenTranslateWindowsTest {
     }
 
     @Test
+    fun cueAt_prefersLaterStartThenHigherRevision_withoutSortedInput() {
+        val cues = listOf(
+            cue(1_000, 4_000, "older", "旧", rev = 1),
+            cue(0, 5_000, "wide", "宽", rev = 9),
+            cue(1_000, 3_000, "newer", "新", rev = 2),
+        )
+
+        assertEquals("newer", ListenTranslateWindows.cueAt(cues, 2_000L)?.textSrc)
+        assertEquals("older", ListenTranslateWindows.cueAt(cues, 3_000L)?.textSrc)
+    }
+
+    @Test
+    fun cueCache_replacesSameRange_andKeepsOverlappingCoverageSorted() {
+        val speech = cue(500, 2_000, "speech", "语音", rev = 1)
+        val coverage = cue(0, 3_000, "", "", rev = ListenCoverageRev.CONFIRMED_SILENCE)
+        val old = cue(3_000, 6_000, "old", "旧", rev = 1)
+        val replacement = cue(3_000, 6_000, "new", "新", rev = 2)
+
+        val withOverlap = ListenCueCache.upsert(listOf(old), speech)
+        val withCoverage = ListenCueCache.upsert(withOverlap, coverage)
+        val replaced = ListenCueCache.upsert(withCoverage, replacement)
+
+        assertEquals(listOf(0L, 500L, 3_000L), replaced.map { it.startMs })
+        assertEquals(listOf("", "speech", "new"), replaced.map { it.textSrc })
+        assertEquals(1, replaced.count { it.startMs == 3_000L && it.endMs == 6_000L })
+    }
+
+    @Test
     fun needsFill_falseWhenCovered() {
         val cues = listOf(cue(0, 3_000, "a", "A"))
         assertFalse(ListenTranslateWindows.needsFill(cues, 0, 3_000))

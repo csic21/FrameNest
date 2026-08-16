@@ -188,7 +188,8 @@ class ListenTranslateSessionTest {
     @Test
     fun fastPipeline_prefetchesContiguousThirtySecondCache() = runTest {
         val identity = PlaybackIdentity("server", "media", "movie.mkv")
-        val repository = ListenTranslateRepository(FakeListenTranslateDao())
+        val dao = FakeListenTranslateDao()
+        val repository = ListenTranslateRepository(dao)
         val processed = mutableListOf<Pair<Long, Long>>()
         var monotonicMs = 0L
         val engine = object : ListenTranslateEngine {
@@ -223,6 +224,7 @@ class ListenTranslateSessionTest {
         assertEquals((0L until 30_000L step 3_000L).toList(), processed.map { it.first })
         assertEquals(30_000L, session.uiState.value.coveredUntilMs)
         assertEquals(30_000L, session.uiState.value.prefetchLookAheadMs)
+        assertEquals(1, dao.listCuesCount)
         session.release()
     }
 
