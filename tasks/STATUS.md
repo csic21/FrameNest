@@ -38,6 +38,7 @@
 | FN-31 大目录浏览内存与无障碍优化 | 已完成 | Codex | `agent/FN-31-browse-memory-a11y` | FN-07, FN-08, FN-22 | [FN-31](handoffs/FN-31.md) |
 | FN-32 可见区域优先的缩略图调度 | 已完成 | Codex | `agent/FN-32-thumbnail-visible-priority` | FN-22, FN-31 | [FN-32](handoffs/FN-32.md) |
 | FN-33 品牌 Logo 与应用主题统一 | 已完成 | Codex | `agent/FN-33-brand-system` | FN-24 | [FN-33](handoffs/FN-33.md) |
+| FN-34 播放器返回不卡主线程 | 已完成 | Codex | `main` | FN-30 | [FN-34](handoffs/FN-34.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。

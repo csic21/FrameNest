@@ -1,5 +1,15 @@
 # 性能与包体基线
 
+## 播放器返回释放（FN-34）
+
+- 返回仍在主线程立即 detach/remove 视频画布，避免 SurfaceView 残留。
+- libVLC 的 native `stop/release`、代理 FD 关闭和 `LibVLC.release` 在命名 daemon
+  线程执行；`popBackStack` 不再等待远程输入和解码器停止。
+- 退出进度快照、SMB/听译后台清理和幂等释放行为保持不变。
+
+当前没有物理设备与真实 NAS，因此不记录虚假的返回帧耗时；真机验收需分别覆盖播放中、
+暂停、断网和大码率远程视频返回。
+
 ## 可见区域优先的缩略图调度（FN-32）
 
 - 待处理任务使用按 `generation + digest` 去重的有序队列，不再为每个条目向无界

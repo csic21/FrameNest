@@ -602,3 +602,22 @@ unit test、lint、debug/release assemble 通过；无真机时不虚报滚动�
 
 验收：Logo 在 48 px、圆形遮罩和单色主题下可辨识；主题关键前景/背景组合满足对比度；
 手机/平板相关 Compose 测试、unit test、lint、debug/release assemble 通过。
+
+## FN-34：播放器返回不卡主线程
+
+**依赖**：FN-30
+
+**拥有路径**：`player/PlayerController.kt`、`player/VlcPlayerController.kt`、
+播放器释放调度与相关单测、性能文档与交接记录
+
+**目标**：从播放器返回时立即显示上一页，不让 libVLC 原生停止或 SMB 输入关闭阻塞主线程。
+
+工作内容：
+
+- 保留主线程上的视频画布 detach/remove，避免已退出画面残留在浏览页。
+- 将 `MediaPlayer.stop/release`、代理 FD 关闭与 `LibVLC.release` 放到命名后台线程。
+- 保持退出进度快照、幂等释放、事件抑制和 ViewModel 后台清理行为不变。
+- 用纯 JVM 测试约束原生释放执行器运行在独立 daemon 线程。
+
+验收：返回调用链不在主线程执行 `MediaPlayer.stop()`；unit test、lint、debug/release
+assemble 通过；无真机时明确保留真实 SMB 返回帧时间验收，不用模拟值代替。

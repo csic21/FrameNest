@@ -80,6 +80,9 @@ interface PlayerController {
      */
     fun refreshVideoSurfaces()
 
-    /** Full teardown of MediaPlayer + LibVLC. Idempotent. */
+    /**
+     * Start full teardown of MediaPlayer + LibVLC. Idempotent; implementations may
+     * complete blocking native/resource release asynchronously after video output detaches.
+     */
     fun release()
 }

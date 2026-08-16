@@ -855,18 +855,14 @@ class VlcPlayerController(
         val afd = ownedSeekableAfd
         ownedSeekableAfd = null
 
-        /**
-         * View detach / removeView must run on the main thread.
-         * stop() is best-effort so the surface stops painting before pop animation.
-         */
-        fun detachAndStop() {
+        /** View detach / removeView must run on the main thread. */
+        fun detachVideoOutput() {
             if (player != null) {
                 runCatching {
                     player.setEventListener(null)
                     if (wasAttached) {
                         runCatching { player.detachViews() }
                     }
-                    player.stop()
                 }
             }
             if (layout != null) {
@@ -881,9 +877,13 @@ class VlcPlayerController(
             }
         }
 
-        /** Native release + proxy AFD close can block on SMB; never block the UI thread. */
-        fun releaseNative() {
+        /**
+         * Native stop/release and proxy AFD close can wait on the decoder or SMB input.
+         * They must never run on the UI thread; the video output is already detached.
+         */
+        fun stopAndReleaseNative() {
             if (player != null) {
+                runCatching { player.stop() }
                 runCatching { player.release() }
             }
             if (afd != null) runCatching { afd.close() }
@@ -894,21 +894,17 @@ class VlcPlayerController(
         val needsMainDetach = wasAttached || layout?.parent != null
         when {
             onMain -> {
-                detachAndStop()
-                // Keep popBackStack animation smooth: heavy native/AFD work off main.
-                Thread(
-                    { releaseNative() },
-                    "framenest-vlc-release",
-                ).apply {
-                    isDaemon = true
-                    start()
+                detachVideoOutput()
+                // Return to popBackStack before nativeStop can wait on remote input.
+                PlayerReleaseExecutor.launch(THREAD_NAME_VLC_RELEASE) {
+                    stopAndReleaseNative()
                 }
             }
             needsMainDetach -> {
                 val done = java.util.concurrent.CountDownLatch(1)
                 mainHandler.post {
                     try {
-                        detachAndStop()
+                        detachVideoOutput()
                     } finally {
                         done.countDown()
                     }
@@ -916,14 +912,13 @@ class VlcPlayerController(
                 if (!done.await(300, java.util.concurrent.TimeUnit.MILLISECONDS)) {
                     Log.w(TAG, "release: main detach timed out; continuing native release")
                     runCatching { player?.setEventListener(null) }
-                    runCatching { player?.stop() }
                 }
-                releaseNative()
+                stopAndReleaseNative()
             }
             else -> {
                 // Typical leave path: AndroidView already detached surfaces.
-                detachAndStop()
-                releaseNative()
+                detachVideoOutput()
+                stopAndReleaseNative()
             }
         }
 
@@ -1295,6 +1290,7 @@ class VlcPlayerController(
 
     companion object {
         private const val TAG = "FrameNestPlayer"
+        private const val THREAD_NAME_VLC_RELEASE = "framenest-vlc-release"
         private const val DISABLED_SPU_TRACK = -1
         private const val DEFAULT_SUBTITLE_FONT_REL_SIZE = 16
         private const val MIN_SUBTITLE_FONT_REL_SIZE = 8
