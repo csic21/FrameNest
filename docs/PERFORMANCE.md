@@ -1,5 +1,18 @@
 # 性能与包体基线
 
+## 听译 PCM 解码分配（FN-37）
+
+- MediaCodec 输出直接从只读 `ByteBuffer` 视图下混 PCM16/float，不再为每个输出块先
+  复制一份同尺寸 `ByteArray`；转换不会移动 codec buffer 的 position/limit。
+- 完整位于目标窗口内的 PCM 块不再执行 `copyOfRange`；源采样率已经是 16 kHz 时也不再
+  `copyOf`。因此常见 PCM16/16 kHz 完整块从“1 个字节数组 + 3 个短整型数组”降为
+  1 个下混短整型数组，再写入最终连续缓冲。
+- 解码结果使用按目标时长预估的连续缓冲，不再把所有分块保留到末尾后统一拼接；常规
+  3–9 秒且样本数与时长匹配时直接返回预分配 backing，长窗口仍有 10 秒预分配上限。
+
+纯逻辑测试验证 PCM16/float 字节序、立体声下混、Buffer 状态不变、完整裁剪/16 kHz
+数组复用，以及低估容量后的扩容顺序；实际 MediaCodec 内存曲线仍需真机 profiler 验收。
+
 ## 听译 cue 内存热路径（FN-36）
 
 - `ListenTranslateSession` 使用 `upsertCue` 返回值更新按 `start_ms/rev` 排序的会话缓存；

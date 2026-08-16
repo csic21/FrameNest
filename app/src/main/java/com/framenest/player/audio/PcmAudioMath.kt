@@ -1,5 +1,7 @@
 package com.framenest.player.audio
 
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import kotlin.math.sqrt
 
 /**
@@ -13,18 +15,23 @@ object PcmAudioMath {
     /**
      * Downmix interleaved 16-bit LE PCM to mono samples (one Short per frame).
      */
-    fun toMonoSamples(pcmLe: ByteArray, channelCount: Int): ShortArray {
+    fun toMonoSamples(pcmLe: ByteArray, channelCount: Int): ShortArray =
+        toMonoSamples(ByteBuffer.wrap(pcmLe), channelCount)
+
+    /**
+     * Downmix the remaining bytes of [pcmLe] without copying the buffer or changing its position.
+     */
+    fun toMonoSamples(pcmLe: ByteBuffer, channelCount: Int): ShortArray {
         require(channelCount >= 1) { "channelCount >= 1" }
-        val frameCount = pcmLe.size / (2 * channelCount)
+        val view = pcmLe.duplicate().order(ByteOrder.LITTLE_ENDIAN)
+        val frameCount = view.remaining() / (2 * channelCount)
         val out = ShortArray(frameCount)
-        var bi = 0
+        var byteIndex = view.position()
         for (i in 0 until frameCount) {
             var sum = 0
             for (c in 0 until channelCount) {
-                val lo = pcmLe[bi].toInt() and 0xff
-                val hi = pcmLe[bi + 1].toInt()
-                bi += 2
-                sum += ((hi shl 8) or lo).toShort().toInt()
+                sum += view.getShort(byteIndex).toInt()
+                byteIndex += 2
             }
             out[i] = (sum / channelCount).toShort()
         }
@@ -32,12 +39,33 @@ object PcmAudioMath {
     }
 
     /**
+     * Downmix interleaved little-endian float PCM without copying or moving [pcmLe].
+     */
+    fun floatToMono16(pcmLe: ByteBuffer, channelCount: Int): ShortArray {
+        require(channelCount >= 1) { "channelCount >= 1" }
+        val view = pcmLe.duplicate().order(ByteOrder.LITTLE_ENDIAN)
+        val frameCount = view.remaining() / (4 * channelCount)
+        val out = ShortArray(frameCount)
+        var byteIndex = view.position()
+        for (i in 0 until frameCount) {
+            var sum = 0f
+            for (c in 0 until channelCount) {
+                sum += view.getFloat(byteIndex)
+                byteIndex += 4
+            }
+            val average = (sum / channelCount).coerceIn(-1f, 1f)
+            out[i] = (average * Short.MAX_VALUE).toInt().toShort()
+        }
+        return out
+    }
+
+    /**
      * Linear-interpolation resample mono shorts to [TARGET_SAMPLE_RATE_HZ].
-     * If [sourceRateHz] already matches, returns a copy of [mono].
+     * If [sourceRateHz] already matches, returns [mono] unchanged.
      */
     fun resampleMonoTo16k(mono: ShortArray, sourceRateHz: Int): ShortArray {
         if (mono.isEmpty()) return ShortArray(0)
-        if (sourceRateHz == TARGET_SAMPLE_RATE_HZ) return mono.copyOf()
+        if (sourceRateHz == TARGET_SAMPLE_RATE_HZ) return mono
         require(sourceRateHz > 0) { "sourceRateHz > 0" }
         val outLen = ((mono.size.toLong() * TARGET_SAMPLE_RATE_HZ) / sourceRateHz)
             .toInt()

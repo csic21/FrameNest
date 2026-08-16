@@ -663,3 +663,23 @@ assemble 通过；无真机时明确保留真实 SMB 返回帧时间验收，不
 
 验收：普通窗口完成后无新增全量 `listCues`；快速预取 10 个窗口仍只执行初始查询；
 字幕选择语义测试不回归；unit test、lint、debug/release assemble 通过。
+
+## FN-37：听译 PCM 解码内存优化
+
+**依赖**：FN-14、FN-36
+
+**拥有路径**：`player/audio/PcmAudioMath.kt`、`player/audio/PcmWindowDecoder.kt`、
+相关纯逻辑测试、性能文档与交接记录
+
+**目标**：减少连续听译解码窗口中每个 MediaCodec 输出块的字节数组和 PCM 数组复制，
+降低 GC 压力与瞬时峰值内存，不改变采样、裁剪或音轨选择语义。
+
+工作内容：
+
+- 从 MediaCodec `ByteBuffer` 直接下混 PCM16/float，不再为每个输出块创建完整 `ByteArray`。
+- 完整覆盖窗口不复制裁剪数组；输入已为 16 kHz 时复用原 PCM 数组。
+- 使用预估容量的连续累加缓冲替代长期保留所有分块，常规 3–9 秒窗口避免末尾再次拼接。
+- 纯逻辑测试覆盖 ByteBuffer 下混、输入 position 保持、无操作路径复用和累加扩容。
+
+验收：常规 PCM16/16 kHz 块只创建下混结果且完整窗口不再二次复制；输出样本语义测试
+不回归；unit test、lint、debug/release assemble 通过。

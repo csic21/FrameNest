@@ -9,8 +9,6 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import androidx.annotation.RawRes
 import java.io.FileDescriptor
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -125,8 +123,9 @@ class PcmWindowDecoder {
             // Seek near start (closest previous sync).
             extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
 
-            val pcmChunks = ArrayList<ShortArray>()
-            var totalSamples = 0
+            val pcmOutput = PcmSampleAccumulator(
+                initialCapacity = expectedPcm16kSamples(endMs - startMs),
+            )
             val info = MediaCodec.BufferInfo()
             var inputDone = false
             var outputDone = false
@@ -179,21 +178,27 @@ class PcmWindowDecoder {
                         ) {
                             if (pts < endUs) {
                                 val outBuf = codec.getOutputBuffer(outIndex)!!
-                                val chunk = ByteArray(info.size)
-                                outBuf.position(info.offset)
-                                outBuf.limit(info.offset + info.size)
-                                outBuf.get(chunk)
+                                val chunk = outBuf.duplicate().apply {
+                                    position(info.offset)
+                                    limit(info.offset + info.size)
+                                }
                                 pcmEncoding = codec.outputFormat.getIntegerOr(
                                     MediaFormat.KEY_PCM_ENCODING,
                                     pcmEncoding,
                                 )
                                 val mono = when (pcmEncoding) {
                                     // AudioFormat.ENCODING_PCM_FLOAT = 4
-                                    4 -> floatLeToMono16(chunk, channels)
-                                    else -> PcmAudioMath.toMonoSamples(chunk, channels.coerceAtLeast(1))
+                                    4 -> PcmAudioMath.floatToMono16(
+                                        chunk,
+                                        channels.coerceAtLeast(1),
+                                    )
+                                    else -> PcmAudioMath.toMonoSamples(
+                                        chunk,
+                                        channels.coerceAtLeast(1),
+                                    )
                                 }
                                 // Trim samples before startMs / after endMs roughly by pts.
-                                val clipped = clipByPts(
+                                val clipped = clipPcmByPts(
                                     mono = mono,
                                     ptsUs = pts,
                                     startUs = startUs,
@@ -205,8 +210,7 @@ class PcmWindowDecoder {
                                     sampleRate.coerceAtLeast(1),
                                 )
                                 if (r16.isNotEmpty()) {
-                                    pcmChunks += r16
-                                    totalSamples += r16.size
+                                    pcmOutput.append(r16)
                                 }
                             }
                         }
@@ -220,12 +224,7 @@ class PcmWindowDecoder {
                     }
                 }
             }
-            val mono16k = ShortArray(totalSamples)
-            var destination = 0
-            for (chunk in pcmChunks) {
-                chunk.copyInto(mono16k, destinationOffset = destination)
-                destination += chunk.size
-            }
+            val mono16k = pcmOutput.toShortArray()
             check(mono16k.isNotEmpty()) {
                 "系统解码器已打开音轨 $mime，但未输出 PCM"
             }
@@ -264,48 +263,71 @@ class PcmWindowDecoder {
         val frames = info.size / bytesPerFrame
         return frames * 1_000_000L / sampleRate
     }
+}
 
-    private fun clipByPts(
-        mono: ShortArray,
-        ptsUs: Long,
-        startUs: Long,
-        endUs: Long,
-        sourceRateHz: Int,
-    ): ShortArray {
-        if (mono.isEmpty()) return mono
-        val frameUs = 1_000_000.0 / sourceRateHz.coerceAtLeast(1)
-        val dropFront = if (ptsUs >= startUs) {
-            0
-        } else {
-            (((startUs - ptsUs) / frameUs).toInt()).coerceIn(0, mono.size)
-        }
-        val keepUntil = if (ptsUs >= endUs) {
-            0
-        } else {
-            val maxFrames = (((endUs - ptsUs) / frameUs).toInt()).coerceAtLeast(0)
-            maxFrames.coerceAtMost(mono.size)
-        }
-        if (dropFront >= keepUntil) return ShortArray(0)
-        return mono.copyOfRange(dropFront, keepUntil)
+internal fun clipPcmByPts(
+    mono: ShortArray,
+    ptsUs: Long,
+    startUs: Long,
+    endUs: Long,
+    sourceRateHz: Int,
+): ShortArray {
+    if (mono.isEmpty()) return mono
+    val frameUs = 1_000_000.0 / sourceRateHz.coerceAtLeast(1)
+    val dropFront = if (ptsUs >= startUs) {
+        0
+    } else {
+        (((startUs - ptsUs) / frameUs).toInt()).coerceIn(0, mono.size)
+    }
+    val keepUntil = if (ptsUs >= endUs) {
+        0
+    } else {
+        val maxFrames = (((endUs - ptsUs) / frameUs).toInt()).coerceAtLeast(0)
+        maxFrames.coerceAtMost(mono.size)
+    }
+    if (dropFront >= keepUntil) return ShortArray(0)
+    if (dropFront == 0 && keepUntil == mono.size) return mono
+    return mono.copyOfRange(dropFront, keepUntil)
+}
+
+internal fun expectedPcm16kSamples(durationMs: Long): Int =
+    durationMs
+        .coerceIn(0L, MAX_PCM_PREALLOC_DURATION_MS)
+        .toInt() * (PcmAudioMath.TARGET_SAMPLE_RATE_HZ / 1_000)
+
+/**
+ * Contiguous PCM builder. The normal 3–9 second path is pre-sized and returns its backing array;
+ * longer or codec-rounded output grows safely and is trimmed once at completion.
+ */
+internal class PcmSampleAccumulator(initialCapacity: Int) {
+    private var samples = ShortArray(initialCapacity.coerceAtLeast(0))
+    private var size = 0
+
+    fun append(incoming: ShortArray) {
+        if (incoming.isEmpty()) return
+        check(incoming.size <= Int.MAX_VALUE - size) { "PCM window is too large" }
+        val required = size + incoming.size
+        ensureCapacity(required)
+        incoming.copyInto(samples, destinationOffset = size)
+        size = required
     }
 
-    private fun floatLeToMono16(pcm: ByteArray, channelCount: Int): ShortArray {
-        val ch = channelCount.coerceAtLeast(1)
-        val floatsPerFrame = ch
-        val frameCount = pcm.size / (4 * floatsPerFrame)
-        val out = ShortArray(frameCount)
-        val bb = ByteBuffer.wrap(pcm).order(ByteOrder.LITTLE_ENDIAN)
-        for (i in 0 until frameCount) {
-            var sum = 0f
-            for (c in 0 until ch) {
-                sum += bb.float
-            }
-            val avg = (sum / ch).coerceIn(-1f, 1f)
-            out[i] = (avg * Short.MAX_VALUE).toInt().toShort()
+    fun toShortArray(): ShortArray =
+        if (size == samples.size) samples else samples.copyOf(size)
+
+    private fun ensureCapacity(required: Int) {
+        if (required <= samples.size) return
+        val doubled = if (samples.size <= Int.MAX_VALUE / 2) {
+            (samples.size * 2).coerceAtLeast(MIN_PCM_GROWTH_SAMPLES)
+        } else {
+            Int.MAX_VALUE
         }
-        return out
+        samples = samples.copyOf(maxOf(required, doubled))
     }
 }
+
+private const val MAX_PCM_PREALLOC_DURATION_MS: Long = 10_000L
+private const val MIN_PCM_GROWTH_SAMPLES: Int = 1_024
 
 internal fun chooseAudioTrack(
     extractorTrackIndices: List<Int>,
