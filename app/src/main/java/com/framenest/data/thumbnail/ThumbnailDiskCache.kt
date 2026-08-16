@@ -14,25 +14,32 @@ import java.io.IOException
  * Clearable for settings (FN-09) via [clear].
  */
 class ThumbnailDiskCache(
-    private val rootDir: File,
+    rootDir: File,
     private val maxBytes: Long = DEFAULT_MAX_BYTES,
     maxMemoryBytes: Long = DEFAULT_MAX_MEMORY_BYTES,
     maxMemoryEntries: Int = DEFAULT_MAX_MEMORY_ENTRIES,
 ) {
-    private val dir: File = File(rootDir, SUBDIR).also { it.mkdirs() }
+    // Do not touch disk while AppContainer is created on the main thread.
+    private val dir: File = File(rootDir, SUBDIR)
     private val memory = BoundedLruCache<String, Bitmap>(
         maxEntries = maxMemoryEntries,
         maxWeight = maxMemoryBytes,
         weightOf = { bitmap -> bitmap.byteCount.toLong() },
     )
+    private val diskSize = ThumbnailDiskSizeIndex()
 
     fun fileFor(key: ThumbnailKey): File = File(dir, "${key.digest()}.jpg")
 
+    @Synchronized
     fun has(key: ThumbnailKey): Boolean = fileFor(key).isFile
 
     @Synchronized
     fun getMemoryBitmap(key: ThumbnailKey): Bitmap? {
         val digest = key.digest()
+        return getMemoryBitmap(digest)
+    }
+
+    private fun getMemoryBitmap(digest: String): Bitmap? {
         memory[digest]?.let { cached ->
             if (!cached.isRecycled) return cached
             memory.remove(digest)
@@ -42,11 +49,16 @@ class ThumbnailDiskCache(
 
     @Synchronized
     fun getBitmap(key: ThumbnailKey): Bitmap? {
-        getMemoryBitmap(key)?.let { return it }
         val digest = key.digest()
-        val file = fileFor(key)
+        getMemoryBitmap(digest)?.let { return it }
+        val file = File(dir, "$digest.jpg")
         if (!file.isFile) return null
-        val decoded = BitmapFactory.decodeFile(file.absolutePath) ?: return null
+        val decoded = BitmapFactory.decodeFile(file.absolutePath)
+        if (decoded == null) {
+            val corruptBytes = file.length()
+            if (file.delete()) diskSize.recordDelete(corruptBytes) else diskSize.invalidate()
+            return null
+        }
         memory.put(digest, decoded)
         return decoded
     }
@@ -57,23 +69,36 @@ class ThumbnailDiskCache(
     @Throws(IOException::class)
     @Synchronized
     fun put(key: ThumbnailKey, jpegBytes: ByteArray, bitmap: Bitmap? = null) {
-        val file = fileFor(key)
+        ensureDirectory()
+        val digest = key.digest()
+        val file = File(dir, "$digest.jpg")
+        val replacedBytes = if (file.isFile) file.length() else 0L
         val tmp = File(file.absolutePath + ".tmp")
-        tmp.outputStream().use { it.write(jpegBytes) }
-        if (!tmp.renameTo(file)) {
-            tmp.copyTo(file, overwrite = true)
+        try {
+            tmp.outputStream().use { it.write(jpegBytes) }
+            if (!tmp.renameTo(file)) {
+                tmp.copyTo(file, overwrite = true)
+            }
+        } catch (failure: Throwable) {
+            diskSize.invalidate()
+            throw failure
+        } finally {
             tmp.delete()
         }
+        diskSize.recordWrite(replacedBytes, file.length()) { scanJpegBytes() }
         if (bitmap != null && !bitmap.isRecycled) {
-            memory.put(key.digest(), bitmap)
+            memory.put(digest, bitmap)
         }
         trimIfNeeded()
     }
 
     @Synchronized
     fun remove(key: ThumbnailKey) {
-        memory.remove(key.digest())
-        fileFor(key).delete()
+        val digest = key.digest()
+        memory.remove(digest)
+        val file = File(dir, "$digest.jpg")
+        val removedBytes = if (file.isFile) file.length() else 0L
+        if (file.delete()) diskSize.recordDelete(removedBytes)
     }
 
     /** Delete all cached thumbnails (disk + memory). */
@@ -83,18 +108,16 @@ class ThumbnailDiskCache(
         dir.listFiles()?.forEach { file ->
             if (file.isFile) file.delete()
         }
+        diskSize.set(scanJpegBytes())
     }
 
     @Synchronized
-    fun approximateSizeBytes(): Long {
-        return dir.listFiles()?.sumOf { it.length() } ?: 0L
-    }
+    fun approximateSizeBytes(): Long = diskSize.bytes { scanJpegBytes() }
 
     private fun trimIfNeeded() {
-        val files = dir.listFiles()?.filter { it.isFile && it.name.endsWith(".jpg") }.orEmpty()
-        var total = files.sumOf { it.length() }
+        var total = diskSize.bytes { scanJpegBytes() }
         if (total <= maxBytes) return
-        val ordered = files.sortedBy { it.lastModified() }
+        val ordered = jpegFiles().sortedBy { it.lastModified() }
         for (file in ordered) {
             if (total <= maxBytes) break
             val len = file.length()
@@ -104,7 +127,22 @@ class ThumbnailDiskCache(
                 memory.remove(digest)
             }
         }
+        diskSize.set(total)
     }
+
+    @Throws(IOException::class)
+    private fun ensureDirectory() {
+        if (!dir.isDirectory && !dir.mkdirs() && !dir.isDirectory) {
+            throw IOException("Unable to create thumbnail cache directory")
+        }
+    }
+
+    private fun scanJpegBytes(): Long = jpegFiles().sumOf { it.length() }
+
+    private fun jpegFiles(): List<File> =
+        dir.listFiles()
+            ?.filter { it.isFile && it.name.endsWith(".jpg") }
+            .orEmpty()
 
     companion object {
         const val SUBDIR: String = "thumbnails"
@@ -117,5 +155,39 @@ class ThumbnailDiskCache(
                 rootDir = context.applicationContext.cacheDir,
                 maxBytes = maxBytes,
             )
+    }
+}
+
+/** Cached byte accounting; callers serialize filesystem mutations. */
+internal class ThumbnailDiskSizeIndex {
+    private var knownBytes: Long? = null
+
+    fun bytes(scan: () -> Long): Long =
+        knownBytes ?: scan().coerceAtLeast(0L).also { knownBytes = it }
+
+    fun recordWrite(replacedBytes: Long, writtenBytes: Long, scan: () -> Long): Long {
+        val known = knownBytes
+        val next = if (known == null) {
+            scan().coerceAtLeast(0L)
+        } else {
+            (known - replacedBytes.coerceAtLeast(0L)).coerceAtLeast(0L) +
+                writtenBytes.coerceAtLeast(0L)
+        }
+        knownBytes = next
+        return next
+    }
+
+    fun recordDelete(removedBytes: Long) {
+        knownBytes = knownBytes?.let { known ->
+            (known - removedBytes.coerceAtLeast(0L)).coerceAtLeast(0L)
+        }
+    }
+
+    fun set(bytes: Long) {
+        knownBytes = bytes.coerceAtLeast(0L)
+    }
+
+    fun invalidate() {
+        knownBytes = null
     }
 }

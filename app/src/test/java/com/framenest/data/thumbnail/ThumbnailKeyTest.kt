@@ -49,4 +49,12 @@ class ThumbnailKeyTest {
         assertNotEquals(a.digest(), b.digest())
         assertNotEquals(a.digest(), c.digest())
     }
+
+    @Test
+    fun sha256Hex_matchesKnownVector_withoutFormatter() {
+        assertEquals(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            ThumbnailKey.sha256Hex("abc"),
+        )
+    }
 }

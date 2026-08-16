@@ -743,3 +743,24 @@ assemble 通过；无真机时明确保留真实 SMB 返回帧时间验收，不
 
 验收：10 个连续空白窗口总计仅初始 1 次 job SELECT + 1 次 job upsert；窗口内使用定向
 UPDATE；失败原文持久化和父行重建测试通过；unit test、lint、debug/release assemble 通过。
+
+## FN-41：缩略图磁盘缓存 O(1) 容量计量
+
+**依赖**：FN-07、FN-32
+
+**拥有路径**：`data/thumbnail/ThumbnailDiskCache.kt`、`data/thumbnail/ThumbnailKey.kt`、
+相关纯逻辑测试、性能文档与交接记录
+
+**目标**：批量生成封面时不为每次 `put` 重新枚举并统计整个缩略图目录，避免大目录下
+近似 O(N²) 的文件系统调用；应用启动时不创建缓存目录。
+
+工作内容：
+
+- 首次按需扫描后缓存 JPEG 总字节数，写入覆盖和删除使用文件长度增量维护。
+- 只有容量真正超限时才枚举并按 mtime 排序淘汰；清理或写入失败时重置/校准计量。
+- `put/get/remove` 每次只计算一次 key digest，损坏 JPEG 解码失败时删除并允许重新生成。
+- 同一 `ThumbnailKey` 缓存 SHA-256 摘要，并用字符表编码十六进制，避免重复摘要与 Formatter。
+- 缓存目录延迟到后台写入/统计时创建，不在 `AppContainer` 构造期间 `mkdirs`。
+
+验收：连续未超限写入只发生 1 次初始容量扫描；覆盖/删除/失效后字节数正确；
+unit test、lint、debug/release assemble 通过。
