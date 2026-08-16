@@ -46,6 +46,7 @@
 | FN-39 LAN 端口探测有界并发与取消稳定性 | 已完成 | Codex | `agent/FN-39-bounded-lan-scan` | FN-17 | [FN-39](handoffs/FN-39.md) |
 | FN-40 听译窗口 Room 快速写入 | 已完成 | Codex | `agent/FN-40-listen-room-fast-write` | FN-35, FN-36 | [FN-40](handoffs/FN-40.md) |
 | FN-41 缩略图磁盘缓存 O(1) 容量计量 | 已完成 | Codex | `agent/FN-41-thumbnail-disk-accounting` | FN-07, FN-32 | [FN-41](handoffs/FN-41.md) |
+| FN-42 听译初始化失败清理非阻塞化 | 已完成 | Codex | `agent/FN-42-listen-cleanup-io` | FN-14, FN-34, FN-37 | [FN-42](handoffs/FN-42.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。

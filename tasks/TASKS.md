@@ -764,3 +764,22 @@ UPDATE；失败原文持久化和父行重建测试通过；unit test、lint、d
 
 验收：连续未超限写入只发生 1 次初始容量扫描；覆盖/删除/失效后字节数正确；
 unit test、lint、debug/release assemble 通过。
+
+## FN-42：听译初始化失败清理非阻塞化
+
+**依赖**：FN-14、FN-34、FN-37
+
+**拥有路径**：`feature/player/PlayerViewModel.kt`、听译初始化清理辅助文件、
+相关纯逻辑测试、性能文档与交接记录
+
+**目标**：听译模型或 SMB 初始化失败/取消时，不在 ViewModel 主线程同步等待音频源、
+Vosk 与翻译器关闭；取消状态下仍保证所有已创建资源得到 best-effort 清理。
+
+工作内容：
+
+- 失败和取消路径统一切到不可取消的 I/O context 关闭待接管资源。
+- 单个资源关闭异常不阻止后续资源清理，完成后清空 pending 引用。
+- JVM 测试覆盖调用方取消、专用清理线程和首个 close 抛错后继续关闭。
+
+验收：失败/取消清理不在主线程执行；取消不会跳过清理；单个 close 异常被隔离；
+unit test、lint、debug/release assemble 通过。

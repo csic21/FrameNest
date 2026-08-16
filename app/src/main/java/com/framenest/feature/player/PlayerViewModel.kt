@@ -275,6 +275,18 @@ class PlayerViewModel(
         var pendingAudio: ListenAudioSource? = null
         var pendingAsr: VoskAsrEngine? = null
         var pendingMt: MlKitMtEngine? = null
+        suspend fun closePendingResources() {
+            closeListenPreparationResources(
+                listOf(
+                    { pendingAudio?.close() },
+                    { pendingAsr?.close() },
+                    { pendingMt?.close() },
+                ),
+            )
+            pendingAudio = null
+            pendingAsr = null
+            pendingMt = null
+        }
         val prepared = try {
             withContext(Dispatchers.IO) {
                 ensureSmbConnectedForListen()
@@ -327,7 +339,6 @@ class PlayerViewModel(
                     mtModelLabel = { "mlkit-v1-$sourceLang-$targetLang" },
                 )
                 if (generation != listenPrepareGeneration) {
-                    engine.close()
                     throw CancellationException("stale listen-translate preparation")
                 }
                 realListenEngine = engine
@@ -338,14 +349,10 @@ class PlayerViewModel(
             }
             true
         } catch (cancelled: CancellationException) {
-            runCatching { pendingAudio?.close() }
-            runCatching { pendingAsr?.close() }
-            runCatching { pendingMt?.close() }
+            closePendingResources()
             throw cancelled
         } catch (t: Throwable) {
-            runCatching { pendingAudio?.close() }
-            runCatching { pendingAsr?.close() }
-            runCatching { pendingMt?.close() }
+            closePendingResources()
             if (generation == listenPrepareGeneration) {
                 val msg = listenTranslatePreparationError(t)
                 listenSession.setInstallingModels(

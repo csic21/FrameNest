@@ -1,5 +1,15 @@
 # 性能与包体基线
 
+## 听译初始化失败清理（FN-42）
+
+- 听译准备失败或取消后，已创建的 SMB 音频源、Vosk engine 和 ML Kit translator 统一在
+  `Dispatchers.IO` 关闭，不再从 `withContext(IO)` 返回后占用 ViewModel 主线程。
+- 清理使用 `NonCancellable`，因此关闭页面或切换听译配置触发取消时仍会释放已创建资源；
+  每个 close 独立 best-effort，一个 native/网络关闭异常不妨碍其余资源释放。
+
+JVM 测试从已取消协程进入清理，验证三个资源都在指定后台线程关闭，并覆盖首个 close
+抛错后继续执行后续清理。
+
 ## 缩略图磁盘计量与摘要（FN-41）
 
 - JPEG 目录大小首次按需扫描后由覆盖前/写入后文件长度增量维护；未超过 80 MiB 上限时，
