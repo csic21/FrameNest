@@ -1,6 +1,7 @@
 package com.framenest.data.thumbnail
 
 import android.content.Context
+import android.os.HandlerThread
 import android.util.Log
 import com.framenest.core.model.RemoteEntry
 import com.framenest.data.server.ServerRepository
@@ -21,9 +22,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlin.coroutines.coroutineContext
 
@@ -56,6 +56,8 @@ class ThumbnailRepository(
     private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
     private val uiStates = ConcurrentHashMap<String, MutableStateFlow<ThumbnailUiState>>()
+    private val emptyUiState: StateFlow<ThumbnailUiState> =
+        MutableStateFlow(ThumbnailUiState.None)
     private val backoff = ConcurrentHashMap<String, ThumbnailBackoffState>()
     private val interestCounts = ConcurrentHashMap<String, Int>()
     private val interestedRequests = ConcurrentHashMap<String, ThumbnailRequest>()
@@ -76,15 +78,15 @@ class ThumbnailRepository(
      * Observe UI state for [entry]. Emits [ThumbnailUiState.Ready] only when a
      * cached (or just-generated) bitmap is available.
      */
-    fun observe(entry: RemoteEntry): Flow<ThumbnailUiState> {
+    fun observe(entry: RemoteEntry): StateFlow<ThumbnailUiState> {
         val request = ThumbnailRequest.fromVideoEntry(entry)
-            ?: return MutableStateFlow(ThumbnailUiState.None)
+            ?: return emptyUiState
         val digest = request.key.digest()
         val flow = uiStates.getOrPut(digest) {
             MutableStateFlow(initialState(request.key))
         }
         pruneUninterestedUiStates(keepDigest = digest)
-        return flow.asStateFlow()
+        return flow
     }
 
     /**
@@ -309,7 +311,7 @@ class ThumbnailRepository(
             randomAccess.use { raf ->
                 coroutineContext.ensureActive()
                 val label = "thumb://${request.share}/${request.path.trimStart('/')}"
-                val result = extractor.extract(raf, debugLabel = label) ?: return false
+                val result = session.extract(raf, debugLabel = label) ?: return false
                 coroutineContext.ensureActive()
                 val accepted = try {
                     synchronized(cacheMutationLock) {
@@ -348,6 +350,16 @@ class ThumbnailRepository(
     private inner class ThumbnailWorkerSession : AutoCloseable {
         private var key: ThumbnailConnectionKey? = null
         private var client: SmbClient? = null
+        private var proxyIoThread: HandlerThread? = null
+
+        fun extract(
+            randomAccess: SmbRandomAccess,
+            debugLabel: String,
+        ): ThumbnailFrameExtractor.ExtractResult? = extractor.extract(
+            randomAccess = randomAccess,
+            debugLabel = debugLabel,
+            ioThread = proxyIoThread(),
+        )
 
         suspend fun open(request: ThumbnailRequest): SmbRandomAccess? {
             val server = serverRepository.getServer(request.key.serverId) ?: return null
@@ -398,7 +410,20 @@ class ThumbnailRepository(
             runCatching { stale?.close() }
         }
 
-        override fun close() = invalidate()
+        override fun close() {
+            invalidate()
+            val staleThread = proxyIoThread
+            proxyIoThread = null
+            staleThread?.quitSafely()
+        }
+
+        private fun proxyIoThread(): HandlerThread {
+            proxyIoThread?.let { return it }
+            return HandlerThread("thumbnail-pfd-io").also { thread ->
+                thread.start()
+                proxyIoThread = thread
+            }
+        }
     }
 
     private fun publish(work: QueuedWork, state: ThumbnailUiState) {

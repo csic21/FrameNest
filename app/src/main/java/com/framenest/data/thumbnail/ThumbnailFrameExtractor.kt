@@ -3,6 +3,7 @@ package com.framenest.data.thumbnail
 import android.content.Context
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
+import android.os.HandlerThread
 import android.util.Log
 import com.framenest.player.SmbSeekableMedia
 import com.framenest.smb.SmbRandomAccess
@@ -30,11 +31,16 @@ class ThumbnailFrameExtractor(
      * Try candidate timestamps until a non-black frame is obtained.
      * @return null when all candidates fail
      */
-    fun extract(randomAccess: SmbRandomAccess, debugLabel: String = "thumb"): ExtractResult? {
+    fun extract(
+        randomAccess: SmbRandomAccess,
+        debugLabel: String = "thumb",
+        ioThread: HandlerThread? = null,
+    ): ExtractResult? {
         val opened = SmbSeekableMedia.open(
             context = appContext,
             randomAccess = randomAccess,
             debugLabel = debugLabel,
+            ioThread = ioThread,
         )
         val afd = opened.assetFileDescriptor
         val retriever = MediaMetadataRetriever()

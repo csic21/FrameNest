@@ -783,3 +783,23 @@ Vosk 与翻译器关闭；取消状态下仍保证所有已创建资源得到 be
 
 验收：失败/取消清理不在主线程执行；取消不会跳过清理；单个 close 异常被隔离；
 unit test、lint、debug/release assemble 通过。
+
+## FN-43：媒体路径重复工作优化
+
+**依赖**：FN-18、FN-32、FN-41
+
+**拥有路径**：`feature/player/PlayerViewModel.kt`、`feature/subtitle/SidecarSubtitleScanner.kt`、
+`data/thumbnail/**`、`feature/browser/BrowseScreen.kt`、相关单测、性能文档与交接记录
+
+**目标**：减少播放首帧和大目录缩略图链路中的重复 SMB、线程与 Compose 状态工作，
+不改变播放、字幕选择或缓存失效语义。
+
+工作内容：
+
+- 播放首帧只列举一次父目录，同时派生外挂字幕候选和同目录播放列表。
+- 每个缩略图 worker 复用一个代理 FD I/O 线程，worker 结束时统一安全关闭。
+- 缩略图观察返回稳定的 `StateFlow`，Compose 行在 entry 不变时不重复创建观察对象。
+- 添加最小测试约束共享目录快照的字幕匹配结果，并记录可测量的性能变化。
+
+验收：SMB 播放首帧的父目录枚举由两次降为一次；连续缩略图提取不再为每张图片新建
+代理 FD 线程；相关 unit test、lint、debug/release assemble 通过。

@@ -33,7 +33,7 @@ class SidecarSubtitleScanner(
         request: ScanRequest,
         preferredLanguages: List<String>,
     ): Result<List<ExternalSubtitleOption>> = withContext(ioDispatcher) {
-        val videoName = request.videoPath.substringAfterLast('/').ifBlank {
+        if (request.videoPath.substringAfterLast('/').isBlank()) {
             return@withContext Result.success(emptyList())
         }
         val parent = SmbPathUtils.parentOf(request.videoPath)
@@ -52,10 +52,36 @@ class SidecarSubtitleScanner(
                 .asSequence()
                 .filter { !it.isDirectory && !SmbPathUtils.isDotEntry(it.name) }
                 .map { it.name }
-                .filter { MediaExtensions.isSubtitle(it) }
                 .toList()
-            val ranked = SubtitleMatcher.rankMatches(videoName, names, preferredLanguages)
-            val options = ranked.map { rankedItem ->
+            Result.success(optionsFromFileNames(request.videoPath, names, preferredLanguages))
+        } catch (t: Throwable) {
+            if (t is kotlinx.coroutines.CancellationException) throw t
+            Result.failure(t)
+        } finally {
+            runCatching { client.close() }
+        }
+    }
+
+    /**
+     * Builds sidecar options from an already enumerated parent directory.
+     * Player bootstrap uses this path so subtitle matching and sibling navigation
+     * share one SMB directory snapshot.
+     */
+    fun optionsFromFileNames(
+        videoPath: String,
+        directoryFileNames: List<String>,
+        preferredLanguages: List<String>,
+    ): List<ExternalSubtitleOption> {
+        val videoName = videoPath.substringAfterLast('/').ifBlank { return emptyList() }
+        val parent = SmbPathUtils.parentOf(videoPath)
+        val subtitleNames = directoryFileNames
+            .asSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && !SmbPathUtils.isDotEntry(it) }
+            .filter { MediaExtensions.isSubtitle(it) }
+            .toList()
+        return SubtitleMatcher.rankMatches(videoName, subtitleNames, preferredLanguages)
+            .map { rankedItem ->
                 ExternalSubtitleOption(
                     fileName = rankedItem.fileName,
                     remotePath = SmbPathUtils.join(parent, rankedItem.fileName),
@@ -63,12 +89,5 @@ class SidecarSubtitleScanner(
                     languageTags = rankedItem.languageTags,
                 )
             }
-            Result.success(options)
-        } catch (t: Throwable) {
-            if (t is kotlinx.coroutines.CancellationException) throw t
-            Result.failure(t)
-        } finally {
-            runCatching { client.close() }
-        }
     }
 }

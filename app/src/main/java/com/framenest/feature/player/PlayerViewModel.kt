@@ -186,13 +186,16 @@ class PlayerViewModel(
                     saveProgressNow(force = true)
                     stopProgressLoop()
                 }
-                if (state.firstFrameReady && !subtitleBootstrapDone) {
+                if (state.firstFrameReady && (!subtitleBootstrapDone || !siblingBootstrapDone)) {
+                    val includeSubtitles = !subtitleBootstrapDone
+                    val includeSiblings = !siblingBootstrapDone
                     subtitleBootstrapDone = true
-                    bootstrapSubtitles(state)
-                }
-                if (state.firstFrameReady && !siblingBootstrapDone) {
                     siblingBootstrapDone = true
-                    loadSiblingPlaylist()
+                    bootstrapDirectoryFeatures(
+                        state = state,
+                        includeSubtitles = includeSubtitles,
+                        includeSiblings = includeSiblings,
+                    )
                 }
             }
         }
@@ -951,36 +954,91 @@ class PlayerViewModel(
         }
     }
 
-    private fun bootstrapSubtitles(state: PlayerState) {
+    private data class PlaybackDirectoryFeatures(
+        val subtitleOptions: List<ExternalSubtitleOption>?,
+        val siblingPlaylist: SiblingPlaylist?,
+    )
+
+    /**
+     * Enumerates the SMB parent directory once, then derives sidecar subtitles and
+     * sibling navigation from the same snapshot. The listing connection remains
+     * isolated from playback/read handles.
+     */
+    private fun bootstrapDirectoryFeatures(
+        state: PlayerState,
+        includeSubtitles: Boolean,
+        includeSiblings: Boolean,
+    ) {
         val selectionGeneration = subtitleSelectionGate.snapshot()
         viewModelScope.launch {
             val smbParams = smbSubtitleParamsOrNull()
             if (smbParams == null) {
-                autoSelectEmbeddedOnly(state, selectionGeneration)
+                if (includeSiblings) {
+                    _siblingNavState.value = SiblingNavUiState.from(SiblingPlaylist.Empty)
+                }
+                if (includeSubtitles) {
+                    autoSelectEmbeddedOnly(state, selectionGeneration)
+                }
                 return@launch
             }
-            _subtitleUiState.update {
-                it.copy(scanning = true, errorMessage = null, message = null)
+            if (includeSubtitles) {
+                _subtitleUiState.update {
+                    it.copy(scanning = true, errorMessage = null, message = null)
+                }
             }
-            val scanResult = try {
-                sidecarScanner.scan(
-                    request = SidecarSubtitleScanner.ScanRequest(
+            if (includeSiblings) {
+                _siblingNavState.value = _siblingNavState.value.copy(loading = true)
+            }
+
+            val featuresResult = try {
+                val features = withContext(Dispatchers.IO) {
+                    val fileNames = listDirectoryFileNames(
+                        share = smbParams.share,
+                        parentPath = SmbPathUtils.parentOf(smbParams.path),
                         host = smbParams.host,
                         port = smbParams.port,
                         username = smbParams.username,
-                        password = smbParams.password.copyOf(),
+                        password = smbParams.password,
                         domain = smbParams.domain,
-                        share = smbParams.share,
-                        videoPath = smbParams.path,
-                    ),
-                    preferredLanguages = preferredLanguages,
-                )
+                    )
+                    PlaybackDirectoryFeatures(
+                        subtitleOptions = if (includeSubtitles) {
+                            sidecarScanner.optionsFromFileNames(
+                                videoPath = smbParams.path,
+                                directoryFileNames = fileNames,
+                                preferredLanguages = preferredLanguages,
+                            )
+                        } else {
+                            null
+                        },
+                        siblingPlaylist = if (includeSiblings) {
+                            SiblingPlaylistFactory.build(
+                                currentPath = request.identity.path,
+                                directoryFileNames = fileNames,
+                            )
+                        } else {
+                            null
+                        },
+                    )
+                }
+                Result.success(features)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                Result.failure(t)
             } finally {
                 smbParams.password.fill('\u0000')
             }
 
-            scanResult.fold(
-                onSuccess = { options ->
+            featuresResult.fold(
+                onSuccess = { features ->
+                    features.siblingPlaylist?.let { playlist ->
+                        _siblingNavState.value = SiblingNavUiState.from(
+                            playlist = playlist,
+                            loading = false,
+                        )
+                    }
+                    val options = features.subtitleOptions ?: return@fold
                     _subtitleUiState.update {
                         it.copy(
                             scanning = false,
@@ -1004,19 +1062,24 @@ class PlayerViewModel(
                 },
                 onFailure = { err ->
                     val msg = CredentialRedactor.redact(
-                        err.message ?: "Subtitle directory scan failed",
+                        err.message ?: "Playback directory scan failed",
                     )
-                    Log.w(TAG, "sidecar scan failed: $msg")
-                    _subtitleUiState.update {
-                        it.copy(
-                            scanning = false,
-                            externalOptions = emptyList(),
-                            // Do not treat scan failure as fatal; still try embedded.
-                            message = null,
-                            errorMessage = null,
-                        )
+                    Log.w(TAG, "playback directory scan failed: $msg")
+                    if (includeSiblings) {
+                        _siblingNavState.value = SiblingNavUiState.from(SiblingPlaylist.Empty)
                     }
-                    autoSelectEmbeddedOnly(controller.state.value, selectionGeneration)
+                    if (includeSubtitles) {
+                        _subtitleUiState.update {
+                            it.copy(
+                                scanning = false,
+                                externalOptions = emptyList(),
+                                // Do not treat scan failure as fatal; still try embedded.
+                                message = null,
+                                errorMessage = null,
+                            )
+                        }
+                        autoSelectEmbeddedOnly(controller.state.value, selectionGeneration)
+                    }
                 },
             )
         }
