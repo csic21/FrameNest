@@ -111,21 +111,17 @@ class ListenTranslateRepository(
     ) {
         val path = identity.normalizedPath()
         val lang = languages.normalized()
-        val existing = dao.getJob(
-            identity.serverId,
-            identity.share,
-            path,
-            lang.sourceLang,
-            lang.targetLang,
-        ) ?: return
-        dao.upsertJob(
-            existing.copy(
-                coveredUntilMs = coveredUntilMs.coerceAtLeast(existing.coveredUntilMs),
-                status = (status ?: ListenTranslateJobStatus.fromStorage(existing.status)).name,
-                lastError = lastError ?: existing.lastError,
-                durationMs = durationMs?.coerceAtLeast(0L) ?: existing.durationMs,
-                updatedAtEpochMs = timeSource(),
-            ),
+        dao.updateJobProgress(
+            serverId = identity.serverId,
+            share = identity.share,
+            path = path,
+            sourceLang = lang.sourceLang,
+            targetLang = lang.targetLang,
+            coveredUntilMs = coveredUntilMs.coerceAtLeast(0L),
+            status = status?.name,
+            lastError = lastError,
+            durationMs = durationMs?.coerceAtLeast(0L),
+            updatedAtEpochMs = timeSource(),
         )
     }
 
@@ -147,32 +143,93 @@ class ListenTranslateRepository(
         val path = identity.normalizedPath()
         val lang = languages.normalized()
         ensureJob(identity, lang, contentKey = contentKey)
-        val id = dao.replaceCueAtRange(
-            ListenTranslateCueEntity(
-                serverId = identity.serverId,
-                share = identity.share,
-                path = path,
-                sourceLang = lang.sourceLang,
-                targetLang = lang.targetLang,
-                startMs = startMs.coerceAtLeast(0L),
-                endMs = endMs.coerceAtLeast(0L),
-                textSrc = textSrc,
-                textTgt = textTgt,
-                rev = rev.coerceAtLeast(0),
-            ),
-        )
+        val entity = cueEntity(identity, lang, path, startMs, endMs, textSrc, textTgt, rev)
+        val id = dao.replaceCueAtRange(entity)
         // ensureJob already refreshes updatedAt immediately before the cue write;
         // querying and upserting the same parent again only added two Room round trips.
-        return ListenTranslateCue(
-            id = id,
-            identity = PlaybackIdentity(identity.serverId, identity.share, path),
-            languages = lang,
-            startMs = startMs.coerceAtLeast(0L),
-            endMs = endMs.coerceAtLeast(0L),
-            textSrc = textSrc,
-            textTgt = textTgt,
-            rev = rev.coerceAtLeast(0),
+        return entity.copy(id = id).toModel()
+    }
+
+    /**
+     * Session fast path after activation has validated content/model identity and created the job.
+     * If settings or another owner removed the parent concurrently, rebuild it and retry once.
+     */
+    suspend fun upsertCueForExistingJob(
+        identity: PlaybackIdentity,
+        languages: ListenLanguagePair,
+        startMs: Long,
+        endMs: Long,
+        textSrc: String,
+        textTgt: String,
+        rev: Int = 1,
+        contentKey: String = "",
+        asrModel: String = "",
+        mtModel: String = "",
+    ): ListenTranslateCue {
+        require(endMs >= startMs) { "endMs >= startMs" }
+        val path = identity.normalizedPath()
+        val lang = languages.normalized()
+        val entity = cueEntity(identity, lang, path, startMs, endMs, textSrc, textTgt, rev)
+        var id = dao.replaceCueForExistingJob(entity, timeSource())
+        if (id == null) {
+            ensureJob(
+                identity = identity,
+                languages = lang,
+                contentKey = contentKey,
+                asrModel = asrModel,
+                mtModel = mtModel,
+                status = ListenTranslateJobStatus.Partial,
+            )
+            id = dao.replaceCueForExistingJob(entity, timeSource())
+        }
+        return entity.copy(id = checkNotNull(id) { "listen job missing after ensure" }).toModel()
+    }
+
+    /** Commit a whole-window coverage cue and its progress in one transaction. */
+    suspend fun completeWindowCueForExistingJob(
+        identity: PlaybackIdentity,
+        languages: ListenLanguagePair,
+        startMs: Long,
+        endMs: Long,
+        textSrc: String,
+        textTgt: String,
+        rev: Int,
+        coveredUntilMs: Long,
+        durationMs: Long?,
+        contentKey: String = "",
+        asrModel: String = "",
+        mtModel: String = "",
+    ): ListenTranslateCue {
+        require(endMs >= startMs) { "endMs >= startMs" }
+        val path = identity.normalizedPath()
+        val lang = languages.normalized()
+        val entity = cueEntity(identity, lang, path, startMs, endMs, textSrc, textTgt, rev)
+        var id = dao.replaceCueAndUpdateProgressForExistingJob(
+            entity = entity,
+            coveredUntilMs = coveredUntilMs.coerceAtLeast(0L),
+            status = ListenTranslateJobStatus.Partial.name,
+            durationMs = durationMs?.coerceAtLeast(0L),
+            updatedAtEpochMs = timeSource(),
         )
+        if (id == null) {
+            ensureJob(
+                identity = identity,
+                languages = lang,
+                contentKey = contentKey,
+                durationMs = durationMs?.coerceAtLeast(0L) ?: 0L,
+                asrModel = asrModel,
+                mtModel = mtModel,
+                status = ListenTranslateJobStatus.Partial,
+            )
+            id = dao.replaceCueAndUpdateProgressForExistingJob(
+                entity = entity,
+                coveredUntilMs = coveredUntilMs.coerceAtLeast(0L),
+                status = ListenTranslateJobStatus.Partial.name,
+                durationMs = durationMs?.coerceAtLeast(0L),
+                updatedAtEpochMs = timeSource(),
+            )
+        }
+        return entity.copy(id = checkNotNull(id) { "listen job missing after ensure" }).toModel()
     }
 
     fun observeCues(
@@ -289,6 +346,29 @@ class ListenTranslateRepository(
 
     private fun shouldInvalidateModel(storedModel: String, incomingModel: String): Boolean =
         incomingModel.isNotBlank() && storedModel != incomingModel
+
+    private fun cueEntity(
+        identity: PlaybackIdentity,
+        languages: ListenLanguagePair,
+        path: String,
+        startMs: Long,
+        endMs: Long,
+        textSrc: String,
+        textTgt: String,
+        rev: Int,
+    ): ListenTranslateCueEntity =
+        ListenTranslateCueEntity(
+            serverId = identity.serverId,
+            share = identity.share,
+            path = path,
+            sourceLang = languages.sourceLang,
+            targetLang = languages.targetLang,
+            startMs = startMs.coerceAtLeast(0L),
+            endMs = endMs.coerceAtLeast(0L),
+            textSrc = textSrc,
+            textTgt = textTgt,
+            rev = rev.coerceAtLeast(0),
+        )
 
     companion object {
         const val DEFAULT_MAX_JOBS: Int = 100

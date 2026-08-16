@@ -326,7 +326,7 @@ class ListenTranslateSession(
                     val cueStart = (result.cueStartMs ?: startMs).coerceIn(startMs, endMs)
                     val cueEnd = (result.cueEndMs ?: endMs).coerceIn(cueStart, endMs)
                     speechCoversWindow = cueStart == startMs && cueEnd == endMs
-                    val persistedSpeech = repository.upsertCue(
+                    val persistedSpeech = repository.upsertCueForExistingJob(
                         identity = identity,
                         languages = langs,
                         startMs = cueStart,
@@ -335,6 +335,8 @@ class ListenTranslateSession(
                         textTgt = result.textTgt,
                         rev = 1,
                         contentKey = contentKey,
+                        asrModel = engine.asrModelId,
+                        mtModel = engine.mtModelId,
                     )
                     cachedCues = ListenCueCache.upsert(cachedCues, persistedSpeech)
                     // Make ASR text visible even when the following MT stage failed.
@@ -346,10 +348,12 @@ class ListenTranslateSession(
                 result.retryableErrorMessage?.let { message ->
                     throw ListenWindowStageException(message)
                 }
+                var progressCommittedWithCoverage = false
                 if (!speechCoversWindow) {
                     // Persist the whole attempted window, including silence. Writing this
-                    // after the speech cue means cancellation cannot hide completed text.
-                    val persistedCoverage = repository.upsertCue(
+                    // after the speech cue means cancellation cannot hide completed text;
+                    // coverage and progress themselves commit in one Room transaction.
+                    val persistedCoverage = repository.completeWindowCueForExistingJob(
                         identity = identity,
                         languages = langs,
                         startMs = startMs,
@@ -364,17 +368,24 @@ class ListenTranslateSession(
                             // a successful silent window. Preserve that contract.
                             else -> ListenCoverageRev.CONFIRMED_SILENCE
                         },
+                        coveredUntilMs = endMs,
+                        durationMs = lastDurationMs.takeIf { it > 0L },
                         contentKey = contentKey,
+                        asrModel = engine.asrModelId,
+                        mtModel = engine.mtModelId,
                     )
                     cachedCues = ListenCueCache.upsert(cachedCues, persistedCoverage)
+                    progressCommittedWithCoverage = true
                 }
-                repository.updateProgress(
-                    identity = identity,
-                    languages = langs,
-                    coveredUntilMs = endMs,
-                    status = ListenTranslateJobStatus.Partial,
-                    durationMs = lastDurationMs.takeIf { it > 0L },
-                )
+                if (!progressCommittedWithCoverage) {
+                    repository.updateProgress(
+                        identity = identity,
+                        languages = langs,
+                        coveredUntilMs = endMs,
+                        status = ListenTranslateJobStatus.Partial,
+                        durationMs = lastDurationMs.takeIf { it > 0L },
+                    )
+                }
                 updateCueSummary()
                 if (result.blankReason == ListenBlankReason.UnrecognizedSpeech) {
                     retryPolicy.recordRecoverableBlank(attemptKey)

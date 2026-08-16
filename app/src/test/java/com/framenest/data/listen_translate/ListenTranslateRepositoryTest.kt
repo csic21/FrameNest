@@ -187,6 +187,110 @@ class ListenTranslateRepositoryTest {
     }
 
     @Test
+    fun existingJobFastWrites_avoidParentSelectAndFullUpsert() = runBlocking {
+        val dao = FakeListenTranslateDao()
+        var now = 8_000L
+        val repo = ListenTranslateRepository(dao, timeSource = { now++ })
+        repo.ensureJob(
+            identity,
+            langs,
+            contentKey = "content",
+            asrModel = "asr",
+            mtModel = "mt",
+            status = ListenTranslateJobStatus.Partial,
+        )
+        dao.getJobCount = 0
+        dao.upsertJobCount = 0
+
+        repo.upsertCueForExistingJob(
+            identity = identity,
+            languages = langs,
+            startMs = 500L,
+            endMs = 2_000L,
+            textSrc = "speech",
+            textTgt = "语音",
+            contentKey = "content",
+            asrModel = "asr",
+            mtModel = "mt",
+        )
+        repo.completeWindowCueForExistingJob(
+            identity = identity,
+            languages = langs,
+            startMs = 0L,
+            endMs = 3_000L,
+            textSrc = "",
+            textTgt = "",
+            rev = 1,
+            coveredUntilMs = 3_000L,
+            durationMs = 60_000L,
+            contentKey = "content",
+            asrModel = "asr",
+            mtModel = "mt",
+        )
+
+        assertEquals(0, dao.getJobCount)
+        assertEquals(0, dao.upsertJobCount)
+        assertEquals(1, dao.touchJobCount)
+        assertEquals(1, dao.updateJobProgressCount)
+        assertEquals(2, dao.cueRows.size)
+        val stored = dao.jobRows.values.single()
+        assertEquals(3_000L, stored.coveredUntilMs)
+        assertEquals(60_000L, stored.durationMs)
+        assertEquals(ListenTranslateJobStatus.Partial.name, stored.status)
+    }
+
+    @Test
+    fun existingJobFastWrite_rebuildsMissingParentOnce() = runBlocking {
+        val dao = FakeListenTranslateDao()
+        val repo = ListenTranslateRepository(dao, timeSource = { 9_000L })
+
+        repo.upsertCueForExistingJob(
+            identity = identity,
+            languages = langs,
+            startMs = 0L,
+            endMs = 3_000L,
+            textSrc = "recovered",
+            textTgt = "已恢复",
+            contentKey = "content",
+            asrModel = "asr",
+            mtModel = "mt",
+        )
+
+        assertEquals(2, dao.touchJobCount)
+        assertEquals(1, dao.getJobCount)
+        assertEquals(1, dao.upsertJobCount)
+        assertEquals("content", dao.jobRows.values.single().contentKey)
+        assertEquals("asr", dao.jobRows.values.single().asrModel)
+        assertEquals(1, dao.cueRows.size)
+    }
+
+    @Test
+    fun updateProgress_usesTargetedUpdate_withoutParentRead() = runBlocking {
+        val dao = FakeListenTranslateDao()
+        val repo = ListenTranslateRepository(dao, timeSource = { 10_000L })
+        repo.ensureJob(identity, langs, status = ListenTranslateJobStatus.Partial)
+        dao.getJobCount = 0
+        dao.upsertJobCount = 0
+
+        repo.updateProgress(
+            identity = identity,
+            languages = langs,
+            coveredUntilMs = 12_000L,
+            status = ListenTranslateJobStatus.Failed,
+            lastError = "network",
+            durationMs = 60_000L,
+        )
+
+        assertEquals(0, dao.getJobCount)
+        assertEquals(0, dao.upsertJobCount)
+        assertEquals(1, dao.updateJobProgressCount)
+        val stored = dao.jobRows.values.single()
+        assertEquals(12_000L, stored.coveredUntilMs)
+        assertEquals(ListenTranslateJobStatus.Failed.name, stored.status)
+        assertEquals("network", stored.lastError)
+    }
+
+    @Test
     fun path_normalized_forStorage() = runBlocking {
         val dao = FakeListenTranslateDao()
         val repo = ListenTranslateRepository(dao, timeSource = { 7_000L })
@@ -217,6 +321,8 @@ internal class FakeListenTranslateDao : ListenTranslateDao {
     private var nextCueId = 1L
     var getJobCount: Int = 0
     var upsertJobCount: Int = 0
+    var touchJobCount: Int = 0
+    var updateJobProgressCount: Int = 0
     var listCuesCount: Int = 0
     private val cueFlows =
         mutableMapOf<String, MutableStateFlow<List<ListenTranslateCueEntity>>>()
@@ -269,6 +375,46 @@ internal class FakeListenTranslateDao : ListenTranslateDao {
     ): ListenTranslateJobEntity? {
         getJobCount++
         return jobRows[jobKey(serverId, share, path, sourceLang, targetLang)]
+    }
+
+    override suspend fun updateJobProgress(
+        serverId: String,
+        share: String,
+        path: String,
+        sourceLang: String,
+        targetLang: String,
+        coveredUntilMs: Long,
+        status: String?,
+        lastError: String?,
+        durationMs: Long?,
+        updatedAtEpochMs: Long,
+    ): Int {
+        updateJobProgressCount++
+        val key = jobKey(serverId, share, path, sourceLang, targetLang)
+        val existing = jobRows[key] ?: return 0
+        jobRows[key] = existing.copy(
+            coveredUntilMs = maxOf(existing.coveredUntilMs, coveredUntilMs),
+            status = status ?: existing.status,
+            lastError = lastError ?: existing.lastError,
+            durationMs = durationMs ?: existing.durationMs,
+            updatedAtEpochMs = updatedAtEpochMs,
+        )
+        return 1
+    }
+
+    override suspend fun touchJob(
+        serverId: String,
+        share: String,
+        path: String,
+        sourceLang: String,
+        targetLang: String,
+        updatedAtEpochMs: Long,
+    ): Int {
+        touchJobCount++
+        val key = jobKey(serverId, share, path, sourceLang, targetLang)
+        val existing = jobRows[key] ?: return 0
+        jobRows[key] = existing.copy(updatedAtEpochMs = updatedAtEpochMs)
+        return 1
     }
 
     override suspend fun listJobsForMedia(

@@ -1,5 +1,18 @@
 # 性能与包体基线
 
+## 听译窗口 Room 快速写入（FN-40）
+
+- 会话 activation 已校验 content/model 并建立 job 后，语音 cue 使用“父行 touch + 同范围
+  替换”事务，不再为每条 cue SELECT 父行并完整 `@Upsert`。
+- 整窗空白/覆盖 cue 与 covered/status/duration 定向 UPDATE 在同一事务提交；ASR 语音原文
+  仍先独立落盘，因此后续覆盖事务取消或翻译失败不会隐藏已完成文本。
+- `updateProgress` 改为单条 SQL UPDATE，以 `MAX` 保持 covered 单调递增，并用 nullable
+  参数保留未指定的 status/error/duration；父行意外被清除时 cue 快速路径会 ensure 后重试。
+
+虚拟时间连续 10 个空白窗口从 20 次 job SELECT + 20 次完整 job upsert 降为窗口内 0 次；
+全会话只剩 activation 的各 1 次，并执行 10 次定向进度 UPDATE。API 36.1 真实 Room 测试
+验证语音、重叠覆盖、进度、外键和事务均通过。
+
 ## LAN 主动探测有界 worker（FN-39）
 
 - /24 主动探测由“每个地址一个 `async` + 信号量”等待改为固定 worker 通过原子索引取下

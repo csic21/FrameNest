@@ -38,6 +38,48 @@ interface ListenTranslateDao {
 
     @Query(
         """
+        UPDATE listen_translate_job
+        SET covered_until_ms = MAX(covered_until_ms, :coveredUntilMs),
+            status = COALESCE(:status, status),
+            last_error = COALESCE(:lastError, last_error),
+            duration_ms = COALESCE(:durationMs, duration_ms),
+            updated_at_epoch_ms = :updatedAtEpochMs
+        WHERE server_id = :serverId AND share = :share AND path = :path
+          AND source_lang = :sourceLang AND target_lang = :targetLang
+        """,
+    )
+    suspend fun updateJobProgress(
+        serverId: String,
+        share: String,
+        path: String,
+        sourceLang: String,
+        targetLang: String,
+        coveredUntilMs: Long,
+        status: String?,
+        lastError: String?,
+        durationMs: Long?,
+        updatedAtEpochMs: Long,
+    ): Int
+
+    @Query(
+        """
+        UPDATE listen_translate_job
+        SET updated_at_epoch_ms = :updatedAtEpochMs
+        WHERE server_id = :serverId AND share = :share AND path = :path
+          AND source_lang = :sourceLang AND target_lang = :targetLang
+        """,
+    )
+    suspend fun touchJob(
+        serverId: String,
+        share: String,
+        path: String,
+        sourceLang: String,
+        targetLang: String,
+        updatedAtEpochMs: Long,
+    ): Int
+
+    @Query(
+        """
         SELECT * FROM listen_translate_job
         WHERE server_id = :serverId AND share = :share AND path = :path
         """,
@@ -189,5 +231,48 @@ interface ListenTranslateDao {
             endMs = entity.endMs,
         )
         return insertCue(entity.copy(id = 0L))
+    }
+
+    /** Fast session path: parent existence check/touch and cue replacement share one transaction. */
+    @Transaction
+    suspend fun replaceCueForExistingJob(
+        entity: ListenTranslateCueEntity,
+        updatedAtEpochMs: Long,
+    ): Long? {
+        val touched = touchJob(
+            serverId = entity.serverId,
+            share = entity.share,
+            path = entity.path,
+            sourceLang = entity.sourceLang,
+            targetLang = entity.targetLang,
+            updatedAtEpochMs = updatedAtEpochMs,
+        )
+        if (touched != 1) return null
+        return replaceCueAtRange(entity)
+    }
+
+    /** Fast coverage path: progress and the whole-window cue commit atomically. */
+    @Transaction
+    suspend fun replaceCueAndUpdateProgressForExistingJob(
+        entity: ListenTranslateCueEntity,
+        coveredUntilMs: Long,
+        status: String,
+        durationMs: Long?,
+        updatedAtEpochMs: Long,
+    ): Long? {
+        val updated = updateJobProgress(
+            serverId = entity.serverId,
+            share = entity.share,
+            path = entity.path,
+            sourceLang = entity.sourceLang,
+            targetLang = entity.targetLang,
+            coveredUntilMs = coveredUntilMs,
+            status = status,
+            lastError = null,
+            durationMs = durationMs,
+            updatedAtEpochMs = updatedAtEpochMs,
+        )
+        if (updated != 1) return null
+        return replaceCueAtRange(entity)
     }
 }

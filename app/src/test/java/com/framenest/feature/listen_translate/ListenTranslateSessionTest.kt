@@ -77,7 +77,8 @@ class ListenTranslateSessionTest {
     fun translationFailure_persistsSourceCue_andKeepsWindowRetryable() = runTest {
         val identity = PlaybackIdentity("server", "media", "movie.mkv")
         val languages = ListenLanguagePair("en", "zh")
-        val repository = ListenTranslateRepository(FakeListenTranslateDao())
+        val dao = FakeListenTranslateDao()
+        val repository = ListenTranslateRepository(dao)
         val engine = object : ListenTranslateEngine {
             override val asrModelId: String = "asr-test"
             override val mtModelId: String = "mt-test"
@@ -114,6 +115,10 @@ class ListenTranslateSessionTest {
         assertEquals(ListenTranslateJobStatus.Failed, session.uiState.value.status)
         assertEquals("translation unavailable", session.uiState.value.errorMessage)
         assertFalse(session.uiState.value.isProcessing)
+        assertEquals(1, dao.getJobCount)
+        assertEquals(1, dao.upsertJobCount)
+        assertEquals(1, dao.touchJobCount)
+        assertEquals(1, dao.updateJobProgressCount)
 
         session.release()
     }
@@ -225,6 +230,10 @@ class ListenTranslateSessionTest {
         assertEquals(30_000L, session.uiState.value.coveredUntilMs)
         assertEquals(30_000L, session.uiState.value.prefetchLookAheadMs)
         assertEquals(1, dao.listCuesCount)
+        assertEquals(1, dao.getJobCount)
+        assertEquals(1, dao.upsertJobCount)
+        assertEquals(0, dao.touchJobCount)
+        assertEquals(10, dao.updateJobProgressCount)
         session.release()
     }
 

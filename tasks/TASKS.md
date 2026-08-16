@@ -723,3 +723,23 @@ assemble 通过；无真机时明确保留真实 SMB 返回帧时间验收，不
 
 验收：253 个 /24 地址默认只创建 32 个探测 worker；最大在途探测不超过配置值；
 相关 unit test、lint、debug/release assemble 通过。
+
+## FN-40：听译窗口 Room 快速写入
+
+**依赖**：FN-35、FN-36
+
+**拥有路径**：`data/listen_translate/**`、`feature/listen_translate/ListenTranslateSession.kt`、
+相关 DAO fake/JVM/Room 测试、性能文档与交接记录
+
+**目标**：会话已建立听译 job 后，每个 3 秒窗口不再重复 SELECT 并整行 upsert 父 job；
+保留 ASR 原文先落盘、取消后不丢已完成文本和父行意外缺失时自动重建的语义。
+
+工作内容：
+
+- 进度更新改为单条定向 `UPDATE`，不再读取父行再执行完整 `@Upsert`。
+- 新增“已有 job cue 写入”事务，仅更新时间戳并同范围替换 cue；父行缺失时回退 ensure。
+- 空白/覆盖 cue 与窗口进度在同一事务完成；语音原文仍先独立提交，再写覆盖。
+- DAO 计数和会话测试约束连续预取的父表查询/upsert 只发生在初始 activation。
+
+验收：10 个连续空白窗口总计仅初始 1 次 job SELECT + 1 次 job upsert；窗口内使用定向
+UPDATE；失败原文持久化和父行重建测试通过；unit test、lint、debug/release assemble 通过。

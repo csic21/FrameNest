@@ -46,4 +46,62 @@ class ListenTranslateRoomUpsertTest {
             database.close()
         }
     }
+
+    @Test
+    fun existingJobFastPath_commitsSpeechCoverageAndProgress() = runBlocking {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = AppDatabase.createInMemory(context)
+        try {
+            val repository = ListenTranslateRepository(
+                dao = database.listenTranslateDao(),
+                timeSource = { 456L },
+            )
+            val identity = PlaybackIdentity("server", "media", "fast.mkv")
+            val languages = ListenLanguagePair("en", "zh")
+            repository.ensureJob(
+                identity = identity,
+                languages = languages,
+                contentKey = "content",
+                asrModel = "asr",
+                mtModel = "mt",
+                status = ListenTranslateJobStatus.Partial,
+            )
+
+            repository.upsertCueForExistingJob(
+                identity = identity,
+                languages = languages,
+                startMs = 500L,
+                endMs = 2_000L,
+                textSrc = "hello",
+                textTgt = "你好",
+                contentKey = "content",
+                asrModel = "asr",
+                mtModel = "mt",
+            )
+            repository.completeWindowCueForExistingJob(
+                identity = identity,
+                languages = languages,
+                startMs = 0L,
+                endMs = 3_000L,
+                textSrc = "",
+                textTgt = "",
+                rev = 1,
+                coveredUntilMs = 3_000L,
+                durationMs = 60_000L,
+                contentKey = "content",
+                asrModel = "asr",
+                mtModel = "mt",
+            )
+
+            val cues = repository.listCues(identity, languages)
+            val job = repository.getJob(identity, languages)
+            assertEquals(2, cues.size)
+            assertEquals("hello", cues.single { it.startMs == 500L }.textSrc)
+            assertEquals(3_000L, job?.coveredUntilMs)
+            assertEquals(60_000L, job?.durationMs)
+            assertEquals(ListenTranslateJobStatus.Partial, job?.status)
+        } finally {
+            database.close()
+        }
+    }
 }
