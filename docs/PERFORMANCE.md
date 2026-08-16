@@ -1,5 +1,16 @@
 # 性能与包体基线
 
+## 播放器无卡顿退出（FN-44）
+
+PME110（Android 16 / API 36）安装 arm64 release 后，以真实 SMB 4K/60fps HEVC 片源从
+“最近播放”进入播放并按系统返回。主线程在 3ms 内隐藏并移除视频输出；native stop 在
+后台于 420ms 完成，随后主线程 detach views，最终后台 release 于 421ms 完成。释放顺序为
+stop → detach → release，未出现 detach timeout，返回页在原生释放完成前已经恢复交互。
+
+该次播放与返回期间共渲染 156 帧，UI 帧耗时 99 分位为 30ms；返回后 `MainActivity` 保持
+resumed，FrameNest 没有活动媒体会话或继续播放的音频。这里的 420ms 是被移出主线程后的
+资源清理时间，不是用户等待时间。
+
 ## 播放目录与缩略图 worker 复用（FN-43）
 
 - SMB 视频首帧就绪后，外挂字幕候选和同目录上一集/下一集从同一份父目录文件名快照
