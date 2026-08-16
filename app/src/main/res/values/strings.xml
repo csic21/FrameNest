@@ -79,6 +79,7 @@
     <string name="player_phase_ready">就绪</string>
     <string name="player_phase_playing">播放中</string>
     <string name="player_phase_paused">已暂停</string>
+    <string name="player_phase_seeking">正在定位画面…</string>
     <string name="player_phase_ended">已结束</string>
     <string name="player_phase_error">错误</string>
     <string name="player_play">播放</string>

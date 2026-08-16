@@ -7,7 +7,9 @@ import android.content.res.AssetFileDescriptor
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
+import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.RawRes
@@ -112,8 +114,9 @@ class VlcPlayerController(
      * After seek while paused/Ready, briefly play so libVLC decodes a frame at the
      * new position, then re-pause. Without this, [setTime] updates the clock only.
      */
-    private var seekPreviewActive: Boolean = false
-    private var seekPreviewTargetMs: Long = -1L
+    private val seekPreview = SeekPreviewSession()
+    /** Player-local volume held at zero so paused frame previews never leak audio. */
+    private var seekPreviewRestoreVolume: Int? = null
     private val seekPreviewPauseRunnable = Runnable { finishSeekPreview(reason = "timeout") }
     private val seekPreviewSettleRunnable = Runnable { finishSeekPreview(reason = "settled") }
 
@@ -123,13 +126,13 @@ class VlcPlayerController(
      * Called from [prepare] (opening=true) and every teardown / error / release path
      * (opening=false). Centralizing this fixes a class of bugs where individual sites
      * hand-copied a *subset* of the flags and left stale ones set (e.g. a leftover
-     * [holdForUserPlay] after a fallback, or [seekPreviewActive] not cleared on
+     * [holdForUserPlay] after a fallback, or a seek preview not cleared on
      * [failOpen]) — which produced phantom "Playing ignored (seek preview)" /
      * "Playing ignored (hold)" events that froze playback.
      *
      * Does NOT touch the suppress flags ([suppressEndReached] / [suppressAllTerminalEvents]):
      * those are intentional per-call policy, and every caller sets them explicitly for
-     * the teardown/open it is about to perform. [seekPreviewActive] / target are cleared
+     * the teardown/open it is about to perform. The seek preview / target are cleared
      * and the preview runnables removed via [cancelSeekPreview].
      */
     private fun resetTransientFlags(opening: Boolean) {
@@ -184,7 +187,7 @@ class VlcPlayerController(
                 if (suppressAllTerminalEvents) return@handleEvent
                 // Seek-preview playback is internal and must run long enough to paint
                 // the target frame before finishSeekPreview() pauses it again.
-                if (seekPreviewActive) {
+                if (seekPreview.active) {
                     Log.i(TAG, "Playing ignored (seek preview)")
                     return@handleEvent
                 }
@@ -196,7 +199,7 @@ class VlcPlayerController(
                         PlaybackIntentPolicy.shouldForcePauseOnPlayingEvent(
                             firstFrameReady = _state.value.firstFrameReady,
                             playRequested = playRequested,
-                            seekPreviewActive = seekPreviewActive,
+                            seekPreviewActive = seekPreview.active,
                         )
                     ) {
                         pauseNativeIfPlaying("first-frame hold")
@@ -211,7 +214,7 @@ class VlcPlayerController(
                     PlaybackIntentPolicy.shouldForcePauseOnPlayingEvent(
                         firstFrameReady = _state.value.firstFrameReady,
                         playRequested = playRequested,
-                        seekPreviewActive = seekPreviewActive,
+                        seekPreviewActive = seekPreview.active,
                     )
                 ) {
                     pauseNativeIfPlaying("pause intent")
@@ -227,6 +230,18 @@ class VlcPlayerController(
             }
             MediaPlayer.Event.Paused -> {
                 if (suppressAllTerminalEvents) return@handleEvent
+                // A delayed Paused event from the user's original pause can arrive
+                // after a paused seek has started its muted frame decode. Keep the
+                // preview alive; finishSeekPreview clears the session before issuing
+                // the intentional final pause, so that event takes the normal path.
+                if (seekPreview.active) {
+                    val player = mediaPlayer
+                    if (player != null && !player.isPlaying) {
+                        runCatching { player.play() }
+                    }
+                    Log.i(TAG, "Paused ignored (seek preview still locating target)")
+                    return@handleEvent
+                }
                 if (!PlaybackIntentPolicy.shouldAcceptPausedEvent(playRequested)) {
                     resumeNativeIfRequested("stale Paused event")
                     Log.i(TAG, "Paused reconciled (play requested)")
@@ -300,8 +315,8 @@ class VlcPlayerController(
             MediaPlayer.Event.TimeChanged -> {
                 val time = event.timeChanged.coerceAtLeast(0L)
                 _state.update { it.copy(positionMs = time) }
-                if (seekPreviewActive && seekPreviewTargetMs >= 0L) {
-                    val delta = kotlin.math.abs(time - seekPreviewTargetMs)
+                if (seekPreview.active && seekPreview.targetMs >= 0L) {
+                    val delta = kotlin.math.abs(time - seekPreview.targetMs)
                     if (delta <= SEEK_PREVIEW_TOLERANCE_MS) {
                         // Clock reached target — but the HW decoder has not necessarily
                         // painted the new frame to the SurfaceView yet (SMB / large MP4
@@ -610,10 +625,20 @@ class VlcPlayerController(
         }
         val duration = player.length.takeIf { it > 0 } ?: _state.value.durationMs
         val clamped = positionMs.coerceIn(0L, if (duration > 0) duration else positionMs)
-        // Cancel any in-flight pause-scrub preview before a new seek.
-        cancelSeekPreview(/* pausePlayer = */ false)
+        // Playing seeks proceed normally. Paused seeks deliberately keep one preview
+        // session alive across repeated drags so its final re-pause cannot be lost.
+        val preservePausedIntent = PlaybackIntentPolicy.shouldPreservePausedIntentOnSeek(phase)
+        if (!preservePausedIntent) {
+            cancelSeekPreview(/* pausePlayer = */ false)
+        }
         _state.update { it.copy(positionMs = clamped) }
-        performSeek(player, clamped, fast = isSmb, phase = phase)
+        performSeek(
+            player = player,
+            targetMs = clamped,
+            fast = isSmb,
+            phase = phase,
+            preservePausedIntent = preservePausedIntent,
+        )
     }
 
     private fun performSeek(
@@ -621,6 +646,7 @@ class VlcPlayerController(
         targetMs: Long,
         fast: Boolean,
         phase: PlayerState.Phase,
+        preservePausedIntent: Boolean,
     ) {
         val applied = runCatching { player.setTime(targetMs, fast) }
             .getOrDefault(-1L)
@@ -631,25 +657,31 @@ class VlcPlayerController(
         )
         // While paused / first-frame Ready, setTime alone does not paint a new frame
         // (HW decoder holds the last surface). Briefly play then re-pause.
-        val needFramePreview = _state.value.firstFrameReady &&
-            !player.isPlaying &&
-            phase != PlayerState.Phase.Playing
+        val needFramePreview = _state.value.firstFrameReady && preservePausedIntent
         if (needFramePreview) {
-            startSeekPreview(player, targetMs)
+            startOrRetargetSeekPreview(player, targetMs)
         }
     }
 
-    private fun startSeekPreview(player: MediaPlayer, targetMs: Long) {
-        seekPreviewActive = true
-        seekPreviewTargetMs = targetMs
+    private fun startOrRetargetSeekPreview(player: MediaPlayer, targetMs: Long) {
+        val shouldStartNativePreview = seekPreview.startOrRetarget(targetMs)
         mainHandler.removeCallbacks(seekPreviewPauseRunnable)
         mainHandler.removeCallbacks(seekPreviewSettleRunnable)
         mainHandler.postDelayed(seekPreviewPauseRunnable, SEEK_PREVIEW_TIMEOUT_MS)
-        runCatching { player.play() }
-            .onFailure { t ->
-                Log.w(TAG, "seek preview play failed: ${t.message}")
-                cancelSeekPreview(pausePlayer = false)
-            }
+        _state.update { it.copy(isSeeking = true) }
+        if (shouldStartNativePreview) {
+            muteSeekPreview(player)
+        }
+        // A retarget can arrive while native preview playback is already running.
+        // Keep it running and only re-arm the target/timeout; never cancel the final
+        // pause obligation. If native playback stopped between events, resume it.
+        if (!player.isPlaying) {
+            runCatching { player.play() }
+                .onFailure { t ->
+                    Log.w(TAG, "seek preview play failed: ${t.message}")
+                    cancelSeekPreview(pausePlayer = false)
+                }
+        }
     }
 
     /**
@@ -667,15 +699,14 @@ class VlcPlayerController(
     }
 
     private fun finishSeekPreview(reason: String) {
-        if (!seekPreviewActive) return
-        seekPreviewActive = false
-        seekPreviewTargetMs = -1L
+        if (!seekPreview.clear()) return
         mainHandler.removeCallbacks(seekPreviewPauseRunnable)
         mainHandler.removeCallbacks(seekPreviewSettleRunnable)
         val player = mediaPlayer
         if (player != null && player.isPlaying) {
             runCatching { player.pause() }
         }
+        restoreSeekPreviewVolume(player)
         _state.update {
             // Never clobber terminal/open phases (Error/Ended/Preparing/Idle) that
             // may have been set while the settle timer was still armed.
@@ -683,30 +714,63 @@ class VlcPlayerController(
                 it.phase != PlayerState.Phase.Ready &&
                 it.phase != PlayerState.Phase.Paused
             ) {
-                return@update it
+                return@update it.copy(isSeeking = false)
             }
             val phase = when {
                 holdForUserPlay && it.firstFrameReady -> PlayerState.Phase.Ready
                 it.firstFrameReady -> PlayerState.Phase.Paused
                 else -> it.phase
             }
-            it.copy(phase = phase)
+            it.copy(
+                phase = phase,
+                isSeeking = false,
+                isBuffering = false,
+            )
         }
         Log.i(TAG, "seek preview finished ($reason)")
     }
 
     private fun cancelSeekPreview(pausePlayer: Boolean) {
-        val wasActive = seekPreviewActive || seekPreviewTargetMs >= 0L
-        seekPreviewActive = false
-        seekPreviewTargetMs = -1L
+        val wasActive = seekPreview.clear()
         mainHandler.removeCallbacks(seekPreviewPauseRunnable)
         mainHandler.removeCallbacks(seekPreviewSettleRunnable)
-        if (!wasActive) return
-        if (pausePlayer) {
+        if (wasActive && pausePlayer) {
             val player = mediaPlayer
             if (player != null && player.isPlaying) {
                 runCatching { player.pause() }
             }
+        }
+        if (released) {
+            // Release will stop/discard this player; avoid a native volume call on
+            // the navigation frame merely to restore an instance being torn down.
+            seekPreviewRestoreVolume = null
+        } else {
+            restoreSeekPreviewVolume(mediaPlayer)
+        }
+        if (wasActive || _state.value.isSeeking) {
+            _state.update { it.copy(isSeeking = false) }
+        }
+    }
+
+    private fun muteSeekPreview(player: MediaPlayer) {
+        if (seekPreviewRestoreVolume != null) return
+        val currentVolume = runCatching { player.volume }
+            .getOrNull()
+            ?.takeIf { it >= 0 }
+            ?: return
+        val muted = runCatching { player.setVolume(0) }
+            .getOrDefault(-1) >= 0
+        if (muted) {
+            seekPreviewRestoreVolume = currentVolume
+        }
+    }
+
+    private fun restoreSeekPreviewVolume(player: MediaPlayer?) {
+        val volume = seekPreviewRestoreVolume ?: return
+        seekPreviewRestoreVolume = null
+        if (player != null) {
+            runCatching { player.setVolume(volume) }
+                .onFailure { t -> Log.w(TAG, "seek preview volume restore failed: ${t.message}") }
         }
     }
 
@@ -821,7 +885,7 @@ class VlcPlayerController(
         // preview is in flight, that Vout would land in the normal onFirstVout path
         // and overwrite the pause-at-seek-target result. Finalize the preview first
         // so the surfaced frame is exactly the seek target before we rebuild.
-        if (seekPreviewActive) {
+        if (seekPreview.active) {
             finishSeekPreview(reason = "surface-refresh")
         }
         val player = mediaPlayer ?: return
@@ -833,6 +897,7 @@ class VlcPlayerController(
 
     override fun release() {
         if (released) return
+        val releaseStartedAtMs = SystemClock.elapsedRealtime()
         released = true
         pendingSource = null
         currentSource = null
@@ -855,8 +920,23 @@ class VlcPlayerController(
         val afd = ownedSeekableAfd
         ownedSeekableAfd = null
 
-        /** View detach / removeView must run on the main thread. */
-        fun detachVideoOutput() {
+        /** Hide/remove the SurfaceView host immediately; contains no libVLC call. */
+        fun removeVideoOutputView() {
+            if (layout != null) {
+                layout.visibility = View.INVISIBLE
+                (layout.parent as? ViewGroup)?.let { parent ->
+                    runCatching { parent.removeView(layout) }
+                }
+            }
+            Log.d(
+                TAG,
+                "release visible output removed " +
+                    "dt=${SystemClock.elapsedRealtime() - releaseStartedAtMs}ms",
+            )
+        }
+
+        /** libVLC view callbacks touch Android Views and must run on main. */
+        fun detachVideoOutputOnMain() {
             if (player != null) {
                 runCatching {
                     player.setEventListener(null)
@@ -865,62 +945,57 @@ class VlcPlayerController(
                     }
                 }
             }
-            if (layout != null) {
-                val parent = layout.parent as? ViewGroup
-                if (parent != null) {
-                    if (Looper.myLooper() == Looper.getMainLooper()) {
-                        runCatching { parent.removeView(layout) }
-                    } else {
-                        mainHandler.post { runCatching { parent.removeView(layout) } }
-                    }
-                }
-            }
+            Log.d(
+                TAG,
+                "release views detached dt=${SystemClock.elapsedRealtime() - releaseStartedAtMs}ms",
+            )
         }
 
         /**
-         * Native stop/release and proxy AFD close can wait on the decoder or SMB input.
-         * They must never run on the UI thread; the video output is already detached.
+         * Native stop can wait on the decoder or SMB input. It runs before main-thread
+         * detach so libVLC's active vout has already quiesced when Surface callbacks
+         * are removed.
          */
-        fun stopAndReleaseNative() {
-            if (player != null) {
-                runCatching { player.stop() }
-                runCatching { player.release() }
-            }
+        fun stopNative() {
+            runCatching { player?.stop() }
+            Log.d(
+                TAG,
+                "release native stop complete " +
+                    "dt=${SystemClock.elapsedRealtime() - releaseStartedAtMs}ms",
+            )
+        }
+
+        /** Native release and proxy AFD close always remain off-main. */
+        fun releaseNative() {
+            runCatching { player?.release() }
             if (afd != null) runCatching { afd.close() }
             runCatching { vlc?.release() }
+            Log.d(
+                TAG,
+                "release complete dt=${SystemClock.elapsedRealtime() - releaseStartedAtMs}ms",
+            )
         }
 
         val onMain = Looper.myLooper() == Looper.getMainLooper()
-        val needsMainDetach = wasAttached || layout?.parent != null
-        when {
-            onMain -> {
-                detachVideoOutput()
-                // Return to popBackStack before nativeStop can wait on remote input.
-                PlayerReleaseExecutor.launch(THREAD_NAME_VLC_RELEASE) {
-                    stopAndReleaseNative()
-                }
-            }
-            needsMainDetach -> {
-                val done = java.util.concurrent.CountDownLatch(1)
-                mainHandler.post {
-                    try {
-                        detachVideoOutput()
-                    } finally {
-                        done.countDown()
-                    }
-                }
-                if (!done.await(300, java.util.concurrent.TimeUnit.MILLISECONDS)) {
-                    Log.w(TAG, "release: main detach timed out; continuing native release")
-                    runCatching { player?.setEventListener(null) }
-                }
-                stopAndReleaseNative()
-            }
-            else -> {
-                // Typical leave path: AndroidView already detached surfaces.
-                detachVideoOutput()
-                stopAndReleaseNative()
-            }
+        if (onMain) {
+            removeVideoOutputView()
+        } else if (!mainHandler.post(::removeVideoOutputView)) {
+            Log.w(TAG, "release: could not post video view removal")
         }
+        PlayerReleaseExecutor.launchPhased(
+            threadName = THREAD_NAME_VLC_RELEASE,
+            stopNative = ::stopNative,
+            postToMain = { action ->
+                if (!mainHandler.post(action)) {
+                    throw IllegalStateException("main handler rejected detach")
+                }
+            },
+            detachOnMain = ::detachVideoOutputOnMain,
+            releaseNative = ::releaseNative,
+            onMainPhaseTimeout = {
+                Log.w(TAG, "release: main detach timed out; continuing native release")
+            },
+        )
 
         _state.value = PlayerState(
             phase = PlayerState.Phase.Idle,
@@ -1045,6 +1120,9 @@ class VlcPlayerController(
     }
 
     private fun handleEndReached() {
+        // EOF is already a native rest state. Clear any paused-seek preview so its
+        // timeout cannot retain the locating UI or restore an obsolete phase later.
+        cancelSeekPreview(pausePlayer = false)
         val player = mediaPlayer
         val pos = player?.time ?: _state.value.positionMs
         val len = player?.length ?: _state.value.durationMs
@@ -1190,7 +1268,7 @@ class VlcPlayerController(
         // First video output means residual stop() EOF is no longer relevant.
         suppressEndReached = false
         ignoreEndReachedBudget = 0
-        if (seekPreviewActive) {
+        if (seekPreview.active) {
             // A decoded frame at the seek target — freeze there again.
             finishSeekPreview(reason = "vout")
             refreshTracks()

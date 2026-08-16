@@ -50,4 +50,17 @@ class PlaybackIntentPolicyTest {
         assertFalse(PlaybackIntentPolicy.shouldAcceptPausedEvent(playRequested = true))
         assertTrue(PlaybackIntentPolicy.shouldAcceptPausedEvent(playRequested = false))
     }
+
+    @Test
+    fun seek_preservesReadyAndPausedIntentWithoutStoppingPlayingIntent() {
+        assertTrue(
+            PlaybackIntentPolicy.shouldPreservePausedIntentOnSeek(PlayerState.Phase.Ready),
+        )
+        assertTrue(
+            PlaybackIntentPolicy.shouldPreservePausedIntentOnSeek(PlayerState.Phase.Paused),
+        )
+        assertFalse(
+            PlaybackIntentPolicy.shouldPreservePausedIntentOnSeek(PlayerState.Phase.Playing),
+        )
+    }
 }

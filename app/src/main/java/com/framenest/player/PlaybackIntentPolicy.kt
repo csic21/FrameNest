@@ -9,4 +9,8 @@ internal object PlaybackIntentPolicy {
     ): Boolean = firstFrameReady && !playRequested && !seekPreviewActive
 
     fun shouldAcceptPausedEvent(playRequested: Boolean): Boolean = !playRequested
+
+    /** Seeking changes position, never a user's Ready/Paused playback intent. */
+    fun shouldPreservePausedIntentOnSeek(phase: PlayerState.Phase): Boolean =
+        phase == PlayerState.Phase.Ready || phase == PlayerState.Phase.Paused
 }

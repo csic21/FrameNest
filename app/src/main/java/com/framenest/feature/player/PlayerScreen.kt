@@ -800,6 +800,9 @@ private fun PlayerSurfaceStack(
                     onRetry = onRetry,
                 )
             }
+            state.isSeeking && state.firstFrameReady -> {
+                SeekingOverlay()
+            }
             state.phase == PlayerState.Phase.Playing && state.firstFrameReady -> {
                 // Tap toggles chrome; double-tap left/right skips ±10s; vertical
                 // drag left = brightness, right = volume.
@@ -859,6 +862,7 @@ private fun PlayerSurfaceStack(
         // Mid-stream rebuffer / post-seek fill while a decoded frame is already up.
         // Preparing uses the branch above; skip when locked so unlock chrome stays clean.
         if (!controlsLocked &&
+            !state.isSeeking &&
             BufferingPolicy.showOverlay(state) &&
             state.phase != PlayerState.Phase.Preparing &&
             state.phase != PlayerState.Phase.Idle
@@ -897,6 +901,30 @@ private fun PlayerSurfaceStack(
                 ),
             )
         }
+    }
+}
+
+@Composable
+private fun SeekingOverlay() {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(SEEKING_INDICATOR_DELAY_MS)
+        visible = true
+    }
+    if (!visible) return
+
+    val label = stringResource(R.string.player_phase_seeking)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .background(Color.Black.copy(alpha = 0.45f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .semantics { contentDescription = label }
+            .testTag("player_seeking"),
+    ) {
+        CircularProgressIndicator(color = Color.White)
+        Spacer(Modifier.height(12.dp))
+        Text(text = label, color = Color.White, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -1486,6 +1514,8 @@ internal fun scrubSeekTargetMs(durationMs: Long, fraction: Float): Long {
 }
 /** Delay before auto-opening the next same-directory video after Ended. */
 private const val AUTO_NEXT_DELAY_MS = 1_500L
+/** Avoid flashing a spinner when a local paused seek resolves almost immediately. */
+private const val SEEKING_INDICATOR_DELAY_MS = 180L
 
 @Composable
 private fun videoScaleLabel(mode: VideoScaleMode): String = when (mode) {
@@ -1499,6 +1529,7 @@ private fun videoScaleLabel(mode: VideoScaleMode): String = when (mode) {
 
 @Composable
 private fun phaseLabel(state: PlayerState): String {
+    if (state.isSeeking) return stringResource(R.string.player_phase_seeking)
     val phase = when (state.phase) {
         PlayerState.Phase.Idle -> stringResource(R.string.player_phase_idle)
         PlayerState.Phase.Preparing -> stringResource(R.string.player_phase_loading)

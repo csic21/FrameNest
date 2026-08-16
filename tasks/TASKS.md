@@ -803,3 +803,27 @@ unit test、lint、debug/release assemble 通过。
 
 验收：SMB 播放首帧的父目录枚举由两次降为一次；连续缩略图提取不再为每张图片新建
 代理 FD 线程；相关 unit test、lint、debug/release assemble 通过。
+
+## FN-44：播放器无卡顿退出
+
+**依赖**：FN-30、FN-34、FN-43
+
+**拥有路径**：`navigation/FrameNestApp.kt`、`feature/player/PlayerScreen.kt`、
+`feature/player/PlayerViewModel.kt`、`player/VlcPlayerController.kt`、
+`player/PlayerReleaseExecutor.kt`、相关单测、性能文档与交接记录
+
+**目标**：所有页面和顶层 Tab 立即切换；播放中返回浏览/最近页时，同时保证视频 Surface、
+libVLC、代理 FD、SMB 读取和播放进度最终正确结束。
+
+工作内容：
+
+- 在全局 NavHost 关闭进入、退出、返回进入和返回退出转场，不保留页面级动画例外。
+- 显式退出先快照进度，不在导航前同步调用 libVLC `pause` 或 `detachViews`。
+- 主线程只隐藏并移除视频容器；后台停止 native 播放后回主线程 detach Surface，最后继续
+  后台 release libVLC 与代理 FD。
+- 用阶段顺序测试约束 stop → main detach → release，保留幂等和超时兜底。
+- 在 PME110 上安装 release，验证播放返回、进程存活、音频停止和最终资源释放日志。
+
+验收：页面和 Tab 切换没有默认淡入淡出，切换后旧目标不继续参与组合；主线程返回路径
+不调用 native pause/stop/release 或活跃 vout detach；进度保存和资源释放测试通过；
+unit test、lint、debug/release assemble 通过，并记录真实设备结果。

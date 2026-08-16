@@ -1,5 +1,7 @@
 package com.framenest.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.window.core.layout.WindowSizeClass
 import org.junit.Assert.assertEquals
@@ -53,6 +55,12 @@ class AdaptiveLayoutPolicyTest {
         assertEquals("nav_suite_bar", navigationSuiteTestTag(NavigationSuiteType.NavigationBar))
         assertEquals("nav_suite_rail", navigationSuiteTestTag(NavigationSuiteType.NavigationRail))
         assertEquals("nav_suite_none", navigationSuiteTestTag(NavigationSuiteType.None))
+    }
+
+    @Test
+    fun navigationTransitions_areDisabled() {
+        assertEquals(EnterTransition.None, frameNestEnterTransition)
+        assertEquals(ExitTransition.None, frameNestExitTransition)
     }
 
     @Test

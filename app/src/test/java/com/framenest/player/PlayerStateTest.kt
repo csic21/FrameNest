@@ -27,4 +27,16 @@ class PlayerStateTest {
         assertFalse(PlayerState(phase = PlayerState.Phase.Ready).canPause)
         assertFalse(PlayerState(phase = PlayerState.Phase.Paused).canPause)
     }
+
+    @Test
+    fun pausedSeek_keepsPlayAsTheNextUserAction() {
+        val state = PlayerState(
+            phase = PlayerState.Phase.Paused,
+            firstFrameReady = true,
+            isSeeking = true,
+        )
+
+        assertTrue(state.canPlay)
+        assertFalse(state.canPause)
+    }
 }

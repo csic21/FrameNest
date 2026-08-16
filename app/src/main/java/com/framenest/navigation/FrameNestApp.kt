@@ -1,5 +1,6 @@
 package com.framenest.navigation
 
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Icon
@@ -154,6 +155,10 @@ private fun FrameNestNavHost(
         navController = navController,
         startDestination = FrameNestRoutes.SERVERS_GRAPH,
         modifier = modifier,
+        enterTransition = { frameNestEnterTransition },
+        exitTransition = { frameNestExitTransition },
+        popEnterTransition = { frameNestEnterTransition },
+        popExitTransition = { frameNestExitTransition },
     ) {
         navigation(
             route = FrameNestRoutes.SERVERS_GRAPH,
@@ -223,10 +228,6 @@ private fun FrameNestNavHost(
                     defaultValue = ""
                 },
             ),
-            // A SurfaceView destination must disappear immediately on Back. The
-            // default fade keeps the old video page composited over Browse and makes
-            // a released player look like it is lingering.
-            popExitTransition = { ExitTransition.None },
         ) { entry ->
             val serverId = entry.arguments?.getString(FrameNestRoutes.ARG_SERVER_ID).orEmpty()
             val share = entry.arguments?.getString(FrameNestRoutes.ARG_SHARE).orEmpty()
@@ -262,6 +263,9 @@ private fun FrameNestNavHost(
         }
     }
 }
+
+internal val frameNestEnterTransition: EnterTransition = EnterTransition.None
+internal val frameNestExitTransition: ExitTransition = ExitTransition.None
 
 private fun androidx.navigation.NavDestination?.resolvedTopLevelDestination(): TopLevelDestination? {
     if (this == null) return null

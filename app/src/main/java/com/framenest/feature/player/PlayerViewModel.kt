@@ -740,7 +740,10 @@ class PlayerViewModel(
      */
     fun onLeaveOrBackground() {
         pauseFromSystem()
-        val state = controller.state.value
+        scheduleLeaveSave(controller.state.value)
+    }
+
+    private fun scheduleLeaveSave(state: PlayerState) {
         if (state.phase == PlayerState.Phase.Idle ||
             state.phase == PlayerState.Phase.Preparing ||
             state.phase == PlayerState.Phase.Error
@@ -773,14 +776,15 @@ class PlayerViewModel(
     }
 
     /**
-     * Explicit destination exit. Snapshot/save first, then synchronously stop and detach
-     * video output so Navigation's pop cannot retain a live SurfaceView. Native VLC
-     * release remains off-main inside [VlcPlayerController.release].
+     * Explicit destination exit. Snapshot/save without synchronously pausing native
+     * playback, then begin release. [VlcPlayerController.release] removes the visible
+     * host immediately but performs native stop/release away from the navigation frame.
      */
     fun onLeave() {
         if (exitStateSnapshot != null) return
-        onLeaveOrBackground()
-        exitStateSnapshot = controller.state.value
+        val snapshot = controller.state.value
+        exitStateSnapshot = snapshot
+        scheduleLeaveSave(snapshot)
         controller.release()
     }
 

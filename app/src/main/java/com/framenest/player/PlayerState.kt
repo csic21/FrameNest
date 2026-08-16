@@ -43,6 +43,11 @@ data class PlayerState(
      * Meaningful only when [isBuffering] is true (or freshly cleared at 100).
      */
     val bufferPercent: Float = 0f,
+    /**
+     * True while a paused seek is decoding the target frame. This never means the
+     * user requested playback; controls must continue to offer Play.
+     */
+    val isSeeking: Boolean = false,
     val hwDecoderRequested: Boolean = true,
     val error: PlayerError? = null,
 ) {
