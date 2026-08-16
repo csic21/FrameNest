@@ -848,3 +848,21 @@ icon 遮罩，同时保留不同圆角/圆形遮罩的兼容性。
 
 验收：PME110 桌面上图形明显铺满遮罩且无外围黑边；核心播放键与旋转影框不被系统遮罩
 误裁；生成测试、unit test、lint、debug/release assemble 通过。
+
+## FN-46：播放器画布位置稳定性
+
+**依赖**：FN-15、FN-20、FN-28
+
+**拥有路径**：`feature/player/**`、相关 UI 测试与交接记录
+
+**目标**：拖动进度条或切换控制层显隐时保持视频画布位置与缩放稳定。
+
+工作内容：
+
+- 竖屏和横屏统一使用固定全窗口视频 viewport，顶栏与底部控制条仅作为叠层。
+- 进度条拖拽、seek / buffering 状态文案和控制层显隐不得改变 VLC Surface bounds。
+- 保持现有单次 seek、自动收起、锁屏、系统栏安全区和旋转 Surface 复用行为。
+- 添加 UI 回归测试，约束不同高度控制层显隐前后视频 viewport bounds 不变。
+
+验收：拖拽期间与松手 seek 时视频位置不跳；单击画面切换顶栏/控制条时视频位置不跳；
+相关 unit test、UI 测试编译、lint、debug/release assemble 通过。

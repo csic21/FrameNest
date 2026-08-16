@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -54,7 +53,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -66,7 +64,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -77,7 +74,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -124,9 +120,9 @@ import com.framenest.player.VideoScaleMode
  * user taps play to start (product requirement).
  *
  * Orientation:
- * - **Portrait**: video in the middle column, solid chrome below (and panels).
- * - **Landscape**: video always fills the full window; top bar + controls overlay
- *   the surface so chrome show/hide does **not** resize the video (no scale jump).
+ * - **Portrait and landscape**: video always fills a stable viewport; top bar +
+ *   controls overlay the surface so chrome show/hide and seek-state text do not
+ *   resize the VLC surface (no position / scale jump).
  * Video scale (BestFit by default) is re-applied on rotation so landscape
  * sources are not stretched when the surface size changes.
  *
@@ -357,44 +353,19 @@ fun PlayerScreen(
         }
     }
 
-    Scaffold(
+    // FN-46: the VLC surface owns one fixed full-window viewport in both
+    // orientations. Chrome is always an overlay; neither its visibility nor a
+    // transient seek/buffer status can feed a new size into VLCVideoLayout.
+    PlayerViewport(
         modifier = modifier
             .fillMaxSize()
+            .background(Color.Black)
             .testTag("player_screen"),
-        containerColor = Color.Black,
-        // Zero insets: landscape content is full-window; portrait applies scaffold
-        // padding only (top bar). Avoid chrome-driven inset jumps in landscape.
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            // Portrait only — landscape top bar is overlaid so video size is fixed.
-            if (!landscape && showChrome) {
-                PlayerTopBar(
-                    title = vm.displayName,
-                    overlay = false,
-                    onBack = leave,
-                    onToggleListen = toggleListen,
-                    onToggleSubtitles = toggleSubtitles,
-                    onToggleAudioTracks = toggleAudioTracks,
-                )
-            }
-        },
-    ) { padding ->
-        // Single surface host for both orientations so AndroidView is not disposed
-        // on rotate (detachViews mid-play freezes "Playing · first frame ready").
-        Box(
-            modifier = Modifier
-                .then(if (landscape) Modifier else Modifier.padding(padding))
-                .fillMaxSize()
-                .background(Color.Black)
-                .testTag(if (landscape) "player_landscape_shell" else "player_portrait_shell"),
-        ) {
-            var portraitControlsHeightPx by remember { mutableIntStateOf(0) }
-            val portraitControlsHeight = with(LocalDensity.current) {
-                portraitControlsHeightPx.toDp()
-            }
-
-            // This call stays at one stable composition position. Changing orientation
-            // only changes its bounds; it never disposes the AndroidView/VLC surface.
+        viewportTag = if (landscape) "player_landscape_shell" else "player_portrait_shell",
+        surface = {
+            // This call stays at one stable composition position. Changing
+            // orientation or chrome visibility never disposes/re-bounds the
+            // AndroidView/VLC surface.
             PlayerSurfaceStack(
                 controller = vm.controller,
                 state = state,
@@ -405,90 +376,68 @@ fun PlayerScreen(
                 onSkipBy = { vm.skipBy(it) },
                 onPlay = { vm.play() },
                 onRetry = { vm.retry() },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(
-                        if (!landscape && showChrome && portraitControlsHeightPx > 0) {
-                            Modifier.padding(bottom = portraitControlsHeight)
-                        } else {
-                            Modifier
-                        },
-                    ),
+                modifier = Modifier.fillMaxSize(),
             )
-
-            if (landscape) {
-                // Full-window surface: top/bottom chrome float above and never
-                // change the video layout bounds when toggled.
-                if (showChrome) {
-                    PlayerTopBar(
-                        title = vm.displayName,
-                        overlay = true,
-                        onBack = leave,
-                        onToggleListen = toggleListen,
-                        onToggleSubtitles = toggleSubtitles,
-                        onToggleAudioTracks = toggleAudioTracks,
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .testTag("player_landscape_top_bar"),
-                    )
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .testTag("player_landscape_bottom_chrome"),
-                    ) {
-                        PlayerControls(
-                            state = state,
-                            siblingNav = siblingNav,
-                            autoNextArmed = autoNextArmed,
-                            onPlay = { vm.play() },
-                            onPause = { vm.pause() },
-                            onSeek = { vm.seekTo(it) },
-                            onCycleVideoScale = { vm.cycleVideoScaleMode() },
-                            onCyclePlaybackRate = { vm.cyclePlaybackRate() },
-                            onLockControls = lockControls,
-                            orientationLocked = orientationLocked,
-                            onToggleOrientationLock = {
-                                orientationLocked = !orientationLocked
+        },
+        topChrome = if (showChrome) {
+            {
+                PlayerTopBar(
+                    title = vm.displayName,
+                    overlay = true,
+                    onBack = leave,
+                    onToggleListen = toggleListen,
+                    onToggleSubtitles = toggleSubtitles,
+                    onToggleAudioTracks = toggleAudioTracks,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(
+                            if (landscape) {
+                                "player_landscape_top_bar"
+                            } else {
+                                "player_portrait_top_bar"
                             },
-                            onPrevious = siblingNav.previousPath?.let { p -> { openSibling(p) } },
-                            onNext = siblingNav.nextPath?.let { p -> { openSibling(p) } },
-                            overlay = true,
-                            onUserInteraction = markChromeInteraction,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-            } else {
-                if (showChrome) {
-                    PlayerControls(
-                        state = state,
-                        siblingNav = siblingNav,
-                        autoNextArmed = autoNextArmed,
-                        onPlay = { vm.play() },
-                        onPause = { vm.pause() },
-                        onSeek = { vm.seekTo(it) },
-                        onCycleVideoScale = { vm.cycleVideoScaleMode() },
-                        onCyclePlaybackRate = { vm.cyclePlaybackRate() },
-                        onLockControls = lockControls,
-                        orientationLocked = orientationLocked,
-                        onToggleOrientationLock = {
-                            orientationLocked = !orientationLocked
-                        },
-                        onPrevious = siblingNav.previousPath?.let { p -> { openSibling(p) } },
-                        onNext = siblingNav.nextPath?.let { p -> { openSibling(p) } },
-                        overlay = false,
-                        onUserInteraction = markChromeInteraction,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .onSizeChanged { portraitControlsHeightPx = it.height }
-                            .navigationBarsPadding(),
-                    )
-                }
+                        ),
+                )
             }
-
+        } else {
+            null
+        },
+        bottomChrome = if (showChrome) {
+            {
+                PlayerControls(
+                    state = state,
+                    siblingNav = siblingNav,
+                    autoNextArmed = autoNextArmed,
+                    onPlay = { vm.play() },
+                    onPause = { vm.pause() },
+                    onSeek = { vm.seekTo(it) },
+                    onCycleVideoScale = { vm.cycleVideoScaleMode() },
+                    onCyclePlaybackRate = { vm.cyclePlaybackRate() },
+                    onLockControls = lockControls,
+                    orientationLocked = orientationLocked,
+                    onToggleOrientationLock = {
+                        orientationLocked = !orientationLocked
+                    },
+                    onPrevious = siblingNav.previousPath?.let { p -> { openSibling(p) } },
+                    onNext = siblingNav.nextPath?.let { p -> { openSibling(p) } },
+                    overlay = true,
+                    onUserInteraction = markChromeInteraction,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .testTag(
+                            if (landscape) {
+                                "player_landscape_bottom_chrome"
+                            } else {
+                                "player_portrait_bottom_chrome"
+                            },
+                        ),
+                )
+            }
+        } else {
+            null
+        },
+        overlay = {
             if (controlsLocked && showUnlockHint) {
                 LockedUnlockOverlay(
                     onUnlock = unlockControls,
@@ -497,8 +446,8 @@ fun PlayerScreen(
                         .padding(bottom = if (landscape) 32.dp else 24.dp),
                 )
             }
-        }
-    }
+        },
+    )
 
     if (showBottomPanels) {
         ModalBottomSheet(
