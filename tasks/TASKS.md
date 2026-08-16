@@ -703,3 +703,23 @@ assemble 通过；无真机时明确保留真实 SMB 返回帧时间验收，不
 
 验收：Settings 首次 composition 不调用目录大小扫描；缓存维护代码无 `runBlocking`；
 相关 unit test、lint、debug/release assemble 通过。
+
+## FN-39：LAN 端口探测有界并发与取消稳定性
+
+**依赖**：FN-17
+
+**拥有路径**：`data/discovery/SmbPortProber.kt`、`data/discovery/LocalIpv4.kt`、
+相关纯逻辑测试、性能文档与交接记录
+
+**目标**：主动扫描 /24 网段时只创建配置数量的 worker，不为每个地址创建一个等待协程；
+网络切换导致单个接口读取失败时跳过该接口，并保持取消传播。
+
+工作内容：
+
+- 用原子索引的固定 worker 池替换 `hostAddresses.map { async }.awaitAll()` 与信号量。
+- Socket 探测前后检查取消，取消不被通用异常处理吞掉，也不在取消后发布发现结果。
+- 网卡的 `isUp`、loopback 与地址快照按接口隔离异常，Wi-Fi/VPN 切换不终止整个枚举。
+- 纯逻辑测试覆盖最大并发、每个地址恰好一次、发现结果和取消传播。
+
+验收：253 个 /24 地址默认只创建 32 个探测 worker；最大在途探测不超过配置值；
+相关 unit test、lint、debug/release assemble 通过。
