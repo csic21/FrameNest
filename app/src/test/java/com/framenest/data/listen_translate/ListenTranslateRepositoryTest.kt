@@ -170,6 +170,23 @@ class ListenTranslateRepositoryTest {
     }
 
     @Test
+    fun upsertCue_reusesSingleJobLookup_andSingleParentWrite() = runBlocking {
+        val dao = FakeListenTranslateDao()
+        val repo = ListenTranslateRepository(dao, timeSource = { 6_500L })
+
+        repo.upsertCue(identity, langs, 0L, 2_000L, "first", "一")
+        assertEquals(1, dao.getJobCount)
+        assertEquals(1, dao.upsertJobCount)
+
+        dao.getJobCount = 0
+        dao.upsertJobCount = 0
+        repo.upsertCue(identity, langs, 2_000L, 4_000L, "second", "二")
+
+        assertEquals(1, dao.getJobCount)
+        assertEquals(1, dao.upsertJobCount)
+    }
+
+    @Test
     fun path_normalized_forStorage() = runBlocking {
         val dao = FakeListenTranslateDao()
         val repo = ListenTranslateRepository(dao, timeSource = { 7_000L })
@@ -198,6 +215,8 @@ internal class FakeListenTranslateDao : ListenTranslateDao {
     val jobRows = linkedMapOf<String, ListenTranslateJobEntity>()
     val cueRows = mutableListOf<ListenTranslateCueEntity>()
     private var nextCueId = 1L
+    var getJobCount: Int = 0
+    var upsertJobCount: Int = 0
     private val cueFlows =
         mutableMapOf<String, MutableStateFlow<List<ListenTranslateCueEntity>>>()
 
@@ -228,6 +247,7 @@ internal class FakeListenTranslateDao : ListenTranslateDao {
     }
 
     override suspend fun upsertJob(entity: ListenTranslateJobEntity) {
+        upsertJobCount++
         jobRows[
             jobKey(
                 entity.serverId,
@@ -245,8 +265,10 @@ internal class FakeListenTranslateDao : ListenTranslateDao {
         path: String,
         sourceLang: String,
         targetLang: String,
-    ): ListenTranslateJobEntity? =
-        jobRows[jobKey(serverId, share, path, sourceLang, targetLang)]
+    ): ListenTranslateJobEntity? {
+        getJobCount++
+        return jobRows[jobKey(serverId, share, path, sourceLang, targetLang)]
+    }
 
     override suspend fun listJobsForMedia(
         serverId: String,

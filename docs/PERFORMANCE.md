@@ -1,5 +1,17 @@
 # 性能与包体基线
 
+## Room 迁移与听译写入（FN-35）
+
+- 数据库不再使用缺少迁移路径时清空全部表的 destructive fallback；v1→v2 显式创建
+  听译 job/cue 表和现有索引，服务器与播放历史原表保持不变。
+- 提交由历史 v1 源码与当前 v2 源码生成的 Room schema；API 36.1 手机模拟器上的
+  `MigrationTestHelper` 验证旧数据保留、最终 schema 匹配且新听译表可写。
+- 连续听译窗口写 cue 时复用 `ensureJob` 已完成的主键查询，并移除紧随其后的重复
+  parent touch。纯逻辑 DAO 计数测试确认每个普通 cue 从 3 次 job 查询、2 次 job upsert
+  降为各 1 次；content key 与模型版本变化仍会删除旧 job/cue 后重建。
+
+上述记录的是确定性的 SQL 往返次数与迁移结果，不将模拟器执行时间当作真机 Room 性能数据。
+
 ## 播放器返回释放（FN-34）
 
 - 返回仍在主线程立即 detach/remove 视频画布，避免 SurfaceView 残留。

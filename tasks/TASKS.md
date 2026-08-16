@@ -621,3 +621,24 @@ unit test、lint、debug/release assemble 通过；无真机时不虚报滚动�
 
 验收：返回调用链不在主线程执行 `MediaPlayer.stop()`；unit test、lint、debug/release
 assemble 通过；无真机时明确保留真实 SMB 返回帧时间验收，不用模拟值代替。
+
+## FN-35：Room 数据迁移与听译写入减负
+
+**依赖**：FN-11、FN-23
+
+**拥有路径**：`data/server/AppDatabase.kt`、Room schema 输出配置与迁移测试、
+`data/listen_translate/**` 的最小写入优化、性能文档与交接记录
+
+**目标**：应用升级时保留服务器、播放历史和听译缓存，并减少连续听译窗口写入中的
+重复 Room 查询。
+
+工作内容：
+
+- 为现有 v1→v2 schema 提供显式迁移，移除升级时清空全部表的 destructive fallback。
+- 开启并提交 Room schema 导出，为迁移验证和后续版本演进保留基线。
+- 添加迁移测试，验证 v1 服务器/播放历史数据保留且 v2 听译表可写。
+- `ensureJob` 复用已读取的 job，避免未失效时再次执行同一主键查询；保持 content/model
+  失效语义不变。
+
+验收：迁移验证通过；旧服务器与播放历史不丢失；听译 repository 回归测试约束普通
+`ensureJob` 只查询一次；unit test、lint、debug/release assemble 通过。

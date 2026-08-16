@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.framenest.data.history.PlaybackHistoryDao
 import com.framenest.data.history.PlaybackHistoryEntity
 import com.framenest.data.listen_translate.ListenTranslateCueEntity
@@ -18,8 +20,9 @@ import com.framenest.data.listen_translate.ListenTranslateJobEntity
  * - [PlaybackHistoryEntity] (FN-05)
  * - [ListenTranslateJobEntity] / [ListenTranslateCueEntity] (FN-11)
  *
- * DB name stays [NAME] so features share one process singleton.
- * Pre-release: destructive migration on version bump is acceptable.
+ * DB name stays [NAME] so features share one process singleton. Every released
+ * schema version must have an explicit, tested migration path so server metadata,
+ * playback history, and local listen-translate cache survive upgrades.
  */
 @Database(
     entities = [
@@ -29,7 +32,7 @@ import com.framenest.data.listen_translate.ListenTranslateJobEntity
         ListenTranslateCueEntity::class,
     ],
     version = 2,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun serverDao(): ServerDao
@@ -49,8 +52,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     NAME,
                 )
-                    // Pre-release: no production users yet.
-                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .addMigrations(MIGRATION_1_2)
                     .build()
                     .also { instance = it }
             }
@@ -62,5 +64,73 @@ abstract class AppDatabase : RoomDatabase() {
                 context.applicationContext,
                 AppDatabase::class.java,
             ).allowMainThreadQueries().build()
+
+        /**
+         * FN-11 added listen-translate jobs/cues to the original server/history DB.
+         * Existing v1 rows stay untouched; the two new tables start empty.
+         */
+        val MIGRATION_1_2: Migration = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `listen_translate_job` (
+                        `server_id` TEXT NOT NULL,
+                        `share` TEXT NOT NULL,
+                        `path` TEXT NOT NULL,
+                        `source_lang` TEXT NOT NULL,
+                        `target_lang` TEXT NOT NULL,
+                        `content_key` TEXT NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `duration_ms` INTEGER NOT NULL,
+                        `covered_until_ms` INTEGER NOT NULL,
+                        `asr_model` TEXT NOT NULL,
+                        `mt_model` TEXT NOT NULL,
+                        `updated_at_epoch_ms` INTEGER NOT NULL,
+                        `last_error` TEXT NOT NULL,
+                        PRIMARY KEY(`server_id`, `share`, `path`, `source_lang`, `target_lang`)
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_listen_translate_job_server_id` " +
+                        "ON `listen_translate_job` (`server_id`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_listen_translate_job_updated_at_epoch_ms` " +
+                        "ON `listen_translate_job` (`updated_at_epoch_ms`)",
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `listen_translate_cue` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `server_id` TEXT NOT NULL,
+                        `share` TEXT NOT NULL,
+                        `path` TEXT NOT NULL,
+                        `source_lang` TEXT NOT NULL,
+                        `target_lang` TEXT NOT NULL,
+                        `start_ms` INTEGER NOT NULL,
+                        `end_ms` INTEGER NOT NULL,
+                        `text_src` TEXT NOT NULL,
+                        `text_tgt` TEXT NOT NULL,
+                        `rev` INTEGER NOT NULL,
+                        FOREIGN KEY(`server_id`, `share`, `path`, `source_lang`, `target_lang`)
+                            REFERENCES `listen_translate_job`(
+                                `server_id`, `share`, `path`, `source_lang`, `target_lang`
+                            ) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS " +
+                        "`index_listen_translate_cue_server_id_share_path_source_lang_target_lang_start_ms` " +
+                        "ON `listen_translate_cue` " +
+                        "(`server_id`, `share`, `path`, `source_lang`, `target_lang`, `start_ms`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_listen_translate_cue_server_id` " +
+                        "ON `listen_translate_cue` (`server_id`)",
+                )
+            }
+        }
     }
 }

@@ -66,11 +66,11 @@ class ListenTranslateRepository(
             lang.sourceLang,
             lang.targetLang,
         )
-        if (existing != null &&
+        val invalidated = existing != null &&
             (shouldInvalidate(existing.contentKey, contentKey) ||
                 shouldInvalidateModel(existing.asrModel, asrModel) ||
                 shouldInvalidateModel(existing.mtModel, mtModel))
-        ) {
+        if (invalidated) {
             dao.deleteJob(
                 identity.serverId,
                 identity.share,
@@ -79,13 +79,9 @@ class ListenTranslateRepository(
                 lang.targetLang,
             )
         }
-        val previous = dao.getJob(
-            identity.serverId,
-            identity.share,
-            path,
-            lang.sourceLang,
-            lang.targetLang,
-        )
+        // Reuse the primary-key lookup above. A second identical query used to run
+        // for every three-second listen window even when nothing was invalidated.
+        val previous = existing.takeUnless { invalidated }
         val entity = ListenTranslateJobEntity(
             serverId = identity.serverId,
             share = identity.share,
@@ -165,7 +161,8 @@ class ListenTranslateRepository(
                 rev = rev.coerceAtLeast(0),
             ),
         )
-        touchJob(identity, lang)
+        // ensureJob already refreshes updatedAt immediately before the cue write;
+        // querying and upserting the same parent again only added two Room round trips.
         return ListenTranslateCue(
             id = id,
             identity = PlaybackIdentity(identity.serverId, identity.share, path),
@@ -283,18 +280,6 @@ class ListenTranslateRepository(
         val jobs = dao.countJobs().toLong()
         // 2 bytes/char (Kotlin String) + fixed overhead per row.
         return chars * 2L + cues * 64L + jobs * 128L
-    }
-
-    private suspend fun touchJob(identity: PlaybackIdentity, lang: ListenLanguagePair) {
-        val path = identity.normalizedPath()
-        val existing = dao.getJob(
-            identity.serverId,
-            identity.share,
-            path,
-            lang.sourceLang,
-            lang.targetLang,
-        ) ?: return
-        dao.upsertJob(existing.copy(updatedAtEpochMs = timeSource()))
     }
 
     private fun shouldInvalidate(storedKey: String, incomingKey: String): Boolean {
