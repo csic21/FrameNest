@@ -683,3 +683,23 @@ assemble 通过；无真机时明确保留真实 SMB 返回帧时间验收，不
 
 验收：常规 PCM16/16 kHz 块只创建下混结果且完整窗口不再二次复制；输出样本语义测试
 不回归；unit test、lint、debug/release assemble 通过。
+
+## FN-38：设置页缓存维护非阻塞化
+
+**依赖**：FN-09、FN-35
+
+**拥有路径**：`feature/settings/CacheMaintenance.kt`、`ui/screens/SettingsScreen.kt`、
+相关纯逻辑测试、性能文档与交接记录
+
+**目标**：设置页首次组合不执行目录遍历，缓存统计和清理不使用 `runBlocking` 占住线程，
+并避免为了计算未展示的总量反复遍历大型 Vosk 模型目录。
+
+工作内容：
+
+- 缓存/模型/Room 统计与清理改为挂起 API，并在维护层统一切到 I/O dispatcher。
+- 设置页缓存和模型状态先使用轻量初值，再异步加载一致的使用量快照。
+- “全部缓存”“听译缓存”“听译模型”分别只统计自身清理范围，不扫描无关目录。
+- 目录递归计数提取为纯逻辑函数并覆盖嵌套文件、目录项和不存在路径测试。
+
+验收：Settings 首次 composition 不调用目录大小扫描；缓存维护代码无 `runBlocking`；
+相关 unit test、lint、debug/release assemble 通过。

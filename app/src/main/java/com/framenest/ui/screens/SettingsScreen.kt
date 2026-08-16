@@ -59,14 +59,11 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     val prefs = container.userPreferences
     val scope = rememberCoroutineScope()
 
-    var cacheBytes by remember {
-        mutableStateOf(container.cacheMaintenance.approximateDiskCacheBytes())
-    }
+    // Directory and Room sizes are loaded below; initial composition must not touch disk.
+    var cacheBytes by remember { mutableStateOf(0L) }
     var listenTranslateBytes by remember { mutableStateOf(0L) }
     var listenModelBytes by remember { mutableStateOf(0L) }
-    var voskStatuses by remember {
-        mutableStateOf(container.voskModelInstaller.languageStatuses())
-    }
+    var voskStatuses by remember { mutableStateOf(emptyList<VoskLanguageStatus>()) }
     var modelsInstalling by remember { mutableStateOf(false) }
     var installProgress by remember { mutableFloatStateOf(0f) }
     var installStep by remember { mutableStateOf<String?>(null) }
@@ -105,21 +102,16 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
 
     suspend fun refreshModelSizesAndStatus() {
         val snapshot = withContext(Dispatchers.IO) {
-            Triple(
-                container.voskModelInstaller.languageStatuses(),
-                container.cacheMaintenance.approximateListenModelBytes(),
-                container.cacheMaintenance.approximateDiskCacheBytes(),
-            )
+            container.voskModelInstaller.languageStatuses() to
+                container.cacheMaintenance.usageSnapshot()
         }
         voskStatuses = snapshot.first
-        listenModelBytes = snapshot.second
-        cacheBytes = snapshot.third
+        cacheBytes = snapshot.second.diskCacheBytes
+        listenTranslateBytes = snapshot.second.listenTranslateBytes
+        listenModelBytes = snapshot.second.listenModelBytes
     }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        listenTranslateBytes = withContext(Dispatchers.IO) {
-            container.cacheMaintenance.approximateListenTranslateBytes()
-        }
         refreshModelSizesAndStatus()
     }
 
@@ -175,9 +167,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         Button(
             onClick = {
                 scope.launch {
-                    val result = withContext(Dispatchers.IO) {
-                        container.cacheMaintenance.clearAllCaches()
-                    }
+                    val result = container.cacheMaintenance.clearAllCaches()
                     // Disk cache + listen-translate Room only; model packs stay
                     // (dedicated「清除听译模型」button).
                     cacheBytes = result.remainingApproxBytes
@@ -219,12 +209,8 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         OutlinedButton(
             onClick = {
                 scope.launch {
-                    val (result, remainingDiskBytes) = withContext(Dispatchers.IO) {
-                        val cleared = container.cacheMaintenance.clearListenTranslateCache()
-                        cleared to container.cacheMaintenance.approximateDiskCacheBytes()
-                    }
-                    listenTranslateBytes = 0L
-                    cacheBytes = remainingDiskBytes
+                    val result = container.cacheMaintenance.clearListenTranslateCache()
+                    listenTranslateBytes = result.remainingApproxBytes
                     statusMessage =
                         listenTranslateClearedTemplate.format(formatBytes(result.freedApproxBytes))
                     DiagnosticLog.info(
@@ -518,9 +504,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             onClick = {
                 if (modelsInstalling) return@OutlinedButton
                 scope.launch {
-                    val result = withContext(Dispatchers.IO) {
-                        container.cacheMaintenance.clearListenModels()
-                    }
+                    val result = container.cacheMaintenance.clearListenModels()
                     refreshModelSizesAndStatus()
                     statusMessage =
                         listenModelsClearedTemplate.format(formatBytes(result.freedApproxBytes))

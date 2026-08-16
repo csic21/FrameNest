@@ -8,7 +8,9 @@ import com.framenest.data.thumbnail.ThumbnailRepository
 import com.framenest.feature.listen_translate.asr.VoskModelInstaller
 import com.framenest.feature.listen_translate.mt.MlKitTranslationModelCleaner
 import java.io.File
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Clears disk caches and listen-translate Room rows.
@@ -16,8 +18,7 @@ import kotlinx.coroutines.runBlocking
  * [clearAllCaches] — settings has a dedicated「清除听译模型」control via
  * [clearListenModels] (decision 0005). Uninstall still clears everything.
  *
- * Call clear / approximate methods that touch Room or models from a background
- * dispatcher.
+ * Public operations switch to [ioDispatcher] themselves; callers never need a blocking bridge.
  */
 class CacheMaintenance(
     private val context: Context,
@@ -27,9 +28,20 @@ class CacheMaintenance(
     private val voskModelInstaller: VoskModelInstaller? = null,
     private val mlKitTranslationModelCleaner: MlKitTranslationModelCleaner =
         MlKitTranslationModelCleaner(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-    fun clearAllCaches(): CacheClearResult {
-        val before = approximateTotalBytes()
+    suspend fun usageSnapshot(): CacheUsageSnapshot = withContext(ioDispatcher) {
+        CacheUsageSnapshot(
+            diskCacheBytes = approximateDiskCacheBytesOnCurrentThread(),
+            listenTranslateBytes = approximateListenTranslateBytesOnCurrentThread(),
+            listenModelBytes = approximateListenModelBytesOnCurrentThread(),
+        )
+    }
+
+    suspend fun clearAllCaches(): CacheClearResult = withContext(ioDispatcher) {
+        // Model packs are intentionally excluded: this control does not remove them.
+        val beforeDisk = approximateDiskCacheBytesOnCurrentThread()
+        val beforeListen = approximateListenTranslateBytesOnCurrentThread()
         thumbnailRepository.clearCache()
         val subtitleDir = File(context.cacheDir, "subtitles")
         runCatching { subtitleDir.listFiles()?.forEach { it.deleteRecursively() } }
@@ -39,75 +51,68 @@ class CacheMaintenance(
         // In-process diagnostic ring buffer (not counted in disk size).
         DiagnosticLog.clear()
         // Room cues only — leave Vosk / JSON model packs alone.
-        runBlocking {
-            listenTranslateRepository?.purgeAll()
-        }
-        val after = approximateTotalBytes()
-        return CacheClearResult(
-            freedApproxBytes = (before - after).coerceAtLeast(0L),
+        listenTranslateRepository?.purgeAll()
+        val afterDisk = approximateDiskCacheBytesOnCurrentThread()
+        val afterListen = approximateListenTranslateBytesOnCurrentThread()
+        CacheClearResult(
+            freedApproxBytes =
+                (beforeDisk + beforeListen - afterDisk - afterListen).coerceAtLeast(0L),
             // Cache row shows disk cache only (not model packs).
-            remainingApproxBytes = approximateDiskCacheBytes(),
+            remainingApproxBytes = afterDisk,
         )
     }
 
     /** Clear only listen-translate Room rows (not model packs). */
-    fun clearListenTranslateCache(): CacheClearResult {
-        val before = approximateTotalBytes()
-        runBlocking {
-            listenTranslateRepository?.purgeAll()
-        }
-        val after = approximateTotalBytes()
-        return CacheClearResult(
+    suspend fun clearListenTranslateCache(): CacheClearResult = withContext(ioDispatcher) {
+        val before = approximateListenTranslateBytesOnCurrentThread()
+        listenTranslateRepository?.purgeAll()
+        val after = approximateListenTranslateBytesOnCurrentThread()
+        CacheClearResult(
             freedApproxBytes = (before - after).coerceAtLeast(0L),
             remainingApproxBytes = after,
         )
     }
 
     /** Clear JSON/Vosk packs and ML Kit translation models from app-private storage. */
-    fun clearListenModels(): CacheClearResult {
-        val before = approximateTotalBytes()
-        runBlocking {
-            listenModelManager?.deleteAll()
-            voskModelInstaller?.deleteAll()
-            mlKitTranslationModelCleaner.deleteAll()
-        }
-        val after = approximateTotalBytes()
-        return CacheClearResult(
+    suspend fun clearListenModels(): CacheClearResult = withContext(ioDispatcher) {
+        val before = approximateListenModelBytesOnCurrentThread()
+        listenModelManager?.deleteAll()
+        voskModelInstaller?.deleteAll()
+        mlKitTranslationModelCleaner.deleteAll()
+        val after = approximateListenModelBytesOnCurrentThread()
+        CacheClearResult(
             freedApproxBytes = (before - after).coerceAtLeast(0L),
             remainingApproxBytes = after,
         )
     }
 
-    fun approximateListenTranslateBytes(): Long =
-        runBlocking {
-            listenTranslateRepository?.approximateCacheBytes() ?: 0L
-        }
+    private suspend fun approximateListenTranslateBytesOnCurrentThread(): Long =
+        listenTranslateRepository?.approximateCacheBytes() ?: 0L
 
-    fun approximateListenModelBytes(): Long {
+    private fun approximateListenModelBytesOnCurrentThread(): Long {
         var total = listenModelManager?.approximateBytes() ?: 0L
         total += voskModelInstaller?.approximateBytes() ?: 0L
         return total
     }
 
-    fun approximateTotalBytes(): Long {
-        var total = approximateDiskCacheBytes()
-        total += approximateListenTranslateBytes()
-        total += approximateListenModelBytes()
-        return total
-    }
-
-    fun approximateDiskCacheBytes(): Long {
+    private fun approximateDiskCacheBytesOnCurrentThread(): Long {
         var total = thumbnailRepository.approximateCacheSizeBytes()
-        total += dirSize(File(context.cacheDir, "subtitles"))
-        total += dirSize(File(context.cacheDir, "diagnostics"))
+        total += directorySizeBytes(File(context.cacheDir, "subtitles"))
+        total += directorySizeBytes(File(context.cacheDir, "diagnostics"))
         return total
-    }
-
-    private fun dirSize(dir: File): Long {
-        if (!dir.exists()) return 0L
-        return dir.walkTopDown().filter { it.isFile }.map { it.length() }.sum()
     }
 }
+
+internal fun directorySizeBytes(directory: File): Long {
+    if (!directory.exists()) return 0L
+    return directory.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+}
+
+data class CacheUsageSnapshot(
+    val diskCacheBytes: Long,
+    val listenTranslateBytes: Long,
+    val listenModelBytes: Long,
+)
 
 data class CacheClearResult(
     val freedApproxBytes: Long,
