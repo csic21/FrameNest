@@ -827,3 +827,24 @@ libVLC、代理 FD、SMB 读取和播放进度最终正确结束。
 验收：页面和 Tab 切换没有默认淡入淡出，切换后旧目标不继续参与组合；主线程返回路径
 不调用 native pause/stop/release 或活跃 vout detach；进度保存和资源释放测试通过；
 unit test、lint、debug/release assemble 通过，并记录真实设备结果。
+
+## FN-45：启动器图标满幅适配
+
+**依赖**：FN-33
+
+**拥有路径**：`design/app-icon/**`、Android launcher 资源、品牌决策记录、相关测试与交接记录
+
+**目标**：消除厂商启动器上蓝紫 Logo 四周可见的深色边缘，让品牌图形铺满系统 adaptive
+icon 遮罩，同时保留不同圆角/圆形遮罩的兼容性。
+
+工作内容：
+
+- 以 Android adaptive icon 的 108dp 图层与约 72dp 可见遮罩为基准，扩大前景图形，不在
+  位图中预裁厂商圆角。
+- 保留深靛蓝背景用于图形负空间，但不再让 66dp 安全区成为可见的外围深色边框。
+- 由现有确定性脚本重建所有密度的 adaptive、legacy、round、monochrome 与品牌资源。
+- 添加生成结果检查，约束 adaptive 前景占比与背景不透明性；在 PME110 桌面安装 release
+  并以修复前后截图验收。
+
+验收：PME110 桌面上图形明显铺满遮罩且无外围黑边；核心播放键与旋转影框不被系统遮罩
+误裁；生成测试、unit test、lint、debug/release assemble 通过。

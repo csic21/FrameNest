@@ -26,6 +26,12 @@ DENSITIES = {
 
 LOGICAL_SIZE = 1024
 
+# Adaptive icon layers are authored on a 108dp canvas, while the launcher mask is
+# roughly 72dp wide. Keeping the mark at the 66dp safe-zone size (0.61) left a
+# visible midnight rim on ColorOS. A small 0.68 overscan fills the mask without
+# moving the central play glyph or baking any vendor-specific corner shape in.
+ADAPTIVE_MARK_FRACTION = 0.68
+
 # Shared with ui/theme/Color.kt. The launcher can use the brighter source hues;
 # the light UI theme uses darker accessible roles where white text is required.
 MIDNIGHT = (12, 18, 43, 255)
@@ -171,7 +177,11 @@ def main() -> None:
 
     for density, (adaptive_size, legacy_size) in DENSITIES.items():
         target = RES / f"mipmap-{density}"
-        adaptive_mark = place_mark(source_mark, adaptive_size, fraction=0.61)
+        adaptive_mark = place_mark(
+            source_mark,
+            adaptive_size,
+            fraction=ADAPTIVE_MARK_FRACTION,
+        )
         write_png(make_background(adaptive_size), target / "ic_launcher_background.png")
         write_png(adaptive_mark, target / "ic_launcher_foreground.png")
         write_png(make_monochrome(adaptive_mark), target / "ic_launcher_monochrome.png")
