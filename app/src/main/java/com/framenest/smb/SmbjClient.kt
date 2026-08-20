@@ -22,227 +22,248 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * SMBJ-backed [SmbClient].
  *
- * Threading: public methods are synchronized on this instance. Callers should
- * still keep heavy work off the main thread.
+ * Threading: connection state is guarded by [lock], but connect / list / metadata /
+ * tree-connect I/O run **outside** that lock. [close] and [disconnect] can therefore
+ * tear down the transport while a listing is blocked and unblock the waiter.
+ * Callers should still keep heavy work off the main thread.
  */
 class SmbjClient(
     private val config: SmbConfig = defaultConfig(),
 ) : SmbClient {
 
     private val client = SMBClient(config)
+    private val lock = Any()
     private var connection: Connection? = null
     private var session: Session? = null
     private var connectedHost: String? = null
+    private val shares = LinkedHashMap<String, DiskShare>()
     private val closed = AtomicBoolean(false)
 
     override val isConnected: Boolean
-        get() = synchronized(this) {
-            connection?.isConnected == true && session != null
+        get() = synchronized(lock) {
+            !closed.get() && connection?.isConnected == true && session != null
         }
 
     @Throws(SmbException::class)
     override fun connect(credentials: SmbCredentials) {
-        synchronized(this) {
-            ensureOpen()
-            disconnectInternal()
-            val host = credentials.host.trim()
-            if (host.isEmpty()) {
-                throw SmbException(SmbError.Network("Host is empty"))
+        ensureOpen()
+        disconnect()
+        val host = credentials.host.trim()
+        if (host.isEmpty()) {
+            throw SmbException(SmbError.Network("Host is empty"))
+        }
+        SmbLog.i("Connecting ${credentials.safeSummary()}")
+        try {
+            val conn = if (credentials.port == SmbCredentials.DEFAULT_PORT) {
+                client.connect(host)
+            } else {
+                client.connect(host, credentials.port)
             }
-            SmbLog.i("Connecting ${credentials.safeSummary()}")
-            try {
-                val conn = if (credentials.port == SmbCredentials.DEFAULT_PORT) {
-                    client.connect(host)
-                } else {
-                    client.connect(host, credentials.port)
+            val auth = AuthenticationContext(
+                credentials.username,
+                credentials.password,
+                credentials.domain,
+            )
+            val sess = conn.authenticate(auth)
+            val stale = try {
+                synchronized(lock) {
+                    ensureOpenLocked()
+                    val previous = snapshotAndClearSession()
+                    connection = conn
+                    session = sess
+                    connectedHost = host
+                    previous
                 }
-                val auth = AuthenticationContext(
-                    credentials.username,
-                    credentials.password,
-                    credentials.domain,
-                )
-                val sess = conn.authenticate(auth)
-                connection = conn
-                session = sess
-                connectedHost = host
-                SmbLog.i("Authenticated to host=$host port=${credentials.port}")
             } catch (t: Throwable) {
-                disconnectInternal()
-                val error = SmbErrorMapper.map(t)
-                SmbLog.e("Connect failed type=${error::class.simpleName} msg=${error.message}", t)
-                throw SmbException(error)
+                runCatching { sess.close() }
+                runCatching { conn.close() }
+                throw t
             }
+            closeSessionSnapshot(stale, closeClient = false)
+            SmbLog.i("Authenticated to host=$host port=${credentials.port}")
+        } catch (t: Throwable) {
+            if (t is SmbException) throw t
+            val error = SmbErrorMapper.map(t)
+            SmbLog.e("Connect failed type=${error::class.simpleName} msg=${error.message}", t)
+            throw SmbException(error)
         }
     }
 
     @Throws(SmbException::class)
     override fun listShares(knownShares: List<String>): List<String> {
-        synchronized(this) {
-            val sess = requireSession()
-            // Pure SMB2/3 has no share-directory op; full MS-SRVS NetShareEnum is not in
-            // stock SMBJ 0.14. Probe user + common home-NAS names via tree-connect.
-            val candidates = SmbShareCandidates.merge(knownShares)
-            if (candidates.isEmpty()) {
-                SmbLog.w("listShares: no candidates after merge")
-                return emptyList()
-            }
-            SmbLog.i("listShares: probing ${candidates.size} candidates")
-            val available = mutableListOf<String>()
-            for (name in candidates) {
-                try {
-                    sess.connectShare(name).use { share ->
-                        if (share is DiskShare) {
-                            available += name
-                        }
-                    }
-                } catch (t: Throwable) {
-                    val mapped = SmbErrorMapper.map(t)
-                    when (mapped) {
-                        is SmbError.Auth -> throw SmbException(mapped)
-                        is SmbError.Network, is SmbError.Disconnected -> throw SmbException(mapped)
-                        else -> SmbLog.d("Share probe miss name=$name type=${mapped::class.simpleName}")
+        val sess = requireSession()
+        // Pure SMB2/3 has no share-directory op; full MS-SRVS NetShareEnum is not in
+        // stock SMBJ 0.14. Probe user + common home-NAS names via tree-connect.
+        val candidates = SmbShareCandidates.merge(knownShares)
+        if (candidates.isEmpty()) {
+            SmbLog.w("listShares: no candidates after merge")
+            return emptyList()
+        }
+        SmbLog.i("listShares: probing ${candidates.size} candidates")
+        val available = mutableListOf<String>()
+        for (name in candidates) {
+            try {
+                sess.connectShare(name).use { share ->
+                    if (share is DiskShare) {
+                        available += name
                     }
                 }
+            } catch (t: Throwable) {
+                val mapped = SmbErrorMapper.map(t)
+                when (mapped) {
+                    is SmbError.Auth -> throw SmbException(mapped)
+                    is SmbError.Network, is SmbError.Disconnected -> throw SmbException(mapped)
+                    else -> SmbLog.d("Share probe miss name=$name type=${mapped::class.simpleName}")
+                }
             }
-            return available.sortedWith(String.CASE_INSENSITIVE_ORDER)
         }
+        return available.sortedWith(String.CASE_INSENSITIVE_ORDER)
     }
 
     @Throws(SmbException::class)
     override fun listDirectory(shareName: String, path: String): List<SmbEntry> {
-        synchronized(this) {
-            val relative = SmbPathUtils.normalizeRelative(path)
-            return withDiskShare(shareName) { share ->
-                try {
-                    val listing: List<FileIdBothDirectoryInformation> = share.list(relative)
-                    val dirAttr = FileAttributes.FILE_ATTRIBUTE_DIRECTORY.value
-                    val entries = listing.mapNotNull { info ->
-                        val name = info.fileName
-                        if (SmbPathUtils.isDotEntry(name)) return@mapNotNull null
-                        val isDir = (info.fileAttributes and dirAttr) != 0L
-                        SmbEntry(
-                            name = name,
-                            path = SmbPathUtils.join(relative, name),
-                            isDirectory = isDir,
-                            sizeBytes = info.endOfFile,
-                            lastModifiedEpochMs = info.changeTime.toEpochMillis(),
-                        )
-                    }
-                    SmbPathUtils.sortEntries(entries)
-                } catch (t: Throwable) {
-                    throw SmbException(SmbErrorMapper.map(t))
-                }
+        val relative = SmbPathUtils.normalizeRelative(path)
+        val share = openDiskShare(shareName)
+        try {
+            val listing: List<FileIdBothDirectoryInformation> = share.list(relative)
+            val dirAttr = FileAttributes.FILE_ATTRIBUTE_DIRECTORY.value
+            val entries = listing.mapNotNull { info ->
+                val name = info.fileName
+                if (SmbPathUtils.isDotEntry(name)) return@mapNotNull null
+                val isDir = (info.fileAttributes and dirAttr) != 0L
+                SmbEntry(
+                    name = name,
+                    path = SmbPathUtils.join(relative, name),
+                    isDirectory = isDir,
+                    sizeBytes = info.endOfFile,
+                    lastModifiedEpochMs = info.changeTime.toEpochMillis(),
+                )
             }
+            return SmbPathUtils.sortEntries(entries)
+        } catch (t: Throwable) {
+            throw SmbException(SmbErrorMapper.map(t))
         }
     }
 
     @Throws(SmbException::class)
     override fun metadata(shareName: String, path: String): SmbFileMetadata {
-        synchronized(this) {
-            val relative = SmbPathUtils.normalizeRelative(path)
-            if (relative.isEmpty()) {
-                throw SmbException(SmbError.NotFound("Empty path"))
+        val relative = SmbPathUtils.normalizeRelative(path)
+        if (relative.isEmpty()) {
+            throw SmbException(SmbError.NotFound("Empty path"))
+        }
+        val share = openDiskShare(shareName)
+        try {
+            val isDir = share.folderExists(relative)
+            val isFile = !isDir && share.fileExists(relative)
+            if (!isDir && !isFile) {
+                throw SmbException(SmbError.NotFound("Not found path=$relative"))
             }
-            return withDiskShare(shareName) { share ->
-                try {
-                    val isDir = share.folderExists(relative)
-                    val isFile = !isDir && share.fileExists(relative)
-                    if (!isDir && !isFile) {
-                        throw SmbException(SmbError.NotFound("Not found path=$relative"))
-                    }
-                    if (isDir) {
-                        SmbFileMetadata(
-                            path = relative,
-                            sizeBytes = 0L,
-                            lastModifiedEpochMs = 0L,
-                            isDirectory = true,
-                        )
-                    } else {
-                        openFile(share, relative).use { file ->
-                            val standard = file.getFileInformation(FileStandardInformation::class.java)
-                            val basic = file.getFileInformation(FileBasicInformation::class.java)
-                            SmbFileMetadata(
-                                path = relative,
-                                sizeBytes = standard.endOfFile,
-                                lastModifiedEpochMs = basic.lastWriteTime.toEpochMillis(),
-                                isDirectory = standard.isDirectory,
-                            )
-                        }
-                    }
-                } catch (t: Throwable) {
-                    if (t is SmbException) throw t
-                    throw SmbException(SmbErrorMapper.map(t))
-                }
+            if (isDir) {
+                return SmbFileMetadata(
+                    path = relative,
+                    sizeBytes = 0L,
+                    lastModifiedEpochMs = 0L,
+                    isDirectory = true,
+                )
             }
+            openFile(share, relative).use { file ->
+                val standard = file.getFileInformation(FileStandardInformation::class.java)
+                val basic = file.getFileInformation(FileBasicInformation::class.java)
+                return SmbFileMetadata(
+                    path = relative,
+                    sizeBytes = standard.endOfFile,
+                    lastModifiedEpochMs = basic.lastWriteTime.toEpochMillis(),
+                    isDirectory = standard.isDirectory,
+                )
+            }
+        } catch (t: Throwable) {
+            if (t is SmbException) throw t
+            throw SmbException(SmbErrorMapper.map(t))
         }
     }
 
     @Throws(SmbException::class)
     override fun openRandomAccess(shareName: String, path: String): SmbRandomAccess {
-        synchronized(this) {
-            val relative = SmbPathUtils.normalizeRelative(path)
-            if (relative.isEmpty()) {
-                throw SmbException(SmbError.NotFound("Empty path"))
-            }
-            val share = openDiskShare(shareName)
-            try {
-                val file = openFile(share, relative)
-                val standard = file.getFileInformation(FileStandardInformation::class.java)
-                val size = standard.endOfFile
-                SmbLog.d("openRandomAccess share=$shareName path=$relative size=$size")
-                return SmbjRandomAccess(share, file, size)
-            } catch (t: Throwable) {
-                try {
-                    share.close()
-                } catch (_: Throwable) {
-                }
-                if (t is SmbException) throw t
-                throw SmbException(SmbErrorMapper.map(t))
-            }
+        val relative = SmbPathUtils.normalizeRelative(path)
+        if (relative.isEmpty()) {
+            throw SmbException(SmbError.NotFound("Empty path"))
+        }
+        val share = openDiskShare(shareName)
+        try {
+            val file = openFile(share, relative)
+            val standard = file.getFileInformation(FileStandardInformation::class.java)
+            val size = standard.endOfFile
+            SmbLog.d("openRandomAccess share=$shareName path=$relative size=$size")
+            // Keep the cached DiskShare open for the session; only the file handle is
+            // owned by the random-access reader.
+            return SmbjRandomAccess(file, size)
+        } catch (t: Throwable) {
+            if (t is SmbException) throw t
+            throw SmbException(SmbErrorMapper.map(t))
         }
     }
 
     override fun disconnect() {
-        synchronized(this) {
-            disconnectInternal()
-        }
+        val snapshot = snapshotAndClearSession()
+        closeSessionSnapshot(snapshot, closeClient = false)
     }
 
     override fun close() {
-        if (closed.compareAndSet(false, true)) {
-            synchronized(this) {
-                disconnectInternal()
-                try {
-                    client.close()
-                } catch (t: Throwable) {
-                    SmbLog.w("SMBClient close", t)
-                }
-            }
+        if (!closed.compareAndSet(false, true)) return
+        val snapshot = snapshotAndClearSession()
+        closeSessionSnapshot(snapshot, closeClient = true)
+    }
+
+    private fun snapshotAndClearSession(): SessionSnapshot {
+        synchronized(lock) {
+            val snapshot = SessionSnapshot(
+                host = connectedHost,
+                shares = shares.values.toList(),
+                session = session,
+                connection = connection,
+            )
+            shares.clear()
+            session = null
+            connection = null
+            connectedHost = null
+            return snapshot
         }
     }
 
-    private fun disconnectInternal() {
-        val host = connectedHost
+    private fun closeSessionSnapshot(snapshot: SessionSnapshot, closeClient: Boolean) {
+        snapshot.shares.forEach { share ->
+            try {
+                share.close()
+            } catch (t: Throwable) {
+                SmbLog.w("Share close", t)
+            }
+        }
         try {
-            session?.close()
+            snapshot.session?.close()
         } catch (t: Throwable) {
             SmbLog.w("Session close", t)
         }
         try {
-            connection?.close()
+            snapshot.connection?.close()
         } catch (t: Throwable) {
             SmbLog.w("Connection close", t)
         }
-        session = null
-        connection = null
-        if (host != null) {
-            SmbLog.i("Disconnected host=$host")
+        if (closeClient) {
+            try {
+                client.close()
+            } catch (t: Throwable) {
+                SmbLog.w("SMBClient close", t)
+            }
         }
-        connectedHost = null
+        if (snapshot.host != null) {
+            SmbLog.i("Disconnected host=${snapshot.host}")
+        }
     }
 
-    private fun requireSession(): Session {
-        ensureOpen()
+    private fun requireSession(): Session = synchronized(lock) { requireSessionLocked() }
+
+    private fun requireSessionLocked(): Session {
+        ensureOpenLocked()
         val sess = session
         val conn = connection
         if (sess == null || conn == null || !conn.isConnected) {
@@ -257,28 +278,44 @@ class SmbjClient(
         }
     }
 
-    private fun <T> withDiskShare(shareName: String, block: (DiskShare) -> T): T {
-        openDiskShare(shareName).use { share ->
-            return block(share)
-        }
+    private fun ensureOpenLocked() {
+        ensureOpen()
     }
 
     private fun openDiskShare(shareName: String): DiskShare {
-        val sess = requireSession()
         val name = shareName.trim()
         if (name.isEmpty()) {
             throw SmbException(SmbError.NotFound("Share name is empty"))
         }
-        try {
+        synchronized(lock) {
+            shares[name]?.takeIf { it.isConnected }?.let { return it }
+            shares.remove(name)
+            requireSessionLocked()
+        }
+        val sess = requireSession()
+        val opened = try {
             val share = sess.connectShare(name)
             if (share !is DiskShare) {
                 share.close()
                 throw SmbException(SmbError.NotFound("Not a disk share name=$name"))
             }
-            return share
+            share
         } catch (t: Throwable) {
             if (t is SmbException) throw t
             throw SmbException(SmbErrorMapper.map(t))
+        }
+        synchronized(lock) {
+            if (closed.get() || session !== sess || connection?.isConnected != true) {
+                runCatching { opened.close() }
+                throw SmbException(SmbError.Disconnected("Not connected"))
+            }
+            val cached = shares[name]
+            if (cached != null && cached.isConnected) {
+                if (cached !== opened) runCatching { opened.close() }
+                return cached
+            }
+            shares[name] = opened
+            return opened
         }
     }
 
@@ -304,19 +341,27 @@ class SmbjClient(
             SmbConfig.builder()
                 .withTimeout(30, TimeUnit.SECONDS)
                 .withSoTimeout(30, TimeUnit.SECONDS)
+                .withDfsEnabled(false)
                 .withReadBufferSize(1024 * 1024)
                 .withWriteBufferSize(1024 * 1024)
                 .build()
     }
+
+    private data class SessionSnapshot(
+        val host: String?,
+        val shares: List<DiskShare>,
+        val session: Session?,
+        val connection: Connection?,
+    )
 }
 
 /**
- * Random-access reader. Closes the underlying SMB file and share.
- * Not tied to [SmbjClient]'s lock after construction so reads can proceed while
- * the client is idle; do not use after [SmbjClient.disconnect].
+ * Random-access reader. Closes the SMB file handle only; the DiskShare stays with
+ * [SmbjClient] until disconnect. Not tied to the client's state lock after
+ * construction so reads can proceed while the client is idle; do not use after
+ * [SmbjClient.disconnect].
  */
 internal class SmbjRandomAccess(
-    private val share: DiskShare,
     private val file: File,
     override val size: Long,
 ) : SmbRandomAccess {
@@ -352,11 +397,6 @@ internal class SmbjRandomAccess(
                 file.close()
             } catch (t: Throwable) {
                 SmbLog.w("File close", t)
-            }
-            try {
-                share.close()
-            } catch (t: Throwable) {
-                SmbLog.w("Share close", t)
             }
         }
     }

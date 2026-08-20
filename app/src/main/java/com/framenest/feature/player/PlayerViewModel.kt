@@ -90,6 +90,9 @@ class PlayerViewModel(
     },
     private val sidecarScanner: SidecarSubtitleScanner = SidecarSubtitleScanner(),
     private val subtitleLoader: ExternalSubtitleLoader = ExternalSubtitleLoader(application),
+    private val browseSessionReleaser: () -> Unit = {
+        (application as? FrameNestApplication)?.container?.browseRepository?.releaseSession()
+    },
 ) : AndroidViewModel(application) {
 
     val controller: PlayerController = controllerFactory(application)
@@ -163,6 +166,10 @@ class PlayerViewModel(
     private var siblingBootstrapDone: Boolean = false
     private var preferredLanguages: List<String> = resolvePreferredLanguages(application)
     init {
+        // Drop the reused browse TCP session before libVLC opens its own SMB
+        // transport. A half-dead browse socket after playback is what left the
+        // folder spinner running indefinitely.
+        browseSessionReleaser()
         openJob = viewModelScope.launch {
             loadResumeAndOpen()
         }

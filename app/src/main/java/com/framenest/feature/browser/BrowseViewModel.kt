@@ -57,7 +57,7 @@ class BrowseViewModel(
     }
 
     fun refresh() {
-        loadJob?.cancel()
+        abortInFlightLoad()
         loadJob = viewModelScope.launch {
             val location = _ui.value.location
             _ui.update {
@@ -112,6 +112,22 @@ class BrowseViewModel(
             location.isShareList -> "/"
             location.normalizedPath.isEmpty() -> "/${location.share}"
             else -> "/${location.share}/${location.normalizedPath}"
+        }
+    }
+
+    override fun onCleared() {
+        abortInFlightLoad()
+        super.onCleared()
+    }
+
+    private fun abortInFlightLoad() {
+        val previous = loadJob
+        loadJob = null
+        if (previous != null && !previous.isCompleted) {
+            previous.cancel()
+            // cancel() is cooperative and will not interrupt blocking SMB I/O.
+            // Close the transport so the waiter unblocks and releases sessionMutex.
+            browseRepository.releaseSession()
         }
     }
 

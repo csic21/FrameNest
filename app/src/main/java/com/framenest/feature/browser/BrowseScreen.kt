@@ -188,7 +188,6 @@ fun BrowseScreen(
                     }
                     IconButton(
                         onClick = onRefresh,
-                        enabled = !state.isLoading,
                         modifier = Modifier.testTag("browse_refresh"),
                     ) {
                         Icon(

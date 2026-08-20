@@ -51,6 +51,7 @@
 | FN-44 播放器无卡顿退出 | 已完成 | Codex | `main` (`3411258`) | FN-30, FN-34, FN-43 | [FN-44](handoffs/FN-44.md) |
 | FN-45 启动器图标满幅适配 | 已完成 | Codex | `agent/FN-45-adaptive-icon-fill` | FN-33 | [FN-45](handoffs/FN-45.md) |
 | FN-46 播放器画布位置稳定性 | 已完成 | Codex | `agent/FN-46-buffering-row-stability` → `main` | FN-15, FN-20, FN-28 | [FN-46](handoffs/FN-46.md) |
+| FN-47 播放后目录浏览卡住 | 已完成 | Grok | `agent/FN-47-browse-hang-after-playback` | FN-22, FN-44 | [FN-47](handoffs/FN-47.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。

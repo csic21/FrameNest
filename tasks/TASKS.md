@@ -866,3 +866,21 @@ icon 遮罩，同时保留不同圆角/圆形遮罩的兼容性。
 
 验收：拖拽期间与松手 seek 时视频位置不跳；单击画面切换顶栏/控制条时视频位置不跳；
 相关 unit test、UI 测试编译、lint、debug/release assemble 通过。
+
+## FN-47：播放后目录浏览卡住
+
+**依赖**：FN-22、FN-44  
+**拥有路径**：`smb/SmbjClient.kt`、`data/server/BrowseRepository.kt`、
+`feature/browser/BrowseViewModel.kt`、`feature/player/PlayerViewModel.kt` 的浏览会话
+释放接线、相关单测与交接记录  
+**目标**：连续播放几个视频后，返回或进入目录不再无限转圈。
+
+工作内容：
+
+- `SmbjClient` 不再在实例锁内执行 connect/list I/O，使 `close()` 能打断卡住的列目录。
+- 浏览会话超时后关闭传输并换新会话重试一次；取消或进入播放时立即释放浏览连接。
+- 刷新在加载中仍可点击，以便用户中断卡住的列出。
+- 纯逻辑测试覆盖超时重试、release 解锁，以及断线/网络才重试的边界。
+
+验收：卡住的 `listDirectory` 会在超时或 `releaseSession` 后结束，后续 load 可完成；
+unit test、lint、debug/release assemble 通过；无真 NAS 时不虚报真机恢复耗时。
