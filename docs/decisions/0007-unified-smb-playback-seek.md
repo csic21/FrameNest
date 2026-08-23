@@ -1,6 +1,6 @@
 # 决策：统一 SMB 产品播放与 seek 路径
 
-- 状态：accepted
+- 状态：accepted（第 2 点交互节奏由 [0010](0010-player-scrub-preview-gestures.md) 替代；SMB 路径决定仍有效）
 - 日期：2026-07-15
 - 任务：FN-15 follow-up
 

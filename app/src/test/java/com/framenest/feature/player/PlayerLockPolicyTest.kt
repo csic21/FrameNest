@@ -83,4 +83,22 @@ class PlayerLockPolicyTest {
             PlayerLockPolicy.orientationRequest(orientationLocked = false),
         )
     }
+
+    @Test
+    fun orientationRequest_fullscreenForcesLandscapeThenPortrait() {
+        assertEquals(
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE,
+            PlayerLockPolicy.orientationRequest(
+                orientationLocked = true,
+                forceLandscape = true,
+            ),
+        )
+        assertEquals(
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT,
+            PlayerLockPolicy.orientationRequest(
+                orientationLocked = false,
+                forcePortrait = true,
+            ),
+        )
+    }
 }

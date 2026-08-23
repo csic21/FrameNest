@@ -1,6 +1,7 @@
 package com.framenest.feature.player
 
 import android.app.Application
+import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
@@ -507,13 +508,46 @@ class PlayerViewModel(
         viewModelScope.launch { saveProgressNow(force = true) }
     }
 
+    /** Last in-drag preview clock, 0 when no preview has been sent this gesture. */
+    private var lastPreviewAtElapsedMs: Long = 0L
+    private var lastPreviewTargetMs: Long = Long.MIN_VALUE
+
+    /**
+     * Throttled seek used while the thumb or a horizontal swipe is still down so
+     * the surface can show the target frame before release.
+     */
+    fun previewSeekTo(positionMs: Long) {
+        val now = SystemClock.elapsedRealtime()
+        if (
+            !ScrubSeekPolicy.shouldEmitPreview(
+                nowMs = now,
+                lastPreviewAtMs = lastPreviewAtElapsedMs,
+                lastTargetMs = lastPreviewTargetMs,
+                targetMs = positionMs,
+            )
+        ) {
+            return
+        }
+        lastPreviewAtElapsedMs = now
+        lastPreviewTargetMs = positionMs
+        commitSeek(positionMs)
+    }
+
     fun seekTo(positionMs: Long) {
+        lastPreviewAtElapsedMs = 0L
+        lastPreviewTargetMs = positionMs
+        commitSeek(positionMs)
+    }
+
+    private fun commitSeek(positionMs: Long) {
+        resumeSeekGate.markFired()
+        startPositionMs = 0L
         controller.seekTo(positionMs)
     }
 
     /**
      * Relative skip (e.g. ±10s from double-tap). Clamped to media bounds.
-     * Uses the same single-seek policy as the slider.
+     * Uses the same seek path as the slider.
      */
     fun skipBy(deltaMs: Long) {
         val state = controller.state.value
@@ -529,10 +563,7 @@ class PlayerViewModel(
             durationMs = state.durationMs,
             deltaMs = deltaMs,
         )
-        // User navigated explicitly — do not let a pending resume seek pull them back.
-        resumeSeekGate.markFired()
-        startPositionMs = 0L
-        controller.seekTo(target)
+        seekTo(target)
     }
 
     fun selectAudioTrack(trackId: Int) {

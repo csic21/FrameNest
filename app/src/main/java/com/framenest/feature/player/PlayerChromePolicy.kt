@@ -11,10 +11,12 @@ internal object PlayerChromePolicy {
         chromeVisible: Boolean,
         controlsLocked: Boolean,
         panelOpen: Boolean,
+        userSeeking: Boolean = false,
     ): Boolean = phase == PlayerState.Phase.Playing &&
         chromeVisible &&
         !controlsLocked &&
-        !panelOpen
+        !panelOpen &&
+        !userSeeking
 }
 
 internal object PlayerControlLayoutPolicy {

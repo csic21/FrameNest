@@ -115,6 +115,11 @@
     <string name="player_orientation_unlock">解锁方向</string>
     <string name="player_orientation_lock_cd">锁定屏幕方向</string>
     <string name="player_orientation_unlock_cd">允许屏幕旋转</string>
+    <string name="player_fullscreen">全屏</string>
+    <string name="player_fullscreen_cd">全屏横屏播放</string>
+    <string name="player_exit_fullscreen">退出全屏</string>
+    <string name="player_exit_fullscreen_cd">退出全屏，回到竖屏</string>
+    <string name="player_gesture_seek_cd">跳转到 %1$s</string>
     <string name="player_locked_hint">已锁定 · 点按显示解锁</string>
     <string name="player_prev_episode">上一集</string>
     <string name="player_next_episode">下一集</string>

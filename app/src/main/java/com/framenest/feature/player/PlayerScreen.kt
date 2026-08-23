@@ -35,6 +35,8 @@ import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Audiotrack
 import androidx.compose.material.icons.filled.BrightnessMedium
 import androidx.compose.material.icons.filled.ClosedCaption
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Pause
@@ -129,6 +131,10 @@ import com.framenest.player.VideoScaleMode
  * FN-17 locks:
  * - **Controls lock**: hide chrome, swallow gestures, back unlocks first.
  * - **Orientation lock**: freeze current rotation via [Activity.requestedOrientation].
+ *
+ * FN-48:
+ * - Dragging the slider or swiping horizontally previews the target frame.
+ * - Fullscreen button forces landscape; exit forces portrait.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -155,6 +161,9 @@ fun PlayerScreen(
     var chromeVisible by remember { mutableStateOf(true) }
     var controlsLocked by remember { mutableStateOf(false) }
     var orientationLocked by remember { mutableStateOf(false) }
+    var forceLandscape by remember { mutableStateOf(false) }
+    var forcePortrait by remember { mutableStateOf(false) }
+    var userSeeking by remember { mutableStateOf(false) }
     var showUnlockHint by remember { mutableStateOf(false) }
     var autoNextArmed by remember { mutableStateOf(false) }
     var chromeInteractionVersion by remember { mutableLongStateOf(0L) }
@@ -196,7 +205,12 @@ fun PlayerScreen(
     PlayerImmersiveEffect(enabled = landscape || controlsLocked)
 
     // Freeze / unfreeze activity orientation for the lifetime of this destination.
-    PlayerOrientationLockEffect(orientationLocked = orientationLocked)
+    // Fullscreen forces landscape even when the device is still physically portrait.
+    PlayerOrientationLockEffect(
+        orientationLocked = orientationLocked,
+        forceLandscape = forceLandscape,
+        forcePortrait = forcePortrait,
+    )
 
     // Keep the screen on while actively playing so the device does not lock /
     // dim mid-video. Cleared the moment playback leaves the Playing phase or
@@ -300,6 +314,7 @@ fun PlayerScreen(
         controlsLocked,
         showBottomPanels,
         chromeInteractionVersion,
+        userSeeking,
     ) {
         if (
             PlayerChromePolicy.shouldAutoHide(
@@ -307,6 +322,7 @@ fun PlayerScreen(
                 chromeVisible = chromeVisible,
                 controlsLocked = controlsLocked,
                 panelOpen = showBottomPanels,
+                userSeeking = userSeeking,
             )
         ) {
             delay(PlayerChromePolicy.AUTO_HIDE_MS)
@@ -372,10 +388,14 @@ fun PlayerScreen(
                 listenUi = listenUi,
                 chromeVisible = showChrome,
                 controlsLocked = controlsLocked,
+                hideSeekingOverlay = userSeeking,
                 onToggleChrome = onToggleChrome,
                 onSkipBy = { vm.skipBy(it) },
+                onPreviewSeek = { vm.previewSeekTo(it) },
+                onCommitSeek = { vm.seekTo(it) },
                 onPlay = { vm.play() },
                 onRetry = { vm.retry() },
+                onUserSeeking = { userSeeking = it },
                 modifier = Modifier.fillMaxSize(),
             )
         },
@@ -410,6 +430,7 @@ fun PlayerScreen(
                     autoNextArmed = autoNextArmed,
                     onPlay = { vm.play() },
                     onPause = { vm.pause() },
+                    onPreviewSeek = { vm.previewSeekTo(it) },
                     onSeek = { vm.seekTo(it) },
                     onCycleVideoScale = { vm.cycleVideoScaleMode() },
                     onCyclePlaybackRate = { vm.cyclePlaybackRate() },
@@ -418,10 +439,21 @@ fun PlayerScreen(
                     onToggleOrientationLock = {
                         orientationLocked = !orientationLocked
                     },
+                    forceLandscape = landscape,
+                    onToggleFullscreen = {
+                        if (landscape) {
+                            forceLandscape = false
+                            forcePortrait = true
+                        } else {
+                            forcePortrait = false
+                            forceLandscape = true
+                        }
+                    },
                     onPrevious = siblingNav.previousPath?.let { p -> { openSibling(p) } },
                     onNext = siblingNav.nextPath?.let { p -> { openSibling(p) } },
                     overlay = true,
                     onUserInteraction = markChromeInteraction,
+                    onUserSeeking = { userSeeking = it },
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
@@ -492,16 +524,23 @@ fun PlayerScreen(
  * destinations are not left orientation-locked.
  */
 @Composable
-private fun PlayerOrientationLockEffect(orientationLocked: Boolean) {
+private fun PlayerOrientationLockEffect(
+    orientationLocked: Boolean,
+    forceLandscape: Boolean,
+    forcePortrait: Boolean,
+) {
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
-    DisposableEffect(orientationLocked, activity) {
+    DisposableEffect(orientationLocked, forceLandscape, forcePortrait, activity) {
         val act = activity
         if (act == null) {
             onDispose { }
         } else {
-            act.requestedOrientation =
-                PlayerLockPolicy.orientationRequest(orientationLocked)
+            act.requestedOrientation = PlayerLockPolicy.orientationRequest(
+                orientationLocked = orientationLocked,
+                forceLandscape = forceLandscape,
+                forcePortrait = forcePortrait,
+            )
             onDispose {
                 act.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
@@ -682,10 +721,14 @@ private fun PlayerSurfaceStack(
     listenUi: ListenTranslateUiState,
     chromeVisible: Boolean,
     controlsLocked: Boolean,
+    hideSeekingOverlay: Boolean,
     onToggleChrome: () -> Unit,
     onSkipBy: (Long) -> Unit,
+    onPreviewSeek: (Long) -> Unit,
+    onCommitSeek: (Long) -> Unit,
     onPlay: () -> Unit,
     onRetry: () -> Unit,
+    onUserSeeking: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val surfaceCd = stringResource(R.string.player_video_surface)
@@ -703,6 +746,7 @@ private fun PlayerSurfaceStack(
     }
     var gestureIndicator by remember { mutableStateOf<PlayerGesture?>(null) }
     var skipIndicator by remember { mutableStateOf<SkipIndicator?>(null) }
+    var seekIndicator by remember { mutableStateOf<SeekGestureUi?>(null) }
     // Restore screen brightness to the system value once the player leaves the
     // surface (e.g. navigates back). Volume is a real system setting and is
     // intentionally left at whatever the user set.
@@ -749,55 +793,75 @@ private fun PlayerSurfaceStack(
                     onRetry = onRetry,
                 )
             }
-            state.isSeeking && state.firstFrameReady -> {
-                SeekingOverlay()
-            }
-            state.phase == PlayerState.Phase.Playing && state.firstFrameReady -> {
-                // Tap toggles chrome; double-tap left/right skips ±10s; vertical
-                // drag left = brightness, right = volume.
-                PlayerGestureLayer(
-                    toggleCd = toggleCd,
-                    onToggleChrome = onToggleChrome,
-                    onSkipBack = {
-                        onSkipBy(-SkipSeekMath.SKIP_DELTA_MS)
-                        skipIndicator = SkipIndicator.Back
-                    },
-                    onSkipForward = {
-                        onSkipBy(SkipSeekMath.SKIP_DELTA_MS)
-                        skipIndicator = SkipIndicator.Forward
-                    },
-                    onGestureStart = { isBrightness ->
-                        gestureController.begin(isBrightness)
-                        gestureIndicator =
-                            if (isBrightness) {
-                                PlayerGesture.Brightness(gestureController.brightnessPct())
-                            } else {
-                                PlayerGesture.Volume(gestureController.volumePct())
-                            }
-                    },
-                    onGestureDrag = { isBrightness, delta, range ->
-                        val pct = gestureController.apply(isBrightness, delta, range)
-                        gestureIndicator =
-                            if (isBrightness) PlayerGesture.Brightness(pct)
-                            else PlayerGesture.Volume(pct)
-                    },
-                    onGestureEnd = { gestureIndicator = null },
-                )
-            }
             state.firstFrameReady &&
-                (
+                state.phase != PlayerState.Phase.Error &&
+                !controlsLocked -> {
+                val playablePaused =
                     state.phase == PlayerState.Phase.Ready ||
                         state.phase == PlayerState.Phase.Paused ||
                         state.phase == PlayerState.Phase.Ended
-                    ) -> {
-                PlayOverlay(
-                    onPlay = onPlay,
-                    label = if (state.phase == PlayerState.Phase.Ended) {
-                        stringResource(R.string.player_replay)
-                    } else {
-                        stringResource(R.string.player_tap_to_play)
-                    },
-                )
+                val pausedPlayLabel = if (state.phase == PlayerState.Phase.Ended) {
+                    stringResource(R.string.player_replay)
+                } else {
+                    stringResource(R.string.player_tap_to_play)
+                }
+                if (playablePaused) {
+                    PlayOverlay(
+                        onPlay = onPlay,
+                        label = pausedPlayLabel,
+                        clickable = state.phase == PlayerState.Phase.Ended,
+                    )
+                }
+                if (state.isSeeking && !hideSeekingOverlay) {
+                    SeekingOverlay()
+                }
+                if (state.phase != PlayerState.Phase.Ended) {
+                    // Tap toggles chrome while playing, or starts playback when
+                    // paused; double-tap skips ±10s; vertical drag is brightness /
+                    // volume; horizontal drag scrubs with live preview.
+                    PlayerGestureLayer(
+                        toggleCd = if (state.phase == PlayerState.Phase.Playing) {
+                            toggleCd
+                        } else {
+                            pausedPlayLabel
+                        },
+                        playing = state.phase == PlayerState.Phase.Playing,
+                        positionMs = state.positionMs,
+                        durationMs = state.durationMs,
+                        onToggleChrome = onToggleChrome,
+                        onPlay = onPlay,
+                        onSkipBack = {
+                            onSkipBy(-SkipSeekMath.SKIP_DELTA_MS)
+                            skipIndicator = SkipIndicator.Back
+                        },
+                        onSkipForward = {
+                            onSkipBy(SkipSeekMath.SKIP_DELTA_MS)
+                            skipIndicator = SkipIndicator.Forward
+                        },
+                        onPreviewSeek = onPreviewSeek,
+                        onCommitSeek = onCommitSeek,
+                        onSeekGesture = { ui ->
+                            seekIndicator = ui
+                            onUserSeeking(ui != null)
+                        },
+                        onGestureStart = { isBrightness ->
+                            gestureController.begin(isBrightness)
+                            gestureIndicator =
+                                if (isBrightness) {
+                                    PlayerGesture.Brightness(gestureController.brightnessPct())
+                                } else {
+                                    PlayerGesture.Volume(gestureController.volumePct())
+                                }
+                        },
+                        onGestureDrag = { isBrightness, delta, range ->
+                            val pct = gestureController.apply(isBrightness, delta, range)
+                            gestureIndicator =
+                                if (isBrightness) PlayerGesture.Brightness(pct)
+                                else PlayerGesture.Volume(pct)
+                        },
+                        onGestureEnd = { gestureIndicator = null },
+                    )
+                }
             }
             else -> {
                 BufferingIndicator(
@@ -812,6 +876,7 @@ private fun PlayerSurfaceStack(
         // Preparing uses the branch above; skip when locked so unlock chrome stays clean.
         if (!controlsLocked &&
             !state.isSeeking &&
+            !hideSeekingOverlay &&
             BufferingPolicy.showOverlay(state) &&
             state.phase != PlayerState.Phase.Preparing &&
             state.phase != PlayerState.Phase.Idle
@@ -848,6 +913,12 @@ private fun PlayerSurfaceStack(
                     if (skip == SkipIndicator.Back) Alignment.CenterStart
                     else Alignment.CenterEnd,
                 ),
+            )
+        }
+        seekIndicator?.let { seek ->
+            SeekGestureOverlay(
+                seek = seek,
+                modifier = Modifier.align(Alignment.Center),
             )
         }
     }
@@ -985,12 +1056,13 @@ private fun PlayerBottomPanels(
 private fun PlayOverlay(
     onPlay: () -> Unit,
     label: String,
+    clickable: Boolean = true,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .minimumInteractiveComponentSize()
-            .clickable(onClick = onPlay)
+            .then(if (clickable) Modifier.clickable(onClick = onPlay) else Modifier)
             .padding(24.dp)
             .testTag("player_play_overlay"),
     ) {
@@ -1046,24 +1118,27 @@ internal fun PlayerControls(
     autoNextArmed: Boolean,
     onPlay: () -> Unit,
     onPause: () -> Unit,
+    onPreviewSeek: (Long) -> Unit = {},
     onSeek: (Long) -> Unit,
     onCycleVideoScale: () -> Unit,
     onCyclePlaybackRate: () -> Unit,
     onLockControls: () -> Unit,
     orientationLocked: Boolean,
     onToggleOrientationLock: () -> Unit,
+    forceLandscape: Boolean = false,
+    onToggleFullscreen: () -> Unit = {},
     onPrevious: (() -> Unit)?,
     onNext: (() -> Unit)?,
     overlay: Boolean,
     onUserInteraction: () -> Unit,
+    onUserSeeking: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val duration = state.durationMs.coerceAtLeast(0L)
     val position = state.positionMs.coerceIn(0L, if (duration > 0) duration else state.positionMs)
     val progress = if (duration > 0) position.toFloat() / duration.toFloat() else 0f
-    // Keep the thumb local while dragging and issue exactly one seek on
-    // release. This gives local and SMB files the same seek behavior and avoids
-    // overlapping random reads on the NAS.
+    // Thumb stays local while dragging. Preview seeks are throttled; release
+    // commits the exact thumb position so the picture matches the drop point.
     var scrubbing by remember { mutableStateOf(false) }
     var scrubFraction by remember { mutableFloatStateOf(0f) }
     val displayProgress = if (scrubbing) scrubFraction else progress
@@ -1082,6 +1157,13 @@ internal fun PlayerControls(
             R.string.player_orientation_unlock_cd
         } else {
             R.string.player_orientation_lock_cd
+        },
+    )
+    val fullscreenCd = stringResource(
+        if (forceLandscape) {
+            R.string.player_exit_fullscreen_cd
+        } else {
+            R.string.player_fullscreen_cd
         },
     )
     val playCd = stringResource(R.string.player_play)
@@ -1162,16 +1244,21 @@ internal fun PlayerControls(
             onValueChange = { fraction ->
                 onUserInteraction()
                 scrubbing = true
+                onUserSeeking(true)
                 scrubFraction = fraction.coerceIn(0f, 1f)
+                if (duration > 0L) {
+                    onPreviewSeek(ScrubSeekPolicy.targetMs(duration, scrubFraction))
+                }
             },
             onValueChangeFinished = {
                 if (!scrubbing) return@Slider
-                val targetMs = scrubSeekTargetMs(duration, scrubFraction)
+                val targetMs = ScrubSeekPolicy.targetMs(duration, scrubFraction)
                 // End local scrub state before dispatching. onSeek synchronously
                 // changes playback phase; dispatching first can recompose/disable
                 // this Slider while it still owns the gesture and invoke finish
                 // repeatedly with intermediate fractions.
                 scrubbing = false
+                onUserSeeking(false)
                 if (duration > 0L) onSeek(targetMs)
             },
             enabled = (state.isSeekable || duration > 0) &&
@@ -1236,6 +1323,7 @@ internal fun PlayerControls(
             playing = state.canPause,
             playEnabled = state.canPause || state.canPlay || state.phase == PlayerState.Phase.Error,
             orientationLocked = orientationLocked,
+            forceLandscape = forceLandscape,
             rateLabel = rateLabel,
             rateCd = rateCd,
             scaleLabel = scaleLabel,
@@ -1244,11 +1332,13 @@ internal fun PlayerControls(
             pauseCd = pauseCd,
             lockCd = lockCd,
             orientationCd = orientationCd,
+            fullscreenCd = fullscreenCd,
             onBg = onBg,
             onPlay = onPlay,
             onPause = onPause,
             onLockControls = onLockControls,
             onToggleOrientationLock = onToggleOrientationLock,
+            onToggleFullscreen = onToggleFullscreen,
             onCyclePlaybackRate = onCyclePlaybackRate,
             onCycleVideoScale = onCycleVideoScale,
             onUserInteraction = onUserInteraction,
@@ -1261,6 +1351,7 @@ private fun PlayerActionButtons(
     playing: Boolean,
     playEnabled: Boolean,
     orientationLocked: Boolean,
+    forceLandscape: Boolean,
     rateLabel: String,
     rateCd: String,
     scaleLabel: String,
@@ -1269,11 +1360,13 @@ private fun PlayerActionButtons(
     pauseCd: String,
     lockCd: String,
     orientationCd: String,
+    fullscreenCd: String,
     onBg: Color,
     onPlay: () -> Unit,
     onPause: () -> Unit,
     onLockControls: () -> Unit,
     onToggleOrientationLock: () -> Unit,
+    onToggleFullscreen: () -> Unit,
     onCyclePlaybackRate: () -> Unit,
     onCycleVideoScale: () -> Unit,
     onUserInteraction: () -> Unit,
@@ -1310,6 +1403,15 @@ private fun PlayerActionButtons(
                 onClick = {
                     onUserInteraction()
                     onToggleOrientationLock()
+                },
+            )
+            PlayerFullscreenAction(
+                forceLandscape = forceLandscape,
+                contentDescription = fullscreenCd,
+                tint = onBg,
+                onClick = {
+                    onUserInteraction()
+                    onToggleFullscreen()
                 },
             )
         }
@@ -1432,6 +1534,32 @@ private fun PlayerOrientationAction(
 }
 
 @Composable
+private fun PlayerFullscreenAction(
+    forceLandscape: Boolean,
+    contentDescription: String,
+    tint: Color,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .minimumInteractiveComponentSize()
+            .semantics { this.contentDescription = contentDescription }
+            .testTag("player_fullscreen"),
+    ) {
+        Icon(
+            imageVector = if (forceLandscape) {
+                Icons.Filled.FullscreenExit
+            } else {
+                Icons.Filled.Fullscreen
+            },
+            contentDescription = null,
+            tint = tint,
+        )
+    }
+}
+
+@Composable
 private fun PlayerTextAction(
     label: String,
     contentDescription: String,
@@ -1453,10 +1581,6 @@ private fun PlayerTextAction(
     }
 }
 
-internal fun scrubSeekTargetMs(durationMs: Long, fraction: Float): Long {
-    if (durationMs <= 0L) return 0L
-    return (fraction.coerceIn(0f, 1f) * durationMs).toLong().coerceIn(0L, durationMs)
-}
 /** Delay before auto-opening the next same-directory video after Ended. */
 private const val AUTO_NEXT_DELAY_MS = 1_500L
 /** Avoid flashing a spinner when a local paused seek resolves almost immediately. */
@@ -1509,6 +1633,11 @@ private fun formatMs(ms: Long): String {
     return "%d:%02d".format(m, s)
 }
 
+private fun formatSignedMs(ms: Long): String {
+    val sign = if (ms < 0L) "−" else "+"
+    return sign + formatMs(abs(ms))
+}
+
 /**
  * Transient indicator shown while the user drags on the video to adjust
  * brightness (left half) or volume (right half).
@@ -1519,11 +1648,20 @@ private sealed interface PlayerGesture {
     data class Volume(override val percent: Int) : PlayerGesture
 }
 
+private data class SeekGestureUi(
+    val deltaMs: Long,
+    val targetMs: Long,
+    val durationMs: Long,
+)
+
 /**
  * Overlay on the playing surface that turns a tap into a chrome toggle, a
- * double-tap into ±10s skip, and a vertical drag into brightness/volume.
+ * double-tap into ±10s skip, a vertical drag into brightness/volume, and a
+ * horizontal drag into timeline seeking.
+ *
  * Splits the surface in half for level control: drag up/down on the **left**
- * changes brightness, on the **right** changes media volume.
+ * changes brightness, on the **right** changes media volume. Horizontal
+ * swipes map left→right to forward and right→left to back.
  *
  * Uses a single [pointerInput] that distinguishes tap vs. drag manually so the
  * gestures do not steal events from each other. Drag distance is reported
@@ -1531,14 +1669,22 @@ private sealed interface PlayerGesture {
  * can map against a fixed baseline.
  *
  * Single-tap chrome toggle is delayed by [SkipSeekMath.DOUBLE_TAP_WINDOW_MS]
- * so a second tap can still become a skip without flashing chrome.
+ * so a second tap can still become a skip without flashing chrome. Paused
+ * tap-to-play is immediate so the overlay does not feel lagged.
  */
 @Composable
 private fun PlayerGestureLayer(
     toggleCd: String,
+    playing: Boolean,
+    positionMs: Long,
+    durationMs: Long,
     onToggleChrome: () -> Unit,
+    onPlay: () -> Unit,
     onSkipBack: () -> Unit,
     onSkipForward: () -> Unit,
+    onPreviewSeek: (Long) -> Unit,
+    onCommitSeek: (Long) -> Unit,
+    onSeekGesture: (SeekGestureUi?) -> Unit,
     onGestureStart: (isBrightness: Boolean) -> Unit,
     onGestureDrag: (isBrightness: Boolean, totalDeltaPx: Float, rangePx: Float) -> Unit,
     onGestureEnd: () -> Unit,
@@ -1548,6 +1694,12 @@ private fun PlayerGestureLayer(
     // restarting the gesture detector on every recomposition.
     val chromeJob = remember { mutableStateOf<Job?>(null) }
     val lastTapAtMs = remember { mutableLongStateOf(0L) }
+    val playingRef = remember { mutableStateOf(playing) }
+    playingRef.value = playing
+    val positionRef = remember { mutableLongStateOf(positionMs) }
+    positionRef.longValue = positionMs
+    val durationRef = remember { mutableLongStateOf(durationMs) }
+    durationRef.longValue = durationMs
 
     Box(
         modifier = Modifier
@@ -1557,8 +1709,9 @@ private fun PlayerGestureLayer(
                     val touchSlop = viewConfiguration.touchSlop
                     var downX = 0f
                     var downY = 0f
-                    var dragging = false
+                    var axis = GestureSeekMath.Axis.None
                     var isBrightness = true
+                    var seekStartPosition = 0L
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull() ?: continue
@@ -1568,68 +1721,112 @@ private fun PlayerGestureLayer(
                             PointerEventType.Press -> {
                                 downX = change.position.x
                                 downY = change.position.y
-                                dragging = false
+                                axis = GestureSeekMath.Axis.None
                             }
                             PointerEventType.Move -> {
                                 if (!change.pressed) continue
-                                val y = change.position.y
-                                // Prefer vertical intent: ignore mostly-horizontal moves
-                                // so scrub-like sideways slides do not start a level drag.
-                                val dy = abs(y - downY)
-                                val dx = abs(change.position.x - downX)
-                                if (!dragging && dy > touchSlop && dy >= dx) {
-                                    dragging = true
-                                    // A drag cancels a pending single-tap chrome toggle.
-                                    chromeJob.value?.cancel()
-                                    chromeJob.value = null
-                                    lastTapAtMs.longValue = 0L
-                                    isBrightness = downX < size.width / 2f
-                                    onGestureStart(isBrightness)
-                                    change.consume()
+                                val dxSigned = change.position.x - downX
+                                val dySigned = change.position.y - downY
+                                if (axis == GestureSeekMath.Axis.None) {
+                                    axis = GestureSeekMath.classifyAxis(
+                                        dxPx = dxSigned,
+                                        dyPx = dySigned,
+                                        touchSlop = touchSlop,
+                                    )
+                                    if (axis != GestureSeekMath.Axis.None) {
+                                        chromeJob.value?.cancel()
+                                        chromeJob.value = null
+                                        lastTapAtMs.longValue = 0L
+                                    }
+                                    if (axis == GestureSeekMath.Axis.Vertical) {
+                                        isBrightness = downX < size.width / 2f
+                                        onGestureStart(isBrightness)
+                                        change.consume()
+                                    } else if (axis == GestureSeekMath.Axis.Horizontal) {
+                                        seekStartPosition = positionRef.longValue
+                                        change.consume()
+                                    }
                                 }
-                                if (dragging) {
-                                    // Cumulative: finger up → positive (increase level).
-                                    val totalDelta = downY - y
-                                    onGestureDrag(isBrightness, totalDelta, range)
-                                    change.consume()
+                                when (axis) {
+                                    GestureSeekMath.Axis.Vertical -> {
+                                        // Cumulative: finger up → positive (increase level).
+                                        onGestureDrag(isBrightness, -dySigned, range)
+                                        change.consume()
+                                    }
+                                    GestureSeekMath.Axis.Horizontal -> {
+                                        val duration = durationRef.longValue
+                                        val target = GestureSeekMath.targetMs(
+                                            startPositionMs = seekStartPosition,
+                                            durationMs = duration,
+                                            dxPx = dxSigned,
+                                            widthPx = size.width.toFloat(),
+                                        )
+                                        val delta = target - seekStartPosition
+                                        onSeekGesture(
+                                            SeekGestureUi(
+                                                deltaMs = delta,
+                                                targetMs = target,
+                                                durationMs = duration,
+                                            ),
+                                        )
+                                        onPreviewSeek(target)
+                                        change.consume()
+                                    }
+                                    GestureSeekMath.Axis.None -> Unit
                                 }
                             }
                             PointerEventType.Release -> {
-                                if (dragging) {
-                                    onGestureEnd()
-                                } else {
-                                    val nowMs = SystemClock.uptimeMillis()
-                                    val action = SkipSeekMath.classifyTap(
-                                        nowMs = nowMs,
-                                        x = downX,
-                                        widthPx = size.width.toFloat(),
-                                        lastTapAtMs = lastTapAtMs.longValue,
-                                    )
-                                    when (action) {
-                                        SurfaceTapAction.SkipBack -> {
-                                            chromeJob.value?.cancel()
-                                            chromeJob.value = null
-                                            lastTapAtMs.longValue = 0L
-                                            onSkipBack()
-                                        }
-                                        SurfaceTapAction.SkipForward -> {
-                                            chromeJob.value?.cancel()
-                                            chromeJob.value = null
-                                            lastTapAtMs.longValue = 0L
-                                            onSkipForward()
-                                        }
-                                        SurfaceTapAction.SingleTap -> {
-                                            chromeJob.value?.cancel()
-                                            lastTapAtMs.longValue = nowMs
-                                            chromeJob.value = scope.launch {
-                                                delay(SkipSeekMath.DOUBLE_TAP_WINDOW_MS)
-                                                lastTapAtMs.longValue = 0L
-                                                onToggleChrome()
+                                when (axis) {
+                                    GestureSeekMath.Axis.Vertical -> onGestureEnd()
+                                    GestureSeekMath.Axis.Horizontal -> {
+                                        val duration = durationRef.longValue
+                                        val target = GestureSeekMath.targetMs(
+                                            startPositionMs = seekStartPosition,
+                                            durationMs = duration,
+                                            dxPx = change.position.x - downX,
+                                            widthPx = size.width.toFloat(),
+                                        )
+                                        onCommitSeek(target)
+                                        onSeekGesture(null)
+                                    }
+                                    GestureSeekMath.Axis.None -> {
+                                        if (playingRef.value) {
+                                            val nowMs = SystemClock.uptimeMillis()
+                                            val action = SkipSeekMath.classifyTap(
+                                                nowMs = nowMs,
+                                                x = downX,
+                                                widthPx = size.width.toFloat(),
+                                                lastTapAtMs = lastTapAtMs.longValue,
+                                            )
+                                            when (action) {
+                                                SurfaceTapAction.SkipBack -> {
+                                                    chromeJob.value?.cancel()
+                                                    chromeJob.value = null
+                                                    lastTapAtMs.longValue = 0L
+                                                    onSkipBack()
+                                                }
+                                                SurfaceTapAction.SkipForward -> {
+                                                    chromeJob.value?.cancel()
+                                                    chromeJob.value = null
+                                                    lastTapAtMs.longValue = 0L
+                                                    onSkipForward()
+                                                }
+                                                SurfaceTapAction.SingleTap -> {
+                                                    chromeJob.value?.cancel()
+                                                    lastTapAtMs.longValue = nowMs
+                                                    chromeJob.value = scope.launch {
+                                                        delay(SkipSeekMath.DOUBLE_TAP_WINDOW_MS)
+                                                        lastTapAtMs.longValue = 0L
+                                                        onToggleChrome()
+                                                    }
+                                                }
                                             }
+                                        } else {
+                                            onPlay()
                                         }
                                     }
                                 }
-                                dragging = false
+                                axis = GestureSeekMath.Axis.None
                             }
                             else -> Unit
                         }
@@ -1705,6 +1902,33 @@ private fun SkipIndicatorOverlay(skip: SkipIndicator, modifier: Modifier = Modif
                 if (skip == SkipIndicator.Back) "player_skip_back" else "player_skip_forward",
             ),
     )
+}
+
+@Composable
+private fun SeekGestureOverlay(seek: SeekGestureUi, modifier: Modifier = Modifier) {
+    val deltaLabel = formatSignedMs(seek.deltaMs)
+    val timeLabel = "${formatMs(seek.targetMs)} / ${formatMs(seek.durationMs)}"
+    val cd = stringResource(R.string.player_gesture_seek_cd, formatMs(seek.targetMs))
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 20.dp, vertical = 14.dp)
+            .semantics { contentDescription = cd }
+            .testTag("player_gesture_seek"),
+    ) {
+        Text(
+            text = deltaLabel,
+            color = Color.White,
+            style = MaterialTheme.typography.headlineSmall,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = timeLabel,
+            color = Color.White.copy(alpha = 0.85f),
+            style = MaterialTheme.typography.labelLarge,
+        )
+    }
 }
 
 /**

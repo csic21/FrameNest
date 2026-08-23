@@ -43,13 +43,19 @@ internal object PlayerLockPolicy {
         phase == PlayerState.Phase.Error
 
     /**
-     * [ActivityInfo.SCREEN_ORIENTATION_LOCKED] freezes the current rotation
-     * (including reverse landscape). Unlock restores sensor-driven rotation.
+     * Fullscreen forces landscape even if the device is still physically
+     * portrait. Exit fullscreen forces portrait so the button is visible even
+     * when the device is lying on its side. Either request wins over the
+     * optional rotation freeze; leaving the player restores sensor rotation.
      */
-    fun orientationRequest(orientationLocked: Boolean): Int =
-        if (orientationLocked) {
-            ActivityInfo.SCREEN_ORIENTATION_LOCKED
-        } else {
-            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        }
+    fun orientationRequest(
+        orientationLocked: Boolean,
+        forceLandscape: Boolean = false,
+        forcePortrait: Boolean = false,
+    ): Int = when {
+        forceLandscape -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        forcePortrait -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+        orientationLocked -> ActivityInfo.SCREEN_ORIENTATION_LOCKED
+        else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    }
 }

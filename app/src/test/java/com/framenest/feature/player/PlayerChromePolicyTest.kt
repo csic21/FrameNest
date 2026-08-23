@@ -41,6 +41,15 @@ class PlayerChromePolicyTest {
                 panelOpen = false,
             ),
         )
+        assertFalse(
+            PlayerChromePolicy.shouldAutoHide(
+                phase = PlayerState.Phase.Playing,
+                chromeVisible = true,
+                controlsLocked = false,
+                panelOpen = false,
+                userSeeking = true,
+            ),
+        )
     }
 
     @Test
