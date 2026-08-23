@@ -58,7 +58,7 @@
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。
 
-**当前发布**：`0.3.1-internal`（versionCode 4）
+**当前发布**：`0.4.0-internal`（versionCode 5）
 
 | 产物 | 路径 | 约大小 |
 |---|---|---|
