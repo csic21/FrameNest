@@ -115,7 +115,9 @@ class VlcPlayerController(
      * new position, then re-pause. Without this, [setTime] updates the clock only.
      */
     private val seekPreview = SeekPreviewSession()
-    /** Player-local volume held at zero so paused frame previews never leak audio. */
+    /** True while the user is dragging the slider or swiping to scrub. */
+    private var scrubbing: Boolean = false
+    /** Player-local volume held at zero so preview seeks never leak audio. */
     private var seekPreviewRestoreVolume: Int? = null
     private val seekPreviewPauseRunnable = Runnable { finishSeekPreview(reason = "timeout") }
     private val seekPreviewSettleRunnable = Runnable { finishSeekPreview(reason = "settled") }
@@ -142,6 +144,7 @@ class VlcPlayerController(
         endedWhileHolding = false
         openedCurrentMedia = false
         ignoreEndReachedBudget = 0
+        scrubbing = false
         cancelSeekPreview(pausePlayer = false)
         pauseAfterFirstFramePhase = if (opening) PlayerState.Phase.Ready else null
     }
@@ -553,6 +556,7 @@ class VlcPlayerController(
         // Not using resetTransientFlags here: [endedWhileHolding] must survive until
         // the atOrPastEnd check below so a stale EOF while holding for the user can
         // still trigger restart-from-0. The other flags are cleared inline.
+        scrubbing = false
         cancelSeekPreview(pausePlayer = false)
         playRequested = true
         awaitingFirstFramePause = false
@@ -641,6 +645,23 @@ class VlcPlayerController(
         )
     }
 
+    override fun setScrubbing(active: Boolean) {
+        if (released) return
+        if (scrubbing == active) return
+        scrubbing = active
+        val player = mediaPlayer
+        if (active) {
+            if (player != null) muteSeekPreview(player)
+        } else if (
+            PlaybackIntentPolicy.shouldRestoreTransientVolume(
+                scrubbing = false,
+                seekPreviewActive = seekPreview.active,
+            )
+        ) {
+            restoreSeekPreviewVolume(player)
+        }
+    }
+
     private fun performSeek(
         player: MediaPlayer,
         targetMs: Long,
@@ -706,7 +727,14 @@ class VlcPlayerController(
         if (player != null && player.isPlaying) {
             runCatching { player.pause() }
         }
-        restoreSeekPreviewVolume(player)
+        if (
+            PlaybackIntentPolicy.shouldRestoreTransientVolume(
+                scrubbing = scrubbing,
+                seekPreviewActive = false,
+            )
+        ) {
+            restoreSeekPreviewVolume(player)
+        }
         _state.update {
             // Never clobber terminal/open phases (Error/Ended/Preparing/Idle) that
             // may have been set while the settle timer was still armed.
@@ -744,7 +772,12 @@ class VlcPlayerController(
             // Release will stop/discard this player; avoid a native volume call on
             // the navigation frame merely to restore an instance being torn down.
             seekPreviewRestoreVolume = null
-        } else {
+        } else if (
+            PlaybackIntentPolicy.shouldRestoreTransientVolume(
+                scrubbing = scrubbing,
+                seekPreviewActive = false,
+            )
+        ) {
             restoreSeekPreviewVolume(mediaPlayer)
         }
         if (wasActive || _state.value.isSeeking) {

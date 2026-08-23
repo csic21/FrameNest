@@ -395,7 +395,10 @@ fun PlayerScreen(
                 onCommitSeek = { vm.seekTo(it) },
                 onPlay = { vm.play() },
                 onRetry = { vm.retry() },
-                onUserSeeking = { userSeeking = it },
+                onUserSeeking = { seeking ->
+                    userSeeking = seeking
+                    vm.setScrubbing(seeking)
+                },
                 modifier = Modifier.fillMaxSize(),
             )
         },
@@ -453,7 +456,10 @@ fun PlayerScreen(
                     onNext = siblingNav.nextPath?.let { p -> { openSibling(p) } },
                     overlay = true,
                     onUserInteraction = markChromeInteraction,
-                    onUserSeeking = { userSeeking = it },
+                    onUserSeeking = { seeking ->
+                    userSeeking = seeking
+                    vm.setScrubbing(seeking)
+                },
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
@@ -1258,8 +1264,9 @@ internal fun PlayerControls(
                 // this Slider while it still owns the gesture and invoke finish
                 // repeatedly with intermediate fractions.
                 scrubbing = false
-                onUserSeeking(false)
+                // Commit the drop point while still muted, then restore audio.
                 if (duration > 0L) onSeek(targetMs)
+                onUserSeeking(false)
             },
             enabled = (state.isSeekable || duration > 0) &&
                 state.phase != PlayerState.Phase.Error &&

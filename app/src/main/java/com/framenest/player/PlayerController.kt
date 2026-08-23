@@ -33,6 +33,13 @@ interface PlayerController {
     /** Seek once to [positionMs]; remote SMB may snap to a nearby keyframe. */
     fun seekTo(positionMs: Long)
 
+    /**
+     * Mute player audio for the duration of a timeline drag / swipe so preview
+     * seeks do not leak a burst of sound. Ending the gesture restores volume
+     * unless a paused frame-preview session still owns the mute.
+     */
+    fun setScrubbing(active: Boolean)
+
     fun selectAudioTrack(trackId: Int)
 
     /**

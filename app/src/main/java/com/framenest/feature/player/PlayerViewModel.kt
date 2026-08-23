@@ -516,6 +516,10 @@ class PlayerViewModel(
      * Throttled seek used while the thumb or a horizontal swipe is still down so
      * the surface can show the target frame before release.
      */
+    fun setScrubbing(active: Boolean) {
+        controller.setScrubbing(active)
+    }
+
     fun previewSeekTo(positionMs: Long) {
         val now = SystemClock.elapsedRealtime()
         if (
@@ -530,6 +534,7 @@ class PlayerViewModel(
         }
         lastPreviewAtElapsedMs = now
         lastPreviewTargetMs = positionMs
+        controller.setScrubbing(true)
         commitSeek(positionMs)
     }
 
@@ -537,6 +542,7 @@ class PlayerViewModel(
         lastPreviewAtElapsedMs = 0L
         lastPreviewTargetMs = positionMs
         commitSeek(positionMs)
+        controller.setScrubbing(false)
     }
 
     private fun commitSeek(positionMs: Long) {

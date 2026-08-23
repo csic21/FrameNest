@@ -20,7 +20,7 @@
 
 ## 决定
 
-1. **拖动预览**：slider 与水平滑动在按下期间按 160ms / 400ms 门槛发送 preview seek；松手再提交一次当前落点。SMB 仍用 `setTime(..., true)`，本地仍用 precise seek。暂停态继续复用同一个 preview session，不反复 play/pause。
+1. **拖动预览**：slider 与水平滑动在按下期间按 160ms / 400ms 门槛发送 preview seek；松手再提交一次当前落点。拖动一开始就把播放器音量置 0，松手落点后再恢复，避免播放中预览 seek 漏出一截声音。SMB 仍用 `setTime(..., true)`，本地仍用 precise seek。暂停态继续复用同一个 preview session，不反复 play/pause。
 2. **不覆盖画面**：用户正在拖动或滑动时不显示“正在定位”与缓冲层，避免把刚解码的预览帧挡住。
 3. **全屏横屏**：全屏按钮请求 `SCREEN_ORIENTATION_SENSOR_LANDSCAPE`；退出全屏请求 `SENSOR_PORTRAIT`。离开播放页仍恢复 `UNSPECIFIED`。全屏请求优先于方向锁。
 4. **手势快进**：水平滑动映射为相对当前进度的时间偏移（满宽最多 90 秒，短片用片长）；垂直滑动仍是亮度/音量；单击与双击逻辑不变。锁定控制时手势仍被吞掉。

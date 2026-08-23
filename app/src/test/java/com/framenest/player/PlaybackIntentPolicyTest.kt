@@ -63,4 +63,26 @@ class PlaybackIntentPolicyTest {
             PlaybackIntentPolicy.shouldPreservePausedIntentOnSeek(PlayerState.Phase.Playing),
         )
     }
+
+    @Test
+    fun transientMute_staysUntilScrubAndPausedPreviewBothEnd() {
+        assertFalse(
+            PlaybackIntentPolicy.shouldRestoreTransientVolume(
+                scrubbing = true,
+                seekPreviewActive = false,
+            ),
+        )
+        assertFalse(
+            PlaybackIntentPolicy.shouldRestoreTransientVolume(
+                scrubbing = false,
+                seekPreviewActive = true,
+            ),
+        )
+        assertTrue(
+            PlaybackIntentPolicy.shouldRestoreTransientVolume(
+                scrubbing = false,
+                seekPreviewActive = false,
+            ),
+        )
+    }
 }
