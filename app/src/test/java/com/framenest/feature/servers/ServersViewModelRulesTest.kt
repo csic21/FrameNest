@@ -1,10 +1,26 @@
 package com.framenest.feature.servers
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ServersViewModelRulesTest {
+
+    @Test
+    fun serverEditor_cannotDismissWhileSaveIsRunning() {
+        assertFalse(canDismissServerEditor(isSaving = true))
+        assertTrue(canDismissServerEditor(isSaving = false))
+    }
+
+    @Test
+    fun serverEditor_fieldsStayStableDuringTestOrSave() {
+        assertTrue(canEditServerEditor(isTesting = false, isSaving = false))
+        assertFalse(canEditServerEditor(isTesting = true, isSaving = false))
+        assertFalse(canEditServerEditor(isTesting = false, isSaving = true))
+    }
+
     @Test
     fun parseServerPort_acceptsOnlyExplicitValidNumber() {
         assertEquals(445, parseServerPort(" 445 "))

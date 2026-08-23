@@ -26,3 +26,12 @@ internal object PlayerControlLayoutPolicy {
     fun useTwoActionRows(widthDp: Float, fontScale: Float): Boolean =
         widthDp < COMPACT_WIDTH_DP || fontScale >= LARGE_FONT_SCALE
 }
+
+/** Keeps recovery actions on the error overlay instead of duplicating Retry. */
+internal object PlayerActionPolicy {
+    fun playEnabled(
+        phase: PlayerState.Phase,
+        canPlay: Boolean,
+        canPause: Boolean,
+    ): Boolean = phase != PlayerState.Phase.Error && (canPlay || canPause)
+}

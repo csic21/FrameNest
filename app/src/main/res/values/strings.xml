@@ -12,12 +12,13 @@
     <string name="action_cancel">取消</string>
     <string name="action_ok">确定</string>
     <string name="action_save">保存</string>
+    <string name="action_confirm_clear">确认清除</string>
 
     <!-- Servers -->
     <string name="servers_title">服务器</string>
     <string name="servers_subtitle">已保存的 SMB 服务器（凭证已加密）</string>
     <string name="servers_empty">尚未添加服务器</string>
-    <string name="servers_empty_hint">可扫描局域网，或点击右下角「+」手动添加 NAS</string>
+    <string name="servers_empty_hint">先扫描局域网发现 NAS，或手动填写 SMB 服务器信息</string>
     <string name="servers_add">添加服务器</string>
     <string name="servers_scan_lan">扫描局域网</string>
     <string name="servers_scan_title">局域网 SMB 发现</string>
@@ -31,7 +32,8 @@
     <string name="servers_edit">编辑</string>
     <string name="servers_delete">删除</string>
     <string name="servers_delete_title">删除服务器？</string>
-    <string name="servers_delete_body">将删除「%1$s」及其保存的凭证，此操作不可撤销。</string>
+    <string name="servers_delete_body">将删除「%1$s」、保存的凭证，以及这台服务器在本机的播放记录和听译结果。此操作不可撤销。</string>
+    <string name="servers_item_cd">%1$s，服务器 %2$s</string>
     <string name="servers_error_title">操作失败</string>
     <string name="servers_select_prompt">选择左侧服务器以查看详情</string>
     <string name="servers_detail_host">主机：%1$s</string>
@@ -62,6 +64,7 @@
     <string name="browse_type_file">文件</string>
     <string name="browse_type_video">视频</string>
     <string name="browse_type_subtitle">字幕</string>
+    <string name="browse_type_subtitle_hint">字幕 · 播放时自动匹配或手动选择</string>
 
     <!-- Player placeholder (legacy) -->
     <string name="player_placeholder_title">播放页占位</string>
@@ -150,6 +153,8 @@
     <string name="subtitle_delay_label">延迟 %1$d ms</string>
     <string name="subtitle_delay_minus">−0.1s</string>
     <string name="subtitle_delay_plus">+0.1s</string>
+    <string name="subtitle_delay_decrease_cd">字幕延迟减少 0.1 秒</string>
+    <string name="subtitle_delay_increase_cd">字幕延迟增加 0.1 秒</string>
     <string name="subtitle_delay_reset">重置</string>
     <string name="subtitle_font_label">字号</string>
     <string name="subtitle_font_small">小</string>
@@ -169,14 +174,16 @@
     <string name="settings_intro">缓存、默认字幕语言与诊断日志。密码不会出现在日志导出中。</string>
     <string name="settings_version_line">版本 %1$s (%2$d)</string>
     <string name="settings_cache_row">缓存</string>
-    <string name="settings_cache_size">约占用 %1$s（缩略图 / 字幕临时文件 / 诊断导出；不含听译模型）</string>
+    <string name="settings_cache_size">约占用 %1$s（缩略图 / 字幕临时文件 / 诊断导出；不含听译结果与模型）</string>
     <string name="settings_clear_cache">清理缓存</string>
-    <string name="settings_cache_cleared">已清理约 %1$s（含诊断日志与听译结果缓存；听译模型保留）</string>
-    <string name="settings_listen_translate_row">听译缓存</string>
+    <string name="settings_cache_cleared">已清理一般缓存约 %1$s；听译结果和模型均保留</string>
+    <string name="settings_listen_translate_row">听译结果</string>
     <string name="settings_listen_translate_hint">本机听译字幕（原文+译文）仅保存在应用内数据库。模型在下方单独管理。不写 NAS；卸载应用后一并删除。</string>
     <string name="settings_listen_translate_size">听译约占用 %1$s</string>
-    <string name="settings_clear_listen_translate">清除听译缓存</string>
-    <string name="settings_listen_translate_cleared">已清除听译约 %1$s</string>
+    <string name="settings_clear_listen_translate">清除听译结果</string>
+    <string name="settings_listen_translate_cleared">已清除听译结果约 %1$s</string>
+    <string name="settings_clear_listen_translate_confirm_title">清除听译结果？</string>
+    <string name="settings_clear_listen_translate_confirm_body">将删除本机已生成的原文与译文。之后播放时需要重新听译；已下载模型会保留。</string>
 
     <!-- Listen-translate (FN-12) -->
     <string name="listen_translate_title">听译字幕</string>
@@ -227,6 +234,9 @@
     <string name="settings_install_listen_models_busy">正在安装… %1$d%%</string>
     <string name="settings_install_listen_models_step">正在安装：%1$s</string>
     <string name="settings_clear_listen_models">清除听译模型</string>
+    <string name="settings_clear_listen_models_confirm_title">清除听译模型？</string>
+    <string name="settings_clear_listen_models_confirm_body">将删除已下载的 Vosk 与 ML Kit 模型。再次使用对应语言时需要重新下载，已生成的听译结果会保留。</string>
+    <string name="settings_maintenance_failed">清理未完成，请稍后重试</string>
     <string name="settings_listen_models_installed">推荐听译模型已就绪（Vosk 中/英 + ML Kit 中↔英）</string>
     <string name="settings_listen_models_lang_installed">已安装：%1$s</string>
     <string name="settings_listen_models_all_installed">所选语言包已安装</string>

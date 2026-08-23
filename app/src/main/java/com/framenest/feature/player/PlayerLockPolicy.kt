@@ -18,6 +18,12 @@ internal object PlayerLockPolicy {
         Leave,
     }
 
+    /** Explicit fullscreen is persistent; portrait exit is a one-shot request. */
+    data class FullscreenState(
+        val explicitLandscape: Boolean = false,
+        val portraitExitPending: Boolean = false,
+    )
+
     fun consumeBack(controlsLocked: Boolean): BackAction =
         if (controlsLocked) BackAction.Unlock else BackAction.Leave
 
@@ -41,6 +47,23 @@ internal object PlayerLockPolicy {
      */
     fun shouldAutoUnlock(phase: PlayerState.Phase): Boolean =
         phase == PlayerState.Phase.Error
+
+    fun toggleFullscreen(state: FullscreenState): FullscreenState =
+        if (state.explicitLandscape) {
+            FullscreenState(portraitExitPending = true)
+        } else {
+            FullscreenState(explicitLandscape = true)
+        }
+
+    /** Release the temporary portrait request only after portrait is observed. */
+    fun settleFullscreenTransition(
+        state: FullscreenState,
+        isLandscape: Boolean,
+    ): FullscreenState = if (state.portraitExitPending && !isLandscape) {
+        state.copy(portraitExitPending = false)
+    } else {
+        state
+    }
 
     /**
      * Fullscreen forces landscape even if the device is still physically

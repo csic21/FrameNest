@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
@@ -19,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.framenest.R
 import com.framenest.data.listen_translate.ListenTranslateJobStatus
@@ -52,7 +54,14 @@ fun ListenTranslateControls(
 
         Spacer(Modifier.height(8.dp))
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(
+                    value = uiState.enabled || uiState.isInstallingModels,
+                    enabled = !uiState.isInstallingModels,
+                    role = Role.Switch,
+                    onValueChange = onEnabledChange,
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -62,7 +71,8 @@ fun ListenTranslateControls(
             )
             Switch(
                 checked = uiState.enabled || uiState.isInstallingModels,
-                onCheckedChange = onEnabledChange,
+                onCheckedChange = null,
+                enabled = !uiState.isInstallingModels,
                 modifier = Modifier.testTag("listen_translate_enable"),
             )
         }

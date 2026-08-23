@@ -101,4 +101,34 @@ class PlayerLockPolicyTest {
             ),
         )
     }
+
+    @Test
+    fun explicitFullscreen_drivesExitStateAndReleasesPortraitRequestAfterRotation() {
+        val entered = PlayerLockPolicy.toggleFullscreen(PlayerLockPolicy.FullscreenState())
+        assertTrue(entered.explicitLandscape)
+        assertFalse(entered.portraitExitPending)
+
+        val exiting = PlayerLockPolicy.toggleFullscreen(entered)
+        assertFalse(exiting.explicitLandscape)
+        assertTrue(exiting.portraitExitPending)
+        assertEquals(
+            exiting,
+            PlayerLockPolicy.settleFullscreenTransition(exiting, isLandscape = true),
+        )
+        assertEquals(
+            PlayerLockPolicy.FullscreenState(),
+            PlayerLockPolicy.settleFullscreenTransition(exiting, isLandscape = false),
+        )
+    }
+
+    @Test
+    fun naturalLandscape_doesNotImplyExplicitFullscreenExit() {
+        val state = PlayerLockPolicy.settleFullscreenTransition(
+            state = PlayerLockPolicy.FullscreenState(),
+            isLandscape = true,
+        )
+
+        assertFalse(state.explicitLandscape)
+        assertFalse(state.portraitExitPending)
+    }
 }

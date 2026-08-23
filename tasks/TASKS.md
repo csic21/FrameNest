@@ -899,3 +899,32 @@ unit test、lint、debug/release assemble 通过；无真 NAS 时不虚报真机
 - 水平滑动按距离映射进度；垂直滑动仍控制亮度/音量；不改 SMB 数据路径。
 
 验收：节流、落点夹紧、滑动方向和全屏方向请求有纯逻辑单测；unit test、lint、debug assemble 通过。
+
+## FN-49：关键操作逻辑与无障碍收口
+
+**依赖**：FN-31、FN-47、FN-48  
+**拥有路径**：`navigation/**`、`feature/browser/**`、`feature/player/**` 的交互层、
+`feature/servers/**`、`feature/settings/**`、`ui/screens/SettingsScreen.kt`、
+`feature/subtitle/SubtitleControls.kt`、`feature/listen_translate/ListenTranslateControls.kt`、
+`res/values/strings.xml`、主题尺寸、相关测试/交接记录  
+**目标**：统一手机和平板上的关键操作语义，消除会误进页面、误清数据、卡住手势或让
+无障碍用户失去控制入口的冲突。
+
+工作内容：
+
+- 服务器空状态只保留一组明确的“扫描 / 手动添加”入口；平板空列表不再重复显示两个
+  相互竞争的空状态，列表项读屏文案不暴露内部 id。
+- 从服务器进入浏览时保留“共享列表 → 默认共享”层级；字幕文件保持可识别但不可误开为
+  视频，说明其应在播放页自动匹配或手动选择。
+- 播放器拖动在 Release、Cancel 或组合退出时都结束 scrubbing 并恢复音量；视频画面提供
+  TalkBack/键盘可达的播放与控制条入口。
+- 全屏横屏只在显式进入时显示退出动作；退出横屏完成后释放临时方向请求，方向锁仍是
+  唯一持久方向约束。
+- “清理缓存”只清理页面所展示的一般磁盘缓存；听译结果和模型使用独立、带确认的操作，
+  结果通过当前可见的 Snackbar/无障碍 live region 反馈。
+- 删除服务器文案如实说明同步删除本机播放历史和听译结果；保存中不可通过外部点按造成
+  “已取消”错觉。设置内容在平板限制可读宽度，推荐模型优先展示。
+
+验收：关键导航/字幕动作、缓存清理域、手势取消、方向状态和语义点击有自动测试；手机
+与平板布局截图通过；`testDebugUnitTest`、`lintDebug`、debug/release assemble 与
+AndroidTest 编译通过。真 NAS seek 预览与物理旋转仍按发布验收单补测。

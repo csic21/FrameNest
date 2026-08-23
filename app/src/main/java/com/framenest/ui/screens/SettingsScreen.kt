@@ -2,6 +2,7 @@ package com.framenest.ui.screens
 
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,16 +15,23 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -35,7 +43,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.framenest.BuildConfig
@@ -48,6 +59,7 @@ import com.framenest.feature.listen_translate.asr.VoskModelInstaller
 import com.framenest.feature.listen_translate.mt.MlKitMtEngine
 import com.framenest.ui.theme.FrameNestDimens
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -65,13 +77,22 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     var listenModelBytes by remember { mutableStateOf(0L) }
     var voskStatuses by remember { mutableStateOf(emptyList<VoskLanguageStatus>()) }
     var modelsInstalling by remember { mutableStateOf(false) }
+    var maintenanceRunning by remember { mutableStateOf(false) }
     var installProgress by remember { mutableFloatStateOf(0f) }
     var installStep by remember { mutableStateOf<String?>(null) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
+    var pendingClearTarget by remember { mutableStateOf<SettingsClearTarget?>(null) }
     var languagePreset by remember { mutableStateOf(prefs.subtitleLanguagePreset()) }
     var thumbConcurrency by remember { mutableStateOf(prefs.thumbnailConcurrency()) }
     var allowMeteredModelDownloads by remember {
         mutableStateOf(prefs.allowMeteredModelDownloads())
+    }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(statusMessage) {
+        val message = statusMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        if (statusMessage == message) statusMessage = null
     }
 
     // Resolve strings at composition time (lint: avoid Context.getString in callbacks).
@@ -86,6 +107,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
     val diagnosticsSavedTemplate = stringResource(R.string.settings_diagnostics_saved)
     val diagnosticsShareTitle = stringResource(R.string.settings_diagnostics_share)
     val diagnosticsFailed = stringResource(R.string.settings_diagnostics_failed)
+    val maintenanceFailed = stringResource(R.string.settings_maintenance_failed)
     val langOk = stringResource(R.string.settings_listen_models_lang_ok)
     val langMissing = stringResource(R.string.settings_listen_models_lang_missing)
     val langLabels = remember {
@@ -111,19 +133,44 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         listenModelBytes = snapshot.second.listenModelBytes
     }
 
+    fun reportMaintenanceFailure(operation: String, error: Exception) {
+        statusMessage = maintenanceFailed
+        DiagnosticLog.info(
+            "Settings",
+            "$operation failed type=${error::class.java.simpleName}",
+        )
+    }
+
     androidx.compose.runtime.LaunchedEffect(Unit) {
         refreshModelSizesAndStatus()
     }
 
-    Column(
-        modifier = modifier
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        },
+    ) { scaffoldPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(scaffoldPadding),
+        ) {
+            Column(
+                modifier = Modifier
+            .align(Alignment.TopCenter)
+            .widthIn(max = FrameNestDimens.SettingsContentMaxWidth)
+            .fillMaxWidth()
             .fillMaxSize()
             // Edge-to-edge (MainActivity): keep title below the status bar.
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(FrameNestDimens.ScreenPadding)
             .testTag("settings_screen"),
-    ) {
+            ) {
         Text(
             text = stringResource(R.string.settings_title),
             style = MaterialTheme.typography.headlineSmall,
@@ -166,16 +213,29 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         Spacer(Modifier.height(8.dp))
         Button(
             onClick = {
+                if (maintenanceRunning) return@Button
+                maintenanceRunning = true
                 scope.launch {
-                    val result = container.cacheMaintenance.clearAllCaches()
-                    // Disk cache + listen-translate Room only; model packs stay
-                    // (dedicated「清除听译模型」button).
-                    cacheBytes = result.remainingApproxBytes
-                    listenTranslateBytes = 0L
-                    statusMessage = cacheClearedTemplate.format(formatBytes(result.freedApproxBytes))
-                    DiagnosticLog.info("Settings", "cache cleared freed=${result.freedApproxBytes}")
+                    try {
+                        val result = container.cacheMaintenance.clearGeneralCaches()
+                        cacheBytes = result.remainingApproxBytes
+                        statusMessage = cacheClearedTemplate.format(
+                            formatBytes(result.freedApproxBytes),
+                        )
+                        DiagnosticLog.info(
+                            "Settings",
+                            "general cache cleared freed=${result.freedApproxBytes}",
+                        )
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        reportMaintenanceFailure("general cache clear", error)
+                    } finally {
+                        maintenanceRunning = false
+                    }
                 }
             },
+            enabled = !maintenanceRunning,
             modifier = Modifier
                 .heightIn(min = FrameNestDimens.MinTouchTarget)
                 .minimumInteractiveComponentSize()
@@ -207,18 +267,8 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         )
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
-            onClick = {
-                scope.launch {
-                    val result = container.cacheMaintenance.clearListenTranslateCache()
-                    listenTranslateBytes = result.remainingApproxBytes
-                    statusMessage =
-                        listenTranslateClearedTemplate.format(formatBytes(result.freedApproxBytes))
-                    DiagnosticLog.info(
-                        "Settings",
-                        "listen-translate cache cleared freed=${result.freedApproxBytes}",
-                    )
-                }
-            },
+            onClick = { pendingClearTarget = SettingsClearTarget.ListenTranslate },
+            enabled = !maintenanceRunning,
             modifier = Modifier
                 .heightIn(min = FrameNestDimens.MinTouchTarget)
                 .minimumInteractiveComponentSize()
@@ -242,6 +292,15 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .toggleable(
+                    value = allowMeteredModelDownloads,
+                    enabled = !modelsInstalling && !maintenanceRunning,
+                    role = Role.Switch,
+                    onValueChange = { allow ->
+                        allowMeteredModelDownloads = allow
+                        prefs.setAllowMeteredModelDownloads(allow)
+                    },
+                )
                 .padding(top = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
@@ -259,11 +318,8 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             }
             Switch(
                 checked = allowMeteredModelDownloads,
-                onCheckedChange = { allow ->
-                    allowMeteredModelDownloads = allow
-                    prefs.setAllowMeteredModelDownloads(allow)
-                },
-                enabled = !modelsInstalling,
+                onCheckedChange = null,
+                enabled = !modelsInstalling && !maintenanceRunning,
                 modifier = Modifier.testTag("settings_model_mobile_data"),
             )
         }
@@ -315,7 +371,17 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             }
             Spacer(Modifier.height(6.dp))
         }
-        voskStatuses.forEach { status ->
+        val orderedVoskStatuses = remember(voskStatuses) {
+            val recommendedOrder = VoskModelInstaller.RECOMMENDED_LANGS
+                .withIndex()
+                .associate { it.value to it.index }
+            voskStatuses.sortedWith(
+                compareBy<VoskLanguageStatus> {
+                    recommendedOrder[it.langTag] ?: Int.MAX_VALUE
+                }.thenBy { it.langTag },
+            )
+        }
+        orderedVoskStatuses.forEach { status ->
             val label = stringResource(
                 langLabels[status.langTag] ?: R.string.settings_listen_models_lang_en,
             )
@@ -324,9 +390,11 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 label = label,
                 okLabel = langOk,
                 missingLabel = langMissing,
-                installing = modelsInstalling,
+                installing = modelsInstalling || maintenanceRunning,
                 onInstall = {
-                    if (modelsInstalling || status.installed) return@VoskLangStatusRow
+                    if (modelsInstalling || maintenanceRunning || status.installed) {
+                        return@VoskLangStatusRow
+                    }
                     scope.launch {
                         modelsInstalling = true
                         installProgress = 0f
@@ -376,7 +444,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         Spacer(Modifier.height(8.dp))
         Button(
             onClick = {
-                if (modelsInstalling) return@Button
+                if (modelsInstalling || maintenanceRunning) return@Button
                 scope.launch {
                     modelsInstalling = true
                     installProgress = 0f
@@ -428,7 +496,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                     }
                 }
             },
-            enabled = !modelsInstalling,
+            enabled = !modelsInstalling && !maintenanceRunning,
             modifier = Modifier
                 .heightIn(min = FrameNestDimens.MinTouchTarget)
                 .minimumInteractiveComponentSize()
@@ -445,12 +513,12 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 },
             )
         }
-        val missingLangs = voskStatuses.filter { !it.installed }.map { it.langTag }
+        val missingLangs = orderedVoskStatuses.filter { !it.installed }.map { it.langTag }
         if (missingLangs.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             OutlinedButton(
                 onClick = {
-                    if (modelsInstalling) return@OutlinedButton
+                    if (modelsInstalling || maintenanceRunning) return@OutlinedButton
                     scope.launch {
                         modelsInstalling = true
                         installProgress = 0f
@@ -490,7 +558,7 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                         }
                     }
                 },
-                enabled = !modelsInstalling,
+                enabled = !modelsInstalling && !maintenanceRunning,
                 modifier = Modifier
                     .heightIn(min = FrameNestDimens.MinTouchTarget)
                     .minimumInteractiveComponentSize()
@@ -501,20 +569,8 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
         }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
-            onClick = {
-                if (modelsInstalling) return@OutlinedButton
-                scope.launch {
-                    val result = container.cacheMaintenance.clearListenModels()
-                    refreshModelSizesAndStatus()
-                    statusMessage =
-                        listenModelsClearedTemplate.format(formatBytes(result.freedApproxBytes))
-                    DiagnosticLog.info(
-                        "Settings",
-                        "listen models cleared freed=${result.freedApproxBytes}",
-                    )
-                }
-            },
-            enabled = !modelsInstalling,
+            onClick = { pendingClearTarget = SettingsClearTarget.Models },
+            enabled = !modelsInstalling && !maintenanceRunning,
             modifier = Modifier
                 .heightIn(min = FrameNestDimens.MinTouchTarget)
                 .minimumInteractiveComponentSize()
@@ -651,15 +707,89 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             Text(stringResource(R.string.settings_export_logs))
         }
 
-        statusMessage?.let { msg ->
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = msg,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.testTag("settings_status"),
-            )
+                Spacer(Modifier.height(16.dp))
+            }
         }
+    }
+
+    pendingClearTarget?.let { target ->
+        val title = stringResource(
+            when (target) {
+                SettingsClearTarget.ListenTranslate ->
+                    R.string.settings_clear_listen_translate_confirm_title
+                SettingsClearTarget.Models -> R.string.settings_clear_listen_models_confirm_title
+            },
+        )
+        val body = stringResource(
+            when (target) {
+                SettingsClearTarget.ListenTranslate ->
+                    R.string.settings_clear_listen_translate_confirm_body
+                SettingsClearTarget.Models -> R.string.settings_clear_listen_models_confirm_body
+            },
+        )
+        AlertDialog(
+            onDismissRequest = {
+                if (!maintenanceRunning) pendingClearTarget = null
+            },
+            title = { Text(title) },
+            text = { Text(body) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingClearTarget = null
+                        maintenanceRunning = true
+                        scope.launch {
+                            try {
+                                when (target) {
+                                    SettingsClearTarget.ListenTranslate -> {
+                                        val result = container.cacheMaintenance
+                                            .clearListenTranslateCache()
+                                        listenTranslateBytes = result.remainingApproxBytes
+                                        statusMessage = listenTranslateClearedTemplate.format(
+                                            formatBytes(result.freedApproxBytes),
+                                        )
+                                        DiagnosticLog.info(
+                                            "Settings",
+                                            "listen-translate cache cleared " +
+                                                "freed=${result.freedApproxBytes}",
+                                        )
+                                    }
+                                    SettingsClearTarget.Models -> {
+                                        val result = container.cacheMaintenance.clearListenModels()
+                                        refreshModelSizesAndStatus()
+                                        statusMessage = listenModelsClearedTemplate.format(
+                                            formatBytes(result.freedApproxBytes),
+                                        )
+                                        DiagnosticLog.info(
+                                            "Settings",
+                                            "listen models cleared freed=${result.freedApproxBytes}",
+                                        )
+                                    }
+                                }
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (error: Exception) {
+                                reportMaintenanceFailure("destructive cache clear", error)
+                            } finally {
+                                maintenanceRunning = false
+                            }
+                        }
+                    },
+                    enabled = !maintenanceRunning,
+                    modifier = Modifier.testTag("settings_clear_confirm"),
+                ) {
+                    Text(stringResource(R.string.action_confirm_clear))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { pendingClearTarget = null },
+                    enabled = !maintenanceRunning,
+                ) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
     }
 }
 
@@ -754,3 +884,5 @@ private fun formatBytes(bytes: Long): String {
     val mb = kb / 1024.0
     return String.format(Locale.US, "%.1f MB", mb)
 }
+
+private enum class SettingsClearTarget { ListenTranslate, Models }

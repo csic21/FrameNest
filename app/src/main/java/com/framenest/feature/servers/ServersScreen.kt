@@ -133,21 +133,31 @@ fun ServersScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAdd,
-                modifier = Modifier
-                    .minimumInteractiveComponentSize()
-                    .testTag("servers_add"),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.servers_add),
-                )
+            if (state.servers.isNotEmpty()) {
+                FloatingActionButton(
+                    onClick = onAdd,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .testTag("servers_add"),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = stringResource(R.string.servers_add),
+                    )
+                }
             }
         },
     ) { padding ->
         // useListDetail comes from WindowSizeClass medium+ (never raw width < 600).
-        if (useListDetail) {
+        if (state.servers.isEmpty()) {
+            ServerEmptyPane(
+                onScanLan = onScanLan,
+                onAdd = onAdd,
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize(),
+            )
+        } else if (useListDetail) {
             Row(
                 modifier = Modifier
                     .padding(padding)
@@ -261,6 +271,83 @@ fun ServersScreen(
 }
 
 @Composable
+private fun ServerEmptyPane(
+    onScanLan: () -> Unit,
+    onAdd: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .padding(FrameNestDimens.ScreenPadding)
+            .testTag("servers_empty_pane"),
+    ) {
+        Text(
+            text = stringResource(R.string.servers_title),
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.testTag("servers_title"),
+        )
+        Text(
+            text = stringResource(R.string.servers_subtitle),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = stringResource(R.string.servers_empty),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.testTag("servers_empty"),
+            )
+            Text(
+                text = stringResource(R.string.servers_empty_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .widthIn(max = FrameNestDimens.ReadableContentMaxWidth),
+            )
+            Button(
+                onClick = onScanLan,
+                modifier = Modifier
+                    .padding(top = 20.dp)
+                    .minimumInteractiveComponentSize()
+                    .testTag("servers_empty_scan"),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Radar,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.servers_scan_lan))
+            }
+            OutlinedButton(
+                onClick = onAdd,
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .minimumInteractiveComponentSize()
+                    .testTag("servers_empty_add"),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.servers_add))
+            }
+            Spacer(Modifier.height(56.dp))
+        }
+    }
+}
+
+@Composable
 private fun ServerListPane(
     servers: List<SavedServer>,
     selectedServerId: String?,
@@ -328,12 +415,17 @@ private fun ServerListPane(
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(servers, key = { it.id }) { server ->
                     val selected = server.id == selectedServerId
+                    val itemDescription = stringResource(
+                        R.string.servers_item_cd,
+                        server.name,
+                        hostLabel(server),
+                    )
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = FrameNestDimens.MinTouchTarget)
                             .testTag("server_item_${server.id}")
-                            .semantics { contentDescription = "server_item_${server.id}" }
+                            .semantics { contentDescription = itemDescription }
                             .clickable {
                                 onSelect(server)
                                 if (selectedServerId == null) {
@@ -532,7 +624,9 @@ private fun ServerEditorDialog(
         stringResource(R.string.servers_edit_title)
     }
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            if (canDismissServerEditor(state.isSaving)) onDismiss()
+        },
         title = { Text(title) },
         text = {
             Column(
@@ -544,6 +638,7 @@ private fun ServerEditorDialog(
                 OutlinedTextField(
                     value = state.name,
                     onValueChange = { v -> onUpdate { it.copy(name = v) } },
+                    enabled = canEditServerEditor(state.isTesting, state.isSaving),
                     label = { Text(stringResource(R.string.servers_field_name)) },
                     singleLine = true,
                     modifier = Modifier
@@ -553,6 +648,7 @@ private fun ServerEditorDialog(
                 OutlinedTextField(
                     value = state.host,
                     onValueChange = { v -> onUpdate { it.copy(host = v) } },
+                    enabled = canEditServerEditor(state.isTesting, state.isSaving),
                     label = { Text(stringResource(R.string.servers_field_host)) },
                     singleLine = true,
                     modifier = Modifier
@@ -562,6 +658,7 @@ private fun ServerEditorDialog(
                 OutlinedTextField(
                     value = state.port,
                     onValueChange = { v -> onUpdate { it.copy(port = v) } },
+                    enabled = canEditServerEditor(state.isTesting, state.isSaving),
                     label = { Text(stringResource(R.string.servers_field_port)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -572,6 +669,7 @@ private fun ServerEditorDialog(
                 OutlinedTextField(
                     value = state.username,
                     onValueChange = { v -> onUpdate { it.copy(username = v) } },
+                    enabled = canEditServerEditor(state.isTesting, state.isSaving),
                     label = { Text(stringResource(R.string.servers_field_username)) },
                     singleLine = true,
                     modifier = Modifier
@@ -581,6 +679,7 @@ private fun ServerEditorDialog(
                 OutlinedTextField(
                     value = state.password,
                     onValueChange = { v -> onUpdate { it.copy(password = v) } },
+                    enabled = canEditServerEditor(state.isTesting, state.isSaving),
                     label = {
                         Text(
                             if (state.isPasswordRequired) {
@@ -600,6 +699,7 @@ private fun ServerEditorDialog(
                 OutlinedTextField(
                     value = state.domain,
                     onValueChange = { v -> onUpdate { it.copy(domain = v) } },
+                    enabled = canEditServerEditor(state.isTesting, state.isSaving),
                     label = { Text(stringResource(R.string.servers_field_domain)) },
                     singleLine = true,
                     modifier = Modifier
@@ -609,6 +709,7 @@ private fun ServerEditorDialog(
                 OutlinedTextField(
                     value = state.defaultShare,
                     onValueChange = { v -> onUpdate { it.copy(defaultShare = v) } },
+                    enabled = canEditServerEditor(state.isTesting, state.isSaving),
                     label = { Text(stringResource(R.string.servers_field_share)) },
                     singleLine = true,
                     supportingText = {
@@ -667,6 +768,11 @@ private fun ServerEditorDialog(
         },
     )
 }
+
+internal fun canDismissServerEditor(isSaving: Boolean): Boolean = !isSaving
+
+internal fun canEditServerEditor(isTesting: Boolean, isSaving: Boolean): Boolean =
+    !isTesting && !isSaving
 
 @Composable
 private fun LanDiscoveryDialog(

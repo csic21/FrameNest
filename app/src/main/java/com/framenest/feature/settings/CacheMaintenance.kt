@@ -13,10 +13,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Clears disk caches and listen-translate Room rows.
- * Never touches credentials. On-device model packs are **not** removed by
- * [clearAllCaches] — settings has a dedicated「清除听译模型」control via
- * [clearListenModels] (decision 0005). Uninstall still clears everything.
+ * Clears explicitly selected cache domains.
+ * Never touches credentials. General disk caches, listen-translate Room rows and
+ * on-device model packs stay separate so a low-risk cleanup never deletes costly
+ * generated captions or downloaded models.
  *
  * Public operations switch to [ioDispatcher] themselves; callers never need a blocking bridge.
  */
@@ -38,32 +38,33 @@ class CacheMaintenance(
         )
     }
 
-    suspend fun clearAllCaches(): CacheClearResult = withContext(ioDispatcher) {
-        // Model packs are intentionally excluded: this control does not remove them.
+    suspend fun clearGeneralCaches(): CacheClearResult = withContext(ioDispatcher) {
+        val domains = CacheClearPolicy.domainsFor(CacheClearTarget.General)
         val beforeDisk = approximateDiskCacheBytesOnCurrentThread()
-        val beforeListen = approximateListenTranslateBytesOnCurrentThread()
-        thumbnailRepository.clearCache()
-        val subtitleDir = File(context.cacheDir, "subtitles")
-        runCatching { subtitleDir.listFiles()?.forEach { it.deleteRecursively() } }
-        // Exported diagnostic reports on disk.
-        val diagDir = File(context.cacheDir, "diagnostics")
-        runCatching { diagDir.listFiles()?.forEach { it.deleteRecursively() } }
-        // In-process diagnostic ring buffer (not counted in disk size).
-        DiagnosticLog.clear()
-        // Room cues only — leave Vosk / JSON model packs alone.
-        listenTranslateRepository?.purgeAll()
+        if (CacheDomain.Thumbnails in domains) thumbnailRepository.clearCache()
+        if (CacheDomain.SubtitleFiles in domains) {
+            val subtitleDir = File(context.cacheDir, "subtitles")
+            runCatching { subtitleDir.listFiles()?.forEach { it.deleteRecursively() } }
+        }
+        if (CacheDomain.Diagnostics in domains) {
+            val diagDir = File(context.cacheDir, "diagnostics")
+            runCatching { diagDir.listFiles()?.forEach { it.deleteRecursively() } }
+            // In-process diagnostic ring buffer is not counted in disk size.
+            DiagnosticLog.clear()
+        }
         val afterDisk = approximateDiskCacheBytesOnCurrentThread()
-        val afterListen = approximateListenTranslateBytesOnCurrentThread()
         CacheClearResult(
-            freedApproxBytes =
-                (beforeDisk + beforeListen - afterDisk - afterListen).coerceAtLeast(0L),
-            // Cache row shows disk cache only (not model packs).
+            freedApproxBytes = (beforeDisk - afterDisk).coerceAtLeast(0L),
             remainingApproxBytes = afterDisk,
         )
     }
 
     /** Clear only listen-translate Room rows (not model packs). */
     suspend fun clearListenTranslateCache(): CacheClearResult = withContext(ioDispatcher) {
+        check(
+            CacheDomain.ListenTranslate in
+                CacheClearPolicy.domainsFor(CacheClearTarget.ListenTranslate),
+        )
         val before = approximateListenTranslateBytesOnCurrentThread()
         listenTranslateRepository?.purgeAll()
         val after = approximateListenTranslateBytesOnCurrentThread()
@@ -75,6 +76,7 @@ class CacheMaintenance(
 
     /** Clear JSON/Vosk packs and ML Kit translation models from app-private storage. */
     suspend fun clearListenModels(): CacheClearResult = withContext(ioDispatcher) {
+        check(CacheDomain.Models in CacheClearPolicy.domainsFor(CacheClearTarget.Models))
         val before = approximateListenModelBytesOnCurrentThread()
         listenModelManager?.deleteAll()
         voskModelInstaller?.deleteAll()
@@ -118,3 +120,20 @@ data class CacheClearResult(
     val freedApproxBytes: Long,
     val remainingApproxBytes: Long,
 )
+
+internal enum class CacheClearTarget { General, ListenTranslate, Models }
+
+internal enum class CacheDomain { Thumbnails, SubtitleFiles, Diagnostics, ListenTranslate, Models }
+
+/** Pure contract used by Settings to keep destructive cache actions non-overlapping. */
+internal object CacheClearPolicy {
+    fun domainsFor(target: CacheClearTarget): Set<CacheDomain> = when (target) {
+        CacheClearTarget.General -> setOf(
+            CacheDomain.Thumbnails,
+            CacheDomain.SubtitleFiles,
+            CacheDomain.Diagnostics,
+        )
+        CacheClearTarget.ListenTranslate -> setOf(CacheDomain.ListenTranslate)
+        CacheClearTarget.Models -> setOf(CacheDomain.Models)
+    }
+}

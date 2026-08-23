@@ -119,12 +119,15 @@ fun BrowseRoute(
             prefs.setBrowseLayoutMode(next)
         },
         onOpenEntry = { entry ->
-            when {
-                entry.isShare -> onOpenDirectory(RemoteLocation.shareRoot(entry.share))
-                entry.isDirectory -> onOpenDirectory(
+            when (browseEntryAction(entry)) {
+                BrowseEntryAction.OPEN_SHARE -> {
+                    onOpenDirectory(RemoteLocation.shareRoot(entry.share))
+                }
+                BrowseEntryAction.OPEN_DIRECTORY -> onOpenDirectory(
                     RemoteLocation.of(entry.share, entry.path),
                 )
-                else -> onOpenFile(entry)
+                BrowseEntryAction.OPEN_VIDEO -> onOpenFile(entry)
+                BrowseEntryAction.NONE -> Unit
             }
         },
         modifier = modifier,
@@ -321,7 +324,7 @@ private fun BrowseList(
                 supportingContent = {
                     Text(
                         text = typeLabel,
-                        maxLines = 1,
+                        maxLines = if (MediaExtensions.isSubtitle(entry.name)) 2 else 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                 },
@@ -338,7 +341,13 @@ private fun BrowseList(
                     .minimumInteractiveComponentSize()
                     .testTag(tag)
                     .semantics { contentDescription = entryDescription }
-                    .clickable { onOpenEntry(entry) },
+                    .then(
+                        if (isBrowseEntryActionable(entry)) {
+                            Modifier.clickable { onOpenEntry(entry) }
+                        } else {
+                            Modifier
+                        },
+                    ),
             )
         }
     }
@@ -389,7 +398,13 @@ private fun BrowseGridCell(
             .fillMaxWidth()
             .minimumInteractiveComponentSize()
             .clip(RoundedCornerShape(FrameNestDimens.BrowseThumbCorner))
-            .clickable(onClick = onOpen)
+            .then(
+                if (isBrowseEntryActionable(entry)) {
+                    Modifier.clickable(onClick = onOpen)
+                } else {
+                    Modifier
+                },
+            )
             .testTag(tag)
             .semantics {
                 contentDescription = entryDescription
@@ -435,7 +450,7 @@ private fun BrowseGridCell(
             text = typeLabel,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
+            maxLines = if (MediaExtensions.isSubtitle(entry.name)) 2 else 1,
             overflow = TextOverflow.Ellipsis,
         )
     }
@@ -521,7 +536,7 @@ private fun BrowseVideoThumbnail(
 private fun entrySupportingText(entry: RemoteEntry): String = when {
     entry.isShare -> stringResource(R.string.browse_type_share)
     entry.isDirectory -> stringResource(R.string.browse_type_folder)
-    MediaExtensions.isSubtitle(entry.name) -> stringResource(R.string.browse_type_subtitle)
+    MediaExtensions.isSubtitle(entry.name) -> stringResource(R.string.browse_type_subtitle_hint)
     MediaExtensions.isVideo(entry.name) -> stringResource(R.string.browse_type_video)
     else -> stringResource(R.string.browse_type_file)
 }

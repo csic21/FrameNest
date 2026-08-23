@@ -152,6 +152,8 @@ fun SubtitleControls(
             style = MaterialTheme.typography.labelMedium,
             modifier = Modifier.testTag("subtitle_delay_label"),
         )
+        val decreaseDelayCd = stringResource(R.string.subtitle_delay_decrease_cd)
+        val increaseDelayCd = stringResource(R.string.subtitle_delay_increase_cd)
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -160,7 +162,7 @@ fun SubtitleControls(
             TextButton(
                 onClick = { onDelayDeltaMs(-100L) },
                 modifier = Modifier
-                    .semantics { contentDescription = "subtitle_delay_minus" }
+                    .semantics { contentDescription = decreaseDelayCd }
                     .testTag("subtitle_delay_minus"),
             ) {
                 Text(stringResource(R.string.subtitle_delay_minus))
@@ -168,7 +170,7 @@ fun SubtitleControls(
             TextButton(
                 onClick = { onDelayDeltaMs(100L) },
                 modifier = Modifier
-                    .semantics { contentDescription = "subtitle_delay_plus" }
+                    .semantics { contentDescription = increaseDelayCd }
                     .testTag("subtitle_delay_plus"),
             ) {
                 Text(stringResource(R.string.subtitle_delay_plus))

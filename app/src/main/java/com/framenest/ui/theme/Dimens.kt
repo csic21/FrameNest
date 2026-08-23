@@ -19,6 +19,9 @@ object FrameNestDimens {
     /** Max width for empty/error body copy on medium+ so text does not stretch edge-to-edge. */
     val ReadableContentMaxWidth = 480.dp
 
+    /** Keeps long settings rows and their trailing controls visually connected on tablets. */
+    val SettingsContentMaxWidth = 640.dp
+
     /** Leading thumbnail in browse list rows. */
     val BrowseListThumbSize = 40.dp
 

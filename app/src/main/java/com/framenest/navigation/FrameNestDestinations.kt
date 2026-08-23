@@ -8,6 +8,8 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.window.core.layout.WindowSizeClass
 import com.framenest.R
+import com.framenest.core.model.MediaExtensions
+import com.framenest.core.model.RemoteEntry
 import com.framenest.core.model.RemoteLocation
 import com.framenest.smb.SmbPathUtils
 import java.net.URLEncoder
@@ -91,6 +93,24 @@ object FrameNestRoutes {
         browse(serverId, location.share, location.normalizedPath)
 
     /**
+     * Browser destinations created when a server is opened.
+     *
+     * The share list is always the first browser entry. A configured default share is a second
+     * entry, so Back from that share returns to the share list instead of leaving the browser.
+     * Only the opaque server id and optional share name enter the route.
+     */
+    fun initialBrowseBackStack(
+        serverId: String,
+        defaultShare: String?,
+    ): List<String> = buildList {
+        add(browse(serverId, RemoteLocation.ROOT))
+        defaultShare
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?.let { share -> add(browse(serverId, RemoteLocation.shareRoot(share))) }
+    }
+
+    /**
      * Player route for FN-05.
      * @param share SMB share name (never empty for real media)
      * @param path share-relative file path
@@ -98,6 +118,20 @@ object FrameNestRoutes {
     fun player(serverId: String, share: String, path: String): String {
         val normalized = SmbPathUtils.normalizeRelative(path)
         return "player/$serverId?share=${encodeQuery(share)}&path=${encodeQuery(normalized)}"
+    }
+
+    /** Defense in depth: browser navigation can create a player route for video files only. */
+    fun playerForBrowseEntry(entry: RemoteEntry): String? {
+        val normalizedPath = SmbPathUtils.normalizeRelative(entry.path)
+        if (
+            !entry.isFile ||
+            !MediaExtensions.isVideo(entry.name) ||
+            entry.share.isBlank() ||
+            normalizedPath.isEmpty()
+        ) {
+            return null
+        }
+        return player(entry.serverId, entry.share, normalizedPath)
     }
 
     fun locationFromArgs(share: String?, path: String?): RemoteLocation =

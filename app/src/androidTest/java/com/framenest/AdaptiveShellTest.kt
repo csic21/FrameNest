@@ -27,7 +27,7 @@ class AdaptiveShellPhoneTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun compactWidth_showsBottomBarAndSinglePaneServers() {
+    fun compactWidth_showsBottomBarAndUnifiedServerEmptyState() {
         composeRule.setContent {
             FrameNestTheme {
                 FrameNestApp(
@@ -41,10 +41,11 @@ class AdaptiveShellPhoneTest {
         composeRule.onNodeWithTag("nav_servers").assertIsDisplayed()
         composeRule.onNodeWithTag("nav_recent").assertIsDisplayed()
         composeRule.onNodeWithTag("nav_settings").assertIsDisplayed()
-        composeRule.onNodeWithTag("servers_single_pane").assertIsDisplayed()
+        composeRule.onNodeWithTag("servers_empty_pane").assertIsDisplayed()
         composeRule.onNodeWithTag("servers_title").assertIsDisplayed()
         composeRule.onNodeWithTag("servers_empty").assertIsDisplayed()
-        composeRule.onNodeWithTag("servers_add").assertIsDisplayed()
+        composeRule.onNodeWithTag("servers_empty_scan").assertIsDisplayed()
+        composeRule.onNodeWithTag("servers_empty_add").assertIsDisplayed()
     }
 
     @Test
@@ -68,7 +69,7 @@ class AdaptiveShellPhoneTest {
         composeRule.onNodeWithTag("settings_title").assertIsDisplayed()
 
         composeRule.onNodeWithTag("nav_servers").performClick()
-        composeRule.onNodeWithTag("servers_single_pane").assertIsDisplayed()
+        composeRule.onNodeWithTag("servers_empty_pane").assertIsDisplayed()
     }
 
     @Test
@@ -82,7 +83,7 @@ class AdaptiveShellPhoneTest {
             }
         }
 
-        composeRule.onNodeWithTag("servers_add").performClick()
+        composeRule.onNodeWithTag("servers_empty_add").performClick()
         composeRule.onNodeWithTag("server_field_name").assertIsDisplayed()
         composeRule.onNodeWithTag("server_field_host").assertIsDisplayed()
         composeRule.onNodeWithTag("server_test").assertIsDisplayed()
@@ -128,7 +129,7 @@ class AdaptiveShellTabletTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun mediumWidth_showsRailAndListDetailServers() {
+    fun mediumWidth_showsRailAndOneUnifiedServerEmptyState() {
         composeRule.setContent {
             FrameNestTheme {
                 FrameNestApp(
@@ -139,11 +140,10 @@ class AdaptiveShellTabletTest {
         }
 
         composeRule.onNodeWithTag("nav_suite_rail").assertIsDisplayed()
-        composeRule.onNodeWithTag("servers_list_detail").assertIsDisplayed()
-        composeRule.onNodeWithTag("servers_detail_pane").assertIsDisplayed()
+        composeRule.onNodeWithTag("servers_empty_pane").assertIsDisplayed()
         composeRule.onNodeWithTag("servers_empty").assertIsDisplayed()
-        // Detail empty prompt when no selection (empty list → null selection).
-        composeRule.onNodeWithTag("servers_detail_empty").assertIsDisplayed()
+        composeRule.onNodeWithTag("servers_empty_scan").assertIsDisplayed()
+        composeRule.onNodeWithTag("servers_empty_add").assertIsDisplayed()
     }
 
     @Test

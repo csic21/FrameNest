@@ -14,6 +14,10 @@ import android.view.Window
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.interaction.Interaction
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -64,16 +68,21 @@ import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -82,7 +91,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -97,7 +110,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlin.math.abs
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import com.framenest.R
 import com.framenest.core.model.PlaybackRequest
 import com.framenest.feature.listen_translate.ListenDisplayMode
@@ -161,8 +176,7 @@ fun PlayerScreen(
     var chromeVisible by remember { mutableStateOf(true) }
     var controlsLocked by remember { mutableStateOf(false) }
     var orientationLocked by remember { mutableStateOf(false) }
-    var forceLandscape by remember { mutableStateOf(false) }
-    var forcePortrait by remember { mutableStateOf(false) }
+    var fullscreenState by remember { mutableStateOf(PlayerLockPolicy.FullscreenState()) }
     var userSeeking by remember { mutableStateOf(false) }
     var showUnlockHint by remember { mutableStateOf(false) }
     var autoNextArmed by remember { mutableStateOf(false) }
@@ -208,9 +222,25 @@ fun PlayerScreen(
     // Fullscreen forces landscape even when the device is still physically portrait.
     PlayerOrientationLockEffect(
         orientationLocked = orientationLocked,
-        forceLandscape = forceLandscape,
-        forcePortrait = forcePortrait,
+        forceLandscape = fullscreenState.explicitLandscape,
+        forcePortrait = fullscreenState.portraitExitPending,
     )
+
+    // A portrait request is only a transition used while leaving explicit
+    // fullscreen. Release it as soon as portrait is observed so a persistent
+    // orientation lock (if enabled) becomes the sole lasting constraint again.
+    LaunchedEffect(landscape, fullscreenState.portraitExitPending) {
+        fullscreenState = PlayerLockPolicy.settleFullscreenTransition(
+            state = fullscreenState,
+            isLandscape = landscape,
+        )
+    }
+
+    // A preview seek mutes VLC. Route removal can cancel the pointer coroutine
+    // before its normal release callback, so restore transient audio here too.
+    DisposableEffect(vm) {
+        onDispose { vm.setScrubbing(false) }
+    }
 
     // Keep the screen on while actively playing so the device does not lock /
     // dim mid-video. Cleared the moment playback leaves the Playing phase or
@@ -442,15 +472,9 @@ fun PlayerScreen(
                     onToggleOrientationLock = {
                         orientationLocked = !orientationLocked
                     },
-                    forceLandscape = landscape,
+                    forceLandscape = fullscreenState.explicitLandscape,
                     onToggleFullscreen = {
-                        if (landscape) {
-                            forceLandscape = false
-                            forcePortrait = true
-                        } else {
-                            forcePortrait = false
-                            forceLandscape = true
-                        }
+                        fullscreenState = PlayerLockPolicy.toggleFullscreen(fullscreenState)
                     },
                     onPrevious = siblingNav.previousPath?.let { p -> { openSibling(p) } },
                     onNext = siblingNav.nextPath?.let { p -> { openSibling(p) } },
@@ -769,7 +793,6 @@ private fun PlayerSurfaceStack(
     Box(
         modifier = modifier
             .background(Color.Black)
-            .semantics { contentDescription = surfaceCd }
             .testTag("player_video_surface"),
         contentAlignment = Alignment.Center,
     ) {
@@ -826,6 +849,7 @@ private fun PlayerSurfaceStack(
                     // paused; double-tap skips ±10s; vertical drag is brightness /
                     // volume; horizontal drag scrubs with live preview.
                     PlayerGestureLayer(
+                        surfaceCd = surfaceCd,
                         toggleCd = if (state.phase == PlayerState.Phase.Playing) {
                             toggleCd
                         } else {
@@ -1068,13 +1092,26 @@ private fun PlayOverlay(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .minimumInteractiveComponentSize()
-            .then(if (clickable) Modifier.clickable(onClick = onPlay) else Modifier)
+            .then(
+                if (clickable) {
+                    Modifier
+                        .clickable(onClick = onPlay)
+                        .semantics {
+                            contentDescription = label
+                            role = Role.Button
+                        }
+                } else {
+                    // Ready/Paused input is owned by PlayerGestureLayer. Do not
+                    // expose this visual-only icon as a dead TalkBack target.
+                    Modifier.clearAndSetSemantics { }
+                },
+            )
             .padding(24.dp)
             .testTag("player_play_overlay"),
     ) {
         Icon(
             imageVector = Icons.Filled.PlayArrow,
-            contentDescription = label,
+            contentDescription = null,
             tint = Color.White,
             modifier = Modifier.size(72.dp),
         )
@@ -1145,8 +1182,13 @@ internal fun PlayerControls(
     val progress = if (duration > 0) position.toFloat() / duration.toFloat() else 0f
     // Thumb stays local while dragging. Preview seeks are throttled; release
     // commits the exact thumb position so the picture matches the drop point.
-    var scrubbing by remember { mutableStateOf(false) }
+    val scrubbingState = remember { mutableStateOf(false) }
+    var scrubbing by scrubbingState
     var scrubFraction by remember { mutableFloatStateOf(0f) }
+    val scrubScope = rememberCoroutineScope()
+    val sliderInteractionSource = remember { SliderInteractionTracker() }
+    val sliderFinishJob = remember { mutableStateOf<Job?>(null) }
+    val latestOnUserSeeking by rememberUpdatedState(onUserSeeking)
     val displayProgress = if (scrubbing) scrubFraction else progress
     val displayPosition = if (scrubbing && duration > 0L) {
         (scrubFraction * duration).toLong().coerceIn(0L, duration)
@@ -1185,6 +1227,33 @@ internal fun PlayerControls(
         phaseLabel(state)
     }
     val statusCd = stringResource(R.string.player_status_cd, statusText)
+
+    val finishSliderScrub: (commit: Boolean) -> Unit = finish@{ commit ->
+        if (!scrubbingState.value) return@finish
+        val targetMs = ScrubSeekPolicy.targetMs(duration, scrubFraction)
+        // Clear local state before seek changes playback state and can disable
+        // or remove the Slider. Audio restoration is guaranteed in finally.
+        scrubbingState.value = false
+        try {
+            if (commit && duration > 0L) onSeek(targetMs)
+        } finally {
+            latestOnUserSeeking(false)
+        }
+    }
+
+    SideEffect {
+        sliderInteractionSource.onDragCancelled = { finishSliderScrub(false) }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            sliderFinishJob.value?.cancel()
+            if (scrubbingState.value) {
+                scrubbingState.value = false
+                latestOnUserSeeking(false)
+            }
+        }
+    }
 
     val bg = if (overlay) {
         Color.Black.copy(alpha = 0.65f)
@@ -1248,6 +1317,7 @@ internal fun PlayerControls(
         Slider(
             value = displayProgress,
             onValueChange = { fraction ->
+                sliderFinishJob.value?.cancel()
                 onUserInteraction()
                 scrubbing = true
                 onUserSeeking(true)
@@ -1258,16 +1328,20 @@ internal fun PlayerControls(
             },
             onValueChangeFinished = {
                 if (!scrubbing) return@Slider
-                val targetMs = ScrubSeekPolicy.targetMs(duration, scrubFraction)
-                // End local scrub state before dispatching. onSeek synchronously
-                // changes playback phase; dispatching first can recompose/disable
-                // this Slider while it still owns the gesture and invoke finish
-                // repeatedly with intermediate fractions.
-                scrubbing = false
-                // Commit the drop point while still muted, then restore audio.
-                if (duration > 0L) onSeek(targetMs)
-                onUserSeeking(false)
+                sliderFinishJob.value?.cancel()
+                sliderFinishJob.value = scrubScope.launch {
+                    // DragInteraction.Stop/Cancel is emitted as the Material
+                    // drag coroutine unwinds. Read it on the next turn so a
+                    // cancellation cannot be mistaken for a normal release.
+                    yield()
+                    val endReason = sliderInteractionSource.consumeDragEndReason()
+                    finishSliderScrub(
+                        endReason !=
+                            PlayerSurfaceInputPolicy.GestureEndReason.Cancel,
+                    )
+                }
             },
+            interactionSource = sliderInteractionSource,
             enabled = (state.isSeekable || duration > 0) &&
                 state.phase != PlayerState.Phase.Error &&
                 state.phase != PlayerState.Phase.Idle &&
@@ -1328,7 +1402,11 @@ internal fun PlayerControls(
         }
         PlayerActionButtons(
             playing = state.canPause,
-            playEnabled = state.canPause || state.canPlay || state.phase == PlayerState.Phase.Error,
+            playEnabled = PlayerActionPolicy.playEnabled(
+                phase = state.phase,
+                canPlay = state.canPlay,
+                canPause = state.canPause,
+            ),
             orientationLocked = orientationLocked,
             forceLandscape = forceLandscape,
             rateLabel = rateLabel,
@@ -1593,6 +1671,49 @@ private const val AUTO_NEXT_DELAY_MS = 1_500L
 /** Avoid flashing a spinner when a local paused seek resolves almost immediately. */
 private const val SEEKING_INDICATOR_DELAY_MS = 180L
 
+/** Records Material Slider's Stop vs Cancel without changing its gesture handling. */
+private class SliderInteractionTracker : MutableInteractionSource {
+    private val delegate = MutableInteractionSource()
+    private var activeDrag: DragInteraction.Start? = null
+    private var dragEndReason: PlayerSurfaceInputPolicy.GestureEndReason? = null
+    var onDragCancelled: () -> Unit = {}
+
+    override val interactions: Flow<Interaction>
+        get() = delegate.interactions
+
+    override suspend fun emit(interaction: Interaction) {
+        record(interaction)
+        delegate.emit(interaction)
+    }
+
+    override fun tryEmit(interaction: Interaction): Boolean {
+        val emitted = delegate.tryEmit(interaction)
+        if (emitted) record(interaction)
+        return emitted
+    }
+
+    fun consumeDragEndReason(): PlayerSurfaceInputPolicy.GestureEndReason? =
+        dragEndReason.also { dragEndReason = null }
+
+    private fun record(interaction: Interaction) {
+        when (interaction) {
+            is DragInteraction.Start -> {
+                activeDrag = interaction
+                dragEndReason = null
+            }
+            is DragInteraction.Stop -> if (interaction.start === activeDrag) {
+                activeDrag = null
+                dragEndReason = PlayerSurfaceInputPolicy.GestureEndReason.Release
+            }
+            is DragInteraction.Cancel -> if (interaction.start === activeDrag) {
+                activeDrag = null
+                dragEndReason = PlayerSurfaceInputPolicy.GestureEndReason.Cancel
+                onDragCancelled()
+            }
+        }
+    }
+}
+
 @Composable
 private fun videoScaleLabel(mode: VideoScaleMode): String = when (mode) {
     VideoScaleMode.BestFit -> stringResource(R.string.player_scale_best_fit)
@@ -1655,7 +1776,7 @@ private sealed interface PlayerGesture {
     data class Volume(override val percent: Int) : PlayerGesture
 }
 
-private data class SeekGestureUi(
+internal data class SeekGestureUi(
     val deltaMs: Long,
     val targetMs: Long,
     val durationMs: Long,
@@ -1680,7 +1801,8 @@ private data class SeekGestureUi(
  * tap-to-play is immediate so the overlay does not feel lagged.
  */
 @Composable
-private fun PlayerGestureLayer(
+internal fun PlayerGestureLayer(
+    surfaceCd: String,
     toggleCd: String,
     playing: Boolean,
     positionMs: Long,
@@ -1708,17 +1830,67 @@ private fun PlayerGestureLayer(
     val durationRef = remember { mutableLongStateOf(durationMs) }
     durationRef.longValue = durationMs
 
+    val activateSurface: () -> Unit = {
+        if (playingRef.value) onToggleChrome() else onPlay()
+    }
+
+    val handleKeyAction: (PlayerSurfaceInputPolicy.KeyAction) -> Boolean = { action ->
+        when (action) {
+            PlayerSurfaceInputPolicy.KeyAction.Activate -> {
+                activateSurface()
+                true
+            }
+            PlayerSurfaceInputPolicy.KeyAction.SkipBack -> {
+                onSkipBack()
+                true
+            }
+            PlayerSurfaceInputPolicy.KeyAction.SkipForward -> {
+                onSkipForward()
+                true
+            }
+            PlayerSurfaceInputPolicy.KeyAction.Consume -> true
+            PlayerSurfaceInputPolicy.KeyAction.Ignore -> false
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .onPreviewKeyEvent { event ->
+                handleKeyAction(
+                    PlayerSurfaceInputPolicy.keyAction(
+                        key = event.key,
+                        type = event.type,
+                    ),
+                )
+            }
+            .focusable()
             .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    val touchSlop = viewConfiguration.touchSlop
-                    var downX = 0f
-                    var downY = 0f
-                    var axis = GestureSeekMath.Axis.None
-                    var isBrightness = true
-                    var seekStartPosition = 0L
+                var axis = GestureSeekMath.Axis.None
+                var downX = 0f
+                var downY = 0f
+                var isBrightness = true
+                var seekStartPosition = 0L
+
+                fun finishGesture(
+                    reason: PlayerSurfaceInputPolicy.GestureEndReason,
+                    releasedSeekTargetMs: Long? = null,
+                ) {
+                    val action = PlayerSurfaceInputPolicy.gestureEndAction(axis, reason)
+                    try {
+                        if (action.commitSeek && releasedSeekTargetMs != null) {
+                            onCommitSeek(releasedSeekTargetMs)
+                        }
+                    } finally {
+                        if (action.clearSeekUi) onSeekGesture(null)
+                        if (action.endLevelGesture) onGestureEnd()
+                        axis = GestureSeekMath.Axis.None
+                    }
+                }
+
+                try {
+                    awaitPointerEventScope {
+                        val touchSlop = viewConfiguration.touchSlop
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull() ?: continue
@@ -1726,12 +1898,18 @@ private fun PlayerGestureLayer(
                         val range = (size.height / 2f).coerceAtLeast(1f)
                         when (event.type) {
                             PointerEventType.Press -> {
+                                if (axis != GestureSeekMath.Axis.None) {
+                                    finishGesture(PlayerSurfaceInputPolicy.GestureEndReason.Cancel)
+                                }
                                 downX = change.position.x
                                 downY = change.position.y
                                 axis = GestureSeekMath.Axis.None
                             }
                             PointerEventType.Move -> {
-                                if (!change.pressed) continue
+                                if (!change.pressed) {
+                                    finishGesture(PlayerSurfaceInputPolicy.GestureEndReason.Cancel)
+                                    continue
+                                }
                                 val dxSigned = change.position.x - downX
                                 val dySigned = change.position.y - downY
                                 if (axis == GestureSeekMath.Axis.None) {
@@ -1783,9 +1961,14 @@ private fun PlayerGestureLayer(
                                 }
                             }
                             PointerEventType.Release -> {
-                                when (axis) {
-                                    GestureSeekMath.Axis.Vertical -> onGestureEnd()
-                                    GestureSeekMath.Axis.Horizontal -> {
+                                val releasedNormally = !change.isConsumed
+                                when {
+                                    !releasedNormally -> {
+                                        finishGesture(
+                                            PlayerSurfaceInputPolicy.GestureEndReason.Cancel,
+                                        )
+                                    }
+                                    axis == GestureSeekMath.Axis.Horizontal -> {
                                         val duration = durationRef.longValue
                                         val target = GestureSeekMath.targetMs(
                                             startPositionMs = seekStartPosition,
@@ -1793,10 +1976,17 @@ private fun PlayerGestureLayer(
                                             dxPx = change.position.x - downX,
                                             widthPx = size.width.toFloat(),
                                         )
-                                        onCommitSeek(target)
-                                        onSeekGesture(null)
+                                        finishGesture(
+                                            reason = PlayerSurfaceInputPolicy.GestureEndReason.Release,
+                                            releasedSeekTargetMs = target,
+                                        )
                                     }
-                                    GestureSeekMath.Axis.None -> {
+                                    axis == GestureSeekMath.Axis.Vertical -> {
+                                        finishGesture(
+                                            PlayerSurfaceInputPolicy.GestureEndReason.Release,
+                                        )
+                                    }
+                                    else -> {
                                         if (playingRef.value) {
                                             val nowMs = SystemClock.uptimeMillis()
                                             val action = SkipSeekMath.classifyTap(
@@ -1835,12 +2025,32 @@ private fun PlayerGestureLayer(
                                 }
                                 axis = GestureSeekMath.Axis.None
                             }
-                            else -> Unit
+                            else -> {
+                                // ACTION_CANCEL and pointer-input replacement can
+                                // arrive without a normal Release. Never commit a
+                                // final seek in that path.
+                                if (axis != GestureSeekMath.Axis.None &&
+                                    event.changes.none { it.pressed }
+                                ) {
+                                    finishGesture(PlayerSurfaceInputPolicy.GestureEndReason.Cancel)
+                                }
+                            }
                         }
                     }
+                    }
+                } finally {
+                    // Covers pointer coroutine cancellation and composition exit.
+                    finishGesture(PlayerSurfaceInputPolicy.GestureEndReason.Cancel)
                 }
             }
-            .semantics { contentDescription = toggleCd }
+            .semantics {
+                contentDescription = surfaceCd
+                role = Role.Button
+                onClick(label = toggleCd) {
+                    activateSurface()
+                    true
+                }
+            }
             .testTag("player_playing_touch"),
     )
 }

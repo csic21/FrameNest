@@ -58,4 +58,22 @@ class PlayerChromePolicyTest {
         assertTrue(PlayerControlLayoutPolicy.useTwoActionRows(widthDp = 600f, fontScale = 1.3f))
         assertFalse(PlayerControlLayoutPolicy.useTwoActionRows(widthDp = 600f, fontScale = 1f))
     }
+
+    @Test
+    fun errorNeverEnablesBottomPlayAsASecondRetryEntry() {
+        assertFalse(
+            PlayerActionPolicy.playEnabled(
+                phase = PlayerState.Phase.Error,
+                canPlay = true,
+                canPause = true,
+            ),
+        )
+        assertTrue(
+            PlayerActionPolicy.playEnabled(
+                phase = PlayerState.Phase.Paused,
+                canPlay = true,
+                canPause = false,
+            ),
+        )
+    }
 }

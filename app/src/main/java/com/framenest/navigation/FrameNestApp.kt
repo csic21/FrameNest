@@ -35,7 +35,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.framenest.ContextAppContainer
 import com.framenest.app.AppContainer
-import com.framenest.core.model.RemoteLocation
 import com.framenest.feature.browser.BrowseRoute
 import com.framenest.feature.player.PlayerRoute
 import com.framenest.feature.servers.ServersRoute
@@ -169,12 +168,9 @@ private fun FrameNestNavHost(
                     useListDetail = useListDetail,
                     serverRepository = container.serverRepository,
                     onOpenBrowse = { serverId, defaultShare ->
-                        val location = if (!defaultShare.isNullOrBlank()) {
-                            RemoteLocation.shareRoot(defaultShare)
-                        } else {
-                            RemoteLocation.ROOT
+                        FrameNestRoutes.initialBrowseBackStack(serverId, defaultShare).forEach { route ->
+                            navController.navigate(route)
                         }
-                        navController.navigate(FrameNestRoutes.browse(serverId, location))
                     },
                 )
             }
@@ -207,9 +203,9 @@ private fun FrameNestNavHost(
                         navController.navigate(FrameNestRoutes.browse(serverId, next))
                     },
                     onOpenFile = { remote ->
-                        navController.navigate(
-                            FrameNestRoutes.player(remote.serverId, remote.share, remote.path),
-                        )
+                        FrameNestRoutes.playerForBrowseEntry(remote)?.let { route ->
+                            navController.navigate(route)
+                        }
                     },
                 )
             }
