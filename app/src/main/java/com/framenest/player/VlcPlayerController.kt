@@ -147,9 +147,11 @@ class VlcPlayerController(
         scrubbing = false
         cancelSeekPreview(pausePlayer = false)
         pauseAfterFirstFramePhase = if (opening) PlayerState.Phase.Ready else null
+        slaveSubtitles.reset()
     }
     /** Owned AFD from path B; closed on re-prepare / release. */
     private var ownedSeekableAfd: AssetFileDescriptor? = null
+    private val slaveSubtitles = SlaveSubtitleTracker()
     private var subtitleDelayMs: Long = 0L
     private var subtitleFontRelSize: Int = DEFAULT_SUBTITLE_FONT_REL_SIZE
     private var videoScaleMode: VideoScaleMode = VideoScaleMode.BestFit
@@ -845,6 +847,9 @@ class VlcPlayerController(
                 else -> Uri.fromFile(File(trimmed))
             }
             // Never pass SMB credentials here — only local/content paths.
+            // Snapshot current SPU ids first so the slave that libVLC injects is
+            // not listed as an embedded track.
+            slaveSubtitles.captureBeforeAddSlave(currentSpuIds())
             val ok = player.addSlave(IMedia.Slave.Type.Subtitle, uri, select)
             if (ok) {
                 // Give libVLC a beat to register ES, then refresh + apply delay.
@@ -853,15 +858,17 @@ class VlcPlayerController(
                     refreshTracks()
                     applySpuDelay()
                     if (select) {
-                        val tracks = mediaPlayer?.spuTracks
-                        val last = tracks?.lastOrNull()
-                        if (last != null && last.id >= 0) {
-                            mediaPlayer?.setSpuTrack(last.id)
-                            _state.update { it.copy(selectedSubtitleTrackId = last.id) }
+                        val lastSlave = mediaPlayer?.spuTracks
+                            ?.lastOrNull { it.id >= 0 && slaveSubtitles.isSlave(it.id) }
+                            ?: mediaPlayer?.spuTracks?.lastOrNull { it.id >= 0 }
+                        if (lastSlave != null) {
+                            mediaPlayer?.setSpuTrack(lastSlave.id)
+                            _state.update { it.copy(selectedSubtitleTrackId = lastSlave.id) }
                         }
                     }
                 }
             } else {
+                slaveSubtitles.cancelPending()
                 Log.w(TAG, "addSlave returned false for external subtitle")
             }
             ok
@@ -1364,13 +1371,28 @@ class VlcPlayerController(
         }
     }
 
+    private fun currentSpuIds(): Set<Int> =
+        mediaPlayer?.spuTracks
+            ?.map { it.id }
+            ?.filter { it >= 0 }
+            ?.toSet()
+            .orEmpty()
+
     private fun refreshTracks() {
         val player = mediaPlayer ?: return
+        val slaveIds = slaveSubtitles.syncWithCurrentIds(currentSpuIds())
         val audio = player.audioTracks
             ?.map { PlayerTrack(it.id, it.name ?: "Audio ${it.id}", PlayerTrack.Kind.Audio) }
             .orEmpty()
         val subs = player.spuTracks
-            ?.map { PlayerTrack(it.id, it.name ?: "Subtitle ${it.id}", PlayerTrack.Kind.Subtitle) }
+            ?.map {
+                PlayerTrack(
+                    id = it.id,
+                    name = it.name ?: "Subtitle ${it.id}",
+                    kind = PlayerTrack.Kind.Subtitle,
+                    isExternalSlave = it.id >= 0 && it.id in slaveIds,
+                )
+            }
             .orEmpty()
         _state.update {
             it.copy(

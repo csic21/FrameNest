@@ -1,5 +1,7 @@
 package com.framenest.feature.subtitle
 
+import com.framenest.player.PlayerTrack
+
 /**
  * UI / session models for subtitle selection (embedded + external sidecars).
  */
@@ -26,6 +28,17 @@ data class ExternalSubtitleOption(
     val localPath: String? = null,
 ) {
     val selectionKey: String get() = SubtitleSelectionKeys.external(remotePath)
+}
+
+object SubtitleTrackLists {
+    /**
+     * Tracks shown under the embedded heading: valid SPU ids that were not
+     * created by attaching a sidecar via addSlave.
+     */
+    fun embedded(tracks: List<PlayerTrack>): List<PlayerTrack> =
+        tracks.filter {
+            it.kind == PlayerTrack.Kind.Subtitle && it.id >= 0 && !it.isExternalSlave
+        }
 }
 
 object SubtitleSelectionKeys {

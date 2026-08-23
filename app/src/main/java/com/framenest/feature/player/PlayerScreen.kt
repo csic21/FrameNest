@@ -121,6 +121,7 @@ import com.framenest.feature.listen_translate.ListenTranslateOverlay
 import com.framenest.feature.listen_translate.ListenTranslateUiState
 import com.framenest.feature.subtitle.ExternalSubtitleOption
 import com.framenest.feature.subtitle.SubtitleControls
+import com.framenest.feature.subtitle.SubtitleTrackLists
 import com.framenest.feature.subtitle.SubtitleUiState
 import com.framenest.player.BufferingPolicy
 import com.framenest.player.PlaybackRates
@@ -528,7 +529,7 @@ fun PlayerScreen(
                     showAudioTracks = showAudioTracks,
                     listenUi = listenUi,
                     subtitleUi = subtitleUi,
-                    embeddedTracks = state.subtitleTracks.filter { it.id >= 0 },
+                    embeddedTracks = SubtitleTrackLists.embedded(state.subtitleTracks),
                     audioTracks = state.audioTracks.filter { it.id >= 0 },
                     selectedAudioTrackId = state.selectedAudioTrackId,
                     onListenEnabled = { vm.setListenTranslateEnabled(it) },

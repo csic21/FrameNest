@@ -36,6 +36,7 @@ import com.framenest.feature.subtitle.SubtitleFontSizes
 import com.framenest.feature.subtitle.SubtitleLanguagePrefs
 import com.framenest.feature.subtitle.SubtitleMatcher
 import com.framenest.feature.subtitle.SubtitleSelectionKeys
+import com.framenest.feature.subtitle.SubtitleTrackLists
 import com.framenest.feature.subtitle.SubtitleUiState
 import com.framenest.player.CredentialRedactor
 import com.framenest.player.MediaSource
@@ -1222,7 +1223,7 @@ class PlayerViewModel(
 
     private fun autoSelectEmbeddedOnly(state: PlayerState, selectionGeneration: Long) {
         if (!subtitleSelectionGate.isCurrent(selectionGeneration)) return
-        val tracks = state.subtitleTracks.filter { it.id >= 0 }
+        val tracks = SubtitleTrackLists.embedded(state.subtitleTracks)
         if (tracks.isEmpty()) {
             controller.disableSubtitles()
             _subtitleUiState.update {
