@@ -110,6 +110,9 @@
     <string name="player_skip_forward">快进 10 秒</string>
     <string name="player_skip_back_label">−10s</string>
     <string name="player_skip_forward_label">+10s</string>
+    <string name="player_speed_boost_label">2x 加速中</string>
+    <string name="player_speed_boost_hint">松开恢复原速</string>
+    <string name="player_speed_boost_cd">正在 2 倍速播放，松开恢复原速</string>
     <string name="player_lock_controls">锁定控制</string>
     <string name="player_unlock_controls">解锁控制</string>
     <string name="player_lock_controls_cd">锁定控制，防止误触</string>

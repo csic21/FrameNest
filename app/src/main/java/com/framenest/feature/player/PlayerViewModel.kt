@@ -520,6 +520,12 @@ class PlayerViewModel(
     private var lastPreviewTargetMs: Long = Long.MIN_VALUE
 
     /**
+     * User's chosen rate saved while a press-and-hold 2x boost is active;
+     * null when not boosting. Restored verbatim on release.
+     */
+    private var speedBoostSavedRate: Float? = null
+
+    /**
      * Throttled seek used while the thumb or a horizontal swipe is still down so
      * the surface can show the target frame before release.
      */
@@ -590,12 +596,48 @@ class PlayerViewModel(
     }
 
     fun setPlaybackRate(rate: Float) {
+        // An explicit rate choice always wins over a held speed boost.
+        speedBoostSavedRate = null
         controller.setPlaybackRate(rate)
     }
 
     fun cyclePlaybackRate() {
-        val next = PlaybackRates.next(controller.state.value.playbackRate)
-        controller.setPlaybackRate(next)
+        val boostedFrom = speedBoostSavedRate
+        speedBoostSavedRate = null
+        val boostedRate = controller.state.value.playbackRate
+        // While boosting the controller sits at 2x; cycle from the user's real
+        // rate so one tap moves 1x -> 1.25x instead of 2x -> 0.5x.
+        val base = if (boostedFrom != null && boostedRate == SpeedBoostPolicy.BOOST_RATE) {
+            boostedFrom
+        } else {
+            boostedRate
+        }
+        controller.setPlaybackRate(PlaybackRates.next(base))
+    }
+
+    /**
+     * Press-and-hold 2x skim (top-tier player signature). Saves the user's
+     * chosen rate and temporarily pins playback to [SpeedBoostPolicy.BOOST_RATE];
+     * [stopSpeedBoost] restores it on release. Returns false when boost cannot
+     * start (not really playing), so the gesture layer can fall through to the
+     * normal tap behavior instead of swallowing it.
+     */
+    fun startSpeedBoost(): Boolean {
+        if (speedBoostSavedRate != null) return true
+        if (!SpeedBoostPolicy.isEligiblePhase(controller.state.value.phase)) return false
+        speedBoostSavedRate = controller.state.value.playbackRate
+        controller.setPlaybackRate(SpeedBoostPolicy.BOOST_RATE)
+        return true
+    }
+
+    fun stopSpeedBoost() {
+        val saved = speedBoostSavedRate ?: return
+        speedBoostSavedRate = null
+        val restore = SpeedBoostPolicy.restoreRateOrNull(
+            currentRate = controller.state.value.playbackRate,
+            savedUserRate = saved,
+        ) ?: return
+        controller.setPlaybackRate(restore)
     }
 
     /**
@@ -835,6 +877,7 @@ class PlayerViewModel(
         if (exitStateSnapshot != null) return
         val snapshot = controller.state.value
         exitStateSnapshot = snapshot
+        speedBoostSavedRate = null
         scheduleLeaveSave(snapshot)
         controller.release()
     }

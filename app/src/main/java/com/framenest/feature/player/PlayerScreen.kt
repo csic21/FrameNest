@@ -9,6 +9,7 @@ import android.content.res.Configuration
 import android.media.AudioManager
 import android.os.SystemClock
 import android.provider.Settings
+import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.Window
 import androidx.activity.compose.BackHandler
@@ -107,7 +108,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlin.math.abs
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -237,10 +237,14 @@ fun PlayerScreen(
         )
     }
 
-    // A preview seek mutes VLC. Route removal can cancel the pointer coroutine
-    // before its normal release callback, so restore transient audio here too.
+    // A preview seek mutes VLC, and a speed boost pins 2x. Route removal can
+    // cancel the pointer coroutine before its normal release callback, so
+    // restore both transient states here too.
     DisposableEffect(vm) {
-        onDispose { vm.setScrubbing(false) }
+        onDispose {
+            vm.setScrubbing(false)
+            vm.stopSpeedBoost()
+        }
     }
 
     // Keep the screen on while actively playing so the device does not lock /
@@ -426,6 +430,8 @@ fun PlayerScreen(
                 onCommitSeek = { vm.seekTo(it) },
                 onPlay = { vm.play() },
                 onRetry = { vm.retry() },
+                onSpeedBoostStart = { vm.startSpeedBoost() },
+                onSpeedBoostEnd = { vm.stopSpeedBoost() },
                 onUserSeeking = { seeking ->
                     userSeeking = seeking
                     vm.setScrubbing(seeking)
@@ -759,6 +765,8 @@ private fun PlayerSurfaceStack(
     onCommitSeek: (Long) -> Unit,
     onPlay: () -> Unit,
     onRetry: () -> Unit,
+    onSpeedBoostStart: () -> Boolean = { false },
+    onSpeedBoostEnd: () -> Unit = {},
     onUserSeeking: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -778,11 +786,38 @@ private fun PlayerSurfaceStack(
     var gestureIndicator by remember { mutableStateOf<PlayerGesture?>(null) }
     var skipIndicator by remember { mutableStateOf<SkipIndicator?>(null) }
     var seekIndicator by remember { mutableStateOf<SeekGestureUi?>(null) }
+    var speedBoost by remember { mutableStateOf(false) }
     // Restore screen brightness to the system value once the player leaves the
     // surface (e.g. navigates back). Volume is a real system setting and is
     // intentionally left at whatever the user set.
     DisposableEffect(gestureController) {
         onDispose { gestureController.restoreBrightness() }
+    }
+    // Boost only exists inside real playback: leaving Playing (pause, error,
+    // ended, background) restores the user's rate even if the finger is down.
+    // NOTE: PlayerGestureLayer's pointerInput(Unit) never restarts, so it keeps
+    // the *first* begin/finish instances forever. They must read boost state
+    // through an updated ref (same pattern as playingRef) — a direct read of
+    // `speedBoost` would stay stale-false and leak 2x after release.
+    val speedBoostRef = rememberUpdatedState(speedBoost)
+    val finishBoost: () -> Unit = {
+        if (speedBoostRef.value) {
+            speedBoost = false
+            onSpeedBoostEnd()
+        }
+    }
+    val beginBoost: () -> Boolean = {
+        val entered = onSpeedBoostStart()
+        if (entered) {
+            hostView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            speedBoost = true
+        }
+        entered
+    }
+    LaunchedEffect(state.phase, speedBoost) {
+        if (speedBoost && !SpeedBoostPolicy.isEligiblePhase(state.phase)) {
+            finishBoost()
+        }
     }
     LaunchedEffect(skipIndicator) {
         if (skipIndicator != null) {
@@ -891,6 +926,8 @@ private fun PlayerSurfaceStack(
                                 else PlayerGesture.Volume(pct)
                         },
                         onGestureEnd = { gestureIndicator = null },
+                        onSpeedBoostStart = beginBoost,
+                        onSpeedBoostEnd = finishBoost,
                     )
                 }
             }
@@ -950,6 +987,13 @@ private fun PlayerSurfaceStack(
             SeekGestureOverlay(
                 seek = seek,
                 modifier = Modifier.align(Alignment.Center),
+            )
+        }
+        // Press-and-hold skim indicator. Top-center so it never covers the
+        // tapped frame, the skip flashes, or the bottom seek readout.
+        if (speedBoost) {
+            SpeedBoostOverlay(
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 72.dp),
             )
         }
     }
@@ -1359,7 +1403,8 @@ internal fun PlayerControls(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "${formatMs(displayPosition)} / ${formatMs(duration)}",
+                text = "${PlayerTimeFormat.formatDuration(displayPosition)} / " +
+                    PlayerTimeFormat.formatDuration(duration),
                 style = MaterialTheme.typography.labelMedium,
                 color = onBg,
                 modifier = Modifier.testTag("player_time"),
@@ -1755,18 +1800,6 @@ private fun phaseLabel(state: PlayerState): String {
     }
 }
 
-private fun formatMs(ms: Long): String {
-    val totalSec = (ms / 1000).coerceAtLeast(0)
-    val m = totalSec / 60
-    val s = totalSec % 60
-    return "%d:%02d".format(m, s)
-}
-
-private fun formatSignedMs(ms: Long): String {
-    val sign = if (ms < 0L) "−" else "+"
-    return sign + formatMs(abs(ms))
-}
-
 /**
  * Transient indicator shown while the user drags on the video to adjust
  * brightness (left half) or volume (right half).
@@ -1797,6 +1830,10 @@ internal data class SeekGestureUi(
  * **cumulatively from press** (not per-frame) so [BrightnessVolumeController]
  * can map against a fixed baseline.
  *
+ * Press-and-hold (no drag for [SpeedBoostPolicy.ENTER_DELAY_MS]) engages 2x
+ * skim while playing; the boost owns the finger until release and swallows
+ * the tap underneath so chrome never flashes.
+ *
  * Single-tap chrome toggle is delayed by [SkipSeekMath.DOUBLE_TAP_WINDOW_MS]
  * so a second tap can still become a skip without flashing chrome. Paused
  * tap-to-play is immediate so the overlay does not feel lagged.
@@ -1818,6 +1855,8 @@ internal fun PlayerGestureLayer(
     onGestureStart: (isBrightness: Boolean) -> Unit,
     onGestureDrag: (isBrightness: Boolean, totalDeltaPx: Float, rangePx: Float) -> Unit,
     onGestureEnd: () -> Unit,
+    onSpeedBoostStart: () -> Boolean = { false },
+    onSpeedBoostEnd: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     // Holder so the pointerInput block can cancel/reschedule chrome without
@@ -1867,11 +1906,20 @@ internal fun PlayerGestureLayer(
             }
             .focusable()
             .pointerInput(Unit) {
+                val inputScope = this
                 var axis = GestureSeekMath.Axis.None
                 var downX = 0f
                 var downY = 0f
                 var isBrightness = true
                 var seekStartPosition = 0L
+                // Press-and-hold 2x owns the finger from its timer until release.
+                var boostActive = false
+                var boostTimer: Job? = null
+
+                fun cancelBoostTimer() {
+                    boostTimer?.cancel()
+                    boostTimer = null
+                }
 
                 fun finishGesture(
                     reason: PlayerSurfaceInputPolicy.GestureEndReason,
@@ -1885,6 +1933,13 @@ internal fun PlayerGestureLayer(
                     } finally {
                         if (action.clearSeekUi) onSeekGesture(null)
                         if (action.endLevelGesture) onGestureEnd()
+                        if (reason == PlayerSurfaceInputPolicy.GestureEndReason.Cancel) {
+                            cancelBoostTimer()
+                            if (boostActive) {
+                                boostActive = false
+                                onSpeedBoostEnd()
+                            }
+                        }
                         axis = GestureSeekMath.Axis.None
                     }
                 }
@@ -1905,10 +1960,33 @@ internal fun PlayerGestureLayer(
                                 downX = change.position.x
                                 downY = change.position.y
                                 axis = GestureSeekMath.Axis.None
+                                // Arm press-and-hold 2x: fires only while the finger
+                                // is still down without classifying into a drag.
+                                // The ViewModel re-gates on the Playing phase, so a
+                                // pause raced with the timer simply no-ops and the
+                                // release below falls through to the normal tap.
+                                cancelBoostTimer()
+                                boostTimer = inputScope.launch {
+                                    delay(SpeedBoostPolicy.ENTER_DELAY_MS)
+                                    if (axis == GestureSeekMath.Axis.None && !boostActive &&
+                                        playingRef.value
+                                    ) {
+                                        chromeJob.value?.cancel()
+                                        chromeJob.value = null
+                                        lastTapAtMs.longValue = 0L
+                                        boostActive = onSpeedBoostStart()
+                                    }
+                                }
                             }
                             PointerEventType.Move -> {
                                 if (!change.pressed) {
                                     finishGesture(PlayerSurfaceInputPolicy.GestureEndReason.Cancel)
+                                    continue
+                                }
+                                if (boostActive) {
+                                    // 2x owns the finger until release; motion is
+                                    // ignored so the skim never becomes a scrub.
+                                    change.consume()
                                     continue
                                 }
                                 val dxSigned = change.position.x - downX
@@ -1962,8 +2040,18 @@ internal fun PlayerGestureLayer(
                                 }
                             }
                             PointerEventType.Release -> {
-                                val releasedNormally = !change.isConsumed
-                                when {
+                                // A quick tap must never let the armed timer fire
+                                // after the finger is already up.
+                                cancelBoostTimer()
+                                if (boostActive) {
+                                    // Held-2x release restores the user's rate and
+                                    // swallows the tap underneath (no chrome flash).
+                                    boostActive = false
+                                    onSpeedBoostEnd()
+                                    axis = GestureSeekMath.Axis.None
+                                } else {
+                                    val releasedNormally = !change.isConsumed
+                                    when {
                                     !releasedNormally -> {
                                         finishGesture(
                                             PlayerSurfaceInputPolicy.GestureEndReason.Cancel,
@@ -2025,6 +2113,7 @@ internal fun PlayerGestureLayer(
                                     }
                                 }
                                 axis = GestureSeekMath.Axis.None
+                            }
                             }
                             else -> {
                                 // ACTION_CANCEL and pointer-input replacement can
@@ -2123,10 +2212,43 @@ private fun SkipIndicatorOverlay(skip: SkipIndicator, modifier: Modifier = Modif
 }
 
 @Composable
+private fun SpeedBoostOverlay(modifier: Modifier = Modifier) {
+    val label = stringResource(R.string.player_speed_boost_label)
+    val hint = stringResource(R.string.player_speed_boost_hint)
+    val cd = stringResource(R.string.player_speed_boost_cd)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .semantics { contentDescription = cd }
+            .testTag("player_speed_boost"),
+    ) {
+        Text(
+            text = label,
+            color = Color.White,
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.testTag("player_speed_boost_label"),
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = hint,
+            color = Color.White.copy(alpha = 0.85f),
+            style = MaterialTheme.typography.labelLarge,
+        )
+    }
+}
+
+@Composable
 private fun SeekGestureOverlay(seek: SeekGestureUi, modifier: Modifier = Modifier) {
-    val deltaLabel = formatSignedMs(seek.deltaMs)
-    val timeLabel = "${formatMs(seek.targetMs)} / ${formatMs(seek.durationMs)}"
-    val cd = stringResource(R.string.player_gesture_seek_cd, formatMs(seek.targetMs))
+    val deltaLabel = PlayerTimeFormat.formatSignedDelta(seek.deltaMs)
+    val timeLabel =
+        "${PlayerTimeFormat.formatDuration(seek.targetMs)} / " +
+            PlayerTimeFormat.formatDuration(seek.durationMs)
+    val cd = stringResource(
+        R.string.player_gesture_seek_cd,
+        PlayerTimeFormat.formatDuration(seek.targetMs),
+    )
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
