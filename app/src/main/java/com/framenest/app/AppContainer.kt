@@ -12,6 +12,7 @@ import com.framenest.data.server.EncryptedCredentialStore
 import com.framenest.data.server.ServerRepository
 import com.framenest.data.settings.UserPreferences
 import com.framenest.data.thumbnail.ThumbnailRepository
+import com.framenest.feature.listen_translate.asr.SherpaModelInstaller
 import com.framenest.feature.listen_translate.asr.VoskModelInstaller
 import com.framenest.feature.settings.CacheMaintenance
 import com.framenest.smb.SmbClient
@@ -58,6 +59,9 @@ class AppContainer(
     /** Vosk offline ASR models (FN-14); filesDir/listen_models/vosk. */
     val voskModelInstaller: VoskModelInstaller = VoskModelInstaller(appContext)
 
+    /** SenseVoice int8 ASR pack via sherpa-onnx (FN-51); filesDir/listen_models/sherpa. */
+    val sherpaModelInstaller: SherpaModelInstaller = SherpaModelInstaller(appContext)
+
     /** List thumbnails (FN-07); concurrency from [userPreferences]. */
     val thumbnailRepository: ThumbnailRepository = ThumbnailRepository(
         context = appContext,
@@ -72,6 +76,7 @@ class AppContainer(
         listenTranslateRepository = listenTranslateRepository,
         listenModelManager = listenModelManager,
         voskModelInstaller = voskModelInstaller,
+        sherpaModelInstaller = sherpaModelInstaller,
     )
 
     val diagnosticLogExporter: DiagnosticLogExporter = DiagnosticLogExporter(appContext)

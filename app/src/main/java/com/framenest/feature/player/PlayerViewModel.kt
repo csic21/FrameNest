@@ -15,6 +15,7 @@ import com.framenest.data.history.PlaybackProgressRules
 import com.framenest.data.listen_translate.ListenContentKey
 import com.framenest.data.listen_translate.ListenTranslateRepository
 import com.framenest.data.server.AppDatabase
+import com.framenest.data.settings.AsrEngineChoice
 import com.framenest.data.settings.UserPreferences
 import com.framenest.feature.listen_translate.ListenDisplayMode
 import com.framenest.feature.listen_translate.ListenCacheVariant
@@ -24,7 +25,13 @@ import com.framenest.feature.listen_translate.ListenTranslateUiState
 import com.framenest.feature.listen_translate.ListenWindowResult
 import com.framenest.feature.listen_translate.ModelsNotReadyException
 import com.framenest.feature.listen_translate.RealListenTranslateEngine
+import com.framenest.feature.listen_translate.asr.AsrEngine
+import com.framenest.feature.listen_translate.asr.AsrModelSupport
+import com.framenest.feature.listen_translate.asr.SherpaAsrEngine
+import com.framenest.feature.listen_translate.asr.SherpaAsrModelSupport
+import com.framenest.feature.listen_translate.asr.SherpaModelInstaller
 import com.framenest.feature.listen_translate.asr.VoskAsrEngine
+import com.framenest.feature.listen_translate.asr.VoskAsrModelSupport
 import com.framenest.feature.listen_translate.asr.VoskModelInstaller
 import com.framenest.feature.listen_translate.audio.ListenAudioSource
 import com.framenest.feature.listen_translate.audio.ListenAudioSources
@@ -113,6 +120,7 @@ class PlayerViewModel(
     val siblingNavState: StateFlow<SiblingNavUiState> = _siblingNavState.asStateFlow()
 
     private val voskInstaller = VoskModelInstaller(application)
+    private val sherpaInstaller = SherpaModelInstaller(application)
     private val userPreferences = UserPreferences(application)
     private var realListenEngine: RealListenTranslateEngine? = null
     private var listenOnlySmbClient: SmbjClient? = null
@@ -224,6 +232,15 @@ class PlayerViewModel(
             listenPrepareJob = null
             listenSession.setEnabled(false)
             listenSession.setInstallingModels(installing = false)
+            // Release the native recognizer (and its SMB audio handle) now instead
+            // of holding ~240MB of SenseVoice weights until the player is left.
+            val engine = realListenEngine
+            realListenEngine = null
+            if (engine != null) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    runCatching { engine.close() }
+                }
+            }
             return
         }
         listenRestartPendingAfterSourceChange = false
@@ -278,20 +295,23 @@ class PlayerViewModel(
         withContext(Dispatchers.IO) {
             runCatching { previous?.close() }
         }
-        val asrReady = voskInstaller.isInstalled(sourceLang)
+        val asrSupport: AsrModelSupport = when (userPreferences.asrEngine()) {
+            AsrEngineChoice.VOSK -> VoskAsrModelSupport(voskInstaller)
+            AsrEngineChoice.SHERPA -> SherpaAsrModelSupport(sherpaInstaller)
+        }
+        val asrReady = asrSupport.isInstalled(sourceLang)
         listenSession.setModelsReady(false)
         listenSession.setInstallingModels(
             installing = true,
             message = if (asrReady) {
                 "本机 ASR 已就绪（$sourceLang），正在启动听译…"
             } else {
-                "正在下载 Vosk($sourceLang)…\n" +
-                    "也可先到「设置 → 听译模型」安装并查看状态"
+                asrSupport.downloadingMessage(sourceLang)
             },
             error = null,
         )
         var pendingAudio: ListenAudioSource? = null
-        var pendingAsr: VoskAsrEngine? = null
+        var pendingAsr: AsrEngine? = null
         var pendingMt: MlKitMtEngine? = null
         suspend fun closePendingResources() {
             closeListenPreparationResources(
@@ -313,7 +333,11 @@ class PlayerViewModel(
                 pendingAudio = audio
                 var lastProgressPercent = -1
                 val allowMeteredDownloads = userPreferences.allowMeteredModelDownloads()
-                voskInstaller.ensureInstalled(
+                val installingEngineLabel = when (asrSupport.engineChoice()) {
+                    AsrEngineChoice.VOSK -> "Vosk($sourceLang)"
+                    AsrEngineChoice.SHERPA -> "SenseVoice"
+                }
+                asrSupport.ensureInstalled(
                     langTag = sourceLang,
                     allowMeteredDownloads = allowMeteredDownloads,
                 ) { p ->
@@ -323,12 +347,15 @@ class PlayerViewModel(
                         lastProgressPercent = percent
                         listenSession.setInstallingModels(
                             installing = true,
-                            message = "正在准备 Vosk($sourceLang)：$percent%",
+                            message = "正在准备 $installingEngineLabel：$percent%",
                         )
                     }
                 }
                 currentCoroutineContext().ensureActive()
-                val asr = VoskAsrEngine()
+                val asr: AsrEngine = when (asrSupport.engineChoice()) {
+                    AsrEngineChoice.VOSK -> VoskAsrEngine()
+                    AsrEngineChoice.SHERPA -> SherpaAsrEngine()
+                }
                 val mt = MlKitMtEngine(allowMeteredDownloads = allowMeteredDownloads)
                 pendingAsr = asr
                 pendingMt = mt
@@ -336,8 +363,8 @@ class PlayerViewModel(
                     installing = true,
                     message = "正在载入本机 ASR 模型 $sourceLang…",
                 )
-                val modelDir = voskInstaller.modelDir(sourceLang)
-                    ?: error("Vosk($sourceLang) 模型安装不完整")
+                val modelDir = asrSupport.modelDir(sourceLang)
+                    ?: error(asrSupport.incompleteModelMessage(sourceLang))
                 asr.ensureModel(modelDir, sourceLang)
                 listenSession.setInstallingModels(
                     installing = true,
@@ -347,13 +374,11 @@ class PlayerViewModel(
                 currentCoroutineContext().ensureActive()
                 val engine = RealListenTranslateEngine(
                     audio = audio,
-                    vosk = asr,
+                    asr = asr,
                     mt = mt,
-                    voskModels = voskInstaller,
+                    asrModels = asrSupport,
                     selectedAudioTrackOrdinal = { selectedAudioTrackOrdinal() },
-                    asrModelLabel = {
-                        "vosk-${VoskModelInstaller.modelVersionTag(sourceLang) ?: sourceLang}"
-                    },
+                    asrModelLabel = { asrSupport.modelLabel(sourceLang) },
                     mtModelLabel = { "mlkit-v1-$sourceLang-$targetLang" },
                 )
                 if (generation != listenPrepareGeneration) {
@@ -387,7 +412,7 @@ class PlayerViewModel(
         listenSession.setModelsReady(true)
         listenSession.setInstallingModels(
             installing = false,
-            message = "本机听译已就绪：Vosk small($sourceLang) + ML Kit Translate",
+            message = asrSupport.readyMessage(sourceLang),
             error = null,
         )
         listenSession.setEnabled(true)
@@ -1514,6 +1539,10 @@ internal fun listenTranslatePreparationError(error: Throwable): String {
     val detail = error.message?.take(200)
     return when {
         error is NoClassDefFoundError && detail?.contains("org.vosk", ignoreCase = true) == true ->
+            "本机语音识别组件加载失败，请更新应用后重试"
+        // sherpa-onnx JNI (.so 缺失/ABI 不匹配) 直接以该 Error 抛出，保持未包装
+        // 才能匹配到这里，而不是淹没在普通失败文案里。
+        error is UnsatisfiedLinkError ->
             "本机语音识别组件加载失败，请更新应用后重试"
         error is NullPointerException && detail?.contains("null object reference", ignoreCase = true) == true ->
             "本机翻译组件初始化失败，请更新应用后重试"

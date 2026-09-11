@@ -5,6 +5,7 @@ import com.framenest.core.diagnostics.DiagnosticLog
 import com.framenest.data.listen_translate.ListenTranslateRepository
 import com.framenest.data.listen_translate.model.ListenModelManager
 import com.framenest.data.thumbnail.ThumbnailRepository
+import com.framenest.feature.listen_translate.asr.SherpaModelInstaller
 import com.framenest.feature.listen_translate.asr.VoskModelInstaller
 import com.framenest.feature.listen_translate.mt.MlKitTranslationModelCleaner
 import java.io.File
@@ -26,6 +27,7 @@ class CacheMaintenance(
     private val listenTranslateRepository: ListenTranslateRepository? = null,
     private val listenModelManager: ListenModelManager? = null,
     private val voskModelInstaller: VoskModelInstaller? = null,
+    private val sherpaModelInstaller: SherpaModelInstaller? = null,
     private val mlKitTranslationModelCleaner: MlKitTranslationModelCleaner =
         MlKitTranslationModelCleaner(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -74,12 +76,13 @@ class CacheMaintenance(
         )
     }
 
-    /** Clear JSON/Vosk packs and ML Kit translation models from app-private storage. */
+    /** Clear JSON/Vosk/SenseVoice packs and ML Kit translation models from app-private storage. */
     suspend fun clearListenModels(): CacheClearResult = withContext(ioDispatcher) {
         check(CacheDomain.Models in CacheClearPolicy.domainsFor(CacheClearTarget.Models))
         val before = approximateListenModelBytesOnCurrentThread()
         listenModelManager?.deleteAll()
         voskModelInstaller?.deleteAll()
+        sherpaModelInstaller?.deleteAll()
         mlKitTranslationModelCleaner.deleteAll()
         val after = approximateListenModelBytesOnCurrentThread()
         CacheClearResult(
@@ -94,6 +97,7 @@ class CacheMaintenance(
     private fun approximateListenModelBytesOnCurrentThread(): Long {
         var total = listenModelManager?.approximateBytes() ?: 0L
         total += voskModelInstaller?.approximateBytes() ?: 0L
+        total += sherpaModelInstaller?.approximateBytes() ?: 0L
         return total
     }
 

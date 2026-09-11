@@ -17,6 +17,13 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // sherpa-onnx Android AAR (JNI + onnxruntime natives) publishes via JitPack.
+        // Content-filtered to its own group so no other artifact resolves from here.
+        maven("https://jitpack.io") {
+            content {
+                includeGroup("com.github.k2-fsa")
+            }
+        }
     }
 }
 

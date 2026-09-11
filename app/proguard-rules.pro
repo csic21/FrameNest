@@ -26,6 +26,12 @@
 -keep class com.sun.jna.** { *; }
 -dontwarn com.sun.jna.**
 
+# sherpa-onnx (FN-51): JNI entry points (native methods + config getters invoked
+# from C++ by name/signature) must survive R8, or recognizer creation fails
+# with UnsatisfiedLinkError on Release only.
+-keep class com.k2fsa.sherpa.onnx.** { *; }
+-dontwarn com.k2fsa.sherpa.onnx.**
+
 # Room
 -keep class * extends androidx.room.RoomDatabase
 -keep @androidx.room.Entity class *

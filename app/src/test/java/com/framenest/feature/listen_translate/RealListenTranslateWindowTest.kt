@@ -1,6 +1,6 @@
 package com.framenest.feature.listen_translate
 
-import com.framenest.feature.listen_translate.asr.VoskWord
+import com.framenest.feature.listen_translate.asr.AsrWord
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -10,9 +10,9 @@ class RealListenTranslateWindowTest {
     @Test
     fun contextWordsAreAssignedToExactlyOneTargetWindow() {
         val words = listOf(
-            VoskWord("before", startMs = 100L, endMs = 300L),
-            VoskWord("inside", startMs = 900L, endMs = 1_200L),
-            VoskWord("after", startMs = 3_900L, endMs = 4_100L),
+            AsrWord("before", startMs = 100L, endMs = 300L),
+            AsrWord("inside", startMs = 900L, endMs = 1_200L),
+            AsrWord("after", startMs = 3_900L, endMs = 4_100L),
         )
 
         val selected = selectWordsForWindow(

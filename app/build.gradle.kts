@@ -125,6 +125,10 @@ dependencies {
 
     // FN-14: on-device listen-translate (Vosk ASR + ML Kit MT).
     implementation(libs.vosk.android)
+    // FN-51: SenseVoice-Small int8 ASR via sherpa-onnx (default engine).
+    // AAR bundles the JNI bridge + onnxruntime natives for all ABIs; the
+    // arm64-v8a/x86_64 abiFilters above keep only the two shipped ABIs.
+    implementation(libs.sherpa.onnx)
     implementation(libs.mlkit.translate)
     implementation(libs.kotlinx.coroutines.play.services)
 

@@ -73,6 +73,17 @@ class UserPreferences(
         prefs.edit().putBoolean(KEY_ALLOW_METERED_MODEL_DOWNLOADS, allow).apply()
     }
 
+    /**
+     * Offline ASR backend. Default [AsrEngineChoice.SHERPA] (SenseVoice);
+     * Settings UI exposes the switch (Vosk stays for fr/de/es fallback).
+     */
+    fun asrEngine(): AsrEngineChoice =
+        AsrEngineChoice.fromStorage(prefs.getString(KEY_ASR_ENGINE, null))
+
+    fun setAsrEngine(choice: AsrEngineChoice) {
+        prefs.edit().putString(KEY_ASR_ENGINE, choice.storageValue()).apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "framenest_user_prefs"
         private const val KEY_SUBTITLE_LANGS = "subtitle_language_tags"
@@ -80,6 +91,7 @@ class UserPreferences(
         private const val KEY_THUMB_CONCURRENCY = "thumbnail_concurrency"
         private const val KEY_BROWSE_LAYOUT = "browse_layout_mode"
         private const val KEY_ALLOW_METERED_MODEL_DOWNLOADS = "allow_metered_model_downloads"
+        private const val KEY_ASR_ENGINE = "asr_engine"
 
         const val PRESET_SYSTEM = "system"
         const val PRESET_ZH = "zh"

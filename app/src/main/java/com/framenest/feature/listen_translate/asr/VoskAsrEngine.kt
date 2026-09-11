@@ -15,12 +15,12 @@ import org.vosk.Recognizer
  * Offline ASR via Vosk (Kaldi). Expects 16 kHz mono PCM.
  * Model directory must already exist (see [VoskModelInstaller]).
  */
-class VoskAsrEngine {
+class VoskAsrEngine : AsrEngine {
     private val mutex = Mutex()
     private var loadedLang: String? = null
     private var model: Model? = null
 
-    suspend fun ensureModel(modelDir: File, langTag: String) = withContext(Dispatchers.IO) {
+    override suspend fun ensureModel(modelDir: File, langTag: String) = withContext(Dispatchers.IO) {
         mutex.withLock {
             if (loadedLang == langTag && model != null) return@withLock
             closeLocked()
@@ -32,11 +32,11 @@ class VoskAsrEngine {
         }
     }
 
-    suspend fun recognize(pcm16kMono: ShortArray): VoskRecognition = withContext(Dispatchers.IO) {
+    override suspend fun recognize(pcm16kMono: ShortArray): AsrRecognition = withContext(Dispatchers.IO) {
         mutex.withLock {
             val m = model ?: error("Vosk model not loaded")
-            if (pcm16kMono.isEmpty()) return@withLock VoskRecognition.EMPTY
-            if (isNearSilence(pcm16kMono)) return@withLock VoskRecognition.EMPTY
+            if (pcm16kMono.isEmpty()) return@withLock AsrRecognition.EMPTY
+            if (isNearSilencePcm(pcm16kMono)) return@withLock AsrRecognition.EMPTY
             val rec = Recognizer(m, PcmAudioMath.TARGET_SAMPLE_RATE_HZ.toFloat())
             try {
                 rec.setWords(true)
@@ -57,7 +57,7 @@ class VoskAsrEngine {
                     offset += count
                 }
                 completed += parseResult(rec.finalResult)
-                mergeVoskRecognitions(completed)
+                mergeVoskRecognitions(completed).toAsrRecognition()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } finally {
@@ -66,7 +66,7 @@ class VoskAsrEngine {
         }
     }
 
-    fun close() {
+    override fun close() {
         // best-effort; may be called off main
         runCatching {
             kotlinx.coroutines.runBlocking {
@@ -107,13 +107,16 @@ class VoskAsrEngine {
     }
 
     companion object {
-        internal const val MIN_SPEECH_RMS: Float = 0.008f
         private const val STREAM_CHUNK_SAMPLES: Int = 4_000 // 250 ms at 16 kHz
-
-        internal fun isNearSilence(pcm16kMono: ShortArray): Boolean =
-            PcmAudioMath.rmsNormalized(pcm16kMono) < MIN_SPEECH_RMS
     }
 }
+
+/** Engine-neutral view of a Vosk result; word timings are preserved verbatim. */
+internal fun VoskRecognition.toAsrRecognition(): AsrRecognition =
+    AsrRecognition(
+        text = text,
+        words = words.map { AsrWord(text = it.text, startMs = it.startMs, endMs = it.endMs) },
+    )
 
 internal fun mergeVoskRecognitions(parts: List<VoskRecognition>): VoskRecognition {
     val nonBlank = parts.filter { it.text.isNotBlank() || it.words.isNotEmpty() }

@@ -21,6 +21,9 @@ coroutines = "1.10.2"
 room = "2.7.2"
 securityCrypto = "1.1.0"
 voskAndroid = "0.3.75"
+# sherpa-onnx Android AAR via JitPack (pinned: artifact verified on Maven index).
+# 1.12.x carries the stable OfflineRecognizer/SenseVoice Java API used by FN-51.
+sherpaOnnx = "1.12.32"
 mlkitTranslate = "17.0.3"
 # Aligns with coroutines 1.10.2 for Tasks.await / asDeferred.
 playServicesCoroutines = "1.10.2"
@@ -61,6 +64,7 @@ kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "playServicesCoroutines" }
 vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "voskAndroid" }
+sherpa-onnx = { group = "com.github.k2-fsa", name = "sherpa-onnx", version.ref = "sherpaOnnx" }
 mlkit-translate = { group = "com.google.mlkit", name = "translate", version.ref = "mlkitTranslate" }
 
 [plugins]

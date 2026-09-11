@@ -13,6 +13,15 @@ class ListenTranslatePreparationErrorTest {
     }
 
     @Test
+    fun sherpaNativeLoadingFailure_isPresentedAsActionableMessage() {
+        val message = listenTranslatePreparationError(
+            UnsatisfiedLinkError("dlopen failed: library \"libsherpa-onnx-jni.so\" not found"),
+        )
+
+        assertEquals("本机语音识别组件加载失败，请更新应用后重试", message)
+    }
+
+    @Test
     fun regularFailure_preservesUsefulDetail() {
         val message = listenTranslatePreparationError(IllegalStateException("模型安装不完整"))
 

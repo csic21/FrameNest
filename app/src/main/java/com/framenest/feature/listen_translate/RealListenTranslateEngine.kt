@@ -1,24 +1,26 @@
 package com.framenest.feature.listen_translate
 
-import com.framenest.feature.listen_translate.asr.VoskAsrEngine
-import com.framenest.feature.listen_translate.asr.VoskModelInstaller
-import com.framenest.feature.listen_translate.asr.VoskWord
+import com.framenest.feature.listen_translate.asr.AsrEngine
+import com.framenest.feature.listen_translate.asr.AsrModelSupport
+import com.framenest.feature.listen_translate.asr.AsrWord
+import com.framenest.feature.listen_translate.asr.isNearSilencePcm
 import com.framenest.feature.listen_translate.audio.ListenAudioSource
 import com.framenest.feature.listen_translate.mt.MlKitMtEngine
 import java.io.File
 import kotlinx.coroutines.CancellationException
 
 /**
- * Product listen-translate engine (FN-14):
- * PCM window → Vosk offline ASR → ML Kit on-device MT.
+ * Product listen-translate engine (FN-14, FN-51):
+ * PCM window → offline ASR ([AsrEngine]: Vosk small or SenseVoice/Sherpa) →
+ * ML Kit on-device MT.
  */
 class RealListenTranslateEngine(
     private val audio: ListenAudioSource,
-    private val vosk: VoskAsrEngine,
+    private val asr: AsrEngine,
     private val mt: MlKitMtEngine,
-    private val voskModels: VoskModelInstaller,
+    private val asrModels: AsrModelSupport,
     private val selectedAudioTrackOrdinal: () -> Int? = { null },
-    private val asrModelLabel: () -> String = { "vosk-small" },
+    private val asrModelLabel: () -> String = { "asr" },
     private val mtModelLabel: () -> String = { "mlkit-translate" },
 ) : ListenTranslateEngine {
 
@@ -33,16 +35,16 @@ class RealListenTranslateEngine(
     ): ListenWindowResult {
         val srcLang = sourceLang.lowercase()
         val tgtLang = targetLang.lowercase()
-        if (!VoskModelInstaller.supportedSourceLanguages().contains(srcLang)) {
-            throw IllegalStateException("源语言「$srcLang」暂无离线 Vosk 小模型")
+        if (!asrModels.supportedSourceLanguages().contains(srcLang)) {
+            throw IllegalStateException(asrModels.unsupportedLanguageMessage(srcLang))
         }
         if (!MlKitMtEngine.isSupported(srcLang) || !MlKitMtEngine.isSupported(tgtLang)) {
             throw IllegalStateException("语言对 $srcLang→$tgtLang 不被 ML Kit 支持")
         }
 
-        val modelDir: File = voskModels.modelDir(srcLang)
-            ?: throw ModelsNotReadyException("请先下载源语言「$srcLang」的 Vosk 模型")
-        vosk.ensureModel(modelDir, srcLang)
+        val modelDir: File = asrModels.modelDir(srcLang)
+            ?: throw ModelsNotReadyException(asrModels.incompleteModelMessage(srcLang))
+        asr.ensureModel(modelDir, srcLang)
         mt.ensureModel(srcLang, tgtLang)
 
         val decodeStartMs = (startMs - CONTEXT_PADDING_MS).coerceAtLeast(0L)
@@ -71,7 +73,7 @@ class RealListenTranslateEngine(
         }
 
         val recognition = try {
-            vosk.recognize(pcm)
+            asr.recognize(pcm)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
@@ -134,7 +136,7 @@ class RealListenTranslateEngine(
 
     fun close() {
         audio.close()
-        vosk.close()
+        asr.close()
         mt.close()
     }
 
@@ -145,16 +147,16 @@ class RealListenTranslateEngine(
 
 internal fun listenPcmBlankReason(pcm16kMono: ShortArray): ListenBlankReason? = when {
     pcm16kMono.isEmpty() -> ListenBlankReason.EmptyPcm
-    VoskAsrEngine.isNearSilence(pcm16kMono) -> ListenBlankReason.NearSilence
+    isNearSilencePcm(pcm16kMono) -> ListenBlankReason.NearSilence
     else -> null
 }
 
 internal fun selectWordsForWindow(
-    words: List<VoskWord>,
+    words: List<AsrWord>,
     decodeStartMs: Long,
     windowStartMs: Long,
     windowEndMs: Long,
-): List<VoskWord> = words.filter { word ->
+): List<AsrWord> = words.filter { word ->
     val absoluteMidpoint = decodeStartMs + (word.startMs + word.endMs) / 2L
     absoluteMidpoint in windowStartMs until windowEndMs
 }
