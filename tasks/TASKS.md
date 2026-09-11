@@ -928,3 +928,20 @@ unit test、lint、debug/release assemble 通过；无真 NAS 时不虚报真机
 验收：关键导航/字幕动作、缓存清理域、手势取消、方向状态和语义点击有自动测试；手机
 与平板布局截图通过；`testDebugUnitTest`、`lintDebug`、debug/release assemble 与
 AndroidTest 编译通过。真 NAS seek 预览与物理旋转仍按发布验收单补测。
+
+## FN-50：连续快进与片尾重播恢复
+
+**依赖**：FN-44、FN-48、FN-49
+
+**拥有路径**：`player/**`、`feature/player/**`、相关测试、播放决策与交接记录
+**目标**：修复片尾重播无效，约束连续快进的在途请求，并让播放加载失败可恢复。
+
+工作内容：
+
+- 片尾重播重新打开原媒体，清除旧播放事件与进度，不停留在已结束的 native input。
+- 快速拖动保留预览与最终落点，但只保留最新待处理目标，避免积压远程 seek。
+- 播放重开不在主线程等待 native stop；加载超时进入可重试错误。
+- 为重播、请求合并、过期事件和恢复补充最小回归测试；不切换 SMB 路径或解码器。
+
+验收：本地样本在手机和平板配置上连续重播通过；快速 seek 最终目标不丢失；
+unit test、lint、debug assemble 与 AndroidTest 编译通过；真实 NAS 未测项如实记录。

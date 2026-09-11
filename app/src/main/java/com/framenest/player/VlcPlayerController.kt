@@ -58,12 +58,14 @@ class VlcPlayerController(
     private var viewsAttached: Boolean = false
 
     private var pendingSource: MediaSource? = null
-    /** Source retained so an SMB seek can reopen the same input with a fresh decoder. */
+    /** Source retained for replay or recovery after a seek reaches EOF. */
     private var currentSource: MediaSource? = null
     /** Applied as VLC's per-media `:start-time` option by [createMedia]. */
     private var pendingStartPositionMs: Long = 0L
     /** Direct SMB resumes with one fast seek when playback starts, not `:start-time`. */
     private var pendingSmbResumePositionMs: Long = 0L
+    private var interruptedSeekTargetMs: Long? = null
+    private var seekAfterReopenMs: Long? = null
     /** Actual decoder policy for the currently prepared source. */
     private var currentHwDecoderRequested: Boolean = enableHwDecoder
     /** Paused-state target after the next first frame; null means keep playing. */
@@ -87,29 +89,32 @@ class VlcPlayerController(
      */
     private var endedWhileHolding: Boolean = false
     private var released: Boolean = false
-    /**
-     * When true, ignore EndReached from intentional [stop]/media=null (re-prepare /
-     * close). Cleared on a short timer or first Vout — **not** on Opening, because a
-     * residual EndReached from stop() often arrives *after* Opening of the new media
-     * and would otherwise surface as "ended before a video frame was ready".
-     */
-    private var suppressEndReached: Boolean = false
-    /**
-     * When true, ignore both EndReached and EncounteredError (closeCurrentMedia /
-     * release teardown only).
-     */
+    /** Each input owns its listener; posted events from an older input are discarded. */
+    private var inputGeneration = 0L
+    private var inputNeedsStop = false
+    private var inputStopThread: Thread? = null
+    private val remoteSeeks = SeekRequestQueue()
+    private val remoteSeekRunnable = Runnable { drainRemoteSeek() }
+    private var loadTimeoutArmed = false
+    private val loadTimeoutRunnable = Runnable {
+        loadTimeoutArmed = false
+        if (!released) {
+            reportExternalError(
+                PlayerError(
+                    PlayerError.Code.OpenFailed,
+                    "视频加载超时，请检查网络后重试",
+                    retryable = true,
+                ),
+            )
+        }
+    }
+    /** Ignore all input events during teardown and after a terminal state. */
     private var suppressAllTerminalEvents: Boolean = false
     /**
      * True after [MediaPlayer.Event.Opening] for the media started by the latest
      * [tryStartPendingIfReady]. Residual EndReached before Opening is always ignored.
      */
     private var openedCurrentMedia: Boolean = false
-    /**
-     * Number of EndReached events to drop after stop() when the previous media was
-     * non-null. Covers the common residual EOF without treating a later real demux
-     * failure as success.
-     */
-    private var ignoreEndReachedBudget: Int = 0
     /**
      * After seek while paused/Ready, briefly play so libVLC decodes a frame at the
      * new position, then re-pause. Without this, [setTime] updates the clock only.
@@ -132,33 +137,36 @@ class VlcPlayerController(
      * [failOpen]) — which produced phantom "Playing ignored (seek preview)" /
      * "Playing ignored (hold)" events that froze playback.
      *
-     * Does NOT touch the suppress flags ([suppressEndReached] / [suppressAllTerminalEvents]):
+     * Does NOT touch [suppressAllTerminalEvents]:
      * those are intentional per-call policy, and every caller sets them explicitly for
      * the teardown/open it is about to perform. The seek preview / target are cleared
      * and the preview runnables removed via [cancelSeekPreview].
      */
     private fun resetTransientFlags(opening: Boolean) {
+        clearLoadTimeout()
+        remoteSeeks.reset()
+        interruptedSeekTargetMs = null
+        seekAfterReopenMs = null
+        mainHandler.removeCallbacks(remoteSeekRunnable)
         playRequested = false
         awaitingFirstFramePause = opening
         holdForUserPlay = opening
         endedWhileHolding = false
         openedCurrentMedia = false
-        ignoreEndReachedBudget = 0
         scrubbing = false
         cancelSeekPreview(pausePlayer = false)
         pauseAfterFirstFramePhase = if (opening) PlayerState.Phase.Ready else null
         slaveSubtitles.reset()
     }
-    /** Owned AFD from path B; closed on re-prepare / release. */
-    private var ownedSeekableAfd: AssetFileDescriptor? = null
+    /** Owns the raw-resource or proxy descriptor until native input has stopped. */
+    private var ownedMediaAfd: AssetFileDescriptor? = null
     private val slaveSubtitles = SlaveSubtitleTracker()
     private var subtitleDelayMs: Long = 0L
     private var subtitleFontRelSize: Int = DEFAULT_SUBTITLE_FONT_REL_SIZE
     private var videoScaleMode: VideoScaleMode = VideoScaleMode.BestFit
     private var playbackRate: Float = PlaybackRates.DEFAULT
 
-    private val eventListener = MediaPlayer.EventListener { event ->
-        if (released) return@EventListener
+    private fun eventListener(generation: Long) = MediaPlayer.EventListener { event ->
         // Serialize all event handling onto the main thread. The transient flags
         // below are read/written by main-thread methods (play/pause/seekTo/prepare);
         // handling events here on the libVLC thread caused visibility races. StateFlow
@@ -166,15 +174,16 @@ class VlcPlayerController(
         // so the controller behaves like a single-threaded state machine. release()
         // removes all callbacks, so queued events after release are dropped via the
         // guard inside handleEvent.
-        mainHandler.post { if (!released) handleEvent(event) }
+        mainHandler.post {
+            if (!released && generation == inputGeneration && !suppressAllTerminalEvents) {
+                handleEvent(event)
+            }
+        }
     }
 
     private fun handleEvent(event: MediaPlayer.Event) {
         when (event.type) {
             MediaPlayer.Event.Opening -> {
-                // New media is opening. Keep suppressEndReached until the post-stop
-                // grace window ends so a late EndReached from stop() is not treated
-                // as "ended before first frame" for this media.
                 openedCurrentMedia = true
                 _state.update { it.copy(phase = PlayerState.Phase.Preparing, error = null) }
             }
@@ -186,6 +195,17 @@ class VlcPlayerController(
                         isBuffering = snap.isBuffering,
                         bufferPercent = snap.percent,
                     )
+                }
+                if (snap.isBuffering) {
+                    if (playRequested || awaitingFirstFramePause || seekPreview.active) armLoadTimeout()
+                } else if (_state.value.firstFrameReady) {
+                    clearLoadTimeout()
+                    if (seekPreview.active && currentSource is MediaSource.Smb) {
+                        // A preview timeout may have yielded while the NAS was
+                        // buffering. Give the decoded frame time to settle now.
+                        mainHandler.removeCallbacks(seekPreviewPauseRunnable)
+                        mainHandler.postDelayed(seekPreviewPauseRunnable, SEEK_PREVIEW_TIMEOUT_MS)
+                    }
                 }
             }
             MediaPlayer.Event.Playing -> {
@@ -268,21 +288,6 @@ class VlcPlayerController(
                     Log.i(TAG, "EndReached ignored (suppressed during close/release)")
                     return@handleEvent
                 }
-                // Residual EOF from stop()/media=null — often arrives after Opening of
-                // the next media. Drop budgeted residuals and anything still inside the
-                // post-stop grace window so we do not false-error "before first frame".
-                if (ignoreEndReachedBudget > 0) {
-                    ignoreEndReachedBudget--
-                    Log.i(
-                        TAG,
-                        "EndReached ignored (residual budget left=$ignoreEndReachedBudget)",
-                    )
-                    return@handleEvent
-                }
-                if (suppressEndReached) {
-                    Log.i(TAG, "EndReached ignored (suppress window after stop)")
-                    return@handleEvent
-                }
                 if (!openedCurrentMedia) {
                     Log.i(TAG, "EndReached ignored (no Opening for current media yet)")
                     return@handleEvent
@@ -294,32 +299,20 @@ class VlcPlayerController(
                     Log.i(TAG, "EncounteredError ignored (suppressed during close/release)")
                     return@handleEvent
                 }
-                // Residual errors from stop are rare; still report once current media
-                // has started opening so real open failures are not swallowed.
-                if (suppressEndReached && !openedCurrentMedia) {
-                    Log.i(TAG, "EncounteredError ignored (residual before Opening)")
-                    return@handleEvent
-                }
                 // Cancel seek-preview settle/timeout so a late finishSeekPreview
                 // cannot overwrite Error → Paused.
-                resetTransientFlags(opening = false)
-                suppressEndReached = false
                 val message = CredentialRedactor.redact("Playback failed (libVLC EncounteredError)")
-                Log.w(TAG, message)
-                _state.update {
-                    it.copy(
-                        phase = PlayerState.Phase.Error,
-                        error = PlayerError(
-                            code = PlayerError.Code.PlaybackError,
-                            message = message,
-                            retryable = true,
-                        ),
-                    )
-                }
+                reportExternalError(PlayerError(PlayerError.Code.PlaybackError, message, retryable = true))
             }
             MediaPlayer.Event.TimeChanged -> {
                 val time = event.timeChanged.coerceAtLeast(0L)
-                _state.update { it.copy(positionMs = time) }
+                remoteSeeks.inFlightTargetMs?.let { target ->
+                    if (kotlin.math.abs(time - target) <= SEEK_PREVIEW_TOLERANCE_MS) {
+                        remoteSeeks.markSettled()
+                        drainRemoteSeek()
+                    }
+                }
+                _state.update { it.copy(positionMs = remoteSeeks.latestTargetMs ?: time) }
                 if (seekPreview.active && seekPreview.targetMs >= 0L) {
                     val delta = kotlin.math.abs(time - seekPreview.targetMs)
                     if (delta <= SEEK_PREVIEW_TOLERANCE_MS) {
@@ -458,10 +451,8 @@ class VlcPlayerController(
         }
 
         ensureEngine()
-        closeOwnedSeekableAfd()
-        if (source is MediaSource.SeekableDescriptor) {
-            ownedSeekableAfd = source.assetFileDescriptor
-        }
+        discardPendingDescriptor(except = source)
+        invalidateInputEvents()
         resetTransientFlags(opening = true)
         currentSource = source
         currentHwDecoderRequested = enableHwDecoder
@@ -469,7 +460,6 @@ class VlcPlayerController(
         val safeStartMs = startPositionMs.coerceAtLeast(0L)
         pendingSmbResumePositionMs = if (source is MediaSource.Smb) safeStartMs else 0L
         pendingStartPositionMs = if (source is MediaSource.Smb) 0L else safeStartMs
-        suppressEndReached = false
         suppressAllTerminalEvents = false
         _state.update {
             PlayerState(
@@ -491,19 +481,15 @@ class VlcPlayerController(
      */
     fun closeCurrentMedia() {
         if (released) return
+        discardPendingDescriptor()
+        invalidateInputEvents()
         pendingSource = null
         currentSource = null
         pendingStartPositionMs = 0L
         pendingSmbResumePositionMs = 0L
         resetTransientFlags(opening = false)
         suppressAllTerminalEvents = true
-        suppressEndReached = true
-        val player = mediaPlayer
-        if (player != null) {
-            runCatching { player.stop() }
-            runCatching { player.media = null }
-        }
-        closeOwnedSeekableAfd()
+        stopInputThenOpenPending()
         _state.update {
             PlayerState(
                 phase = PlayerState.Phase.Idle,
@@ -514,13 +500,6 @@ class VlcPlayerController(
                 playbackRate = playbackRate,
             )
         }
-        // Clear after libVLC has delivered any async EndReached from stop().
-        mainHandler.postDelayed({
-            if (!released) {
-                suppressAllTerminalEvents = false
-                suppressEndReached = false
-            }
-        }, STOP_EVENT_SUPPRESS_MS)
     }
 
     /**
@@ -529,6 +508,8 @@ class VlcPlayerController(
      */
     fun reportExternalError(error: PlayerError) {
         if (released) return
+        discardPendingDescriptor()
+        invalidateInputEvents()
         pendingSource = null
         resetTransientFlags(opening = false)
         val safe = error.copy(message = CredentialRedactor.redact(error.message))
@@ -538,14 +519,33 @@ class VlcPlayerController(
                 phase = PlayerState.Phase.Error,
                 error = safe,
                 firstFrameReady = false,
+                isBuffering = false,
+                isSeeking = false,
             )
         }
+        stopInputThenOpenPending()
     }
 
     override fun play() {
         if (released) return
         val player = mediaPlayer ?: return
         val phase = _state.value.phase
+        val length = _state.value.durationMs
+        val atEnd = length > 0L && _state.value.positionMs >=
+            (length - END_EPSILON_MS).coerceAtLeast(0L)
+        if (phase == PlayerState.Phase.Ended || endedWhileHolding ||
+            (atEnd && remoteSeeks.latestTargetMs == null &&
+                (phase == PlayerState.Phase.Ready || phase == PlayerState.Phase.Paused))
+        ) {
+            val source = currentSource ?: return
+            // An EOF input cannot be resumed with setTime. Reopen it from zero and
+            // preserve this explicit play request through the first-frame gate.
+            prepare(source, 0L)
+            playRequested = true
+            holdForUserPlay = false
+            pauseAfterFirstFramePhase = null
+            return
+        }
         if (phase == PlayerState.Phase.Error ||
             phase == PlayerState.Phase.Idle ||
             phase == PlayerState.Phase.Preparing
@@ -555,37 +555,26 @@ class VlcPlayerController(
             return
         }
         // User-initiated play cancels pause-scrub preview and continues for real.
-        // Not using resetTransientFlags here: [endedWhileHolding] must survive until
-        // the atOrPastEnd check below so a stale EOF while holding for the user can
-        // still trigger restart-from-0. The other flags are cleared inline.
+        // A pending zero is an explicit seek-to-start, not the history "no resume"
+        // sentinel. An already issued seek can simply continue when Play is pressed.
+        val queuedSeekTarget = remoteSeeks.latestTargetMs.takeIf { remoteSeeks.hasPending }
+            ?: interruptedSeekTargetMs
+        interruptedSeekTargetMs = null
+        remoteSeeks.reset()
+        mainHandler.removeCallbacks(remoteSeekRunnable)
         scrubbing = false
         cancelSeekPreview(pausePlayer = false)
         playRequested = true
         awaitingFirstFramePause = false
         holdForUserPlay = false
         pauseAfterFirstFramePhase = null
-        suppressEndReached = false
         suppressAllTerminalEvents = false
-        ignoreEndReachedBudget = 0
-        val length = player.length.takeIf { it > 0 } ?: _state.value.durationMs
         val time = player.time.coerceAtLeast(0L)
-        // Restart when already at/near EOF (stale pause after full decode, bad resume
-        // seek, short sample that finished during first-frame priming, or EndReached
-        // ignored while holding for the user).
-        val atOrPastEnd = phase == PlayerState.Phase.Ended ||
-            endedWhileHolding ||
-            (length > 0L && time >= (length - END_EPSILON_MS).coerceAtLeast(0L))
         endedWhileHolding = false
-        if (atOrPastEnd) {
-            Log.i(TAG, "play() restart from 0 (phase=$phase time=$time length=$length)")
-            // Prefer seek-to-start over stop(): stop() can drop the media/surface binding.
-            runCatching { player.setTime(0L, /* fast = */ currentSource is MediaSource.Smb) }
-            _state.update { it.copy(positionMs = 0L) }
-        } else {
-            Log.i(TAG, "play() phase=$phase time=$time length=$length")
-        }
-        if (pendingSmbResumePositionMs > 0L) {
-            val targetMs = pendingSmbResumePositionMs
+        Log.i(TAG, "play() phase=$phase time=$time length=$length")
+        val resumeTarget = queuedSeekTarget ?: pendingSmbResumePositionMs.takeIf { it > 0L }
+        if (resumeTarget != null) {
+            val targetMs = resumeTarget
             pendingSmbResumePositionMs = 0L
             val applied = runCatching { player.setTime(targetMs, /* fast = */ true) }
                 .getOrDefault(-1L)
@@ -594,19 +583,35 @@ class VlcPlayerController(
         }
         applyPlaybackRate(player)
         player.play()
+        if (_state.value.isBuffering) armLoadTimeout()
         _state.update { it.copy(phase = PlayerState.Phase.Playing, error = null) }
     }
 
     override fun pause() {
         if (released) return
         val player = mediaPlayer ?: return
-        if (_state.value.phase != PlayerState.Phase.Playing) return
+        if (_state.value.phase == PlayerState.Phase.Preparing) {
+            // Audio-focus/lifecycle pause can arrive while an EOF replay is opening.
+            playRequested = false
+            holdForUserPlay = true
+            pauseAfterFirstFramePhase = PlayerState.Phase.Paused
+            return
+        }
+        if (_state.value.phase != PlayerState.Phase.Playing &&
+            !seekPreview.active && remoteSeeks.latestTargetMs == null
+        ) return
         playRequested = false
+        clearLoadTimeout()
+        interruptedSeekTargetMs = remoteSeeks.latestTargetMs ?: interruptedSeekTargetMs
+        remoteSeeks.reset()
+        mainHandler.removeCallbacks(remoteSeekRunnable)
+        scrubbing = false
         // MediaPlayer.pause() is toggle-like. Never call it when native playback is
         // already paused, otherwise the UI pause action can resume the video.
         if (player.isPlaying) {
             player.pause()
         }
+        cancelSeekPreview(pausePlayer = false)
         _state.update {
             it.copy(
                 phase = if (it.firstFrameReady) PlayerState.Phase.Paused else it.phase,
@@ -638,6 +643,13 @@ class VlcPlayerController(
             cancelSeekPreview(/* pausePlayer = */ false)
         }
         _state.update { it.copy(positionMs = clamped) }
+        pendingSmbResumePositionMs = 0L
+        interruptedSeekTargetMs = null
+        if (isSmb) {
+            remoteSeeks.submit(clamped)
+            drainRemoteSeek()
+            return
+        }
         performSeek(
             player = player,
             targetMs = clamped,
@@ -645,6 +657,25 @@ class VlcPlayerController(
             phase = phase,
             preservePausedIntent = preservePausedIntent,
         )
+    }
+
+    private fun drainRemoteSeek() {
+        mainHandler.removeCallbacks(remoteSeekRunnable)
+        if (released) return
+        val target = remoteSeeks.poll(SystemClock.elapsedRealtime())
+        if (target != null) {
+            val player = mediaPlayer ?: return
+            val phase = _state.value.phase
+            performSeek(
+                player, target, fast = true, phase = phase,
+                preservePausedIntent = PlaybackIntentPolicy.shouldPreservePausedIntentOnSeek(phase),
+            )
+        }
+        // A timer also expires a seek whose fast keyframe landed outside the clock
+        // tolerance. There is never a FIFO of obsolete network seeks to drain.
+        if (remoteSeeks.latestTargetMs != null) {
+            mainHandler.postDelayed(remoteSeekRunnable, REMOTE_SEEK_POLL_MS)
+        }
     }
 
     override fun setScrubbing(active: Boolean) {
@@ -722,7 +753,15 @@ class VlcPlayerController(
     }
 
     private fun finishSeekPreview(reason: String) {
+        if (seekPreview.active && currentSource is MediaSource.Smb && _state.value.isBuffering) {
+            // Pausing before the buffer fills freezes the previous frame, and
+            // clearing isBuffering here would hide the reason from the user.
+            // Keep muted decoding until Buffering=100 or the load watchdog fails.
+            armLoadTimeout()
+            return
+        }
         if (!seekPreview.clear()) return
+        if (!playRequested) clearLoadTimeout()
         mainHandler.removeCallbacks(seekPreviewPauseRunnable)
         mainHandler.removeCallbacks(seekPreviewSettleRunnable)
         val player = mediaPlayer
@@ -902,7 +941,13 @@ class VlcPlayerController(
         _state.update { it.copy(subtitleFontRelSize = clamped) }
         // Best-effort live apply; full effect is on next prepare via media options.
         runCatching {
-            mediaPlayer?.media?.addOption(":freetype-rel-fontsize=$clamped")
+            // getMedia() retains a native reference; release every temporary read.
+            val media = mediaPlayer?.media
+            try {
+                media?.addOption(":freetype-rel-fontsize=$clamped")
+            } finally {
+                media?.release()
+            }
         }
     }
 
@@ -936,16 +981,24 @@ class VlcPlayerController(
     }
 
     override fun release() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            // ViewModel cleanup can originate on IO. Keep snapshotting and input
+            // replacement on the same looper; only native teardown runs off-main.
+            mainHandler.post { release() }
+            return
+        }
         if (released) return
         val releaseStartedAtMs = SystemClock.elapsedRealtime()
         released = true
+        discardPendingDescriptor()
+        inputGeneration++
+        val pendingStop = inputStopThread
         pendingSource = null
         currentSource = null
         pendingStartPositionMs = 0L
         pendingSmbResumePositionMs = 0L
         resetTransientFlags(opening = false)
         suppressAllTerminalEvents = true
-        suppressEndReached = true
         mainHandler.removeCallbacksAndMessages(null)
 
         // Snapshot then null fields so concurrent callers see a released controller.
@@ -957,8 +1010,8 @@ class VlcPlayerController(
         viewsAttached = false
         val vlc = libVlc
         libVlc = null
-        val afd = ownedSeekableAfd
-        ownedSeekableAfd = null
+        val afd = ownedMediaAfd
+        ownedMediaAfd = null
 
         /** Hide/remove the SurfaceView host immediately; contains no libVLC call. */
         fun removeVideoOutputView() {
@@ -997,6 +1050,9 @@ class VlcPlayerController(
          * are removed.
          */
         fun stopNative() {
+            // A prepare/replay may already be stopping this same native input.
+            // Join that worker before final teardown; never race stop with release.
+            pendingStop?.join()
             runCatching { player?.stop() }
             Log.d(
                 TAG,
@@ -1074,9 +1130,9 @@ class VlcPlayerController(
         }
     }
 
-    private fun closeOwnedSeekableAfd() {
-        val afd = ownedSeekableAfd
-        ownedSeekableAfd = null
+    private fun closeOwnedMediaAfd() {
+        val afd = ownedMediaAfd
+        ownedMediaAfd = null
         if (afd != null) {
             runCatching { afd.close() }
         }
@@ -1094,72 +1150,120 @@ class VlcPlayerController(
         val vlc = LibVLC(appContext, options)
         libVlc = vlc
         val player = MediaPlayer(vlc)
-        player.setEventListener(eventListener)
         mediaPlayer = player
+    }
+
+    private fun invalidateInputEvents() {
+        inputGeneration++
+        suppressAllTerminalEvents = true
+        mediaPlayer?.setEventListener(null)
+    }
+
+    private fun discardPendingDescriptor(except: MediaSource? = null) {
+        val afd = (pendingSource as? MediaSource.SeekableDescriptor)?.assetFileDescriptor ?: return
+        if (afd !== ownedMediaAfd &&
+            afd !== (except as? MediaSource.SeekableDescriptor)?.assetFileDescriptor
+        ) {
+            runCatching { afd.close() }
+        }
+    }
+
+    /** One stop worker per controller; newer prepare calls only replace pendingSource. */
+    private fun stopInputThenOpenPending() {
+        if (inputStopThread != null) return
+        val player = mediaPlayer ?: return
+        if (!inputNeedsStop) {
+            closeOwnedMediaAfdUnlessReused()
+            tryStartPendingIfReady()
+            return
+        }
+        inputStopThread = PlayerReleaseExecutor.launch("framenest-vlc-reopen") {
+            val stopped = runCatching { player.stop() }
+            mainHandler.post {
+                inputStopThread = null
+                if (released) return@post
+                if (stopped.isFailure) {
+                    failOpen("Unable to stop previous playback; reopen the player")
+                    return@post
+                }
+                // stop has joined the old native input. Only now may its descriptor
+                // and Media be released, or a listener for the new input installed.
+                player.media = null
+                inputNeedsStop = false
+                closeOwnedMediaAfdUnlessReused()
+                tryStartPendingIfReady()
+            }
+        }
+    }
+
+    private fun closeOwnedMediaAfdUnlessReused() {
+        val next = (pendingSource as? MediaSource.SeekableDescriptor)?.assetFileDescriptor
+        if (ownedMediaAfd !== next) closeOwnedMediaAfd()
     }
 
     private fun tryStartPendingIfReady() {
         val source = pendingSource ?: return
         val player = mediaPlayer ?: return
-        if (!viewsAttached) {
-            // Wait until Compose attaches VLCVideoLayout so first frame can paint.
+        if (!viewsAttached) return
+        armLoadTimeout()
+        if (inputStopThread != null) return
+        if (inputNeedsStop) {
+            stopInputThenOpenPending()
             return
         }
         val startPositionMs = pendingStartPositionMs.coerceAtLeast(0L)
         pendingSource = null
         pendingStartPositionMs = 0L
-        // stop()/media=null can emit EndReached asynchronously — often *after*
-        // Opening of the next media. Drop residual EOF and keep a short suppress
-        // window; do not clear that suppress on Opening (see event listener).
         openedCurrentMedia = false
-        val hadMedia = player.media != null
-        suppressEndReached = true
-        runCatching { player.stop() }
-        runCatching { player.media = null }
-        ignoreEndReachedBudget = if (hadMedia) 1 else 0
-        mainHandler.postDelayed({
-            if (released) return@postDelayed
-            if (suppressEndReached) {
-                suppressEndReached = false
-                // stop() never delivered EndReached — drop unused residual budget so a
-                // later real demux EOF is not swallowed.
-                if (ignoreEndReachedBudget > 0) {
-                    Log.i(TAG, "clearing unused EndReached residual budget")
-                    ignoreEndReachedBudget = 0
-                }
-                Log.i(TAG, "EndReached suppress window ended")
-            }
-        }, STOP_EVENT_SUPPRESS_MS)
-        val media = createMedia(source, startPositionMs) ?: return
-        Log.i(
-            TAG,
-            "opening media source=${source::class.simpleName} startMs=$startPositionMs",
-        )
+        suppressAllTerminalEvents = false
+        if (source is MediaSource.SeekableDescriptor) ownedMediaAfd = source.assetFileDescriptor
+        var media: Media? = null
         try {
+            media = createMedia(source, startPositionMs) ?: return
+            player.setEventListener(eventListener(inputGeneration))
             player.media = media
-            // MediaPlayer retains; release local ref.
-            media.release()
-            // Re-apply rate after setMedia; some demuxes reset rate to 1.0.
+            inputNeedsStop = true
             applyPlaybackRate(player)
             player.play()
         } catch (t: Throwable) {
-            media.release()
-            holdForUserPlay = false
-            awaitingFirstFramePause = false
-            suppressEndReached = false
-            ignoreEndReachedBudget = 0
-            val msg = CredentialRedactor.redact(t.message ?: "Failed to open media")
-            Log.w(TAG, "prepare failed: $msg")
-            _state.update {
-                it.copy(
-                    phase = PlayerState.Phase.Error,
-                    error = PlayerError(PlayerError.Code.OpenFailed, msg, retryable = true),
-                )
-            }
+            failOpen(CredentialRedactor.redact(t.message ?: "Failed to open media"))
+        } finally {
+            // setMedia retains its own reference, including when play throws.
+            media?.release()
         }
     }
 
+    private fun armLoadTimeout() {
+        if (loadTimeoutArmed) return
+        loadTimeoutArmed = true
+        mainHandler.postDelayed(loadTimeoutRunnable, LOAD_TIMEOUT_MS)
+    }
+
+    private fun clearLoadTimeout() {
+        loadTimeoutArmed = false
+        mainHandler.removeCallbacks(loadTimeoutRunnable)
+    }
+
     private fun handleEndReached() {
+        val pendingTarget = remoteSeeks.latestTargetMs
+        val source = currentSource
+        if (source != null && remoteSeeks.hasPending && pendingTarget != null &&
+            pendingTarget < (_state.value.durationMs - END_EPSILON_MS).coerceAtLeast(0L)
+        ) {
+            // An older seek hit EOF while the user already dragged back. Keep the
+            // latest target and decode it on a fresh input instead of dropping it.
+            val shouldPlay = playRequested
+            val pausedPhase = _state.value.phase
+            prepare(source, 0L)
+            playRequested = shouldPlay
+            holdForUserPlay = !shouldPlay
+            pauseAfterFirstFramePhase = if (shouldPlay) null else pausedPhase
+            seekAfterReopenMs = pendingTarget
+            return
+        }
+        clearLoadTimeout()
+        remoteSeeks.reset()
+        mainHandler.removeCallbacks(remoteSeekRunnable)
         // EOF is already a native rest state. Clear any paused-seek preview so its
         // timeout cannot retain the locating UI or restore an obsolete phase later.
         cancelSeekPreview(pausePlayer = false)
@@ -1176,22 +1280,7 @@ class VlcPlayerController(
         // look like a finished movie with a permanent loading spinner.
         if (awaitingFirstFramePause || !_state.value.firstFrameReady) {
             // Clear seek-preview + hold flags so a late settle cannot leave Error.
-            resetTransientFlags(opening = false)
-            val message = CredentialRedactor.redact(
-                "Playback ended before a video frame was ready",
-            )
-            Log.w(TAG, message)
-            _state.update {
-                it.copy(
-                    phase = PlayerState.Phase.Error,
-                    error = PlayerError(
-                        code = PlayerError.Code.OpenFailed,
-                        message = message,
-                        retryable = true,
-                    ),
-                    firstFrameReady = false,
-                )
-            }
+            failOpen("Playback ended before a video frame was ready")
             return
         }
         // Delayed/stale EndReached while still holding first frame (user has not
@@ -1208,9 +1297,13 @@ class VlcPlayerController(
         }
         awaitingFirstFramePause = false
         holdForUserPlay = false
+        playRequested = false
+        suppressAllTerminalEvents = true
         _state.update {
             it.copy(
                 phase = PlayerState.Phase.Ended,
+                isBuffering = false,
+                isSeeking = false,
                 positionMs = it.durationMs.takeIf { d -> d > 0 } ?: pos.coerceAtLeast(0L),
             )
         }
@@ -1240,7 +1333,7 @@ class VlcPlayerController(
                 // Proxy FD path (decision 0002 B): use the bare FileDescriptor for
                 // every file size so nativeNewFromFd + fstat/onGetSize is the only
                 // product SMB descriptor contract.
-                // Keep the AFD open for the session (ownedSeekableAfd).
+                // Keep the AFD open for the session (ownedMediaAfd).
                 Media(vlc, afd.fileDescriptor)
             }
             is MediaSource.Smb -> {
@@ -1276,8 +1369,14 @@ class VlcPlayerController(
     private fun createRawMedia(vlc: LibVLC, @RawRes resId: Int): Media? {
         return try {
             val afd = appContext.resources.openRawResourceFd(resId)
-            // Media(ILibVLC, AssetFileDescriptor) takes ownership of the fd.
-            Media(vlc, afd)
+            // The Java binding reads the descriptor but neither keeps nor closes
+            // the AssetFileDescriptor. Keep it alive through native input teardown.
+            try {
+                Media(vlc, afd).also { ownedMediaAfd = afd }
+            } catch (t: Throwable) {
+                afd.close()
+                throw t
+            }
         } catch (t: Throwable) {
             val msg = CredentialRedactor.redact(t.message ?: "Raw resource open failed")
             failOpen(msg)
@@ -1305,9 +1404,6 @@ class VlcPlayerController(
             Log.i(TAG, "Vout ignored before Opening for current media")
             return
         }
-        // First video output means residual stop() EOF is no longer relevant.
-        suppressEndReached = false
-        ignoreEndReachedBudget = 0
         if (seekPreview.active) {
             // A decoded frame at the seek target — freeze there again.
             finishSeekPreview(reason = "vout")
@@ -1319,30 +1415,37 @@ class VlcPlayerController(
             refreshTracks()
             return
         }
+        clearLoadTimeout()
         // Pause first so the decoded frame sticks. Keep holdForUserPlay=true until
         // user taps play (see play()).
         awaitingFirstFramePause = false
         val player = mediaPlayer
-        if (player?.isPlaying == true) {
+        if (!playRequested && player?.isPlaying == true) {
             player.pause()
         }
         refreshTracks()
         val length = player?.length?.coerceAtLeast(0L) ?: 0L
         val time = player?.time?.coerceAtLeast(0L) ?: 0L
-        val pausedPhase = pauseAfterFirstFramePhase ?: PlayerState.Phase.Ready
+        val pausedPhase = if (playRequested) PlayerState.Phase.Playing
+            else pauseAfterFirstFramePhase ?: PlayerState.Phase.Ready
         pauseAfterFirstFramePhase = null
         _state.update {
             it.copy(
                 phase = pausedPhase,
                 firstFrameReady = true,
+                isBuffering = false,
                 durationMs = length.takeIf { d -> d > 0 } ?: it.durationMs,
                 positionMs = time,
                 isSeekable = player?.isSeekable == true,
             )
         }
+        seekAfterReopenMs?.let { target ->
+            seekAfterReopenMs = null
+            seekTo(target)
+        }
         Log.i(
             TAG,
-            "first frame ready (paused); time=$time length=$length " +
+            "first frame ready phase=$pausedPhase; time=$time length=$length " +
                 "hwDecoderRequested=$currentHwDecoderRequested holdForUser=$holdForUserPlay " +
                 "scale=$videoScaleMode",
         )
@@ -1405,13 +1508,17 @@ class VlcPlayerController(
     }
 
     private fun failOpen(message: String) {
+        invalidateInputEvents()
+        discardPendingDescriptor()
+        pendingSource = null
         resetTransientFlags(opening = false)
-        suppressEndReached = false
         val safe = CredentialRedactor.redact(message)
         _state.update {
             it.copy(
                 phase = PlayerState.Phase.Error,
                 firstFrameReady = false,
+                isBuffering = false,
+                isSeeking = false,
                 error = PlayerError(
                     code = PlayerError.Code.OpenFailed,
                     message = safe,
@@ -1430,11 +1537,8 @@ class VlcPlayerController(
         private const val MAX_SUBTITLE_FONT_REL_SIZE = 32
         /** Treat as EOF when remaining time is within this window (ms). */
         private const val END_EPSILON_MS: Long = 400L
-        /**
-         * How long to ignore EndReached after stop()/media=null when starting a new
-         * media. Residual EOF commonly arrives after Opening of the next item.
-         */
-        private const val STOP_EVENT_SUPPRESS_MS: Long = 400L
+        private const val LOAD_TIMEOUT_MS = 30_000L
+        private const val REMOTE_SEEK_POLL_MS = 100L
         /** Max time to run play() after a paused seek before re-pausing. */
         private const val SEEK_PREVIEW_TIMEOUT_MS: Long = 750L
         /** Consider seek-preview settled when TimeChanged is this close to target. */

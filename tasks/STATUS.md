@@ -54,6 +54,7 @@
 | FN-47 播放后目录浏览卡住 | 已完成 | Grok | `agent/FN-47-browse-hang-after-playback` | FN-22, FN-44 | [FN-47](handoffs/FN-47.md) |
 | FN-48 拖动预览/全屏/手势快进 | 已完成 | Grok | `agent/FN-48-player-seek-gestures` | FN-15, FN-16, FN-17, FN-46 | [FN-48](handoffs/FN-48.md) |
 | FN-49 关键操作逻辑与无障碍收口 | 已完成 | Codex | `main` | FN-31, FN-47, FN-48 | [FN-49](handoffs/FN-49.md) |
+| FN-50 连续快进与片尾重播恢复 | 已完成 | Codex | `agent/FN-50-playback-recovery` | FN-44, FN-48, FN-49 | [FN-50](handoffs/FN-50.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。

@@ -177,6 +177,12 @@ class PlayerViewModel(
         }
         viewModelScope.launch {
             controller.state.collect { state ->
+                if (state.phase == PlayerState.Phase.Preparing && subtitleBootstrapDone) {
+                    // EOF replay creates a fresh native media, so its subtitle slaves
+                    // must be attached again when the new first frame is available.
+                    subtitleBootstrapDone = false
+                    subtitleSelectionGate.advance()
+                }
                 listenSession.setContentKey(
                     ListenCacheVariant.contentKey(
                         listenBaseContentKey,
@@ -834,10 +840,8 @@ class PlayerViewModel(
     }
 
     private fun pauseFromSystem() {
-        val phase = controller.state.value.phase
-        if (phase == PlayerState.Phase.Playing) {
-            controller.pause()
-        }
+        // A Ready/Paused UI may still be decoding a muted seek preview.
+        controller.pause()
     }
 
     private suspend fun loadResumeAndOpen(forceReloadHistory: Boolean = true) {
