@@ -1,5 +1,6 @@
 package com.framenest.feature.listen_translate.asr
 
+import android.content.res.AssetManager
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
@@ -22,8 +23,12 @@ import kotlinx.coroutines.withContext
  * `finally`. Native failures propagate raw on purpose — keeping
  * [UnsatisfiedLinkError] unwrapped lets `listenTranslatePreparationError`
  * recognize a broken native install instead of showing an opaque message.
+ *
+ * @param assetManager process asset manager (native layer requires one even
+ *   when models come from absolute private-storage paths).
  */
 class SherpaAsrEngine(
+    private val assetManager: AssetManager,
     private val numThreads: Int = DEFAULT_NUM_THREADS,
 ) : AsrEngine {
 
@@ -42,24 +47,24 @@ class SherpaAsrEngine(
                 if (!onnx.isFile || !tokens.isFile) {
                     error("SenseVoice 模型缺失（${SherpaModelInstaller.MODEL_ID}）")
                 }
-                val senseVoice = OfflineSenseVoiceModelConfig.builder()
-                    .setModel(onnx.absolutePath)
-                    .setLanguage(mapLanguage(langTag))
-                    .setInverseTextNormalization(true)
-                    .build()
-                val modelConfig = OfflineModelConfig.builder()
-                    .setSenseVoice(senseVoice)
-                    .setTokens(tokens.absolutePath)
-                    .setNumThreads(numThreads.coerceAtLeast(1))
-                    .setDebug(false)
-                    .setProvider("cpu")
-                    .build()
-                val config = OfflineRecognizerConfig.builder()
-                    .setOfflineModelConfig(modelConfig)
-                    .setDecodingMethod("greedy_search")
-                    .setMaxActivePaths(4)
-                    .build()
-                recognizer = OfflineRecognizer(config)
+                val senseVoice = OfflineSenseVoiceModelConfig(
+                    model = onnx.absolutePath,
+                    language = mapLanguage(langTag),
+                    useInverseTextNormalization = true,
+                )
+                val modelConfig = OfflineModelConfig(
+                    senseVoice = senseVoice,
+                    tokens = tokens.absolutePath,
+                    numThreads = numThreads.coerceAtLeast(1),
+                    debug = false,
+                    provider = "cpu",
+                )
+                val config = OfflineRecognizerConfig(
+                    modelConfig = modelConfig,
+                    decodingMethod = "greedy_search",
+                    maxActivePaths = 4,
+                )
+                recognizer = OfflineRecognizer(assetManager, config)
                 loadedKey = key
             }
         }

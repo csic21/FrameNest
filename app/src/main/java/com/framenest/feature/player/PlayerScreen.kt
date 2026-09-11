@@ -1906,7 +1906,6 @@ internal fun PlayerGestureLayer(
             }
             .focusable()
             .pointerInput(Unit) {
-                val inputScope = this
                 var axis = GestureSeekMath.Axis.None
                 var downX = 0f
                 var downY = 0f
@@ -1965,8 +1964,12 @@ internal fun PlayerGestureLayer(
                                 // The ViewModel re-gates on the Playing phase, so a
                                 // pause raced with the timer simply no-ops and the
                                 // release below falls through to the normal tap.
+                                // NOTE: PointerInputScope is not a CoroutineScope,
+                                // so the timer launches on the remembered
+                                // composition scope (stable across recompositions
+                                // and cancelled with the surface).
                                 cancelBoostTimer()
-                                boostTimer = inputScope.launch {
+                                boostTimer = scope.launch {
                                     delay(SpeedBoostPolicy.ENTER_DELAY_MS)
                                     if (axis == GestureSeekMath.Axis.None && !boostActive &&
                                         playingRef.value

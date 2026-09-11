@@ -354,7 +354,8 @@ class PlayerViewModel(
                 currentCoroutineContext().ensureActive()
                 val asr: AsrEngine = when (asrSupport.engineChoice()) {
                     AsrEngineChoice.VOSK -> VoskAsrEngine()
-                    AsrEngineChoice.SHERPA -> SherpaAsrEngine()
+                    AsrEngineChoice.SHERPA ->
+                        SherpaAsrEngine(assetManager = getApplication<Application>().assets)
                 }
                 val mt = MlKitMtEngine(allowMeteredDownloads = allowMeteredDownloads)
                 pendingAsr = asr

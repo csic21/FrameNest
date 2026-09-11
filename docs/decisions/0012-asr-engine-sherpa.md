@@ -28,7 +28,11 @@ FN-14 落地的 Vosk small（`small-cn-0.22`，2022 年 Kaldi TDNN）是听译�
 ### 钉死的集成事实（均已核对源码/官方文档）
 
 - AAR：`com.github.k2-fsa:sherpa-onnx:1.12.32`（JitPack，AAR 44.4MB，含全 ABI `.so`；
-  本仓 abiFilters 只留 arm64-v8a/x86_64，包体增量约 +11MB/分包）。
+  本仓 abiFilters 只留 arm64-v8a/x86_64）。注意 1.12.32 的 Android API 是
+  **Kotlin data class 风格**（`OfflineSenseVoiceModelConfig(model=…, language=…, …)`，
+  `OfflineRecognizer(assetManager, config)`），不是 master 分支 Java `builder()` 写法；
+  CI 已用 javap 锁定签名。arm64 natives 约 30MB（未压缩；onnxruntime 19.3 +
+  c-api 4.8 + jni 5.1），release 包体增量以 CI 产物实测为准。
 - Java API（master 已核对签名）：`OfflineRecognizer(OfflineRecognizerConfig)` →
   `createStream()` → `acceptWaveform(float[], 16000)` → `decode()` →
   `getResult()` → `getText/getTokens/getTimestamps`（逐 token 起始秒，中文到字）。
@@ -63,8 +67,8 @@ FN-14 落地的 Vosk small（`small-cn-0.22`，2022 年 Kaldi TDNN）是听译�
 
 ## 后果
 
-- 包体：AAR 按 ABI 拆分后 release arm64 预计 +11MB（72.0 → ~83MB），以实测为准，
-  记入包体账本。
+- 包体：AAR 按 ABI 拆分后 release arm64 增量以 CI 产物实测为准（arm64
+  natives 未压缩约 30MB，压缩后预计 +12~15MB），记入包体账本。
 - R8：`com.k2fsa.sherpa.onnx.**` 全 keep（JNI 按名反射；FN-25/26 教训）。
 - License：sherpa-onnx 为 Apache-2.0；**SenseVoiceSmall 权重为 FunASR Model
   License**（官方澄清可商用、需署名），设置页须加署名行（交接中描述）。
