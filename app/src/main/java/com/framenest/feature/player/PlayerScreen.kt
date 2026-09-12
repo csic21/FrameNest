@@ -200,6 +200,14 @@ fun PlayerScreen(
                         vm.onLeaveOrBackground()
                     }
                 }
+                // Background destroys the SurfaceView surface with the same Compose
+                // size, so VlcVideoSurface's size-change refresh never fires. Rebind
+                // + repaint here or the picture stays black after switching apps.
+                Lifecycle.Event.ON_START -> {
+                    if (activity?.isChangingConfigurations != true) {
+                        vm.onReturnToForeground()
+                    }
+                }
                 else -> Unit
             }
         }

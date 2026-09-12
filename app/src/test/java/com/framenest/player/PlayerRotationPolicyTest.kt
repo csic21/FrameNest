@@ -40,6 +40,52 @@ class PlayerRotationPolicyTest {
     }
 
     @Test
+    fun foreground_repaintsRestingFrameOnly() {
+        assertTrue(
+            PlayerRotationPolicy.shouldRepaintOnForeground(
+                firstFrameReady = true,
+                phase = PlayerState.Phase.Paused,
+            ),
+        )
+        assertTrue(
+            PlayerRotationPolicy.shouldRepaintOnForeground(
+                firstFrameReady = true,
+                phase = PlayerState.Phase.Ready,
+            ),
+        )
+        assertFalse(
+            PlayerRotationPolicy.shouldRepaintOnForeground(
+                firstFrameReady = false,
+                phase = PlayerState.Phase.Paused,
+            ),
+        )
+        assertFalse(
+            PlayerRotationPolicy.shouldRepaintOnForeground(
+                firstFrameReady = true,
+                phase = PlayerState.Phase.Playing,
+            ),
+        )
+        assertFalse(
+            PlayerRotationPolicy.shouldRepaintOnForeground(
+                firstFrameReady = true,
+                phase = PlayerState.Phase.Preparing,
+            ),
+        )
+        assertFalse(
+            PlayerRotationPolicy.shouldRepaintOnForeground(
+                firstFrameReady = true,
+                phase = PlayerState.Phase.Ended,
+            ),
+        )
+        assertFalse(
+            PlayerRotationPolicy.shouldRepaintOnForeground(
+                firstFrameReady = true,
+                phase = PlayerState.Phase.Error,
+            ),
+        )
+    }
+
+    @Test
     fun staleContainer_cannotDetachCurrentVideoLayout() {
         val currentContainer = Any()
 

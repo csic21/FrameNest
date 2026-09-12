@@ -678,6 +678,39 @@ class VlcPlayerController(
         }
     }
 
+    /**
+     * Repaint the resting frame after the SurfaceView surface was destroyed by an
+     * app-background transition.
+     *
+     * Same-position muted decode via the paused-seek preview path. Unlike [seekTo],
+     * this never clears [pendingSmbResumePositionMs] so a Ready state holding an
+     * unapplied SMB resume keeps it for the user's first play().
+     */
+    fun repaintCurrentFrame() {
+        if (released) return
+        val snap = _state.value
+        if (!snap.firstFrameReady) return
+        if (snap.phase != PlayerState.Phase.Ready && snap.phase != PlayerState.Phase.Paused) return
+        val player = mediaPlayer ?: return
+        if (remoteSeeks.latestTargetMs != null) return
+        if (!player.isSeekable && snap.durationMs <= 0L) return
+        val duration = player.length.takeIf { it > 0 } ?: snap.durationMs
+        val target = snap.positionMs.coerceIn(0L, if (duration > 0) duration else snap.positionMs)
+        _state.update { it.copy(positionMs = target) }
+        if (currentSource is MediaSource.Smb) {
+            remoteSeeks.submit(target)
+            drainRemoteSeek()
+            return
+        }
+        performSeek(
+            player = player,
+            targetMs = target,
+            fast = false,
+            phase = snap.phase,
+            preservePausedIntent = true,
+        )
+    }
+
     override fun setScrubbing(active: Boolean) {
         if (released) return
         if (scrubbing == active) return

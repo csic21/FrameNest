@@ -862,6 +862,31 @@ class PlayerViewModel(
         scheduleLeaveSave(controller.state.value)
     }
 
+    /**
+     * Call when the app returns to the foreground after [onLeaveOrBackground].
+     *
+     * Backgrounding destroys the SurfaceView surface while the Compose host keeps
+     * the same size, so the size-change surface refresh never fires and
+     * libVLC stays bound to the dead surface (black picture, play appears stuck).
+     * Always rebind, then repaint the resting frame when Ready/Paused so the user
+     * sees the picture again without having to leave and re-enter the player.
+     */
+    fun onReturnToForeground() {
+        val snapshot = controller.state.value
+        controller.refreshVideoSurfaces()
+        if (
+            com.framenest.player.PlayerRotationPolicy.shouldRepaintOnForeground(
+                firstFrameReady = snapshot.firstFrameReady,
+                phase = snapshot.phase,
+            )
+        ) {
+            // Prefer the resume-preserving repaint; other controllers fall back to
+            // a same-position seek (their pending-resume contract, if any, is theirs).
+            (controller as? com.framenest.player.VlcPlayerController)?.repaintCurrentFrame()
+                ?: controller.seekTo(snapshot.positionMs)
+        }
+    }
+
     private fun scheduleLeaveSave(state: PlayerState) {
         if (state.phase == PlayerState.Phase.Idle ||
             state.phase == PlayerState.Phase.Preparing ||
