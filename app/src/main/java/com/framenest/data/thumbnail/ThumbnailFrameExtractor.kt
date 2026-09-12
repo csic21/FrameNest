@@ -2,7 +2,9 @@ package com.framenest.data.thumbnail
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
+import android.os.Build
 import android.os.HandlerThread
 import android.util.Log
 import com.framenest.player.SmbSeekableMedia
@@ -50,9 +52,16 @@ class ThumbnailFrameExtractor(
                 ?.toLongOrNull()
                 ?.coerceAtLeast(0L)
                 ?: 0L
+            // Fast path: embedded cover art needs no video decode at all.
+            embeddedCover(retriever, durationMs)?.let { return it }
+            val videoW = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+                ?.toIntOrNull() ?: 0
+            val videoH = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+                ?.toIntOrNull() ?: 0
+            val dst = scaledDstSize(videoW, videoH, targetMaxEdgePx)
             val candidates = ThumbnailCandidatePolicy.candidateTimestampsMs(durationMs)
             for (timeMs in candidates) {
-                val frame = getFrameAt(retriever, timeMs) ?: continue
+                val frame = getFrameAt(retriever, timeMs, dst) ?: continue
                 if (isBlack(frame)) {
                     Log.d(TAG, "black frame at ${timeMs}ms label=$debugLabel")
                     if (!frame.isRecycled) frame.recycle()
@@ -80,11 +89,67 @@ class ThumbnailFrameExtractor(
         }
     }
 
-    private fun getFrameAt(retriever: MediaMetadataRetriever, timeMs: Long): Bitmap? {
+    private fun embeddedCover(
+        retriever: MediaMetadataRetriever,
+        durationMs: Long,
+    ): ExtractResult? {
+        val bytes = try {
+            retriever.embeddedPicture
+        } catch (t: Throwable) {
+            Log.d(TAG, "embeddedPicture failed: ${t.javaClass.simpleName}")
+            null
+        } ?: return null
+        if (bytes.isEmpty()) return null
+        val bitmap = try {
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        } catch (t: Throwable) {
+            Log.d(TAG, "embedded decode failed: ${t.javaClass.simpleName}")
+            null
+        } ?: return null
+        if (bitmap.width <= 0 || bitmap.height <= 0) {
+            if (!bitmap.isRecycled) bitmap.recycle()
+            return null
+        }
+        if (isBlack(bitmap)) {
+            Log.d(TAG, "embedded cover is black, fall back to frame decode")
+            if (!bitmap.isRecycled) bitmap.recycle()
+            return null
+        }
+        val scaled = scaleDown(bitmap)
+        if (scaled !== bitmap && !bitmap.isRecycled) bitmap.recycle()
+        return ExtractResult(
+            bitmap = scaled,
+            jpegBytes = compressJpeg(scaled),
+            usedTimestampMs = 0L,
+            durationMs = durationMs,
+        )
+    }
+
+    private fun getFrameAt(
+        retriever: MediaMetadataRetriever,
+        timeMs: Long,
+        dst: Pair<Int, Int>? = null,
+    ): Bitmap? {
         val timeUs = timeMs.coerceAtLeast(0L) * 1000L
         return try {
             // OPTION_CLOSEST_SYNC is cheap and good enough for list covers.
-            retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            // API 27+ decodes directly at thumbnail size; older devices fall
+            // back to full-res decode + scaleDown below.
+            if (dst != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                try {
+                    retriever.getScaledFrameAtTime(
+                        timeUs,
+                        MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                        dst.first,
+                        dst.second,
+                    )
+                } catch (t: Throwable) {
+                    Log.d(TAG, "scaled frame failed, fallback full-res: ${t.javaClass.simpleName}")
+                    retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                }
+            } else {
+                retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            }
         } catch (t: Throwable) {
             Log.d(TAG, "getFrameAtTime failed t=${timeMs}ms: ${t.javaClass.simpleName}")
             null
@@ -120,5 +185,21 @@ class ThumbnailFrameExtractor(
         private const val TAG = "FrameNestThumb"
         const val DEFAULT_MAX_EDGE_PX: Int = 320
         const val DEFAULT_JPEG_QUALITY: Int = 80
+
+        /**
+         * Target size for [MediaMetadataRetriever.getScaledFrameAtTime] that
+         * preserves aspect ratio with the longest edge at [maxEdgePx].
+         * Returns null when source dimensions are unknown (caller falls back
+         * to full-res decode + [scaleDown] equivalent).
+         */
+        fun scaledDstSize(videoWidth: Int, videoHeight: Int, maxEdgePx: Int): Pair<Int, Int>? {
+            if (videoWidth <= 0 || videoHeight <= 0 || maxEdgePx <= 0) return null
+            val maxEdge = maxOf(videoWidth, videoHeight)
+            if (maxEdge <= maxEdgePx) return Pair(videoWidth, videoHeight)
+            val scale = maxEdgePx.toDouble() / maxEdge.toDouble()
+            val w = (videoWidth * scale).toInt().coerceAtLeast(1)
+            val h = (videoHeight * scale).toInt().coerceAtLeast(1)
+            return Pair(w, h)
+        }
     }
 }

@@ -63,6 +63,26 @@ class PcmAudioMathTest {
     }
 
     @Test
+    fun resampleMonoTo16k_thirdsRateWhenFrom48k() {
+        val src = ShortArray(48_000) { (it % 200).toShort() }
+        val out = PcmAudioMath.resampleMonoTo16k(src, sourceRateHz = 48_000)
+        assertEquals(16_000, out.size)
+        // Exact 3:1 step hits every third input sample.
+        assertEquals(src[0], out[0])
+        assertEquals(src[3], out[1])
+        assertEquals(src[6], out[2])
+    }
+
+    @Test
+    fun resampleMonoTo16k_matchesExpectedLengthFor441k() {
+        val src = ShortArray(44_100) { 1000 }
+        val out = PcmAudioMath.resampleMonoTo16k(src, sourceRateHz = 44_100)
+        assertEquals(16_000, out.size)
+        // Constant input stays constant through linear interpolation.
+        assertTrue(out.all { it == 1000.toShort() })
+    }
+
+    @Test
     fun resampleMonoTo16k_identityAt16k() {
         val src = shortArrayOf(1, 2, 3, 4)
         val out = PcmAudioMath.resampleMonoTo16k(src, sourceRateHz = 16_000)

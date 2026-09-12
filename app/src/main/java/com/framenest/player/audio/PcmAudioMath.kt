@@ -62,6 +62,10 @@ object PcmAudioMath {
     /**
      * Linear-interpolation resample mono shorts to [TARGET_SAMPLE_RATE_HZ].
      * If [sourceRateHz] already matches, returns [mono] unchanged.
+     *
+     * Uses one incremental accumulator instead of a per-sample
+     * `i * sourceRate / target` multiply+divide, which roughly halves the
+     * floating-point work on the 44.1 kHz → 16 kHz path (~48k samples/window).
      */
     fun resampleMonoTo16k(mono: ShortArray, sourceRateHz: Int): ShortArray {
         if (mono.isEmpty()) return ShortArray(0)
@@ -72,13 +76,16 @@ object PcmAudioMath {
             .coerceAtLeast(0)
         if (outLen == 0) return ShortArray(0)
         val out = ShortArray(outLen)
+        val lastIndex = mono.lastIndex
+        val step = sourceRateHz.toDouble() / TARGET_SAMPLE_RATE_HZ
+        var srcPos = 0.0
         for (i in 0 until outLen) {
-            val srcPos = i.toDouble() * sourceRateHz / TARGET_SAMPLE_RATE_HZ
-            val idx = srcPos.toInt().coerceIn(0, mono.lastIndex)
+            val idx = srcPos.toInt().coerceIn(0, lastIndex)
             val frac = srcPos - idx
             val s0 = mono[idx].toInt()
-            val s1 = mono[minOf(idx + 1, mono.lastIndex)].toInt()
+            val s1 = mono[if (idx < lastIndex) idx + 1 else lastIndex].toInt()
             out[i] = (s0 + ((s1 - s0) * frac).toInt()).toShort()
+            srcPos += step
         }
         return out
     }

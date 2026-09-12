@@ -58,8 +58,30 @@ class PcmWindowDecoderClipTest {
     }
 
     @Test
-    fun pcmSampleAccumulator_appendsInOrder_andGrowsPastEstimate() {
-        val accumulator = PcmSampleAccumulator(initialCapacity = 3)
+    fun cachedDecoderName_cachesLookupPerMime() {
+        clearCachedDecoderNamesForTest()
+        var lookups = 0
+        val first = cachedDecoderName("audio/mp4a-latm") { lookups++; "c2.aac.decoder" }
+        val second = cachedDecoderName("audio/mp4a-latm") { lookups++; "c2.aac.other" }
+        assertEquals("c2.aac.decoder", first)
+        assertEquals("c2.aac.decoder", second)
+        assertEquals(1, lookups)
+        clearCachedDecoderNamesForTest()
+    }
+
+    @Test
+    fun cachedDecoderName_returnsNullWithoutCaching() {
+        clearCachedDecoderNamesForTest()
+        var lookups = 0
+        assertNull(cachedDecoderName("audio/x-unknown") { lookups++; null })
+        assertEquals(1, lookups)
+        assertNull(cachedDecoderName("audio/x-unknown") { lookups++; null })
+        assertEquals(2, lookups)
+        clearCachedDecoderNamesForTest()
+    }
+
+    @Test
+    fun pcmSampleAccumulator_appendsInOrder_andGrowsPastEstimate() {        val accumulator = PcmSampleAccumulator(initialCapacity = 3)
 
         accumulator.append(shortArrayOf(1, 2))
         accumulator.append(shortArrayOf(3, 4, 5))

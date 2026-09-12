@@ -9,6 +9,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import androidx.annotation.RawRes
 import java.io.FileDescriptor
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -111,12 +112,26 @@ class PcmWindowDecoder {
             var sampleRate = format.getIntegerOr(MediaFormat.KEY_SAMPLE_RATE, 44_100)
             var channels = format.getIntegerOr(MediaFormat.KEY_CHANNEL_COUNT, 1)
 
-            val codecName = MediaCodecList(MediaCodecList.REGULAR_CODECS)
-                .findDecoderForFormat(format)
-                ?: throw UnsupportedOperationException(
-                    "设备不支持听译音轨编码 $mime（视频仍可继续播放）",
-                )
-            codec = MediaCodec.createByCodecName(codecName)
+            val codecName = cachedDecoderName(
+                mime = mime,
+                lookup = {
+                    MediaCodecList(MediaCodecList.REGULAR_CODECS).findDecoderForFormat(format)
+                },
+            ) ?: throw UnsupportedOperationException(
+                "设备不支持听译音轨编码 $mime（视频仍可继续播放）",
+            )
+            codec = try {
+                MediaCodec.createByCodecName(codecName)
+            } catch (t: Throwable) {
+                // Cached entry went stale (e.g. codec disabled); drop it and
+                // re-query once before surfacing the failure.
+                decoderNameCache.remove(mime, codecName)
+                val fresh = MediaCodecList(MediaCodecList.REGULAR_CODECS)
+                    .findDecoderForFormat(format)
+                    ?.also { decoderNameCache[mime] = it }
+                    ?: throw t
+                MediaCodec.createByCodecName(fresh)
+            }
             codec.configure(format, null, null, 0)
             codec.start()
 
@@ -336,4 +351,25 @@ internal fun chooseAudioTrack(
     if (extractorTrackIndices.isEmpty()) return null
     val ordinal = preferredAudioTrackOrdinal ?: 0
     return extractorTrackIndices.getOrNull(ordinal) ?: extractorTrackIndices.first()
+}
+
+/**
+ * Decoder-name cache keyed by MIME.
+ *
+ * Building [MediaCodecList] and calling `findDecoderForFormat` enumerates
+ * every codec on the device; listen-translate previously paid that cost once
+ * per 3-second window. The audio MIME → decoder mapping is stable per boot,
+ * so cache it and only re-query when `createByCodecName` rejects the entry.
+ */
+private val decoderNameCache = ConcurrentHashMap<String, String>()
+
+internal fun cachedDecoderName(mime: String, lookup: () -> String?): String? {
+    decoderNameCache[mime]?.let { return it }
+    val fresh = lookup() ?: return null
+    decoderNameCache[mime] = fresh
+    return fresh
+}
+
+internal fun clearCachedDecoderNamesForTest() {
+    decoderNameCache.clear()
 }

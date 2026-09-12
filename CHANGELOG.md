@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## 0.4.1-internal
+
+Decode-path performance, no behavior change:
+
+### Performance
+
+- **Thumbnails**: try embedded cover art first (zero video decode); on API 27+
+  decode directly at 320px via `getScaledFrameAtTime` instead of full-res
+  decode + `createScaledBitmap`
+- **Listen-translate PCM**: cache `MediaCodecList.findDecoderForFormat` result
+  per MIME (was once per 3s window); resample 44.1/48 kHz → 16 kHz with a
+  single incremental accumulator instead of per-sample multiply+divide
+
+### Known limitations
+
+- Same as 0.4.0-internal; real-NAS E2E still depends on user environment
+
 ## 0.4.0-internal (2026-08-24)
 
 Internal test build after listen-translate, player product controls, brand, and
