@@ -261,7 +261,9 @@ class VlcPlayerController(
                 // the intentional final pause, so that event takes the normal path.
                 if (seekPreview.active) {
                     val player = mediaPlayer
-                    if (player != null && !player.isPlaying) {
+                    // Unknown state skips the kick: blindly calling play() here could
+                    // start audible playback against a pause intent.
+                    if (player != null && !runCatching { player.isPlaying }.getOrDefault(true)) {
                         runCatching { player.play() }
                     }
                     Log.i(TAG, "Paused ignored (seek preview still locating target)")
@@ -540,18 +542,38 @@ class VlcPlayerController(
             val source = currentSource ?: return
             // An EOF input cannot be resumed with setTime. Reopen it from zero and
             // preserve this explicit play request through the first-frame gate.
+            // A seek issued while Ended is still honored: the target is applied to
+            // the fresh input via seekAfterReopenMs (see onFirstVout) instead of
+            // being dropped by the reopen.
+            val reopenTarget = PlaybackIntentPolicy.replayResumeTargetMs(
+                seekTargetMs = remoteSeeks.latestTargetMs,
+                positionMs = _state.value.positionMs,
+                durationMs = _state.value.durationMs,
+                endEpsilonMs = END_EPSILON_MS,
+            )
             prepare(source, 0L)
             playRequested = true
             holdForUserPlay = false
             pauseAfterFirstFramePhase = null
+            seekAfterReopenMs = reopenTarget
             return
         }
         if (phase == PlayerState.Phase.Error ||
-            phase == PlayerState.Phase.Idle ||
-            phase == PlayerState.Phase.Preparing
+            phase == PlayerState.Phase.Idle
         ) {
             // Nothing useful to resume; caller should retry/prepare again.
             Log.w(TAG, "play() ignored in phase=$phase")
+            return
+        }
+        if (phase == PlayerState.Phase.Preparing) {
+            // Latch the intent (symmetric with pause() in Preparing): the first
+            // frame continues into Playing instead of holding for another tap.
+            // Native playback already started in tryStartPendingIfReady; onFirstVout
+            // sees playRequested and skips the hold pause.
+            playRequested = true
+            holdForUserPlay = false
+            pauseAfterFirstFramePhase = null
+            Log.i(TAG, "play() latched during Preparing; first frame will continue")
             return
         }
         // User-initiated play cancels pause-scrub preview and continues for real.
@@ -569,7 +591,10 @@ class VlcPlayerController(
         holdForUserPlay = false
         pauseAfterFirstFramePhase = null
         suppressAllTerminalEvents = false
-        val time = player.time.coerceAtLeast(0L)
+        // Native getters can throw while an input is being torn down on another
+        // thread; never let that crash the UI thread (setTime below is already
+        // guarded the same way).
+        val time = runCatching { player.time }.getOrDefault(-1L).coerceAtLeast(0L)
         endedWhileHolding = false
         Log.i(TAG, "play() phase=$phase time=$time length=$length")
         val resumeTarget = queuedSeekTarget ?: pendingSmbResumePositionMs.takeIf { it > 0L }
@@ -582,7 +607,19 @@ class VlcPlayerController(
             Log.i(TAG, "SMB resume fast seek target=$targetMs applied=$applied")
         }
         applyPlaybackRate(player)
-        player.play()
+        val playStarted = runCatching { player.play() }
+            .onFailure { t -> Log.w(TAG, "play() native play failed: ${t.javaClass.simpleName}") }
+            .isSuccess
+        if (!playStarted) {
+            reportExternalError(
+                PlayerError(
+                    PlayerError.Code.PlaybackError,
+                    "播放启动失败，可重试",
+                    retryable = true,
+                ),
+            )
+            return
+        }
         if (_state.value.isBuffering) armLoadTimeout()
         _state.update { it.copy(phase = PlayerState.Phase.Playing, error = null) }
     }
@@ -608,8 +645,11 @@ class VlcPlayerController(
         scrubbing = false
         // MediaPlayer.pause() is toggle-like. Never call it when native playback is
         // already paused, otherwise the UI pause action can resume the video.
-        if (player.isPlaying) {
-            player.pause()
+        // A throwing getter means "unknown" — skip the toggle rather than risk a
+        // resume or a main-thread crash.
+        if (runCatching { player.isPlaying }.getOrDefault(false)) {
+            runCatching { player.pause() }
+                .onFailure { t -> Log.w(TAG, "pause() native pause failed: ${t.javaClass.simpleName}") }
         }
         cancelSeekPreview(pausePlayer = false)
         _state.update {
@@ -630,11 +670,13 @@ class VlcPlayerController(
             return
         }
         val player = mediaPlayer ?: return
-        if (!player.isSeekable && _state.value.durationMs <= 0L) {
+        val seekable = runCatching { player.isSeekable }.getOrDefault(false)
+        if (!seekable && _state.value.durationMs <= 0L) {
             Log.w(TAG, "seekTo ignored (not seekable, duration unknown)")
             return
         }
-        val duration = player.length.takeIf { it > 0 } ?: _state.value.durationMs
+        val duration = runCatching { player.length }.getOrDefault(0L)
+            .takeIf { it > 0 } ?: _state.value.durationMs
         val clamped = positionMs.coerceIn(0L, if (duration > 0) duration else positionMs)
         // Playing seeks proceed normally. Paused seeks deliberately keep one preview
         // session alive across repeated drags so its final re-pause cannot be lost.
@@ -693,8 +735,10 @@ class VlcPlayerController(
         if (snap.phase != PlayerState.Phase.Ready && snap.phase != PlayerState.Phase.Paused) return
         val player = mediaPlayer ?: return
         if (remoteSeeks.latestTargetMs != null) return
-        if (!player.isSeekable && snap.durationMs <= 0L) return
-        val duration = player.length.takeIf { it > 0 } ?: snap.durationMs
+        val seekable = runCatching { player.isSeekable }.getOrDefault(false)
+        if (!seekable && snap.durationMs <= 0L) return
+        val duration = runCatching { player.length }.getOrDefault(0L)
+            .takeIf { it > 0 } ?: snap.durationMs
         val target = snap.positionMs.coerceIn(0L, if (duration > 0) duration else snap.positionMs)
         _state.update { it.copy(positionMs = target) }
         if (currentSource is MediaSource.Smb) {
@@ -737,10 +781,12 @@ class VlcPlayerController(
     ) {
         val applied = runCatching { player.setTime(targetMs, fast) }
             .getOrDefault(-1L)
+        val seekable = runCatching { player.isSeekable }.getOrDefault(false)
+        val playing = runCatching { player.isPlaying }.getOrDefault(false)
         Log.i(
             TAG,
-            "seekTo target=$targetMs applied=$applied seekable=${player.isSeekable} " +
-                "phase=$phase playing=${player.isPlaying} fast=$fast",
+            "seekTo target=$targetMs applied=$applied seekable=$seekable " +
+                "phase=$phase playing=$playing fast=$fast",
         )
         // While paused / first-frame Ready, setTime alone does not paint a new frame
         // (HW decoder holds the last surface). Briefly play then re-pause.
@@ -762,7 +808,9 @@ class VlcPlayerController(
         // A retarget can arrive while native preview playback is already running.
         // Keep it running and only re-arm the target/timeout; never cancel the final
         // pause obligation. If native playback stopped between events, resume it.
-        if (!player.isPlaying) {
+        // An unknown native state still attempts play: play() on an already-playing
+        // input is a harmless no-op, while skipping it could leave no preview at all.
+        if (!runCatching { player.isPlaying }.getOrDefault(true)) {
             runCatching { player.play() }
                 .onFailure { t ->
                     Log.w(TAG, "seek preview play failed: ${t.message}")
@@ -798,8 +846,12 @@ class VlcPlayerController(
         mainHandler.removeCallbacks(seekPreviewPauseRunnable)
         mainHandler.removeCallbacks(seekPreviewSettleRunnable)
         val player = mediaPlayer
-        if (player != null && player.isPlaying) {
+        // Skip the toggle on unknown state: a blind pause() could resume a paused
+        // input, which is worse than leaving a (muted) preview running until the
+        // next event path pauses it.
+        if (player != null && runCatching { player.isPlaying }.getOrDefault(false)) {
             runCatching { player.pause() }
+                .onFailure { t -> Log.w(TAG, "seek preview pause failed: ${t.javaClass.simpleName}") }
         }
         if (
             PlaybackIntentPolicy.shouldRestoreTransientVolume(
@@ -838,8 +890,9 @@ class VlcPlayerController(
         mainHandler.removeCallbacks(seekPreviewSettleRunnable)
         if (wasActive && pausePlayer) {
             val player = mediaPlayer
-            if (player != null && player.isPlaying) {
+            if (player != null && runCatching { player.isPlaying }.getOrDefault(false)) {
                 runCatching { player.pause() }
+                    .onFailure { t -> Log.w(TAG, "cancel preview pause failed: ${t.javaClass.simpleName}") }
             }
         }
         if (released) {
@@ -1301,8 +1354,10 @@ class VlcPlayerController(
         // timeout cannot retain the locating UI or restore an obsolete phase later.
         cancelSeekPreview(pausePlayer = false)
         val player = mediaPlayer
-        val pos = player?.time ?: _state.value.positionMs
-        val len = player?.length ?: _state.value.durationMs
+        val pos = runCatching { player?.time }.getOrNull()?.coerceAtLeast(0L)
+            ?: _state.value.positionMs
+        val len = runCatching { player?.length }.getOrNull()?.coerceAtLeast(0L)
+            ?: _state.value.durationMs
         Log.i(
             TAG,
             "EndReached pos=$pos len=$len firstFrame=${_state.value.firstFrameReady} " +
@@ -1453,12 +1508,17 @@ class VlcPlayerController(
         // user taps play (see play()).
         awaitingFirstFramePause = false
         val player = mediaPlayer
-        if (!playRequested && player?.isPlaying == true) {
-            player.pause()
+        // Guarded the same way as pause(): never toggle blindly, and a late
+        // Playing event re-drives the hold pause if this one fails.
+        if (!playRequested && player != null &&
+            runCatching { player.isPlaying }.getOrDefault(false)
+        ) {
+            runCatching { player.pause() }
+                .onFailure { t -> Log.w(TAG, "first-frame hold pause failed: ${t.javaClass.simpleName}") }
         }
         refreshTracks()
-        val length = player?.length?.coerceAtLeast(0L) ?: 0L
-        val time = player?.time?.coerceAtLeast(0L) ?: 0L
+        val length = runCatching { player?.length }.getOrNull()?.coerceAtLeast(0L) ?: 0L
+        val time = runCatching { player?.time }.getOrNull()?.coerceAtLeast(0L) ?: 0L
         val pausedPhase = if (playRequested) PlayerState.Phase.Playing
             else pauseAfterFirstFramePhase ?: PlayerState.Phase.Ready
         pauseAfterFirstFramePhase = null
@@ -1469,7 +1529,7 @@ class VlcPlayerController(
                 isBuffering = false,
                 durationMs = length.takeIf { d -> d > 0 } ?: it.durationMs,
                 positionMs = time,
-                isSeekable = player?.isSeekable == true,
+                isSeekable = runCatching { player?.isSeekable == true }.getOrDefault(false),
             )
         }
         seekAfterReopenMs?.let { target ->
@@ -1493,7 +1553,7 @@ class VlcPlayerController(
 
     private fun pauseNativeIfPlaying(reason: String) {
         val player = mediaPlayer ?: return
-        if (player.isPlaying) {
+        if (runCatching { player.isPlaying }.getOrDefault(false)) {
             runCatching { player.pause() }
                 .onFailure { t -> Log.w(TAG, "pause failed ($reason): ${t.message}") }
         }
@@ -1501,7 +1561,9 @@ class VlcPlayerController(
 
     private fun resumeNativeIfRequested(reason: String) {
         val player = mediaPlayer ?: return
-        if (playRequested && !player.isPlaying) {
+        // Unknown state attempts play: intent IS play here, and play() on an
+        // already-playing input is a harmless no-op.
+        if (playRequested && !runCatching { player.isPlaying }.getOrDefault(false)) {
             runCatching { player.play() }
                 .onFailure { t -> Log.w(TAG, "play failed ($reason): ${t.message}") }
         }

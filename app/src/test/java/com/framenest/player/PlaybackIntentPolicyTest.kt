@@ -1,6 +1,8 @@
 package com.framenest.player
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -65,8 +67,7 @@ class PlaybackIntentPolicyTest {
     }
 
     @Test
-    fun transientMute_staysUntilScrubAndPausedPreviewBothEnd() {
-        assertFalse(
+    fun transientMute_staysUntilScrubAndPausedPreviewBothEnd() {        assertFalse(
             PlaybackIntentPolicy.shouldRestoreTransientVolume(
                 scrubbing = true,
                 seekPreviewActive = false,
@@ -82,6 +83,65 @@ class PlaybackIntentPolicyTest {
             PlaybackIntentPolicy.shouldRestoreTransientVolume(
                 scrubbing = false,
                 seekPreviewActive = false,
+            ),
+        )
+    }
+
+    @Test
+    fun replay_prefersExplicitInEndedSeekTarget() {
+        assertEquals(
+            60_000L,
+            PlaybackIntentPolicy.replayResumeTargetMs(
+                seekTargetMs = 60_000L,
+                positionMs = 600_000L,
+                durationMs = 600_000L,
+                endEpsilonMs = 400L,
+            ),
+        )
+    }
+
+    @Test
+    fun replay_fallsBackToRestingClockWithoutSeek() {
+        assertEquals(
+            300_000L,
+            PlaybackIntentPolicy.replayResumeTargetMs(
+                seekTargetMs = null,
+                positionMs = 300_000L,
+                durationMs = 600_000L,
+                endEpsilonMs = 400L,
+            ),
+        )
+    }
+
+    @Test
+    fun replay_dropsTargetsInsideEndEpsilon() {
+        assertNull(
+            PlaybackIntentPolicy.replayResumeTargetMs(
+                seekTargetMs = 599_900L,
+                positionMs = 599_900L,
+                durationMs = 600_000L,
+                endEpsilonMs = 400L,
+            ),
+        )
+    }
+
+    @Test
+    fun replay_returnsNullAtStartOrWithoutDuration() {
+        assertNull(
+            PlaybackIntentPolicy.replayResumeTargetMs(
+                seekTargetMs = null,
+                positionMs = 0L,
+                durationMs = 600_000L,
+                endEpsilonMs = 400L,
+            ),
+        )
+        assertEquals(
+            60_000L,
+            PlaybackIntentPolicy.replayResumeTargetMs(
+                seekTargetMs = 60_000L,
+                positionMs = 0L,
+                durationMs = 0L,
+                endEpsilonMs = 400L,
             ),
         )
     }
