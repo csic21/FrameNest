@@ -40,7 +40,8 @@ interface PlayerController {
      */
     fun setScrubbing(active: Boolean)
 
-    fun selectAudioTrack(trackId: Int)
+    /** @return false when the native switch was rejected; state is unchanged. */
+    fun selectAudioTrack(trackId: Int): Boolean
 
     /**
      * Playback rate multiplier. Values are snapped to [PlaybackRates] steps.

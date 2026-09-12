@@ -612,13 +612,15 @@ class PlayerViewModel(
     }
 
     fun selectAudioTrack(trackId: Int) {
+        // Only re-key listen-translate after the native switch succeeds, so a
+        // rejected switch cannot strand the cache on the wrong audio ordinal.
+        if (!controller.selectAudioTrack(trackId)) return
         val state = controller.state.value
         val ordinal = state.audioTracks
             .filter { it.id >= 0 }
             .indexOfFirst { it.id == trackId }
             .takeIf { it >= 0 }
         listenSession.setContentKey(ListenCacheVariant.contentKey(listenBaseContentKey, ordinal))
-        controller.selectAudioTrack(trackId)
     }
 
     fun setPlaybackRate(rate: Float) {

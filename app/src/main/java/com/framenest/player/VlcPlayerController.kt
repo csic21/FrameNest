@@ -802,8 +802,12 @@ class VlcPlayerController(
         mainHandler.removeCallbacks(seekPreviewSettleRunnable)
         mainHandler.postDelayed(seekPreviewPauseRunnable, SEEK_PREVIEW_TIMEOUT_MS)
         _state.update { it.copy(isSeeking = true) }
-        if (shouldStartNativePreview) {
-            muteSeekPreview(player)
+        if (shouldStartNativePreview && !muteSeekPreview(player)) {
+            // Without the mute the preview would leak audible audio; drop the
+            // frame repaint and keep the seek itself (clock already updated).
+            Log.w(TAG, "seek preview cancelled (could not mute)")
+            cancelSeekPreview(pausePlayer = false)
+            return
         }
         // A retarget can arrive while native preview playback is already running.
         // Keep it running and only re-arm the target/timeout; never cancel the final
@@ -876,9 +880,10 @@ class VlcPlayerController(
                 else -> it.phase
             }
             it.copy(
+                // isBuffering is owned by Buffering events only; clearing it here
+                // hid genuine stalls until the next event arrived.
                 phase = phase,
                 isSeeking = false,
-                isBuffering = false,
             )
         }
         Log.i(TAG, "seek preview finished ($reason)")
@@ -912,17 +917,23 @@ class VlcPlayerController(
         }
     }
 
-    private fun muteSeekPreview(player: MediaPlayer) {
-        if (seekPreviewRestoreVolume != null) return
+    /**
+     * @return false when the mute could not be applied; callers must not start
+     * audible preview playback in that case.
+     */
+    private fun muteSeekPreview(player: MediaPlayer): Boolean {
+        if (seekPreviewRestoreVolume != null) return true
         val currentVolume = runCatching { player.volume }
             .getOrNull()
             ?.takeIf { it >= 0 }
-            ?: return
+            ?: return false
         val muted = runCatching { player.setVolume(0) }
             .getOrDefault(-1) >= 0
         if (muted) {
             seekPreviewRestoreVolume = currentVolume
+            return true
         }
+        return false
     }
 
     private fun restoreSeekPreviewVolume(player: MediaPlayer?) {
@@ -934,12 +945,14 @@ class VlcPlayerController(
         }
     }
 
-    override fun selectAudioTrack(trackId: Int) {
-        if (released) return
-        val player = mediaPlayer ?: return
+    override fun selectAudioTrack(trackId: Int): Boolean {
+        if (released) return false
+        val player = mediaPlayer ?: return false
         if (player.setAudioTrack(trackId)) {
             _state.update { it.copy(selectedAudioTrackId = trackId) }
+            return true
         }
+        return false
     }
 
     override fun setPlaybackRate(rate: Float) {

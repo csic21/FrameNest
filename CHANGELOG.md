@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+## 0.4.2-internal
+
+Main playback path fixes, no behavior change on the happy path:
+
+### Fixes
+
+- **Replay from Ended** keeps an in-Ended seek: reopen from zero, then apply
+  the target on the fresh input instead of dropping it
+- **Play during Preparing** latches the intent (symmetric with pause), so the
+  first frame continues into Playing without a second tap
+- **Native hardening**: all `MediaPlayer` getters/calls guarded — a teardown
+  race can no longer throw onto the main thread; a failed native `play()`
+  surfaces a retryable error instead of crashing
+- **Seek preview**: `isBuffering` is owned by Buffering events again (preview
+  completion no longer hides real stalls); a preview that cannot be muted is
+  cancelled instead of leaking audio
+- **Audio track switch**: listen-translate cache is re-keyed only after the
+  native switch succeeds
+- Removed the unused `ResumeSeekGate.shouldFire` natural-fire path
+
+### Known limitations
+
+- Same as 0.4.1-internal; real-NAS E2E still depends on user environment
+
 ## 0.4.1-internal
 
 Decode-path performance, no behavior change:
