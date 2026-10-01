@@ -65,9 +65,9 @@
 
 | 产物 | 路径 | 约大小 |
 |---|---|---|
-| Release universal | `app/build/outputs/apk/release/app-universal-release-unsigned.apk` | 147.1MB |
-| Release arm64 | `app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk` | 72.3MB |
-| Release x86_64 | `app/build/outputs/apk/release/app-x86_64-release-unsigned.apk` | 79.3MB |
+| Release universal | `app/build/outputs/apk/release/app-universal-release-unsigned.apk` | 208.2MB |
+| Release arm64 | `app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk` | 100.7MB |
+| Release x86_64 | `app/build/outputs/apk/release/app-x86_64-release-unsigned.apk` | 112.2MB |
 
 已发布的安装包是用与 0.4.0 相同的 debug 证书签过名的 arm64 APK：`framenest-0.5.0-internal-arm64.apk`。
 
