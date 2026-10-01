@@ -76,6 +76,33 @@ class ThumbnailDiskSizeIndexTest {
     }
 
     @Test
+    fun diskCache_storesDurationBesideTheRevisedJpeg_andDropsBothOnRemove() {
+        val root = Files.createTempDirectory("framenest-thumbnail-duration").toFile()
+        try {
+            val cache = ThumbnailDiskCache(rootDir = root, maxBytes = 1_024L)
+            val key = key("clip.mkv")
+            cache.put(key, byteArrayOf(1, 2, 3), durationMs = 125_000L)
+
+            val jpeg = cache.fileFor(key)
+            assertTrue(jpeg.name.endsWith(".${ThumbnailDiskCache.FILE_REVISION}.jpg"))
+            assertTrue(jpeg.isFile)
+            assertEquals(125_000L, cache.readDurationMs(key))
+            assertEquals(125_000L, cache.cachedDurationMs(key))
+
+            cache.remove(key)
+            assertFalse(jpeg.exists())
+            assertEquals(0L, cache.readDurationMs(key))
+            val leftover = File(root, ThumbnailDiskCache.SUBDIR)
+                .listFiles()
+                .orEmpty()
+                .count { it.isFile }
+            assertEquals(0, leftover)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun diskCache_trimsJpegsOnlyAfterConfiguredLimitIsExceeded() {
         val root = Files.createTempDirectory("framenest-thumbnail-trim").toFile()
         try {

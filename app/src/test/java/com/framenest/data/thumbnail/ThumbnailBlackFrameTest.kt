@@ -25,6 +25,24 @@ class ThumbnailBlackFrameTest {
     }
 
     @Test
+    fun solidColor_isLowInformation() {
+        val blue = IntArray(64) { 0xFF1020C0.toInt() }
+        val white = IntArray(64) { 0xFFFFFFFF.toInt() }
+        assertTrue(ThumbnailBlackFrame.isLowInformation(blue))
+        assertTrue(ThumbnailBlackFrame.isLowInformation(white))
+        assertTrue(ThumbnailBlackFrame.isLowInformation(IntArray(0)))
+    }
+
+    @Test
+    fun mixedScene_isNotLowInformation() {
+        val pixels = IntArray(64) { index ->
+            if (index % 2 == 0) 0xFF101010.toInt() else 0xFFE8D7A2.toInt()
+        }
+        assertFalse(ThumbnailBlackFrame.isLowInformation(pixels))
+        assertFalse(ThumbnailBlackFrame.isBlackFrame(pixels))
+    }
+
+    @Test
     fun sampleGrid_picksInteriorPixels() {
         val width = 4
         val height = 4

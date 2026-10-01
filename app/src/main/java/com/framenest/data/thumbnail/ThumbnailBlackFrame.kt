@@ -36,6 +36,31 @@ object ThumbnailBlackFrame {
         return mean < LUMINANCE_THRESHOLD && darkRatio >= DARK_PIXEL_RATIO
     }
 
+    /**
+     * Nearly uniform fields (solid color, gray fade) do not show what the video is.
+     * Text on a background still has luminance spread, so title cards are kept.
+     */
+    const val LOW_INFORMATION_LUMINANCE_STDDEV: Double = 6.0
+
+    fun isLowInformation(argb: IntArray): Boolean {
+        if (argb.isEmpty()) return true
+        var sumY = 0.0
+        val luma = DoubleArray(argb.size)
+        for (index in argb.indices) {
+            val y = luminance(argb[index])
+            luma[index] = y
+            sumY += y
+        }
+        val mean = sumY / argb.size
+        var variance = 0.0
+        for (y in luma) {
+            val delta = y - mean
+            variance += delta * delta
+        }
+        val stddev = kotlin.math.sqrt(variance / argb.size)
+        return stddev < LOW_INFORMATION_LUMINANCE_STDDEV
+    }
+
     /** Rec. 601 luma from packed ARGB. */
     fun luminance(argb: Int): Double {
         val r = (argb shr 16) and 0xFF

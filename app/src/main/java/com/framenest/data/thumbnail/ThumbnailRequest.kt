@@ -34,6 +34,9 @@ data class ThumbnailRequest(
 sealed class ThumbnailUiState {
     data object None : ThumbnailUiState()
     data object Loading : ThumbnailUiState()
-    data class Ready(val bitmap: android.graphics.Bitmap) : ThumbnailUiState()
+    data class Ready(
+        val bitmap: android.graphics.Bitmap,
+        val durationMs: Long = 0L,
+    ) : ThumbnailUiState()
     data object Failed : ThumbnailUiState()
 }

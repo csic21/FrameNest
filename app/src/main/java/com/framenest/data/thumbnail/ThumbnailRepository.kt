@@ -105,7 +105,7 @@ class ThumbnailRepository(
         // Memory hits are safe on the UI thread. Disk decode stays on an IO worker.
         val cached = diskCache.getMemoryBitmap(request.key)
         if (cached != null) {
-            current.value = ThumbnailUiState.Ready(cached)
+            current.value = ThumbnailUiState.Ready(cached, diskCache.cachedDurationMs(request.key))
             return
         }
         val state = backoff[digest] ?: ThumbnailBackoffState()
@@ -192,7 +192,7 @@ class ThumbnailRepository(
 
     private fun initialState(key: ThumbnailKey): ThumbnailUiState {
         val bitmap = diskCache.getMemoryBitmap(key) ?: return ThumbnailUiState.None
-        return ThumbnailUiState.Ready(bitmap)
+        return ThumbnailUiState.Ready(bitmap, diskCache.cachedDurationMs(key))
     }
 
     private fun enqueue(request: ThumbnailRequest, workGeneration: Long) {
@@ -263,7 +263,7 @@ class ThumbnailRepository(
             coroutineContext.ensureActive()
             if ((interestCounts[digest] ?: 0) <= 0) return
             diskCache.getBitmap(request.key)?.let { bitmap ->
-                publish(work, ThumbnailUiState.Ready(bitmap))
+                publish(work, ThumbnailUiState.Ready(bitmap, diskCache.readDurationMs(request.key)))
                 return
             }
             val state = backoff[digest] ?: ThumbnailBackoffState()
@@ -318,7 +318,12 @@ class ThumbnailRepository(
                         if (!generation.isCurrent(work.generation)) {
                             false
                         } else {
-                            diskCache.put(request.key, result.jpegBytes, result.bitmap)
+                            diskCache.put(
+                                request.key,
+                                result.jpegBytes,
+                                result.bitmap,
+                                result.durationMs,
+                            )
                             true
                         }
                     }
@@ -330,7 +335,7 @@ class ThumbnailRepository(
                     if (!result.bitmap.isRecycled) result.bitmap.recycle()
                     return false
                 }
-                publish(work, ThumbnailUiState.Ready(result.bitmap))
+                publish(work, ThumbnailUiState.Ready(result.bitmap, result.durationMs))
                 Log.d(
                     TAG,
                     "thumb ok digest=${request.key.digest().take(8)} " +

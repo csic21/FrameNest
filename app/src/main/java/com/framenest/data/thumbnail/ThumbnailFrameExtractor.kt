@@ -62,8 +62,8 @@ class ThumbnailFrameExtractor(
             val candidates = ThumbnailCandidatePolicy.candidateTimestampsMs(durationMs)
             for (timeMs in candidates) {
                 val frame = getFrameAt(retriever, timeMs, dst) ?: continue
-                if (isBlack(frame)) {
-                    Log.d(TAG, "black frame at ${timeMs}ms label=$debugLabel")
+                if (rejectFrame(frame)) {
+                    Log.d(TAG, "unusable frame at ${timeMs}ms")
                     if (!frame.isRecycled) frame.recycle()
                     continue
                 }
@@ -110,8 +110,8 @@ class ThumbnailFrameExtractor(
             if (!bitmap.isRecycled) bitmap.recycle()
             return null
         }
-        if (isBlack(bitmap)) {
-            Log.d(TAG, "embedded cover is black, fall back to frame decode")
+        if (rejectFrame(bitmap)) {
+            Log.d(TAG, "embedded cover unusable, fall back to frame decode")
             if (!bitmap.isRecycled) bitmap.recycle()
             return null
         }
@@ -156,14 +156,15 @@ class ThumbnailFrameExtractor(
         }
     }
 
-    private fun isBlack(bitmap: Bitmap): Boolean {
+    private fun rejectFrame(bitmap: Bitmap): Boolean {
         val w = bitmap.width
         val h = bitmap.height
         if (w <= 0 || h <= 0) return true
         val samples = ThumbnailBlackFrame.sampleGrid(w, h, samplesPerSide = 8) { x, y ->
             bitmap.getPixel(x, y)
         }
-        return ThumbnailBlackFrame.isBlackFrame(samples)
+        return ThumbnailBlackFrame.isBlackFrame(samples) ||
+            ThumbnailBlackFrame.isLowInformation(samples)
     }
 
     private fun scaleDown(source: Bitmap): Bitmap {

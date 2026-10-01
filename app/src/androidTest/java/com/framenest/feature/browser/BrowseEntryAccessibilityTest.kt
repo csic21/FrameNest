@@ -3,6 +3,8 @@ package com.framenest.feature.browser
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHasNoClickAction
+import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -11,6 +13,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.framenest.R
 import com.framenest.core.model.RemoteEntry
 import com.framenest.data.settings.BrowseLayoutMode
+import com.framenest.ui.theme.FrameNestDimens
 import com.framenest.ui.theme.FrameNestTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -53,6 +56,19 @@ class BrowseEntryAccessibilityTest {
         name = "Example.zh.srt",
         isDirectory = false,
     )
+
+    @Test
+    fun listVideo_usesAWideCoverSlot() {
+        setBrowseContent(BrowseLayoutMode.LIST)
+
+        composeRule
+            .onNodeWithTag(
+                "browse_thumb_slot_${video.stableKey()}",
+                useUnmergedTree = true,
+            )
+            .assertWidthIsEqualTo(FrameNestDimens.BrowseListThumbWidth)
+            .assertHeightIsEqualTo(FrameNestDimens.BrowseListThumbHeight)
+    }
 
     @Test
     fun listEntry_exposesLocalizedNameAndTypeInsteadOfTestTag() {
@@ -138,12 +154,18 @@ class BrowseEntryAccessibilityTest {
     private fun expectedDescription(
         entry: RemoteEntry = video,
         typeRes: Int = R.string.browse_type_video,
-    ): String =
-        InstrumentationRegistry.getInstrumentation().targetContext.getString(
-            R.string.browse_entry_cd,
-            entry.name,
-            InstrumentationRegistry.getInstrumentation().targetContext.getString(
-                typeRes,
-            ),
-        )
+    ): String {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val size = if (typeRes == R.string.browse_type_video) {
+            BrowseEntryText.formatBytes(entry.sizeBytes)
+        } else {
+            null
+        }
+        val type = if (size == null) {
+            context.getString(typeRes)
+        } else {
+            context.getString(R.string.browse_type_video_with_size, size)
+        }
+        return context.getString(R.string.browse_entry_cd, entry.name, type)
+    }
 }

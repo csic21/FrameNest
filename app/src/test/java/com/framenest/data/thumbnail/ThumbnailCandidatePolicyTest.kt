@@ -7,9 +7,16 @@ import org.junit.Test
 class ThumbnailCandidatePolicyTest {
 
     @Test
-    fun preferred_usesTenSecondsForLongVideos() {
-        assertEquals(10_000L, ThumbnailCandidatePolicy.preferredTimestampMs(120_000L))
+    fun preferred_usesTenSecondsBeforeTheBodySample() {
         assertEquals(10_000L, ThumbnailCandidatePolicy.preferredTimestampMs(15_000L))
+        assertEquals(10_000L, ThumbnailCandidatePolicy.preferredTimestampMs(59_000L))
+    }
+
+    @Test
+    fun preferred_longVideo_samplesInsideTheBodyWithoutADeepSeek() {
+        assertEquals(30_000L, ThumbnailCandidatePolicy.preferredTimestampMs(120_000L))
+        assertEquals(90_000L, ThumbnailCandidatePolicy.preferredTimestampMs(600_000L))
+        assertEquals(120_000L, ThumbnailCandidatePolicy.preferredTimestampMs(3_600_000L))
     }
 
     @Test
@@ -25,7 +32,8 @@ class ThumbnailCandidatePolicyTest {
         val candidates = ThumbnailCandidatePolicy.candidateTimestampsMs(3_600_000L)
         assertTrue(candidates.isNotEmpty())
         assertTrue(candidates.size <= ThumbnailCandidatePolicy.MAX_CANDIDATES)
-        assertEquals(10_000L, candidates.first())
+        assertEquals(120_000L, candidates.first())
+        assertEquals(candidates.distinct(), candidates)
     }
 
     @Test

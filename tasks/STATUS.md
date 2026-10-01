@@ -56,6 +56,7 @@
 | FN-49 关键操作逻辑与无障碍收口 | 已完成 | Codex | `main` | FN-31, FN-47, FN-48 | [FN-49](handoffs/FN-49.md) |
 | FN-50 连续快进与片尾重播恢复 | 已完成 | Codex | `agent/FN-50-playback-recovery` | FN-44, FN-48, FN-49 | [FN-50](handoffs/FN-50.md) |
 | FN-51 拖动预览图 | 已完成 | Grok | `agent/FN-51-scrub-preview-images` | FN-48, FN-50 | [FN-51](handoffs/FN-51.md) |
+| FN-52 文件夹视频封面 | 已完成 | Grok | `agent/FN-52-folder-video-covers` | FN-07, FN-32, FN-51 | [FN-52](handoffs/FN-52.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。

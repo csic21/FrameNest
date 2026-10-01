@@ -9,7 +9,7 @@ import java.io.IOException
 /**
  * Disk cache for list thumbnails under the app cache directory.
  *
- * Layout: `[cacheDir]/thumbnails/<digest>.jpg`
+ * Layout: `[cacheDir]/thumbnails/<digest>.c2.jpg`, plus a sibling duration file.
  *
  * Clearable for settings (FN-09) via [clear].
  */
@@ -27,8 +27,9 @@ class ThumbnailDiskCache(
         weightOf = { bitmap -> bitmap.byteCount.toLong() },
     )
     private val diskSize = ThumbnailDiskSizeIndex()
+    private val durations = HashMap<String, Long>()
 
-    fun fileFor(key: ThumbnailKey): File = File(dir, "${key.digest()}.jpg")
+    fun fileFor(key: ThumbnailKey): File = File(dir, jpegName(key.digest()))
 
     @Synchronized
     fun has(key: ThumbnailKey): Boolean = fileFor(key).isFile
@@ -51,15 +52,16 @@ class ThumbnailDiskCache(
     fun getBitmap(key: ThumbnailKey): Bitmap? {
         val digest = key.digest()
         getMemoryBitmap(digest)?.let { return it }
-        val file = File(dir, "$digest.jpg")
+        val file = fileFor(key)
         if (!file.isFile) return null
         val decoded = BitmapFactory.decodeFile(file.absolutePath)
         if (decoded == null) {
             val corruptBytes = file.length()
-            if (file.delete()) diskSize.recordDelete(corruptBytes) else diskSize.invalidate()
+            if (deleteJpeg(file)) diskSize.recordDelete(corruptBytes) else diskSize.invalidate()
             return null
         }
         memory.put(digest, decoded)
+        rememberDuration(digest)
         return decoded
     }
 
@@ -68,10 +70,15 @@ class ThumbnailDiskCache(
      */
     @Throws(IOException::class)
     @Synchronized
-    fun put(key: ThumbnailKey, jpegBytes: ByteArray, bitmap: Bitmap? = null) {
+    fun put(
+        key: ThumbnailKey,
+        jpegBytes: ByteArray,
+        bitmap: Bitmap? = null,
+        durationMs: Long = 0L,
+    ) {
         ensureDirectory()
         val digest = key.digest()
-        val file = File(dir, "$digest.jpg")
+        val file = fileFor(key)
         val replacedBytes = if (file.isFile) file.length() else 0L
         val tmp = File(file.absolutePath + ".tmp")
         try {
@@ -89,22 +96,38 @@ class ThumbnailDiskCache(
         if (bitmap != null && !bitmap.isRecycled) {
             memory.put(digest, bitmap)
         }
+        writeDuration(digest, durationMs)
         trimIfNeeded()
+    }
+
+    /** Duration already loaded with a memory bitmap. Does not touch disk. */
+    @Synchronized
+    fun cachedDurationMs(key: ThumbnailKey): Long = durations[key.digest()] ?: 0L
+
+    /** Duration stored beside the JPEG. Safe on the extraction worker. */
+    @Synchronized
+    fun readDurationMs(key: ThumbnailKey): Long {
+        val digest = key.digest()
+        durations[digest]?.let { return it }
+        rememberDuration(digest)
+        return durations[digest] ?: 0L
     }
 
     @Synchronized
     fun remove(key: ThumbnailKey) {
         val digest = key.digest()
         memory.remove(digest)
-        val file = File(dir, "$digest.jpg")
+        durations.remove(digest)
+        val file = fileFor(key)
         val removedBytes = if (file.isFile) file.length() else 0L
-        if (file.delete()) diskSize.recordDelete(removedBytes)
+        if (deleteJpeg(file)) diskSize.recordDelete(removedBytes)
     }
 
     /** Delete all cached thumbnails (disk + memory). */
     @Synchronized
     fun clear() {
         memory.clear()
+        durations.clear()
         dir.listFiles()?.forEach { file ->
             if (file.isFile) file.delete()
         }
@@ -121,10 +144,13 @@ class ThumbnailDiskCache(
         for (file in ordered) {
             if (total <= maxBytes) break
             val len = file.length()
-            if (file.delete()) {
+            if (deleteJpeg(file)) {
                 total -= len
-                val digest = file.name.removeSuffix(".jpg")
-                memory.remove(digest)
+                val digest = digestOfJpeg(file)
+                if (file.name == jpegName(digest)) {
+                    memory.remove(digest)
+                    durations.remove(digest)
+                }
             }
         }
         diskSize.set(total)
@@ -144,8 +170,51 @@ class ThumbnailDiskCache(
             ?.filter { it.isFile && it.name.endsWith(".jpg") }
             .orEmpty()
 
+    private fun rememberDuration(digest: String) {
+        val file = File(dir, durationName(digest))
+        val value = if (file.isFile) {
+            file.readText().trim().toLongOrNull()?.coerceAtLeast(0L) ?: 0L
+        } else {
+            0L
+        }
+        durations[digest] = value
+    }
+
+    private fun writeDuration(digest: String, durationMs: Long) {
+        val stored = durationMs.coerceAtLeast(0L)
+        durations[digest] = stored
+        val file = File(dir, durationName(digest))
+        val tmp = File(file.absolutePath + ".tmp")
+        try {
+            tmp.writeText(stored.toString())
+            if (!tmp.renameTo(file)) {
+                tmp.copyTo(file, overwrite = true)
+            }
+        } finally {
+            tmp.delete()
+        }
+    }
+
+    private fun deleteJpeg(file: File): Boolean {
+        if (!file.isFile) return false
+        val deleted = file.delete()
+        if (deleted) {
+            File(file.parentFile, file.name.removeSuffix(".jpg") + ".dur").delete()
+        }
+        return deleted
+    }
+
+    private fun digestOfJpeg(file: File): String =
+        file.name.removeSuffix(".$FILE_REVISION.jpg").removeSuffix(".jpg")
+
     companion object {
+        /** New covers use this suffix so older 10s frames are not reused. */
+        const val FILE_REVISION: String = "c2"
         const val SUBDIR: String = "thumbnails"
+
+        fun jpegName(digest: String): String = "$digest.$FILE_REVISION.jpg"
+
+        fun durationName(digest: String): String = "$digest.$FILE_REVISION.dur"
         const val DEFAULT_MAX_BYTES: Long = 80L * 1024L * 1024L // 80 MiB
         const val DEFAULT_MAX_MEMORY_BYTES: Long = 16L * 1024L * 1024L // 16 MiB
         const val DEFAULT_MAX_MEMORY_ENTRIES: Int = 64

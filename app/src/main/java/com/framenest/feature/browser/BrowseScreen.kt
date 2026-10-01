@@ -56,11 +56,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -75,6 +75,8 @@ import com.framenest.data.settings.BrowseLayoutMode
 import com.framenest.data.thumbnail.ThumbnailRepository
 import com.framenest.data.thumbnail.ThumbnailUiState
 import com.framenest.ui.theme.FrameNestDimens
+import com.framenest.ui.theme.FrameNestIvory
+import com.framenest.ui.theme.FrameNestMidnight
 
 @Composable
 fun BrowseRoute(
@@ -332,7 +334,6 @@ private fun BrowseList(
                     BrowseEntryLeading(
                         entry = entry,
                         thumbnailRepository = thumbnailRepository,
-                        size = FrameNestDimens.BrowseListThumbSize,
                     )
                 },
                 modifier = Modifier
@@ -460,22 +461,40 @@ private fun BrowseGridCell(
 private fun BrowseEntryLeading(
     entry: RemoteEntry,
     thumbnailRepository: ThumbnailRepository?,
-    size: Dp,
 ) {
     val isVideo = entry.isFile && MediaExtensions.isVideo(entry.name)
-    if (isVideo && thumbnailRepository != null) {
-        BrowseVideoThumbnail(
-            entry = entry,
-            repository = thumbnailRepository,
-            modifier = Modifier
-                .size(size)
-                .testTag("browse_thumb_${entry.stableKey()}"),
-        )
-    } else {
+    if (!isVideo) {
         Icon(
             imageVector = entryIcon(entry),
             contentDescription = null,
         )
+        return
+    }
+    Box(
+        modifier = Modifier
+            .size(
+                width = FrameNestDimens.BrowseListThumbWidth,
+                height = FrameNestDimens.BrowseListThumbHeight,
+            )
+            .clip(RoundedCornerShape(FrameNestDimens.BrowseThumbCorner))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .testTag("browse_thumb_slot_${entry.stableKey()}"),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (thumbnailRepository != null) {
+            BrowseVideoThumbnail(
+                entry = entry,
+                repository = thumbnailRepository,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("browse_thumb_${entry.stableKey()}"),
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Filled.Movie,
+                contentDescription = null,
+            )
+        }
     }
 }
 
@@ -512,6 +531,20 @@ private fun BrowseVideoThumbnail(
                         .fillMaxSize()
                         .testTag("browse_thumb_ready"),
                 )
+                if (s.durationMs > 0L) {
+                    Text(
+                        text = BrowseEntryText.formatDuration(s.durationMs),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = FrameNestIvory,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(4.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(FrameNestMidnight.copy(alpha = 0.72f))
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                            .clearAndSetSemantics { },
+                    )
+                }
             }
             ThumbnailUiState.Loading -> {
                 CircularProgressIndicator(
@@ -537,7 +570,14 @@ private fun entrySupportingText(entry: RemoteEntry): String = when {
     entry.isShare -> stringResource(R.string.browse_type_share)
     entry.isDirectory -> stringResource(R.string.browse_type_folder)
     MediaExtensions.isSubtitle(entry.name) -> stringResource(R.string.browse_type_subtitle_hint)
-    MediaExtensions.isVideo(entry.name) -> stringResource(R.string.browse_type_video)
+    MediaExtensions.isVideo(entry.name) -> {
+        val size = BrowseEntryText.formatBytes(entry.sizeBytes)
+        if (size == null) {
+            stringResource(R.string.browse_type_video)
+        } else {
+            stringResource(R.string.browse_type_video_with_size, size)
+        }
+    }
     else -> stringResource(R.string.browse_type_file)
 }
 

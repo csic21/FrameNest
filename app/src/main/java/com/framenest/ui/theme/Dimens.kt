@@ -22,8 +22,9 @@ object FrameNestDimens {
     /** Keeps long settings rows and their trailing controls visually connected on tablets. */
     val SettingsContentMaxWidth = 640.dp
 
-    /** Leading thumbnail in browse list rows. */
-    val BrowseListThumbSize = 40.dp
+    /** Leading 16:9 cover in browse list rows. Wide enough to recognize a scene. */
+    val BrowseListThumbWidth = 128.dp
+    val BrowseListThumbHeight = 72.dp
 
     /** Corner radius for browse thumbnails / grid media. */
     val BrowseThumbCorner = 8.dp
