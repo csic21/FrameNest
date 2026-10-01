@@ -3,6 +3,7 @@ package com.framenest.feature.player
 import android.app.Activity
 import android.app.Application
 import android.content.Context
+import android.graphics.Bitmap
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
@@ -171,6 +172,8 @@ fun PlayerScreen(
     val subtitleUi by vm.subtitleUiState.collectAsStateWithLifecycle()
     val listenUi by vm.listenTranslateUiState.collectAsStateWithLifecycle()
     val siblingNav by vm.siblingNavState.collectAsStateWithLifecycle()
+    val scrubFrames by vm.scrubPreviewFrames.collectAsStateWithLifecycle()
+    val scrubFailed by vm.scrubPreviewFailed.collectAsStateWithLifecycle()
     var showSubtitles by remember { mutableStateOf(false) }
     var showListenTranslate by remember { mutableStateOf(false) }
     var showAudioTracks by remember { mutableStateOf(false) }
@@ -436,6 +439,8 @@ fun PlayerScreen(
                 onSkipBy = { vm.skipBy(it) },
                 onPreviewSeek = { vm.previewSeekTo(it) },
                 onCommitSeek = { vm.seekTo(it) },
+                scrubFrames = scrubFrames,
+                scrubFailed = scrubFailed,
                 onPlay = { vm.play() },
                 onRetry = { vm.retry() },
                 onSpeedBoostStart = { vm.startSpeedBoost() },
@@ -480,6 +485,8 @@ fun PlayerScreen(
                     onPause = { vm.pause() },
                     onPreviewSeek = { vm.previewSeekTo(it) },
                     onSeek = { vm.seekTo(it) },
+                    scrubFrames = scrubFrames,
+                    scrubFailed = scrubFailed,
                     onCycleVideoScale = { vm.cycleVideoScaleMode() },
                     onCyclePlaybackRate = { vm.cyclePlaybackRate() },
                     onLockControls = lockControls,
@@ -771,6 +778,8 @@ private fun PlayerSurfaceStack(
     onSkipBy: (Long) -> Unit,
     onPreviewSeek: (Long) -> Unit,
     onCommitSeek: (Long) -> Unit,
+    scrubFrames: Map<Long, Bitmap>,
+    scrubFailed: Set<Long>,
     onPlay: () -> Unit,
     onRetry: () -> Unit,
     onSpeedBoostStart: () -> Boolean = { false },
@@ -891,7 +900,7 @@ private fun PlayerSurfaceStack(
                 if (state.phase != PlayerState.Phase.Ended) {
                     // Tap toggles chrome while playing, or starts playback when
                     // paused; double-tap skips ±10s; vertical drag is brightness /
-                    // volume; horizontal drag scrubs with live preview.
+                    // volume; horizontal drag shows a preview frame and seeks on release.
                     PlayerGestureLayer(
                         surfaceCd = surfaceCd,
                         toggleCd = if (state.phase == PlayerState.Phase.Playing) {
@@ -994,6 +1003,9 @@ private fun PlayerSurfaceStack(
         seekIndicator?.let { seek ->
             SeekGestureOverlay(
                 seek = seek,
+                bitmap = scrubPreviewBitmap(scrubFrames, seek.targetMs),
+                unavailable = ScrubPreviewPlan.bucketStartMs(seek.targetMs) in scrubFailed &&
+                    scrubPreviewBitmap(scrubFrames, seek.targetMs) == null,
                 modifier = Modifier.align(Alignment.Center),
             )
         }
@@ -1216,6 +1228,8 @@ internal fun PlayerControls(
     onPause: () -> Unit,
     onPreviewSeek: (Long) -> Unit = {},
     onSeek: (Long) -> Unit,
+    scrubFrames: Map<Long, Bitmap> = emptyMap(),
+    scrubFailed: Set<Long> = emptySet(),
     onCycleVideoScale: () -> Unit,
     onCyclePlaybackRate: () -> Unit,
     onLockControls: () -> Unit,
@@ -1233,8 +1247,8 @@ internal fun PlayerControls(
     val duration = state.durationMs.coerceAtLeast(0L)
     val position = state.positionMs.coerceIn(0L, if (duration > 0) duration else state.positionMs)
     val progress = if (duration > 0) position.toFloat() / duration.toFloat() else 0f
-    // Thumb stays local while dragging. Preview seeks are throttled; release
-    // commits the exact thumb position so the picture matches the drop point.
+    // The thumb stays local while dragging. A preview image follows it; release
+    // commits one seek so the picture matches the drop point.
     val scrubbingState = remember { mutableStateOf(false) }
     var scrubbing by scrubbingState
     var scrubFraction by remember { mutableFloatStateOf(0f) }
@@ -1367,7 +1381,26 @@ internal fun PlayerControls(
                     .testTag("player_sibling_position"),
             )
         }
-        Slider(
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            if (scrubbing && duration > 0L) {
+                val travel = (maxWidth - ScrubPreviewCardWidth).coerceAtLeast(0.dp)
+                val previewBitmap = scrubPreviewBitmap(scrubFrames, displayPosition)
+                ScrubPreviewCard(
+                    timeLabel = PlayerTimeFormat.formatDuration(displayPosition),
+                    bitmap = previewBitmap,
+                    unavailable = previewBitmap == null &&
+                        ScrubPreviewPlan.bucketStartMs(displayPosition) in scrubFailed,
+                    description = stringResource(
+                        R.string.player_scrub_preview_cd,
+                        PlayerTimeFormat.formatDuration(displayPosition),
+                    ),
+                    modifier = Modifier.scrubPreviewOverlay(
+                        x = travel * scrubFraction.coerceIn(0f, 1f),
+                        lift = 4.dp,
+                    ),
+                )
+            }
+            Slider(
             value = displayProgress,
             onValueChange = { fraction ->
                 sliderFinishJob.value?.cancel()
@@ -1404,7 +1437,8 @@ internal fun PlayerControls(
                 .minimumInteractiveComponentSize()
                 .semantics { contentDescription = seekCd }
                 .testTag("player_seek"),
-        )
+            )
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -2251,33 +2285,36 @@ private fun SpeedBoostOverlay(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun SeekGestureOverlay(seek: SeekGestureUi, modifier: Modifier = Modifier) {
+private fun SeekGestureOverlay(
+    seek: SeekGestureUi,
+    bitmap: Bitmap?,
+    unavailable: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val deltaLabel = PlayerTimeFormat.formatSignedDelta(seek.deltaMs)
-    val timeLabel =
-        "${PlayerTimeFormat.formatDuration(seek.targetMs)} / " +
-            PlayerTimeFormat.formatDuration(seek.durationMs)
-    val cd = stringResource(
-        R.string.player_gesture_seek_cd,
-        PlayerTimeFormat.formatDuration(seek.targetMs),
-    )
+    val timeLabel = PlayerTimeFormat.formatDuration(seek.targetMs)
+    val cd = stringResource(R.string.player_gesture_seek_cd, timeLabel)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
-            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
-            .padding(horizontal = 20.dp, vertical = 14.dp)
             .semantics { contentDescription = cd }
             .testTag("player_gesture_seek"),
     ) {
+        ScrubPreviewCard(
+            timeLabel = timeLabel,
+            bitmap = bitmap,
+            unavailable = unavailable,
+            description = "",
+            showCaret = false,
+        )
+        Spacer(Modifier.height(8.dp))
         Text(
             text = deltaLabel,
             color = Color.White,
             style = MaterialTheme.typography.headlineSmall,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = timeLabel,
-            color = Color.White.copy(alpha = 0.85f),
-            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier
+                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                .padding(horizontal = 14.dp, vertical = 6.dp),
         )
     }
 }

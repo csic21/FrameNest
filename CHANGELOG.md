@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 拖动进度条或左右滑动时，先显示目标时刻的预览图；松手后才跳转，播放中的画面不再跟着远程定位。
+
 ## 0.4.2-internal
 
 Main playback path fixes, no behavior change on the happy path:

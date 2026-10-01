@@ -1,6 +1,6 @@
 # 决策：拖动预览画面、全屏横屏与手势快进
 
-- 状态：accepted（远程 seek 调度由 [0011](0011-player-seek-recovery.md) 补充有界队列；预览与手势保持不变）
+- 状态：accepted（拖动期间的画面预览已由 [0012](0012-scrub-preview-images.md) 改为独立预览图；松手后的远程 seek 仍由 [0011](0011-player-seek-recovery.md) 约束）
 - 日期：2026-08-23
 - 任务：FN-48
 

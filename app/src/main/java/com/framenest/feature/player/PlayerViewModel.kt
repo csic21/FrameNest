@@ -1,7 +1,7 @@
 package com.framenest.feature.player
 
 import android.app.Application
-import android.os.SystemClock
+import android.graphics.Bitmap
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
@@ -105,6 +105,48 @@ class PlayerViewModel(
 ) : AndroidViewModel(application) {
 
     val controller: PlayerController = controllerFactory(application)
+
+    private val _scrubPreviewFrames = MutableStateFlow<Map<Long, Bitmap>>(emptyMap())
+    val scrubPreviewFrames: StateFlow<Map<Long, Bitmap>> = _scrubPreviewFrames.asStateFlow()
+    private val _scrubPreviewFailed = MutableStateFlow<Set<Long>>(emptySet())
+    val scrubPreviewFailed: StateFlow<Set<Long>> = _scrubPreviewFailed.asStateFlow()
+    private val scrubPreviewExtractor = ScrubPreviewExtractor(application, request)
+
+    @Volatile
+    private var scrubFocusMs: Long = -1L
+    private val scrubPreviewScheduler = ScrubPreviewScheduler(viewModelScope) { bucket ->
+        val bitmap = try {
+            withContext(Dispatchers.IO) {
+                scrubPreviewExtractor.frameAt(bucket)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            Log.w(TAG, "scrub preview failed: ${t.javaClass.simpleName}")
+            null
+        }
+        if (!currentCoroutineContext().isActive) {
+            if (bitmap != null && !bitmap.isRecycled) bitmap.recycle()
+            throw CancellationException()
+        }
+        if (bitmap == null) {
+            _scrubPreviewFailed.update { it + bucket }
+            return@ScrubPreviewScheduler false
+        }
+        _scrubPreviewFrames.update { current ->
+            val merged = HashMap<Long, Bitmap>(current.size + 1)
+            merged.putAll(current)
+            merged[bucket] = bitmap
+            val keep = ScrubPreviewPlan.retain(
+                keys = merged.keys,
+                anchorMs = controller.state.value.positionMs,
+                scrubTargetMs = scrubFocusMs.takeIf { it >= 0L },
+                maxEntries = ScrubPreviewPlan.MAX_MEMORY_FRAMES,
+            )
+            merged.filterKeys { it in keep }
+        }
+        true
+    }
 
     val playerState: StateFlow<PlayerState> = controller.state.stateIn(
         scope = viewModelScope,
@@ -220,6 +262,15 @@ class PlayerViewModel(
                         includeSiblings = includeSiblings,
                     )
                 }
+                scrubPreviewScheduler.updatePlayback(
+                    durationMs = state.durationMs,
+                    anchorMs = state.positionMs,
+                    buffering = state.isBuffering,
+                    active = state.firstFrameReady &&
+                        state.phase != PlayerState.Phase.Idle &&
+                        state.phase != PlayerState.Phase.Preparing &&
+                        state.phase != PlayerState.Phase.Error,
+                )
             }
         }
     }
@@ -541,10 +592,6 @@ class PlayerViewModel(
         viewModelScope.launch { saveProgressNow(force = true) }
     }
 
-    /** Last in-drag preview clock, 0 when no preview has been sent this gesture. */
-    private var lastPreviewAtElapsedMs: Long = 0L
-    private var lastPreviewTargetMs: Long = Long.MIN_VALUE
-
     /**
      * User's chosen rate saved while a press-and-hold 2x boost is active;
      * null when not boosting. Restored verbatim on release.
@@ -552,36 +599,25 @@ class PlayerViewModel(
     private var speedBoostSavedRate: Float? = null
 
     /**
-     * Throttled seek used while the thumb or a horizontal swipe is still down so
-     * the surface can show the target frame before release.
+     * Finger is down on the timeline. The playing surface stays where it is;
+     * preview frames are decoded beside it and the real seek happens on release.
      */
     fun setScrubbing(active: Boolean) {
-        controller.setScrubbing(active)
+        if (!active) {
+            scrubFocusMs = -1L
+            scrubPreviewScheduler.setScrubbing(false, null)
+        }
     }
 
     fun previewSeekTo(positionMs: Long) {
-        val now = SystemClock.elapsedRealtime()
-        if (
-            !ScrubSeekPolicy.shouldEmitPreview(
-                nowMs = now,
-                lastPreviewAtMs = lastPreviewAtElapsedMs,
-                lastTargetMs = lastPreviewTargetMs,
-                targetMs = positionMs,
-            )
-        ) {
-            return
-        }
-        lastPreviewAtElapsedMs = now
-        lastPreviewTargetMs = positionMs
-        controller.setScrubbing(true)
-        commitSeek(positionMs)
+        scrubFocusMs = positionMs
+        scrubPreviewScheduler.setScrubbing(true, positionMs)
     }
 
     fun seekTo(positionMs: Long) {
-        lastPreviewAtElapsedMs = 0L
-        lastPreviewTargetMs = positionMs
+        scrubFocusMs = -1L
+        scrubPreviewScheduler.setScrubbing(false, null)
         commitSeek(positionMs)
-        controller.setScrubbing(false)
     }
 
     private fun commitSeek(positionMs: Long) {
@@ -1415,6 +1451,8 @@ class PlayerViewModel(
         val saveDisplayName = request.displayName
         val history = historyRepository
 
+        scrubPreviewScheduler.close()
+        val previewExtractor = scrubPreviewExtractor
         listenSession.release()
         listenPrepareGeneration += 1L
         listenPrepareJob?.cancel()
@@ -1459,6 +1497,9 @@ class PlayerViewModel(
                     }
                 }
                 // Order: stop player / close proxy AFD, then SMB sessions.
+                // Preview extraction uses its own SMB session and must not run on
+                // the main thread that is already leaving the player.
+                runCatching { previewExtractor.close() }
                 runCatching { player.release() }
                 runCatching { listenEngine?.close() }
                 clients.forEach { client ->

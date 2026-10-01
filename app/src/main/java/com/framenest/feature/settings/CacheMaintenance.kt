@@ -6,6 +6,7 @@ import com.framenest.data.listen_translate.ListenTranslateRepository
 import com.framenest.data.listen_translate.model.ListenModelManager
 import com.framenest.data.thumbnail.ThumbnailRepository
 import com.framenest.feature.listen_translate.asr.SherpaModelInstaller
+import com.framenest.feature.player.ScrubPreviewPlan
 import com.framenest.feature.listen_translate.asr.VoskModelInstaller
 import com.framenest.feature.listen_translate.mt.MlKitTranslationModelCleaner
 import java.io.File
@@ -43,7 +44,11 @@ class CacheMaintenance(
     suspend fun clearGeneralCaches(): CacheClearResult = withContext(ioDispatcher) {
         val domains = CacheClearPolicy.domainsFor(CacheClearTarget.General)
         val beforeDisk = approximateDiskCacheBytesOnCurrentThread()
-        if (CacheDomain.Thumbnails in domains) thumbnailRepository.clearCache()
+        if (CacheDomain.Thumbnails in domains) {
+            thumbnailRepository.clearCache()
+            val scrubPreviews = File(context.cacheDir, ScrubPreviewPlan.CACHE_DIR)
+            runCatching { scrubPreviews.deleteRecursively() }
+        }
         if (CacheDomain.SubtitleFiles in domains) {
             val subtitleDir = File(context.cacheDir, "subtitles")
             runCatching { subtitleDir.listFiles()?.forEach { it.deleteRecursively() } }
@@ -103,6 +108,7 @@ class CacheMaintenance(
 
     private fun approximateDiskCacheBytesOnCurrentThread(): Long {
         var total = thumbnailRepository.approximateCacheSizeBytes()
+        total += directorySizeBytes(File(context.cacheDir, ScrubPreviewPlan.CACHE_DIR))
         total += directorySizeBytes(File(context.cacheDir, "subtitles"))
         total += directorySizeBytes(File(context.cacheDir, "diagnostics"))
         return total

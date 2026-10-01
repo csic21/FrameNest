@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
@@ -128,6 +129,51 @@ class PlayerSurfaceInputTest {
             assertTrue(committedTargets.isEmpty())
         }
     }
+
+    @Test
+    fun timelineDrag_showsPreviewImageAboveTheSlider() {
+        composeRule.setContent {
+            MaterialTheme {
+                PlayerControls(
+                    state = PlayerState(
+                        phase = PlayerState.Phase.Playing,
+                        positionMs = 20_000L,
+                        durationMs = 120_000L,
+                        isSeekable = true,
+                        firstFrameReady = true,
+                    ),
+                    siblingNav = SiblingNavUiState(),
+                    autoNextArmed = false,
+                    onPlay = {},
+                    onPause = {},
+                    onSeek = {},
+                    onCycleVideoScale = {},
+                    onCyclePlaybackRate = {},
+                    onLockControls = {},
+                    orientationLocked = false,
+                    onToggleOrientationLock = {},
+                    onPrevious = null,
+                    onNext = null,
+                    overlay = true,
+                    onUserInteraction = {},
+                    modifier = Modifier.width(360.dp),
+                )
+            }
+        }
+
+        assertFalse(previewVisible())
+        composeRule.onNodeWithTag("player_seek").performTouchInput {
+            down(center)
+            moveBy(Offset(120f, 0f))
+        }
+        assertTrue(previewVisible())
+        composeRule.onNodeWithTag("player_seek").performTouchInput { up() }
+        composeRule.waitForIdle()
+        assertFalse(previewVisible())
+    }
+
+    private fun previewVisible(): Boolean =
+        composeRule.onAllNodesWithTag("player_scrub_preview").fetchSemanticsNodes().isNotEmpty()
 
     private fun setSurface(
         playing: Boolean,
