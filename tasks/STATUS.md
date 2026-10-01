@@ -61,16 +61,15 @@
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。
 
-**当前发布**：`0.4.0-internal`（versionCode 5）
+**当前发布**：`0.5.0-internal`（versionCode 8）
 
 | 产物 | 路径 | 约大小 |
 |---|---|---|
-| Debug universal | `app/build/outputs/apk/debug/app-universal-debug.apk` | 168.7MB |
-| Debug arm64 | `app/build/outputs/apk/debug/app-arm64-v8a-debug.apk` | 93.9MB |
-| Debug x86_64 | `app/build/outputs/apk/debug/app-x86_64-debug.apk` | 100.9MB |
-| Release universal | `app/build/outputs/apk/release/app-universal-release-unsigned.apk` | 146.8MB |
-| Release arm64 | `app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk` | 72.0MB |
-| Release x86_64 | `app/build/outputs/apk/release/app-x86_64-release-unsigned.apk` | 79.0MB |
+| Release universal | `app/build/outputs/apk/release/app-universal-release-unsigned.apk` | 147.1MB |
+| Release arm64 | `app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk` | 72.3MB |
+| Release x86_64 | `app/build/outputs/apk/release/app-x86_64-release-unsigned.apk` | 79.3MB |
+
+已发布的安装包是用与 0.4.0 相同的 debug 证书签过名的 arm64 APK：`framenest-0.5.0-internal-arm64.apk`。
 
 NAS 验收勾选：`docs/NAS-ACCEPTANCE-CHECKLIST.md`  
 后续 backlog：`docs/POST-MVP.md`
