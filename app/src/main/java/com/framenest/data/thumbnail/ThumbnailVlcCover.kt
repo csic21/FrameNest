@@ -65,8 +65,8 @@ internal class ThumbnailVlcCover(
                     // avcodec bytes, not a MediaCodec surface.
                     media.addOption(":codec=avcodec")
                     media.addOption(":avcodec-hw=none")
-                    media.addOption(":network-caching=800")
-                    media.addOption(":file-caching=800")
+                    media.addOption(":network-caching=300")
+                    media.addOption(":file-caching=300")
                     media.setDefaultMediaPlayerOptions()
                     media.addOption(":no-audio")
                     media.addOption(":no-spu")

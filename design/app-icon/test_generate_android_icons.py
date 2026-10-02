@@ -8,7 +8,7 @@ import sys
 import unittest
 from pathlib import Path
 
-from PIL import Image, ImageChops
+from PIL import Image
 
 
 SCRIPT = Path(__file__).with_name("generate_android_icons.py")
@@ -37,16 +37,12 @@ class GeneratedLauncherIconTest(unittest.TestCase):
                 self.assertIsNotNone(bounds)
                 assert bounds is not None
                 visible_fraction = max(bounds[2] - bounds[0], bounds[3] - bounds[1]) / adaptive_size
-                self.assertGreaterEqual(visible_fraction, 0.675)
-                self.assertLessEqual(visible_fraction, 0.69)
+                self.assertGreaterEqual(visible_fraction, 0.98)
 
                 self.assertEqual(background.getchannel("A").getextrema(), (255, 255))
-                self.assertIsNone(
-                    ImageChops.difference(
-                        foreground.getchannel("A"),
-                        monochrome.getchannel("A"),
-                    ).getbbox()
-                )
+                glyph = monochrome.getchannel("A")
+                self.assertLess(glyph.getpixel((2, 2)), 40)
+                self.assertGreater(glyph.getpixel((adaptive_size // 2, adaptive_size // 2)), 180)
 
 
 if __name__ == "__main__":

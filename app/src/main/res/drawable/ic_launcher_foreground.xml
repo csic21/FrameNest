@@ -1,27 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Flat vector fallback; generated launcher mipmaps preserve the approved gradients. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <path
-        android:fillColor="#7E7FF6"
-        android:pathData="M45,27 C41,27 38,30 38,34 V46 C38,50 40,53 43,55 C43,51 45,48 49,46 L84,28 C86,27 85,27 82,27 Z" />
-    <path
-        android:fillColor="#8D73E7"
-        android:pathData="M60,46 C62,42 65,40 69,40 H82 C86,40 89,43 89,47 V82 C89,86 87,87 85,83 L68,60 C66,56 63,54 60,53 C62,50 62,48 60,46 Z" />
-    <path
-        android:fillColor="#8177EC"
-        android:pathData="M68,59 C72,60 75,63 75,68 V79 C75,84 72,87 67,87 H24 C21,87 21,86 24,84 L61,63 C65,61 67,60 68,59 Z" />
-    <path
-        android:fillColor="#7375EB"
-        android:pathData="M20,32 C19,29 19,30 19,33 V67 C19,72 22,75 27,75 H42 C46,75 49,73 50,69 C46,68 43,66 41,62 Z" />
-    <path
-        android:fillColor="#B8B1F6"
-        android:pathData="M23,27 H36 L28,36 Z M84,31 L89,35 V44 Z M19,75 L29,83 L19,87 Z M81,87 L86,78 L74,87 Z" />
+    <path android:pathData="M0,0 H108 V108 H0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="108"
+                android:endY="108"
+                android:startX="0"
+                android:startY="0"
+                android:type="linear">
+                <item
+                    android:color="#7E7FF6"
+                    android:offset="0" />
+                <item
+                    android:color="#8D73E7"
+                    android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
     <path
         android:fillColor="#FDF5E2"
-        android:pathData="M50,49 L50,62 L62,55.5 Z" />
+        android:pathData="M44.4,35.6 L44.4,72.4 L78.1,54 Z" />
 </vector>

@@ -12,6 +12,39 @@ import org.junit.Test
 
 class ScrubPreviewPlanTest {
     @Test
+    fun digestFromKnownContent_skipsWhenTheListingHasNoStamp() {
+        assertNull(
+            ScrubPreviewPlan.digestFromKnownContent(
+                serverId = "srv",
+                share = "media",
+                path = "films/a.mkv",
+                sizeBytes = null,
+                modifiedTimeMs = 10L,
+            ),
+        )
+        assertNull(
+            ScrubPreviewPlan.digestFromKnownContent(
+                serverId = "srv",
+                share = "media",
+                path = "films/a.mkv",
+                sizeBytes = 20L,
+                modifiedTimeMs = null,
+            ),
+        )
+        val listed = ScrubPreviewPlan.digestFromKnownContent(
+            serverId = "srv",
+            share = "media",
+            path = "films/a.mkv",
+            sizeBytes = 20L,
+            modifiedTimeMs = 10L,
+        )
+        assertEquals(
+            ScrubPreviewPlan.cacheDigest("srv", "media", "films/a.mkv", 20L, 10L),
+            listed,
+        )
+    }
+
+    @Test
     fun neighborhood_startsAtTheBucketUnderTheFinger() {
         assertEquals(
             listOf(10_000L, 20_000L, 0L, 30_000L),

@@ -26,6 +26,8 @@ object PlaybackRequestFactory {
         password: CharArray,
         startPositionMs: Long = 0L,
         displayName: String? = null,
+        contentSizeBytes: Long? = null,
+        contentModifiedTimeMs: Long? = null,
     ): PlaybackRequest {
         val normalized = SmbPathUtils.normalizeRelative(path)
         val name = displayName?.ifBlank { null }
@@ -48,6 +50,8 @@ object PlaybackRequestFactory {
                 path = normalized,
             ),
             startPositionMs = startPositionMs,
+            contentSizeBytes = contentSizeBytes?.takeIf { it >= 0L },
+            contentModifiedTimeMs = contentModifiedTimeMs?.takeIf { it >= 0L },
         )
     }
 

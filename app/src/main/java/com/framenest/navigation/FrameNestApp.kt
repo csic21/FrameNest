@@ -36,6 +36,7 @@ import androidx.navigation.navArgument
 import com.framenest.ContextAppContainer
 import com.framenest.app.AppContainer
 import com.framenest.feature.browser.BrowseRoute
+import com.framenest.feature.player.PlaybackMediaFacts
 import com.framenest.feature.player.PlayerRoute
 import com.framenest.feature.servers.ServersRoute
 import com.framenest.ui.screens.RecentScreen
@@ -203,6 +204,7 @@ private fun FrameNestNavHost(
                         navController.navigate(FrameNestRoutes.browse(serverId, next))
                     },
                     onOpenFile = { remote ->
+                        PlaybackMediaFacts.remember(remote)
                         FrameNestRoutes.playerForBrowseEntry(remote)?.let { route ->
                             navController.navigate(route)
                         }

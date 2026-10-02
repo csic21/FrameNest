@@ -112,7 +112,7 @@ internal class ScrubPreviewExtractor(
                 }
             }
             is PlaybackDataSource.LocalRawResource -> Unit
-            is PlaybackDataSource.SeekableSmb -> rememberSmbDigest(
+            is PlaybackDataSource.SeekableSmb -> if (!applyListedDigest()) rememberSmbDigest(
                 host = source.host,
                 port = source.port,
                 username = source.username,
@@ -121,7 +121,7 @@ internal class ScrubPreviewExtractor(
                 share = source.share,
                 path = source.path,
             )
-            is PlaybackDataSource.DirectSmbUrl -> rememberSmbDigest(
+            is PlaybackDataSource.DirectSmbUrl -> if (!applyListedDigest()) rememberSmbDigest(
                 host = source.host,
                 port = source.port ?: SmbCredentials.DEFAULT_PORT,
                 username = source.username,
@@ -222,6 +222,18 @@ internal class ScrubPreviewExtractor(
         val next = MediaMetadataRetriever()
         next.setDataSource(descriptor.fileDescriptor, descriptor.startOffset, descriptor.length)
         retriever = next
+    }
+
+    private fun applyListedDigest(): Boolean {
+        val digest = ScrubPreviewPlan.digestFromKnownContent(
+            serverId = request.identity.serverId,
+            share = request.identity.share,
+            path = request.identity.normalizedPath(),
+            sizeBytes = request.contentSizeBytes,
+            modifiedTimeMs = request.contentModifiedTimeMs,
+        ) ?: return false
+        cacheDigest = digest
+        return true
     }
 
     private fun rememberSmbDigest(

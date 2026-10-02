@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Deterministically render the approved FrameNest launcher icon family."""
+"""Scale the generated FrameNest icon into the Android launcher sizes."""
 
 from __future__ import annotations
 
-import colorsys
-import math
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -14,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DESIGN_DIR = Path(__file__).resolve().parent
 RES = ROOT / "app" / "src" / "main" / "res"
 BRAND_DIR = ROOT / "docs" / "brand"
-APPROVED_ART = DESIGN_DIR / "framenest-logo-approved.png"
+MASTER = DESIGN_DIR / "framenest-logo-generated.png"
 
 DENSITIES = {
     "mdpi": (108, 48),
@@ -24,119 +22,47 @@ DENSITIES = {
     "xxxhdpi": (432, 192),
 }
 
-LOGICAL_SIZE = 1024
 
-# Adaptive icon layers are authored on a 108dp canvas, while the launcher mask is
-# roughly 72dp wide. Keeping the mark at the 66dp safe-zone size (0.61) left a
-# visible midnight rim on ColorOS. A small 0.68 overscan fills the mask without
-# moving the central play glyph or baking any vendor-specific corner shape in.
-ADAPTIVE_MARK_FRACTION = 0.68
-
-# Shared with ui/theme/Color.kt. The launcher can use the brighter source hues;
-# the light UI theme uses darker accessible roles where white text is required.
-MIDNIGHT = (12, 18, 43, 255)
-BACKGROUND_STOPS = (
-    (0.0, (7, 11, 29)),
-    (0.55, MIDNIGHT[:3]),
-    (1.0, (22, 29, 63)),
-)
+def load_master() -> Image.Image:
+    image = Image.open(MASTER).convert("RGBA")
+    side = min(image.size)
+    left = (image.width - side) // 2
+    top = (image.height - side) // 2
+    return image.crop((left, top, left + side, top + side))
 
 
-def interpolate(stops: tuple, t: float) -> tuple[int, int, int]:
-    t = max(0.0, min(1.0, t))
-    for index in range(len(stops) - 1):
-        start_t, start = stops[index]
-        end_t, end = stops[index + 1]
-        if t <= end_t:
-            progress = (t - start_t) / (end_t - start_t)
-            return tuple(round(a + (b - a) * progress) for a, b in zip(start, end))
-    return stops[-1][1]
+def fit(image: Image.Image, size: int) -> Image.Image:
+    return image.resize((size, size), Image.Resampling.LANCZOS)
 
 
-def make_background(size: int) -> Image.Image:
-    """Matte midnight indigo with the approved restrained center lift."""
-    pixels: list[tuple[int, int, int, int]] = []
-    denominator = max(1, 2 * (size - 1))
-    for y in range(size):
-        for x in range(size):
-            diagonal = (x + y) / denominator
-            red, green, blue = interpolate(BACKGROUND_STOPS, diagonal)
-
-            dx = (x - size * 0.5) / (size * 0.64)
-            dy = (y - size * 0.48) / (size * 0.64)
-            glow = max(0.0, 1.0 - math.sqrt(dx * dx + dy * dy)) ** 2
-            pixels.append(
-                (
-                    min(255, round(red + 3 * glow)),
-                    min(255, round(green + 4 * glow)),
-                    min(255, round(blue + 10 * glow)),
-                    255,
-                )
-            )
-
-    result = Image.new("RGBA", (size, size))
-    result.putdata(pixels)
-    return result
-
-
-def approved_mark(size: int = LOGICAL_SIZE) -> Image.Image:
-    """Extract the approved ImageGen mark while preserving its exact visible geometry."""
-    source = Image.open(APPROVED_ART).convert("RGBA")
-    pixels = source.load()
-    alpha = Image.new("L", source.size, 0)
-    alpha_pixels = alpha.load()
-
-    for y in range(source.height):
-        for x in range(source.width):
-            red, green, blue, _ = pixels[x, y]
-            _, _, value = colorsys.rgb_to_hsv(red / 255, green / 255, blue / 255)
-
-            # The approved artwork has a low-value navy background and high-value colored mark.
-            # A short soft transition keeps the generated antialiased boundary intact.
-            if value <= 0.30:
-                opacity = 0
-            elif value >= 0.52:
-                opacity = 255
-            else:
-                opacity = round((value - 0.30) / 0.22 * 255)
-            alpha_pixels[x, y] = opacity
-
-    source.putalpha(alpha)
-    mark = trimmed(source)
-    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    target_width = round(size * 0.78)
-    target_height = round(mark.height * target_width / mark.width)
-    resized = mark.resize((target_width, target_height), Image.Resampling.LANCZOS)
-    canvas.alpha_composite(
-        resized,
-        ((size - target_width) // 2, (size - target_height) // 2),
+def corner_color(image: Image.Image) -> tuple[int, int, int, int]:
+    samples = (
+        image.getpixel((0, 0)),
+        image.getpixel((image.width - 1, 0)),
+        image.getpixel((0, image.height - 1)),
+        image.getpixel((image.width - 1, image.height - 1)),
     )
-    return canvas
+    channels = [sum(pixel[index] for pixel in samples) // len(samples) for index in range(3)]
+    return (channels[0], channels[1], channels[2], 255)
 
 
-def trimmed(image: Image.Image) -> Image.Image:
-    bounds = image.getchannel("A").getbbox()
-    if bounds is None:
-        raise ValueError("The rendered mark has no visible pixels")
-    return image.crop(bounds)
+def solid(size: int, color: tuple[int, int, int, int]) -> Image.Image:
+    image = Image.new("RGBA", (size, size), color)
+    return image
 
 
-def place_mark(mark: Image.Image, size: int, fraction: float) -> Image.Image:
-    mark = trimmed(mark)
-    scale = (size * fraction) / max(mark.size)
-    resized = mark.resize(
-        (max(1, round(mark.width * scale)), max(1, round(mark.height * scale))),
-        Image.Resampling.LANCZOS,
-    )
-    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    offset = ((size - resized.width) // 2, (size - resized.height) // 2)
-    canvas.alpha_composite(resized, offset)
-    return canvas
-
-
-def make_monochrome(foreground: Image.Image) -> Image.Image:
-    result = Image.new("RGBA", foreground.size, (255, 255, 255, 0))
-    result.putalpha(foreground.getchannel("A"))
+def glyph_alpha(image: Image.Image, field: tuple[int, int, int, int]) -> Image.Image:
+    """Keep the frame and play mark; drop the flat background for themed icons."""
+    result = Image.new("RGBA", image.size, (255, 255, 255, 0))
+    source = image.load()
+    output = result.load()
+    for y in range(image.height):
+        for x in range(image.width):
+            red, green, blue, _ = source[x, y]
+            distance = abs(red - field[0]) + abs(green - field[1]) + abs(blue - field[2])
+            if distance < 36:
+                continue
+            output[x, y] = (255, 255, 255, min(255, (distance - 36) * 4))
     return result
 
 
@@ -153,58 +79,31 @@ def apply_mask(image: Image.Image, *, round_icon: bool) -> Image.Image:
     return result
 
 
-def compose_icon(
-    source_mark: Image.Image,
-    size: int,
-    *,
-    fraction: float,
-    round_icon: bool = False,
-) -> Image.Image:
-    icon = make_background(size)
-    icon.alpha_composite(place_mark(source_mark, size, fraction))
-    return apply_mask(icon, round_icon=round_icon)
-
-
 def write_png(image: Image.Image, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path, format="PNG", optimize=True)
 
 
 def main() -> None:
-    source_mark = approved_mark(LOGICAL_SIZE)
-    write_png(source_mark, DESIGN_DIR / "framenest-foreground.png")
-    write_png(source_mark, BRAND_DIR / "framenest-mark-transparent.png")
+    master = load_master()
+    field = corner_color(master)
+    write_png(fit(master, 1024), DESIGN_DIR / "framenest-app-icon-preview.png")
+    write_png(fit(master, 1024), BRAND_DIR / "framenest-logo-1024.png")
+    write_png(fit(master, 512), BRAND_DIR / "framenest-logo-512.png")
+    write_png(fit(master, 512), BRAND_DIR / "framenest-icon-512.png")
+    write_png(fit(master, 512), ROOT / "app" / "src" / "main" / "ic_launcher-playstore.png")
+    write_png(glyph_alpha(fit(master, 1024), field), DESIGN_DIR / "framenest-foreground.png")
+    write_png(glyph_alpha(fit(master, 1024), field), BRAND_DIR / "framenest-mark-transparent.png")
 
     for density, (adaptive_size, legacy_size) in DENSITIES.items():
         target = RES / f"mipmap-{density}"
-        adaptive_mark = place_mark(
-            source_mark,
-            adaptive_size,
-            fraction=ADAPTIVE_MARK_FRACTION,
-        )
-        write_png(make_background(adaptive_size), target / "ic_launcher_background.png")
-        write_png(adaptive_mark, target / "ic_launcher_foreground.png")
-        write_png(make_monochrome(adaptive_mark), target / "ic_launcher_monochrome.png")
-        write_png(
-            compose_icon(source_mark, legacy_size, fraction=0.66),
-            target / "ic_launcher.png",
-        )
-        write_png(
-            compose_icon(source_mark, legacy_size, fraction=0.66, round_icon=True),
-            target / "ic_launcher_round.png",
-        )
-
-    preview = compose_icon(source_mark, 1024, fraction=0.65)
-    write_png(preview, DESIGN_DIR / "framenest-app-icon-preview.png")
-
-    play_store = compose_icon(source_mark, 512, fraction=0.64)
-    write_png(play_store, ROOT / "app" / "src" / "main" / "ic_launcher-playstore.png")
-    write_png(play_store, BRAND_DIR / "framenest-icon-512.png")
-    write_png(compose_icon(source_mark, 512, fraction=0.64), BRAND_DIR / "framenest-logo-512.png")
-    write_png(
-        compose_icon(source_mark, 1024, fraction=0.64),
-        BRAND_DIR / "framenest-logo-1024.png",
-    )
+        adaptive = fit(master, adaptive_size)
+        write_png(solid(adaptive_size, field), target / "ic_launcher_background.png")
+        write_png(adaptive, target / "ic_launcher_foreground.png")
+        write_png(glyph_alpha(adaptive, field), target / "ic_launcher_monochrome.png")
+        legacy = fit(master, legacy_size)
+        write_png(apply_mask(legacy, round_icon=False), target / "ic_launcher.png")
+        write_png(apply_mask(legacy, round_icon=True), target / "ic_launcher_round.png")
 
 
 if __name__ == "__main__":

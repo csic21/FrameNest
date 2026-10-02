@@ -134,6 +134,22 @@ internal object ScrubPreviewPlan {
             .toSet()
     }
 
+    /**
+     * Cache key from a listing that already knows size and modification time.
+     * Null when either value is missing, so the caller still stats the file.
+     */
+    fun digestFromKnownContent(
+        serverId: String,
+        share: String,
+        path: String,
+        sizeBytes: Long?,
+        modifiedTimeMs: Long?,
+    ): String? {
+        if (sizeBytes == null || sizeBytes < 0L) return null
+        if (modifiedTimeMs == null || modifiedTimeMs < 0L) return null
+        return cacheDigest(serverId, share, path, sizeBytes, modifiedTimeMs)
+    }
+
     fun cacheDigest(
         serverId: String,
         share: String,

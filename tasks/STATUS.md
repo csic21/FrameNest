@@ -62,15 +62,15 @@
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。
 
-**当前发布**：`0.5.1-internal`（versionCode 9）
+**当前发布**：`0.5.2-internal`（versionCode 10）
 
 | 产物 | 路径 | 约大小 |
 |---|---|---|
-| Release universal | `app/build/outputs/apk/release/app-universal-release-unsigned.apk` | 208.3MB |
-| Release arm64 | `app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk` | 100.7MB |
-| Release x86_64 | `app/build/outputs/apk/release/app-x86_64-release-unsigned.apk` | 112.2MB |
+| Release universal | `app/build/outputs/apk/release/app-universal-release-unsigned.apk` | 208.1MB |
+| Release arm64 | `app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk` | 100.5MB |
+| Release x86_64 | `app/build/outputs/apk/release/app-x86_64-release-unsigned.apk` | 112.0MB |
 
-已发布的安装包是用与 0.5.0 相同的 debug 证书签过名的 arm64 APK：`framenest-0.5.1-internal-arm64.apk`。
+已发布的安装包是用与 0.5.1 相同的 debug 证书签过名的 arm64 APK：`framenest-0.5.2-internal-arm64.apk`。
 
 NAS 验收勾选：`docs/NAS-ACCEPTANCE-CHECKLIST.md`  
 后续 backlog：`docs/POST-MVP.md`

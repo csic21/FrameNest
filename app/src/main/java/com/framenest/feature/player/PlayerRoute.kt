@@ -145,6 +145,7 @@ private suspend fun buildPlaybackRequest(
         ?: return Result.failure(IllegalStateException("Missing credentials for server"))
 
     return try {
+        val listed = PlaybackMediaFacts.lookup(serverId, share, normalizedPath)
         Result.success(
             PlaybackRequestFactory.fromSavedServer(
                 server = server,
@@ -154,6 +155,8 @@ private suspend fun buildPlaybackRequest(
                 startPositionMs = resumeMs,
                 displayName = history?.displayName
                     ?: normalizedPath.substringAfterLast('/'),
+                contentSizeBytes = listed?.sizeBytes,
+                contentModifiedTimeMs = listed?.modifiedTimeMs,
             ),
         )
     } finally {

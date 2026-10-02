@@ -44,6 +44,13 @@ data class PlaybackRequest(
      */
     val dataSource: PlaybackDataSource,
     val startPositionMs: Long = 0L,
+    /**
+     * Size and modification time already known from a directory listing.
+     * Scrub preview uses them as the cache key so the first drag does not
+     * open a separate SMB connection just to stat the file.
+     */
+    val contentSizeBytes: Long? = null,
+    val contentModifiedTimeMs: Long? = null,
 ) {
     override fun toString(): String =
         "PlaybackRequest(identity=$identity, displayName=$displayName, " +
