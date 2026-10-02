@@ -111,41 +111,66 @@ class PlayerViewModel(
     private val _scrubPreviewFailed = MutableStateFlow<Set<Long>>(emptySet())
     val scrubPreviewFailed: StateFlow<Set<Long>> = _scrubPreviewFailed.asStateFlow()
     private val scrubPreviewExtractor = ScrubPreviewExtractor(application, request)
+    private val scrubWarmsDuringPlayback: Boolean =
+        request.dataSource !is PlaybackDataSource.SeekableSmb &&
+            request.dataSource !is PlaybackDataSource.DirectSmbUrl
 
     @Volatile
     private var scrubFocusMs: Long = -1L
     private val scrubPreviewScheduler = ScrubPreviewScheduler(viewModelScope) { bucket ->
-        val bitmap = try {
+        if (abandonScrubExtract(bucket)) return@ScrubPreviewScheduler ScrubLoadResult.Abandoned
+        val grabbed = try {
             withContext(Dispatchers.IO) {
-                scrubPreviewExtractor.frameAt(bucket)
+                scrubPreviewExtractor.frameAt(bucket) { abandonScrubExtract(bucket) }
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
             Log.w(TAG, "scrub preview failed: ${t.javaClass.simpleName}")
-            null
+            ScrubGrab.Miss
         }
         if (!currentCoroutineContext().isActive) {
-            if (bitmap != null && !bitmap.isRecycled) bitmap.recycle()
+            if (grabbed is ScrubGrab.Image && !grabbed.bitmap.isRecycled) grabbed.bitmap.recycle()
             throw CancellationException()
         }
-        if (bitmap == null) {
-            _scrubPreviewFailed.update { it + bucket }
-            return@ScrubPreviewScheduler false
+        if (scrubFocusMs < 0L) scrubPreviewExtractor.pause()
+        when (grabbed) {
+            ScrubGrab.Abandoned -> ScrubLoadResult.Abandoned
+            ScrubGrab.Miss -> {
+                _scrubPreviewFailed.update { it + bucket }
+                ScrubLoadResult.Failed
+            }
+            is ScrubGrab.Image -> {
+                val bitmap = grabbed.bitmap
+                _scrubPreviewFrames.update { current ->
+                    val merged = HashMap<Long, Bitmap>(current.size + 1)
+                    merged.putAll(current)
+                    merged[bucket] = bitmap
+                    val keep = ScrubPreviewPlan.retain(
+                        keys = merged.keys,
+                        anchorMs = controller.state.value.positionMs,
+                        scrubTargetMs = scrubFocusMs.takeIf { it >= 0L },
+                        maxEntries = ScrubPreviewPlan.MAX_MEMORY_FRAMES,
+                    )
+                    merged.filterKeys { it in keep }
+                }
+                ScrubLoadResult.Ready
+            }
         }
-        _scrubPreviewFrames.update { current ->
-            val merged = HashMap<Long, Bitmap>(current.size + 1)
-            merged.putAll(current)
-            merged[bucket] = bitmap
-            val keep = ScrubPreviewPlan.retain(
-                keys = merged.keys,
-                anchorMs = controller.state.value.positionMs,
-                scrubTargetMs = scrubFocusMs.takeIf { it >= 0L },
-                maxEntries = ScrubPreviewPlan.MAX_MEMORY_FRAMES,
-            )
-            merged.filterKeys { it in keep }
-        }
-        true
+    }
+
+    private fun abandonScrubExtract(bucket: Long): Boolean {
+        val focus = scrubFocusMs
+        val focusBucketReady = focus >= 0L &&
+            ScrubPreviewPlan.bucketStartMs(focus) in _scrubPreviewFrames.value
+        val focusBucketFailed = focus >= 0L &&
+            ScrubPreviewPlan.bucketStartMs(focus) in _scrubPreviewFailed.value
+        return ScrubPreviewPlan.shouldAbandonScrubExtract(
+            requestedBucketMs = bucket,
+            focusMs = focus,
+            focusBucketReady = focusBucketReady,
+            focusBucketFailed = focusBucketFailed,
+        )
     }
 
     val playerState: StateFlow<PlayerState> = controller.state.stateIn(
@@ -266,7 +291,10 @@ class PlayerViewModel(
                     durationMs = state.durationMs,
                     anchorMs = state.positionMs,
                     buffering = state.isBuffering,
-                    active = state.firstFrameReady &&
+                    // A second SMB reader during playback competes with the picture.
+                    // Remote previews wait until the finger is down.
+                    active = scrubWarmsDuringPlayback &&
+                        state.firstFrameReady &&
                         state.phase != PlayerState.Phase.Idle &&
                         state.phase != PlayerState.Phase.Preparing &&
                         state.phase != PlayerState.Phase.Error,
@@ -606,17 +634,21 @@ class PlayerViewModel(
         if (!active) {
             scrubFocusMs = -1L
             scrubPreviewScheduler.setScrubbing(false, null)
+            scrubPreviewExtractor.pause()
         }
     }
 
     fun previewSeekTo(positionMs: Long) {
+        val starting = scrubFocusMs < 0L
         scrubFocusMs = positionMs
+        if (starting) _scrubPreviewFailed.value = emptySet()
         scrubPreviewScheduler.setScrubbing(true, positionMs)
     }
 
     fun seekTo(positionMs: Long) {
         scrubFocusMs = -1L
         scrubPreviewScheduler.setScrubbing(false, null)
+        scrubPreviewExtractor.pause()
         commitSeek(positionMs)
     }
 
@@ -903,13 +935,27 @@ class PlayerViewModel(
     /**
      * Call when the app returns to the foreground after [onLeaveOrBackground].
      *
-     * Backgrounding destroys the SurfaceView surface while the Compose host keeps
-     * the same size, so the size-change surface refresh never fires and
-     * libVLC stays bound to the dead surface (black picture, play appears stuck).
-     * Always rebind, then repaint the resting frame when Ready/Paused so the user
-     * sees the picture again without having to leave and re-enter the player.
+     * Surface destruction removes libVLC's holder callback. A size refresh then
+     * returns immediately, and the new surface is never delivered, so play stays
+     * dead until the screen is opened again. Attach the layout first. Repaint
+     * only after that surface exists, and only while playback is resting.
      */
     fun onReturnToForeground() {
+        val vlc = controller as? com.framenest.player.VlcPlayerController
+        if (vlc != null) {
+            vlc.rebindVideoOutput {
+                val snapshot = controller.state.value
+                if (
+                    com.framenest.player.PlayerRotationPolicy.shouldRepaintOnForeground(
+                        firstFrameReady = snapshot.firstFrameReady,
+                        phase = snapshot.phase,
+                    )
+                ) {
+                    vlc.repaintCurrentFrame()
+                }
+            }
+            return
+        }
         val snapshot = controller.state.value
         controller.refreshVideoSurfaces()
         if (
@@ -918,10 +964,7 @@ class PlayerViewModel(
                 phase = snapshot.phase,
             )
         ) {
-            // Prefer the resume-preserving repaint; other controllers fall back to
-            // a same-position seek (their pending-resume contract, if any, is theirs).
-            (controller as? com.framenest.player.VlcPlayerController)?.repaintCurrentFrame()
-                ?: controller.seekTo(snapshot.positionMs)
+            controller.seekTo(snapshot.positionMs)
         }
     }
 

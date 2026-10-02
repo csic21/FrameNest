@@ -11,9 +11,16 @@ import kotlinx.coroutines.launch
  * background strip, and a newer target replaces the queue without stacking
  * SMB reads.
  */
+internal enum class ScrubLoadResult {
+    Ready,
+    Failed,
+    /** The finger moved; do not remember this bucket as ready or failed. */
+    Abandoned,
+}
+
 internal class ScrubPreviewScheduler(
     scope: CoroutineScope,
-    private val loadFrame: suspend (bucketStartMs: Long) -> Boolean,
+    private val loadFrame: suspend (bucketStartMs: Long) -> ScrubLoadResult,
 ) {
     private val ready = HashSet<Long>()
     private val failed = HashSet<Long>()
@@ -60,8 +67,11 @@ internal class ScrubPreviewScheduler(
     fun setScrubbing(active: Boolean, targetMs: Long?) {
         synchronized(lock) {
             if (closed) return
+            val starting = active && targetMs != null && !scrubbing
             scrubbing = active && targetMs != null
             scrubTargetMs = if (scrubbing) targetMs else null
+            // A new gesture can retry a bucket the previous drag missed.
+            if (starting) failed.clear()
         }
         wake.trySend(Unit)
     }
@@ -75,22 +85,43 @@ internal class ScrubPreviewScheduler(
     }
 
     private suspend fun drain() {
+        var abandonedStreak: Long? = null
         while (true) {
             val next = synchronized(lock) {
                 if (closed) return
                 selectNextLocked()
             } ?: return
-            val ok = try {
+            val outcome = try {
                 loadFrame(next)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Throwable) {
-                false
+                ScrubLoadResult.Failed
             }
-            synchronized(lock) {
+            val stop = synchronized(lock) {
                 if (closed) return
-                if (ok) ready += next else failed += next
+                when (outcome) {
+                    ScrubLoadResult.Ready -> {
+                        ready += next
+                        abandonedStreak = null
+                        false
+                    }
+                    ScrubLoadResult.Failed -> {
+                        failed += next
+                        abandonedStreak = null
+                        false
+                    }
+                    ScrubLoadResult.Abandoned -> {
+                        if (abandonedStreak == next) {
+                            true
+                        } else {
+                            abandonedStreak = next
+                            false
+                        }
+                    }
+                }
             }
+            if (stop) return
         }
     }
 

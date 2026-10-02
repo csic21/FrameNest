@@ -186,6 +186,7 @@ fun PlayerScreen(
     var autoNextArmed by remember { mutableStateOf(false) }
     var chromeInteractionVersion by remember { mutableLongStateOf(0L) }
     val lifecycleOwner = LocalLifecycleOwner.current
+    var leftForAnotherApp by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
     // Orientation chrome only — not a device-model / width-bucket check.
     val landscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -200,14 +201,17 @@ fun PlayerScreen(
                             isChangingConfigurations = activity?.isChangingConfigurations == true,
                         )
                     ) {
+                        leftForAnotherApp = true
                         vm.onLeaveOrBackground()
                     }
                 }
-                // Background destroys the SurfaceView surface with the same Compose
-                // size, so VlcVideoSurface's size-change refresh never fires. Rebind
-                // + repaint here or the picture stays black after switching apps.
+                // The first ON_START is the screen opening. Only a later return
+                // from another app has to attach the video surface again.
                 Lifecycle.Event.ON_START -> {
-                    if (activity?.isChangingConfigurations != true) {
+                    if (
+                        PlayerRotationPolicy.shouldReattachVideoOnForeground(leftForAnotherApp)
+                    ) {
+                        leftForAnotherApp = false
                         vm.onReturnToForeground()
                     }
                 }

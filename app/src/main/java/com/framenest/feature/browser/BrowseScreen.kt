@@ -1,5 +1,7 @@
 package com.framenest.feature.browser
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -499,8 +501,8 @@ private fun BrowseEntryLeading(
 }
 
 /**
- * Shows a **cached** bitmap only. While generating, a placeholder icon is shown.
- * Does not create a player instance.
+ * Shows a cached bitmap only. While a cover is still on the way the slot keeps
+ * the same movie poster, then the picture fades in. Does not create a player.
  */
 @Composable
 private fun BrowseVideoThumbnail(
@@ -516,50 +518,55 @@ private fun BrowseVideoThumbnail(
         repository.retain(entry)
         onDispose { repository.release(entry) }
     }
+    val ready = state as? ThumbnailUiState.Ready
 
     Box(
         modifier = modifier.clip(RoundedCornerShape(4.dp)),
         contentAlignment = Alignment.Center,
     ) {
-        when (val s = state) {
-            is ThumbnailUiState.Ready -> {
-                Image(
-                    bitmap = s.bitmap.asImageBitmap(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .testTag("browse_thumb_ready"),
-                )
-                if (s.durationMs > 0L) {
-                    Text(
-                        text = BrowseEntryText.formatDuration(s.durationMs),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = FrameNestIvory,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(4.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(FrameNestMidnight.copy(alpha = 0.72f))
-                            .padding(horizontal = 4.dp, vertical = 1.dp)
-                            .clearAndSetSemantics { },
-                    )
-                }
-            }
-            ThumbnailUiState.Loading -> {
-                CircularProgressIndicator(
-                    modifier = Modifier
-                        .size(20.dp)
-                        .testTag("browse_thumb_loading"),
-                    strokeWidth = 2.dp,
-                )
-            }
-            else -> {
+        Crossfade(
+            targetState = ready,
+            modifier = Modifier.fillMaxSize(),
+            animationSpec = tween(durationMillis = 240),
+            label = "browse_thumb",
+        ) { frame ->
+            if (frame == null) {
                 Icon(
                     imageVector = Icons.Filled.Movie,
                     contentDescription = null,
-                    modifier = Modifier.testTag("browse_thumb_placeholder"),
+                    modifier = Modifier.testTag(
+                        if (state is ThumbnailUiState.Loading) {
+                            "browse_thumb_loading"
+                        } else {
+                            "browse_thumb_placeholder"
+                        },
+                    ),
                 )
+            } else {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Image(
+                        bitmap = frame.bitmap.asImageBitmap(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("browse_thumb_ready"),
+                    )
+                    if (frame.durationMs > 0L) {
+                        Text(
+                            text = BrowseEntryText.formatDuration(frame.durationMs),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = FrameNestIvory,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(4.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(FrameNestMidnight.copy(alpha = 0.72f))
+                                .padding(horizontal = 4.dp, vertical = 1.dp)
+                                .clearAndSetSemantics { },
+                        )
+                    }
+                }
             }
         }
     }

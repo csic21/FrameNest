@@ -24,6 +24,32 @@ internal object ScrubPreviewPlan {
     }
 
     /**
+     * A fast seek lands on a keyframe near [targetMs]. The opening frame must
+     * not satisfy a later bucket.
+     */
+    fun frameLanded(targetMs: Long, decodedMs: Long, slopMs: Long = BUCKET_MS): Boolean {
+        if (targetMs < 0L || decodedMs < 0L) return false
+        return decodedMs + slopMs >= targetMs && decodedMs <= targetMs + slopMs
+    }
+
+    /**
+     * Drop a stale extract when the finger has moved to a bucket that still
+     * needs a frame. A bucket that is already ready or already missed stays
+     * put, so the scheduler does not spin on the same request.
+     */
+    fun shouldAbandonScrubExtract(
+        requestedBucketMs: Long,
+        focusMs: Long,
+        focusBucketReady: Boolean,
+        focusBucketFailed: Boolean,
+    ): Boolean {
+        if (focusMs < 0L) return false
+        val focusBucket = bucketStartMs(focusMs)
+        if (focusBucket == requestedBucketMs) return false
+        return !focusBucketReady && !focusBucketFailed
+    }
+
+    /**
      * The bucket under [focusMs], then one step either side, so the next drag
      * increment is usually already decoded.
      */

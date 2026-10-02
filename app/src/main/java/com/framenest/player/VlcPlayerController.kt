@@ -18,10 +18,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import java.util.concurrent.atomic.AtomicBoolean
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.interfaces.IMedia
+import org.videolan.libvlc.interfaces.IVLCVout
 import org.videolan.libvlc.util.VLCVideoLayout
 
 /**
@@ -56,6 +58,7 @@ class VlcPlayerController(
     private var mediaPlayer: MediaPlayer? = null
     private var videoLayout: VLCVideoLayout? = null
     private var viewsAttached: Boolean = false
+    private var foregroundVoutCallback: IVLCVout.Callback? = null
 
     private var pendingSource: MediaSource? = null
     /** Source retained for replay or recovery after a seek reaches EOF. */
@@ -607,6 +610,7 @@ class VlcPlayerController(
             Log.i(TAG, "SMB resume fast seek target=$targetMs applied=$applied")
         }
         applyPlaybackRate(player)
+        ensureVideoOutputAttached()
         val playStarted = runCatching { player.play() }
             .onFailure { t -> Log.w(TAG, "play() native play failed: ${t.javaClass.simpleName}") }
             .isSuccess
@@ -1063,6 +1067,64 @@ class VlcPlayerController(
         mediaPlayer?.let { applyVideoScale(it) }
     }
 
+    /**
+     * Attach the video layout again after the activity returns from the background.
+     *
+     * Destroying the surface makes libVLC drop its holder callback and report the
+     * vout as detached. [refreshVideoSurfaces] then returns without registering
+     * the callback, so the recreated surface never reaches the decoder and play
+     * cannot draw. [onSurfaceReady] runs once that new surface exists.
+     */
+    fun rebindVideoOutput(onSurfaceReady: () -> Unit) {
+        if (released) return
+        val layout = videoLayout ?: return
+        val player = mediaPlayer ?: return
+        val vout = player.vlcVout
+        clearForegroundVoutCallback(vout)
+        val fired = AtomicBoolean(false)
+        val callback = object : IVLCVout.Callback {
+            override fun onSurfacesCreated(vout: IVLCVout) {
+                if (!fired.compareAndSet(false, true)) return
+                runCatching { vout.removeCallback(this) }
+                if (foregroundVoutCallback === this) foregroundVoutCallback = null
+                mainHandler.post {
+                    if (released) return@post
+                    onSurfaceReady()
+                }
+            }
+
+            override fun onSurfacesDestroyed(vout: IVLCVout) = Unit
+        }
+        foregroundVoutCallback = callback
+        runCatching { vout.addCallback(callback) }
+        runCatching { player.detachViews() }
+        viewsAttached = false
+        try {
+            player.attachViews(layout, null, true, false)
+            viewsAttached = true
+            applyVideoScale(player)
+        } catch (t: Throwable) {
+            Log.w(TAG, "rebind video output failed: ${t.javaClass.simpleName}")
+            return
+        }
+        Log.i(TAG, "rebind video output attached=${runCatching { vout.areViewsAttached() }.getOrDefault(false)}")
+    }
+
+    private fun ensureVideoOutputAttached() {
+        if (released || !viewsAttached || videoLayout == null) return
+        val player = mediaPlayer ?: return
+        val attached = runCatching { player.vlcVout.areViewsAttached() }.getOrDefault(true)
+        if (attached) return
+        Log.i(TAG, "video output detached; reattach before play")
+        rebindVideoOutput { }
+    }
+
+    private fun clearForegroundVoutCallback(vout: IVLCVout?) {
+        val callback = foregroundVoutCallback ?: return
+        foregroundVoutCallback = null
+        if (vout != null) runCatching { vout.removeCallback(callback) }
+    }
+
     override fun refreshVideoSurfaces() {
         if (released || !viewsAttached) return
         // A surface rebuild (orientation/size change) re-triggers Vout; if a seek
@@ -1087,6 +1149,7 @@ class VlcPlayerController(
             return
         }
         if (released) return
+        clearForegroundVoutCallback(mediaPlayer?.vlcVout)
         val releaseStartedAtMs = SystemClock.elapsedRealtime()
         released = true
         discardPendingDescriptor()

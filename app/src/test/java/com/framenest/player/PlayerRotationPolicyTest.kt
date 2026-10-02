@@ -40,6 +40,12 @@ class PlayerRotationPolicyTest {
     }
 
     @Test
+    fun foreground_reattachesOnlyAfterABackgroundStop() {
+        assertTrue(PlayerRotationPolicy.shouldReattachVideoOnForeground(returningFromBackground = true))
+        assertFalse(PlayerRotationPolicy.shouldReattachVideoOnForeground(returningFromBackground = false))
+    }
+
+    @Test
     fun foreground_repaintsRestingFrameOnly() {
         assertTrue(
             PlayerRotationPolicy.shouldRepaintOnForeground(

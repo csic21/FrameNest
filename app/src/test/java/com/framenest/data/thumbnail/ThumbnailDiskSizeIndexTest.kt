@@ -125,6 +125,32 @@ class ThumbnailDiskSizeIndexTest {
         }
     }
 
+    @Test
+    fun diskCache_oldJpegIsNotARevisedHit() {
+        val root = Files.createTempDirectory("framenest-thumbnail-legacy").toFile()
+        try {
+            val cache = ThumbnailDiskCache(rootDir = root, maxBytes = 1_024L)
+            val key = key("clip.mkv")
+            val legacy = cache.legacyJpegFile(key)
+            assertEquals("${key.digest()}.jpg", legacy.name)
+            assertFalse(legacy.name.contains(".${ThumbnailDiskCache.FILE_REVISION}."))
+            legacy.parentFile?.mkdirs()
+            legacy.writeBytes(byteArrayOf(1, 2, 3))
+
+            assertTrue(legacy.isFile)
+            assertFalse(cache.has(key))
+            assertEquals(null, cache.getBitmap(key))
+
+            cache.put(key, byteArrayOf(9, 9), durationMs = 4_000L)
+            assertTrue(cache.has(key))
+            assertTrue(cache.fileFor(key).isFile)
+            assertTrue(legacy.isFile)
+            assertFalse(cache.fileFor(key).absolutePath == legacy.absolutePath)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
     private fun key(path: String): ThumbnailKey =
         ThumbnailKey(
             serverId = "server",

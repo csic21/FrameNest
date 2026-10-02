@@ -4,11 +4,11 @@ package com.framenest.data.thumbnail
  * Pure policy for which timestamps to sample when extracting a list thumbnail.
  *
  * Short videos stay near 20% of their length. Longer videos start past the usual
- * logo and fade, then fall back through a finite list when that frame is black
- * or a flat color field.
+ * logo and fade. A rejected frame only retries other points inside the first
+ * two minutes, so a long file is never sampled at mid-duration.
  */
 object ThumbnailCandidatePolicy {
-    /** Preferred seek when duration is unknown, and the last fallback. */
+    /** Preferred seek when duration is unknown. Also one of the early retries. */
     const val PREFERRED_MS: Long = 10_000L
 
     /** Videos shorter than this use the 20%-of-duration rule. */
@@ -33,6 +33,17 @@ object ThumbnailCandidatePolicy {
     const val MAX_CANDIDATES: Int = 4
 
     /**
+     * Retries after a black or flat frame. Fixed offsets, not a percent of
+     * duration: 45% of a multi-gigabyte file seeks far past the opening.
+     */
+    private val EARLY_FALLBACKS_MS: LongArray = longArrayOf(
+        PREFERRED_MS,
+        CONTENT_MIN_MS,
+        60_000L,
+        CONTENT_MAX_MS,
+    )
+
+    /**
      * Ordered candidate timestamps in milliseconds (0-based media time).
      *
      * Always finite; empty only when [durationMs] is negative (invalid).
@@ -48,11 +59,7 @@ object ThumbnailCandidatePolicy {
         val lastUsable = (durationMs - 1L).coerceAtLeast(0L)
         val preferred = preferredTimestampMs(durationMs).coerceIn(0L, lastUsable)
 
-        val extras = listOf(
-            percentOf(durationMs, 45),
-            percentOf(durationMs, 75),
-            PREFERRED_MS,
-        ).map { it.coerceIn(0L, lastUsable) }
+        val extras = EARLY_FALLBACKS_MS.map { it.coerceIn(0L, lastUsable) }
 
         return (listOf(preferred) + extras)
             .distinct()

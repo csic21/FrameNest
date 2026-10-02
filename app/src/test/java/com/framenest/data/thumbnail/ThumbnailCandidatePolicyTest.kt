@@ -37,6 +37,20 @@ class ThumbnailCandidatePolicyTest {
     }
 
     @Test
+    fun candidates_longVideo_retriesStayInsideTheOpening() {
+        assertEquals(
+            listOf(120_000L, 10_000L, 30_000L, 60_000L),
+            ThumbnailCandidatePolicy.candidateTimestampsMs(3_600_000L),
+        )
+        assertEquals(
+            listOf(90_000L, 10_000L, 30_000L, 60_000L),
+            ThumbnailCandidatePolicy.candidateTimestampsMs(600_000L),
+        )
+        val hour = ThumbnailCandidatePolicy.candidateTimestampsMs(3_600_000L)
+        assertTrue(hour.none { it == 3_600_000L * 45L / 100L || it == 3_600_000L * 75L / 100L })
+    }
+
+    @Test
     fun candidates_shortVideo_startsNearTwentyPercent() {
         val candidates = ThumbnailCandidatePolicy.candidateTimestampsMs(8_000L)
         assertEquals(1_600L, candidates.first())

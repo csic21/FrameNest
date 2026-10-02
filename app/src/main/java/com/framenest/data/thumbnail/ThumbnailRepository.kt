@@ -1,7 +1,7 @@
 package com.framenest.data.thumbnail
 
 import android.content.Context
-import android.os.HandlerThread
+import android.graphics.Bitmap
 import android.util.Log
 import com.framenest.core.model.RemoteEntry
 import com.framenest.data.server.ServerRepository
@@ -30,7 +30,8 @@ import kotlin.coroutines.coroutineContext
 /**
  * List thumbnail facade: disk cache + limited-concurrency SMB extract workers.
  *
- * Default concurrency is **1** (architecture D2). Settings may raise to 2.
+ * Default concurrency is **3**. Settings may lower it to 1 or 2.
+ * Each worker reuses one player. Rows do not get their own.
  * UI must only display [ThumbnailUiState.Ready] bitmaps; never one player per row.
  */
 class ThumbnailRepository(
@@ -53,6 +54,7 @@ class ThumbnailRepository(
         val job: Job,
     )
 
+    private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
 
     private val uiStates = ConcurrentHashMap<String, MutableStateFlow<ThumbnailUiState>>()
@@ -108,11 +110,12 @@ class ThumbnailRepository(
             current.value = ThumbnailUiState.Ready(cached, diskCache.cachedDurationMs(request.key))
             return
         }
+        showLegacyCover(request)
         val state = backoff[digest] ?: ThumbnailBackoffState()
         if (!state.isEligible(timeSource())) {
-            if (state.permanentlyFailed) {
+            if (state.permanentlyFailed && current.value !is ThumbnailUiState.Ready) {
                 current.value = ThumbnailUiState.Failed
-            } else {
+            } else if (!state.permanentlyFailed) {
                 scheduleRetry(
                     work = QueuedWork(generation.current(), request),
                     state = state,
@@ -120,8 +123,7 @@ class ThumbnailRepository(
             }
             return
         }
-        if (current.value is ThumbnailUiState.Ready) return
-        if (current.value !is ThumbnailUiState.Loading) {
+        if (current.value !is ThumbnailUiState.Loading && current.value !is ThumbnailUiState.Ready) {
             current.value = ThumbnailUiState.Loading
         }
         enqueue(request, generation.current())
@@ -209,13 +211,13 @@ class ThumbnailRepository(
         ensureWorkers()
     }
 
-    /** Current configured concurrency (1–2). */
+    /** Current configured concurrency (1–3). */
     fun configuredConcurrency(): Int =
         concurrencyProvider()
             .coerceIn(UserPreferences.MIN_THUMB_CONCURRENCY, UserPreferences.MAX_THUMB_CONCURRENCY)
 
     /**
-     * Ensure worker count matches [configuredConcurrency] (1–2).
+     * Ensure worker count matches [configuredConcurrency] (1–3).
      * Multiple coroutines consume the same channel → true parallel extracts.
      * Safe to call after the user changes Settings.
      */
@@ -276,7 +278,9 @@ class ThumbnailRepository(
                 return
             }
 
-            publish(work, ThumbnailUiState.Loading)
+            if (uiStates[digest]?.value !is ThumbnailUiState.Ready) {
+                publish(work, ThumbnailUiState.Loading)
+            }
             val success = generate(work, session)
             if (!generation.isCurrent(work.generation)) return
             if (success) {
@@ -306,43 +310,38 @@ class ThumbnailRepository(
     ): Boolean {
         val request = work.request
         return try {
-            val randomAccess = session.open(request) ?: return false
             coroutineContext.ensureActive()
-            randomAccess.use { raf ->
-                coroutineContext.ensureActive()
-                val label = "thumb://${request.share}/${request.path.trimStart('/')}"
-                val result = session.extract(raf, debugLabel = label) ?: return false
-                coroutineContext.ensureActive()
-                val accepted = try {
-                    synchronized(cacheMutationLock) {
-                        if (!generation.isCurrent(work.generation)) {
-                            false
-                        } else {
-                            diskCache.put(
-                                request.key,
-                                result.jpegBytes,
-                                result.bitmap,
-                                result.durationMs,
-                            )
-                            true
-                        }
+            val result = session.cover(request) ?: return false
+            coroutineContext.ensureActive()
+            val accepted = try {
+                synchronized(cacheMutationLock) {
+                    if (!generation.isCurrent(work.generation)) {
+                        false
+                    } else {
+                        diskCache.put(
+                            request.key,
+                            result.jpegBytes,
+                            result.bitmap,
+                            result.durationMs,
+                        )
+                        true
                     }
-                } catch (t: Throwable) {
-                    if (!result.bitmap.isRecycled) result.bitmap.recycle()
-                    throw t
                 }
-                if (!accepted) {
-                    if (!result.bitmap.isRecycled) result.bitmap.recycle()
-                    return false
-                }
-                publish(work, ThumbnailUiState.Ready(result.bitmap, result.durationMs))
-                Log.d(
-                    TAG,
-                    "thumb ok digest=${request.key.digest().take(8)} " +
-                        "t=${result.usedTimestampMs}ms dur=${result.durationMs}ms",
-                )
-                true
+            } catch (t: Throwable) {
+                if (!result.bitmap.isRecycled) result.bitmap.recycle()
+                throw t
             }
+            if (!accepted) {
+                if (!result.bitmap.isRecycled) result.bitmap.recycle()
+                return false
+            }
+            publish(work, ThumbnailUiState.Ready(result.bitmap, result.durationMs))
+            Log.d(
+                TAG,
+                "thumb ok digest=${request.key.digest().take(8)} " +
+                    "t=${result.usedTimestampMs}ms dur=${result.durationMs}ms",
+            )
+            true
         } catch (t: Throwable) {
             if (t is CancellationException) throw t
             session.invalidate()
@@ -351,20 +350,44 @@ class ThumbnailRepository(
         }
     }
 
-    /** One SMB session per extraction worker; never shared across parallel workers. */
+    /** One SMB session and one reused player per worker; never shared across workers. */
     private inner class ThumbnailWorkerSession : AutoCloseable {
         private var key: ThumbnailConnectionKey? = null
         private var client: SmbClient? = null
-        private var proxyIoThread: HandlerThread? = null
+        private var coverGrabber: ThumbnailVlcCover? = null
 
-        fun extract(
-            randomAccess: SmbRandomAccess,
-            debugLabel: String,
-        ): ThumbnailFrameExtractor.ExtractResult? = extractor.extract(
-            randomAccess = randomAccess,
-            debugLabel = debugLabel,
-            ioThread = proxyIoThread(),
-        )
+        /**
+         * One direct SMB frame. Null leaves the row on the poster icon.
+         * The list does not fall back to a file-prefix download.
+         */
+        suspend fun cover(request: ThumbnailRequest): ThumbnailFrameExtractor.ExtractResult? {
+            val server = serverRepository.getServer(request.key.serverId) ?: return null
+            val password = serverRepository.getPassword(server) ?: CharArray(0)
+            val job = coroutineContext[Job]
+            return try {
+                val grabber = coverGrabber ?: ThumbnailVlcCover(appContext).also { coverGrabber = it }
+                grabber.frame(
+                    host = server.host,
+                    port = server.port,
+                    share = request.share,
+                    path = request.path,
+                    username = server.username,
+                    password = password,
+                    domain = server.domain.orEmpty(),
+                    active = { job?.isActive != false },
+                )
+            } finally {
+                password.fill('\u0000')
+            }
+        }
+
+        suspend fun extractPrefix(request: ThumbnailRequest): ThumbnailFrameExtractor.ExtractResult? {
+            val randomAccess = open(request) ?: return null
+            return randomAccess.use { raf -> extract(raf) }
+        }
+
+        fun extract(randomAccess: SmbRandomAccess): ThumbnailFrameExtractor.ExtractResult? =
+            extractor.extract(randomAccess)
 
         suspend fun open(request: ThumbnailRequest): SmbRandomAccess? {
             val server = serverRepository.getServer(request.key.serverId) ?: return null
@@ -417,17 +440,9 @@ class ThumbnailRepository(
 
         override fun close() {
             invalidate()
-            val staleThread = proxyIoThread
-            proxyIoThread = null
-            staleThread?.quitSafely()
-        }
-
-        private fun proxyIoThread(): HandlerThread {
-            proxyIoThread?.let { return it }
-            return HandlerThread("thumbnail-pfd-io").also { thread ->
-                thread.start()
-                proxyIoThread = thread
-            }
+            val grabber = coverGrabber
+            coverGrabber = null
+            runCatching { grabber?.close() }
         }
     }
 
@@ -435,7 +450,42 @@ class ThumbnailRepository(
         if (!generation.isCurrent(work.generation)) return
         val digest = work.request.key.digest()
         if ((interestCounts[digest] ?: 0) <= 0) return
-        uiStates[digest]?.value = state
+        val flow = uiStates[digest] ?: return
+        // A provisional legacy cover stays up when this attempt fails or is still loading.
+        if (flow.value is ThumbnailUiState.Ready && state !is ThumbnailUiState.Ready) return
+        flow.value = state
+    }
+
+    private fun showLegacyCover(request: ThumbnailRequest) {
+        val workGeneration = generation.current()
+        val digest = request.key.digest()
+        scope.launch {
+            if (!generation.isCurrent(workGeneration)) return@launch
+            if ((interestCounts[digest] ?: 0) <= 0) return@launch
+            val bitmap = try {
+                diskCache.readLegacyBitmap(request.key)
+            } catch (t: Throwable) {
+                Log.d(TAG, "legacy cover skipped: ${t.javaClass.simpleName}")
+                null
+            } ?: return@launch
+            val published = publishLegacy(workGeneration, request, bitmap)
+            if (!published && !bitmap.isRecycled) bitmap.recycle()
+        }
+    }
+
+    private fun publishLegacy(
+        workGeneration: Long,
+        request: ThumbnailRequest,
+        bitmap: Bitmap,
+    ): Boolean {
+        if (!generation.isCurrent(workGeneration)) return false
+        val digest = request.key.digest()
+        if ((interestCounts[digest] ?: 0) <= 0) return false
+        val flow = uiStates[digest] ?: return false
+        if (flow.value is ThumbnailUiState.Ready) return false
+        if (diskCache.getMemoryBitmap(request.key) != null || diskCache.has(request.key)) return false
+        flow.value = ThumbnailUiState.Ready(bitmap, 0L)
+        return true
     }
 
     private fun scheduleRetry(work: QueuedWork, state: ThumbnailBackoffState) {

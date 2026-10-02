@@ -5,17 +5,22 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.os.Build
-import android.os.HandlerThread
 import android.util.Log
-import com.framenest.player.SmbSeekableMedia
 import com.framenest.smb.SmbRandomAccess
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.RandomAccessFile
 
 /**
- * Extracts a single list thumbnail frame from seekable SMB data using
- * [MediaMetadataRetriever] + [SmbSeekableMedia] proxy FD (decision 0002 path B).
+ * Bounded SMB prefix copied to a local file, then decoded with
+ * [MediaMetadataRetriever].
  *
- * Does **not** create a libVLC player instance.
+ * The folder list does not call this. A short prefix still produced no frame
+ * for the files that stayed on the placeholder, and the copy made every miss
+ * slow. Scrub preview does not use it either.
+ *
+ * Does **not** create a libVLC player instance, and does **not** open a proxy
+ * file descriptor.
  */
 class ThumbnailFrameExtractor(
     private val appContext: Context,
@@ -30,36 +35,51 @@ class ThumbnailFrameExtractor(
     )
 
     /**
-     * Try candidate timestamps until a non-black frame is obtained.
-     * @return null when all candidates fail
+     * Copy a prefix, then try early timestamps until a usable frame is obtained.
+     * @return null when the prefix is empty or every candidate fails
      */
-    fun extract(
-        randomAccess: SmbRandomAccess,
-        debugLabel: String = "thumb",
-        ioThread: HandlerThread? = null,
-    ): ExtractResult? {
-        val opened = SmbSeekableMedia.open(
-            context = appContext,
-            randomAccess = randomAccess,
-            debugLabel = debugLabel,
-            ioThread = ioThread,
-        )
-        val afd = opened.assetFileDescriptor
+    fun extract(randomAccess: SmbRandomAccess): ExtractResult? {
+        val fileBytes = randomAccess.size.coerceAtLeast(0L)
+        val prefix = File.createTempFile("thumb-prefix-", ".bin", appContext.cacheDir)
+        return try {
+            val written = copyPrefix(randomAccess, prefix)
+            if (written <= 0L) {
+                Log.w(TAG, "prefix empty fileBytes=$fileBytes")
+                return null
+            }
+            val segmentUnknown = markMkvSegmentUnknown(prefix)
+            Log.i(
+                TAG,
+                "prefix ready fileBytes=$fileBytes prefixBytes=$written segmentUnknown=$segmentUnknown",
+            )
+            readPrefix(prefix, fileBytes, written)
+        } catch (t: Throwable) {
+            if (t is java.util.concurrent.CancellationException) throw t
+            Log.w(TAG, "extract failed: ${t.javaClass.simpleName}")
+            null
+        } finally {
+            prefix.delete()
+        }
+    }
+
+    private fun readPrefix(prefix: File, fileBytes: Long, written: Long): ExtractResult? {
         val retriever = MediaMetadataRetriever()
         return try {
-            retriever.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+            retriever.setDataSource(prefix.absolutePath)
             val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                 ?.toLongOrNull()
                 ?.coerceAtLeast(0L)
                 ?: 0L
-            // Fast path: embedded cover art needs no video decode at all.
-            embeddedCover(retriever, durationMs)?.let { return it }
+            embeddedCover(retriever, durationMs)?.let { cover ->
+                Log.i(TAG, "prefix embedded fileBytes=$fileBytes prefixBytes=$written")
+                return cover
+            }
             val videoW = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
                 ?.toIntOrNull() ?: 0
             val videoH = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
                 ?.toIntOrNull() ?: 0
             val dst = scaledDstSize(videoW, videoH, targetMaxEdgePx)
-            val candidates = ThumbnailCandidatePolicy.candidateTimestampsMs(durationMs)
+            val candidates = ThumbnailPrefixPlan.timestampsMs(durationMs)
             for (timeMs in candidates) {
                 val frame = getFrameAt(retriever, timeMs, dst) ?: continue
                 if (rejectFrame(frame)) {
@@ -72,6 +92,11 @@ class ThumbnailFrameExtractor(
                     frame.recycle()
                 }
                 val jpeg = compressJpeg(scaled)
+                Log.i(
+                    TAG,
+                    "prefix frame t=${timeMs}ms dur=${durationMs}ms " +
+                        "fileBytes=$fileBytes prefixBytes=$written",
+                )
                 return ExtractResult(
                     bitmap = scaled,
                     jpegBytes = jpeg,
@@ -79,13 +104,39 @@ class ThumbnailFrameExtractor(
                     durationMs = durationMs,
                 )
             }
-            null
-        } catch (t: Throwable) {
-            Log.w(TAG, "extract failed label=$debugLabel: ${t.javaClass.simpleName}")
+            Log.w(TAG, "prefix no frame fileBytes=$fileBytes prefixBytes=$written dur=${durationMs}ms")
             null
         } finally {
             runCatching { retriever.release() }
-            runCatching { afd.close() }
+        }
+    }
+
+    private fun copyPrefix(randomAccess: SmbRandomAccess, dest: File): Long {
+        val want = ThumbnailPrefixPlan.prefixBytes(randomAccess.size)
+        if (want <= 0L) return 0L
+        val buffer = ByteArray(COPY_CHUNK_BYTES)
+        var written = 0L
+        dest.outputStream().use { out ->
+            while (written < want) {
+                val request = minOf(buffer.size.toLong(), want - written).toInt()
+                val n = randomAccess.readAt(written, buffer, 0, request)
+                if (n <= 0) break
+                out.write(buffer, 0, n)
+                written += n
+            }
+        }
+        return written
+    }
+
+    private fun markMkvSegmentUnknown(prefix: File): Boolean {
+        RandomAccessFile(prefix, "rw").use { file ->
+            val header = ByteArray(MKV_HEADER_SCAN_BYTES)
+            val read = file.read(header)
+            if (read <= 0) return false
+            val field = ThumbnailPrefixPlan.mkvSegmentSizeField(header.copyOf(read)) ?: return false
+            file.seek(field.first.toLong())
+            file.write(ByteArray(field.last - field.first + 1) { 0xFF.toByte() })
+            return true
         }
     }
 
@@ -132,24 +183,23 @@ class ThumbnailFrameExtractor(
     ): Bitmap? {
         val timeUs = timeMs.coerceAtLeast(0L) * 1000L
         return try {
-            // OPTION_CLOSEST_SYNC is cheap and good enough for list covers.
-            // API 27+ decodes directly at thumbnail size; older devices fall
-            // back to full-res decode + scaleDown below.
-            if (dst != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                try {
+            // Scaled decode first. A null scaled frame falls back to a full frame,
+            // then to the nearest decoded frame.
+            val scaled = if (dst != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                runCatching {
                     retriever.getScaledFrameAtTime(
                         timeUs,
                         MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
                         dst.first,
                         dst.second,
                     )
-                } catch (t: Throwable) {
-                    Log.d(TAG, "scaled frame failed, fallback full-res: ${t.javaClass.simpleName}")
-                    retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                }
+                }.getOrNull()
             } else {
-                retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                null
             }
+            scaled
+                ?: retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                ?: retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST)
         } catch (t: Throwable) {
             Log.d(TAG, "getFrameAtTime failed t=${timeMs}ms: ${t.javaClass.simpleName}")
             null
@@ -184,6 +234,8 @@ class ThumbnailFrameExtractor(
 
     companion object {
         private const val TAG = "FrameNestThumb"
+        private const val COPY_CHUNK_BYTES: Int = 1024 * 1024
+        private const val MKV_HEADER_SCAN_BYTES: Int = 4096
         const val DEFAULT_MAX_EDGE_PX: Int = 320
         const val DEFAULT_JPEG_QUALITY: Int = 80
 

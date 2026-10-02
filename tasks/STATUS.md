@@ -57,19 +57,20 @@
 | FN-50 连续快进与片尾重播恢复 | 已完成 | Codex | `agent/FN-50-playback-recovery` | FN-44, FN-48, FN-49 | [FN-50](handoffs/FN-50.md) |
 | FN-51 拖动预览图 | 已完成 | Grok | `agent/FN-51-scrub-preview-images` | FN-48, FN-50 | [FN-51](handoffs/FN-51.md) |
 | FN-52 文件夹视频封面 | 已完成 | Grok | `agent/FN-52-folder-video-covers` | FN-07, FN-32, FN-51 | [FN-52](handoffs/FN-52.md) |
+| FN-53 文件夹封面尽快出现 | 已完成 | Grok | `agent/FN-53-fast-folder-covers` | FN-52 | [FN-53](handoffs/FN-53.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。
 
-**当前发布**：`0.5.0-internal`（versionCode 8）
+**当前发布**：`0.5.1-internal`（versionCode 9）
 
 | 产物 | 路径 | 约大小 |
 |---|---|---|
-| Release universal | `app/build/outputs/apk/release/app-universal-release-unsigned.apk` | 208.2MB |
+| Release universal | `app/build/outputs/apk/release/app-universal-release-unsigned.apk` | 208.3MB |
 | Release arm64 | `app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk` | 100.7MB |
 | Release x86_64 | `app/build/outputs/apk/release/app-x86_64-release-unsigned.apk` | 112.2MB |
 
-已发布的安装包是用与 0.4.0 相同的 debug 证书签过名的 arm64 APK：`framenest-0.5.0-internal-arm64.apk`。
+已发布的安装包是用与 0.5.0 相同的 debug 证书签过名的 arm64 APK：`framenest-0.5.1-internal-arm64.apk`。
 
 NAS 验收勾选：`docs/NAS-ACCEPTANCE-CHECKLIST.md`  
 后续 backlog：`docs/POST-MVP.md`

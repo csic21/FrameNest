@@ -12,8 +12,8 @@ android {
         applicationId = "com.framenest"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.5.0-internal"
+        versionCode = 9
+        versionName = "0.5.1-internal"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -113,6 +113,13 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
     implementation(libs.libvlc.all)
+    // Cover frames call libvlc_video_set_callbacks. The AAR supplies the
+    // Android JNI dispatcher; vosk/sherpa must not also package com.sun.jna.
+    implementation(libs.jna) {
+        artifact {
+            type = "aar"
+        }
+    }
 
     implementation(libs.smbj)
     implementation(libs.kotlinx.coroutines.android)
@@ -124,11 +131,15 @@ dependencies {
     implementation(libs.androidx.security.crypto)
 
     // FN-14: on-device listen-translate (Vosk ASR + ML Kit MT).
-    implementation(libs.vosk.android)
+    implementation(libs.vosk.android) {
+        exclude(group = "net.java.dev.jna", module = "jna")
+    }
     // FN-51: SenseVoice-Small int8 ASR via sherpa-onnx (default engine).
     // AAR bundles the JNI bridge + onnxruntime natives for all ABIs; the
     // arm64-v8a/x86_64 abiFilters above keep only the two shipped ABIs.
-    implementation(libs.sherpa.onnx)
+    implementation(libs.sherpa.onnx) {
+        exclude(group = "net.java.dev.jna", module = "jna")
+    }
     implementation(libs.mlkit.translate)
     implementation(libs.kotlinx.coroutines.play.services)
 

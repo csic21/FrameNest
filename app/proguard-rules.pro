@@ -25,6 +25,12 @@
 -dontwarn org.vosk.**
 -keep class com.sun.jna.** { *; }
 -dontwarn com.sun.jna.**
+# libvlc calls these from native code. R8 never sees a Java call site.
+-keep class com.framenest.data.thumbnail.ThumbnailVlcCover { *; }
+-keep class com.framenest.data.thumbnail.ThumbnailVlcCover$* { *; }
+-keep class com.framenest.feature.player.ScrubPreviewVlc { *; }
+-keep class com.framenest.feature.player.ScrubPreviewVlc$* { *; }
+-keepclassmembers class * implements com.sun.jna.Callback { *; }
 
 # sherpa-onnx (FN-51): JNI entry points (native methods + config getters invoked
 # from C++ by name/signature) must survive R8, or recognizer creation fails

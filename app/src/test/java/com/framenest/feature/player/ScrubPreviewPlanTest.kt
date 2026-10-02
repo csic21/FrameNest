@@ -103,6 +103,51 @@ class ScrubPreviewPlanTest {
     }
 
     @Test
+    fun frameLanded_rejectsTheOpeningFrameForALaterBucket() {
+        assertTrue(ScrubPreviewPlan.frameLanded(targetMs = 0L, decodedMs = 0L))
+        assertTrue(ScrubPreviewPlan.frameLanded(targetMs = 15_000L, decodedMs = 10_000L))
+        assertTrue(!ScrubPreviewPlan.frameLanded(targetMs = 15_000L, decodedMs = 0L))
+        assertTrue(!ScrubPreviewPlan.frameLanded(targetMs = 15_000L, decodedMs = 40_000L))
+        assertTrue(!ScrubPreviewPlan.frameLanded(targetMs = 15_000L, decodedMs = -1L))
+    }
+
+    @Test
+    fun abandon_onlyWhenTheFingerBucketStillNeedsAFrame() {
+        assertTrue(
+            ScrubPreviewPlan.shouldAbandonScrubExtract(
+                requestedBucketMs = 0L,
+                focusMs = 95_000L,
+                focusBucketReady = false,
+                focusBucketFailed = false,
+            ),
+        )
+        assertTrue(
+            !ScrubPreviewPlan.shouldAbandonScrubExtract(
+                requestedBucketMs = 90_000L,
+                focusMs = 95_000L,
+                focusBucketReady = false,
+                focusBucketFailed = false,
+            ),
+        )
+        assertTrue(
+            !ScrubPreviewPlan.shouldAbandonScrubExtract(
+                requestedBucketMs = 0L,
+                focusMs = -1L,
+                focusBucketReady = false,
+                focusBucketFailed = false,
+            ),
+        )
+        assertTrue(
+            !ScrubPreviewPlan.shouldAbandonScrubExtract(
+                requestedBucketMs = 0L,
+                focusMs = 95_000L,
+                focusBucketReady = true,
+                focusBucketFailed = false,
+            ),
+        )
+    }
+
+    @Test
     fun cacheDigest_changesWhenTheFileChanges() {
         val first = ScrubPreviewPlan.cacheDigest("srv", "media", "a.mkv", 10L, 1L)
         val replaced = ScrubPreviewPlan.cacheDigest("srv", "media", "a.mkv", 10L, 2L)
@@ -131,7 +176,7 @@ class ScrubPreviewSchedulerTest {
         val loaded = mutableListOf<Long>()
         val scheduler = ScrubPreviewScheduler(this) { bucket ->
             loaded += bucket
-            true
+            ScrubLoadResult.Ready
         }
         try {
             scheduler.setScrubbing(true, 95_000L)
@@ -157,7 +202,7 @@ class ScrubPreviewSchedulerTest {
         val loaded = mutableListOf<Long>()
         val scheduler = ScrubPreviewScheduler(this) { bucket ->
             loaded += bucket
-            true
+            ScrubLoadResult.Ready
         }
         try {
             scheduler.updatePlayback(
@@ -186,7 +231,7 @@ class ScrubPreviewSchedulerTest {
         var calls = 0
         val scheduler = ScrubPreviewScheduler(this) {
             calls += 1
-            false
+            ScrubLoadResult.Failed
         }
         try {
             scheduler.updatePlayback(
@@ -198,11 +243,17 @@ class ScrubPreviewSchedulerTest {
             advanceUntilIdle()
             val once = calls
             assertTrue(once > 0)
-            scheduler.setScrubbing(true, 5_000L)
-            advanceUntilIdle()
-            scheduler.setScrubbing(false, null)
+            scheduler.updatePlayback(
+                durationMs = 30_000L,
+                anchorMs = 0L,
+                buffering = false,
+                active = true,
+            )
             advanceUntilIdle()
             assertEquals(once, calls)
+            scheduler.setScrubbing(true, 5_000L)
+            advanceUntilIdle()
+            assertTrue(calls > once)
         } finally {
             scheduler.close()
         }
@@ -215,7 +266,7 @@ class ScrubPreviewSchedulerTest {
         val scheduler = ScrubPreviewScheduler(this) { bucket ->
             started.send(bucket)
             release.receive()
-            true
+            ScrubLoadResult.Ready
         }
         try {
             scheduler.updatePlayback(
@@ -229,6 +280,28 @@ class ScrubPreviewSchedulerTest {
             release.send(Unit)
             assertEquals(90_000L, withTimeout(1_000) { started.receive() })
             assertTrue(started.tryReceive().isFailure)
+        } finally {
+            scheduler.close()
+        }
+    }
+
+    @Test
+    fun abandonedBucket_isNotRemembered_andDoesNotSpin() = runTest {
+        var calls = 0
+        val scheduler = ScrubPreviewScheduler(this) {
+            calls += 1
+            ScrubLoadResult.Abandoned
+        }
+        try {
+            scheduler.updatePlayback(
+                durationMs = 30_000L,
+                anchorMs = 0L,
+                buffering = false,
+                active = true,
+            )
+            advanceUntilIdle()
+            assertEquals(2, calls)
+            assertTrue(scheduler.readyBuckets().isEmpty())
         } finally {
             scheduler.close()
         }

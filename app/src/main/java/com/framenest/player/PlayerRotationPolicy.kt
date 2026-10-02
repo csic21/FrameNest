@@ -7,16 +7,22 @@ internal object PlayerRotationPolicy {
         !isChangingConfigurations
 
     /**
-     * Foreground recovery after an app-background transition.
+     * True only after an actual background stop.
      *
-     * The underlying SurfaceView surface is destroyed on STOP and recreated on
-     * START with the same size, so [VlcVideoSurface]'s size-change refresh does
-     * not fire. The caller must always rebind via `refreshVideoSurfaces()`.
+     * Opening the player also delivers ON_START. That pass must not detach the
+     * video layout. A later return from another app must attach it again:
+     * surface destruction clears libVLC's holder callback, and a size-only
+     * refresh then does nothing, so play stays dead until the screen is reopened.
+     */
+    fun shouldReattachVideoOnForeground(returningFromBackground: Boolean): Boolean =
+        returningFromBackground
+
+    /**
+     * After the video layout is attached again, repaint a resting frame.
      *
-     * When a decoded frame was already on screen and playback is resting in
-     * Ready/Paused, the dead surface's BufferQueue took the last frame with it —
-     * rebinding alone leaves black. A same-position seek forces one muted decode
-     * to repaint the current picture without changing user intent.
+     * The new surface has an empty buffer. A same-position seek forces one muted
+     * decode so Ready/Paused shows the current picture again. Playing, opening,
+     * and error states keep their own path.
      */
     fun shouldRepaintOnForeground(
         firstFrameReady: Boolean,

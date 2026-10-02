@@ -98,7 +98,7 @@ adb shell am start -n com.framenest/.MainActivity
 4. 将 [任务卡](tasks/TASKS.md) 中对应的 `FN-XX` 段落直接交给 Agent。
 5. 要求每个 Agent 按 [交接模板](tasks/HANDOFF.md) 回报。
 
-内部测试版：`0.5.0-internal`。安装：
+内部测试版：`0.5.1-internal`。安装：
 
 ```bash
 ./gradlew assembleDebug

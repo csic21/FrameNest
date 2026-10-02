@@ -9,7 +9,7 @@ import java.io.IOException
 /**
  * Disk cache for list thumbnails under the app cache directory.
  *
- * Layout: `[cacheDir]/thumbnails/<digest>.c2.jpg`, plus a sibling duration file.
+ * Layout: `[cacheDir]/thumbnails/<digest>.c3.jpg`, plus a sibling duration file.
  *
  * Clearable for settings (FN-09) via [clear].
  */
@@ -31,8 +31,29 @@ class ThumbnailDiskCache(
 
     fun fileFor(key: ThumbnailKey): File = File(dir, jpegName(key.digest()))
 
+    /** Pre-revision cover. Not a hit: generation of [fileFor] still has to run. */
+    fun legacyJpegFile(key: ThumbnailKey): File = File(dir, "${key.digest()}.jpg")
+
     @Synchronized
     fun has(key: ThumbnailKey): Boolean = fileFor(key).isFile
+
+    /**
+     * Decode an older `<digest>.jpg` while the revised cover is missing.
+     * The bitmap is not stored in the memory cache, so a later revised file
+     * can replace it.
+     */
+    @Synchronized
+    fun readLegacyBitmap(key: ThumbnailKey): Bitmap? {
+        if (fileFor(key).isFile) return null
+        val legacy = legacyJpegFile(key)
+        if (!legacy.isFile) return null
+        val decoded = BitmapFactory.decodeFile(legacy.absolutePath) ?: return null
+        if (decoded.width <= 0 || decoded.height <= 0) {
+            if (!decoded.isRecycled) decoded.recycle()
+            return null
+        }
+        return decoded
+    }
 
     @Synchronized
     fun getMemoryBitmap(key: ThumbnailKey): Bitmap? {
@@ -209,7 +230,7 @@ class ThumbnailDiskCache(
 
     companion object {
         /** New covers use this suffix so older 10s frames are not reused. */
-        const val FILE_REVISION: String = "c2"
+        const val FILE_REVISION: String = "c3"
         const val SUBDIR: String = "thumbnails"
 
         fun jpegName(digest: String): String = "$digest.$FILE_REVISION.jpg"

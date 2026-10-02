@@ -42,7 +42,8 @@ class UserPreferences(
     }
 
     /**
-     * Max concurrent list-thumbnail extract jobs (1–2). Default 1 per architecture.
+     * How many list covers generate at once (1–3). Default 3.
+     * Each worker keeps one player; rows do not.
      */
     fun thumbnailConcurrency(): Int =
         prefs.getInt(KEY_THUMB_CONCURRENCY, DEFAULT_THUMB_CONCURRENCY)
@@ -98,7 +99,7 @@ class UserPreferences(
         const val PRESET_EN = "en"
 
         const val MIN_THUMB_CONCURRENCY = 1
-        const val MAX_THUMB_CONCURRENCY = 2
-        const val DEFAULT_THUMB_CONCURRENCY = 1
+        const val MAX_THUMB_CONCURRENCY = 3
+        const val DEFAULT_THUMB_CONCURRENCY = 3
     }
 }

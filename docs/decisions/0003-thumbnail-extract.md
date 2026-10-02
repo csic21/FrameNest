@@ -1,6 +1,6 @@
 # 决策：列表缩略图取帧方式
 
-- 状态：accepted（候选时间与列表呈现由 [0013](0013-folder-video-covers.md) 补充；取帧路径与单并发不变）
+- 状态：accepted（候选时间与列表呈现由 [0013](0013-folder-video-covers.md) 补充。列表封面的代理 FD 取帧由 [0015](0015-thumbnail-prefix.md) 替代，主路径再由 [0016](0016-vlc-folder-covers.md) 改为 libVLC 内存回调。默认并发改为 3，仍不为每一行建播放器）
 - 日期：2026-07-14
 - 任务：FN-07
 

@@ -653,6 +653,16 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
                 container.thumbnailRepository.ensureWorkers()
             },
         )
+        LanguageOption(
+            label = stringResource(R.string.settings_thumb_concurrency_3),
+            selected = thumbConcurrency == 3,
+            testTag = "settings_thumb_concurrency_3",
+            onSelect = {
+                thumbConcurrency = 3
+                prefs.setThumbnailConcurrency(3)
+                container.thumbnailRepository.ensureWorkers()
+            },
+        )
 
         Spacer(Modifier.height(20.dp))
         Text(

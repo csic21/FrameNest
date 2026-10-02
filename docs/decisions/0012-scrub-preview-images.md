@@ -1,6 +1,6 @@
 # 决策：拖动时用预览图，松手再定位
 
-- 状态：accepted（实现与自动测试；真实 NAS 出图耗时需补验）
+- 状态：accepted（SMB 上的取帧改由 [0017](0017-scrub-preview-smb-and-foreground.md) 用一个软件解码 libVLC。本地文件、松手定位，以及拖动期间不 seek 主画面，仍然成立）
 - 日期：2026-10-01
 - 任务：FN-51
 
