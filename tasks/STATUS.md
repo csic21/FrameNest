@@ -60,15 +60,17 @@
 | FN-53 文件夹封面尽快出现 | 已完成 | Grok | `agent/FN-53-fast-folder-covers` | FN-52 | [FN-53](handoffs/FN-53.md) |
 
 
-| FN-54 播放会话与前后台恢复 | 进行中 | Codex | `agent/FN-57-state-experience` | FN-49, FN-50, FN-53 | [FN-54](handoffs/FN-54.md) |
+| FN-54 播放会话与前后台恢复 | 待集成 | Codex | `agent/FN-57-state-experience` | FN-49, FN-50, FN-53 | [FN-54](handoffs/FN-54.md) |
 | FN-55 SMB 非阻塞取消 | 待集成 | Codex | `agent/FN-57-state-experience` | FN-53 | [FN-55](handoffs/FN-55.md) |
 | FN-56 Android 构建检查 | 待集成 | Codex | `agent/FN-57-state-experience` | 无 | [FN-56](handoffs/FN-56.md) |
-| FN-57 体验修复与更新接线 | 进行中 | Codex | `agent/FN-57-state-experience` | FN-54, FN-55, FN-56, FN-58, FN-59 | 待最终验收 |
+| FN-57 体验修复与更新接线 | 待集成 | Codex | `agent/FN-57-state-experience` | FN-54, FN-55, FN-56, FN-58, FN-59 | [FN-57](handoffs/FN-57.md) |
 | FN-58 应用内安全更新 | 待集成 | Codex | `agent/FN-57-state-experience` | FN-54, FN-56 | [FN-58](handoffs/FN-58.md) |
 | FN-59 固定签名可复用发布 | 进行中 | Codex | `agent/FN-57-state-experience` | FN-56, FN-58 | [FN-59](handoffs/FN-59.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。
+
+本轮 `0.6.0-internal`（versionCode 11）已完成源码集成及本地/分支 CI 检查，等待签名发布。设备验收受云端模拟器会话阻塞，详见 FN-57 交接。
 
 **当前发布**：`0.5.2-internal`（versionCode 10）
 
