@@ -40,11 +40,19 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Override v3's legacy `tools platform-tools` default.
+          packages: platform-tools
+          # Hosted runners already accept the stable SDK license. Do not bulk
+          # accept unrelated preview/emulator agreements on every build.
+          accept-android-sdk-licenses: false
 
       - name: Install SDK packages
         run: |
-          sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
-          yes | sdkmanager --licenses > /dev/null
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" < /dev/null
+          # sdkmanager may return zero after skipping an unaccepted license.
+          test -f "$ANDROID_HOME/platforms/android-36/android.jar"
+          test -x "$ANDROID_HOME/build-tools/36.0.0/aapt2"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -54,6 +62,9 @@ jobs:
 
       - name: Unit tests
         run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Compile instrumentation tests
+        run: ./gradlew assembleDebugAndroidTest --stacktrace
 
       - name: Lint
         run: ./gradlew lintDebug --stacktrace

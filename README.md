@@ -24,7 +24,7 @@ FrameNest（栖影）是面向 Android 手机和平板的 NAS/SMB 视频播放�
 | 工具 | 要求 |
 |---|---|
 | JDK | **17**（`JAVA_HOME` 指向 JDK 17） |
-| Android SDK | Platform **36**（`compileSdk` / `targetSdk`）、Build-Tools 36.x |
+| Android SDK | Platform **36**（`compileSdk` / `targetSdk`）、Build-Tools **36.0.0** |
 | Gradle | Wrapper 自带 **9.6.1**（AGP 9.2.1 最低要求 9.4.1） |
 | minSdk | 26 |
 
@@ -73,9 +73,17 @@ adb shell am start -n com.framenest/.smb.spike.SmbSpikeActivity
 # 仪器测试（需模拟器/设备；Compose smoke）
 ./gradlew connectedDebugAndroidTest
 
+# 只编译仪器测试 APK（不代表已在设备上通过）
+./gradlew assembleDebugAndroidTest
+
 # 一键：assemble + 单测 + lint
 ./gradlew assembleDebug testDebugUnitTest lintDebug
 ```
+
+CI 显式安装 `platform-tools`、`platforms;android-36` 和 `build-tools;36.0.0`，
+避免 `setup-android@v3` 默认请求已下线的 `tools` 包。复用 hosted runner
+已有的稳定版 SDK 许可，不批量接受无关许可；缺少目标 SDK 文件时直接失败。
+CI 包含仪器测试 APK 编译；手机和平板的实际验证仍需执行 `connectedDebugAndroidTest`。
 
 产物路径：
 
