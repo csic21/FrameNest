@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.StateFlow
 interface PlayerController {
     val state: StateFlow<PlayerState>
 
+    /** History snapshot includes a held resume/seek target, even while the preview clock is near zero. */
+    val progressState: PlayerState get() = state.value
+
     /**
      * Bind video output. Must be called with a live [ViewGroup] that will host
      * [org.videolan.libvlc.util.VLCVideoLayout] (or is one). Safe to call once

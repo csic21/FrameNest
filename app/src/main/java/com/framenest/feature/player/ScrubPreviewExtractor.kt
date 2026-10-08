@@ -10,6 +10,7 @@ import com.framenest.player.CredentialRedactor
 import com.framenest.smb.SmbjClient
 import com.framenest.smb.SmbCredentials
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Scrub frames for the current file. Local files use one
@@ -31,20 +32,24 @@ internal class ScrubPreviewExtractor(
     private var digestResolved: Boolean = false
     private var opened: Boolean = false
     private var broken: Boolean = false
-    private var closed: Boolean = false
+    private val closed = AtomicBoolean(false)
+    @Volatile
     private var remoteFrames: ScrubPreviewVlc? = null
 
     fun frameAt(bucketStartMs: Long, abandon: () -> Boolean = { false }): ScrubGrab {
-        if (abandon()) return ScrubGrab.Abandoned
+        val shouldAbandon = { closed.get() || abandon() }
+        if (shouldAbandon()) return ScrubGrab.Abandoned
         val digest = synchronized(gate) {
-            if (closed) return ScrubGrab.Miss
+            if (closed.get()) return ScrubGrab.Abandoned
             ensureDigestLocked()
             cacheDigest
         }
         if (digest != null) {
-            disk.read(digest, bucketStartMs)?.let { return ScrubGrab.Image(it) }
+            disk.read(digest, bucketStartMs)?.let {
+                return discardIfAbandoned(ScrubGrab.Image(it), shouldAbandon)
+            }
         }
-        if (abandon()) return ScrubGrab.Abandoned
+        if (shouldAbandon()) return ScrubGrab.Abandoned
         val grabbed = when (val source = request.dataSource) {
             is PlaybackDataSource.LocalFile,
             is PlaybackDataSource.LocalRawResource,
@@ -58,7 +63,7 @@ internal class ScrubPreviewExtractor(
                 share = source.share,
                 path = source.path,
                 timeMs = bucketStartMs,
-                abandon = abandon,
+                abandon = shouldAbandon,
             )
             is PlaybackDataSource.DirectSmbUrl -> remoteFrame(
                 host = source.host,
@@ -69,17 +74,25 @@ internal class ScrubPreviewExtractor(
                 share = source.share,
                 path = source.path,
                 timeMs = bucketStartMs,
-                abandon = abandon,
+                abandon = shouldAbandon,
             )
         }
+        val accepted = discardIfAbandoned(grabbed, shouldAbandon)
+        if (accepted !is ScrubGrab.Image) return accepted
         val writeDigest = synchronized(gate) { cacheDigest } ?: digest
-        if (grabbed is ScrubGrab.Image && writeDigest != null) {
-            runCatching { disk.write(writeDigest, bucketStartMs, grabbed.bitmap) }
+        if (writeDigest != null) {
+            runCatching { disk.write(writeDigest, bucketStartMs, accepted.bitmap) }
                 .onFailure { t ->
                     Log.w(TAG, "disk write failed: ${t.javaClass.simpleName}")
                 }
         }
-        return grabbed
+        return discardIfAbandoned(accepted, shouldAbandon)
+    }
+
+    private fun discardIfAbandoned(grabbed: ScrubGrab, abandon: () -> Boolean): ScrubGrab {
+        if (!abandon()) return grabbed
+        if (grabbed is ScrubGrab.Image && !grabbed.bitmap.isRecycled) grabbed.bitmap.recycle()
+        return ScrubGrab.Abandoned
     }
 
     fun pause() {
@@ -87,8 +100,9 @@ internal class ScrubPreviewExtractor(
     }
 
     override fun close() {
+        // Invalidate an in-flight grab before waiting for local/native cleanup.
+        if (!closed.compareAndSet(false, true)) return
         val remote = synchronized(gate) {
-            closed = true
             closeLocked()
             remoteFrames.also { remoteFrames = null }
         }
@@ -134,7 +148,7 @@ internal class ScrubPreviewExtractor(
     }
 
     private fun localFrame(bucketStartMs: Long): ScrubGrab = synchronized(gate) {
-        if (closed || broken) return ScrubGrab.Miss
+        if (closed.get() || broken) return ScrubGrab.Miss
         if (!opened) {
             try {
                 when (val source = request.dataSource) {
@@ -176,21 +190,26 @@ internal class ScrubPreviewExtractor(
         timeMs: Long,
         abandon: () -> Boolean,
     ): ScrubGrab {
-        val session = synchronized(gate) {
-            if (closed) return ScrubGrab.Miss
-            remoteFrames ?: ScrubPreviewVlc(appContext).also { remoteFrames = it }
+        try {
+            val session = synchronized(gate) {
+                if (closed.get()) return ScrubGrab.Abandoned
+                remoteFrames ?: ScrubPreviewVlc(appContext).also { remoteFrames = it }
+            }
+            return session.frameAt(
+                host = host,
+                port = port,
+                share = share,
+                path = path,
+                username = username,
+                password = password,
+                domain = domain,
+                timeMs = timeMs,
+                abandon = abandon,
+            )
+        } finally {
+            // Also clear when close wins before the native session is entered.
+            password.fill('\u0000')
         }
-        return session.frameAt(
-            host = host,
-            port = port,
-            share = share,
-            path = path,
-            username = username,
-            password = password,
-            domain = domain,
-            timeMs = timeMs,
-            abandon = abandon,
-        )
     }
 
     private fun openLocalFile(path: String) {
@@ -205,8 +224,8 @@ internal class ScrubPreviewExtractor(
             )
         }
         val next = MediaMetadataRetriever()
-        next.setDataSource(file.absolutePath)
         retriever = next
+        next.setDataSource(file.absolutePath)
     }
 
     private fun openRaw(resId: Int) {
@@ -220,8 +239,8 @@ internal class ScrubPreviewExtractor(
             modifiedTimeMs = 0L,
         )
         val next = MediaMetadataRetriever()
-        next.setDataSource(descriptor.fileDescriptor, descriptor.startOffset, descriptor.length)
         retriever = next
+        next.setDataSource(descriptor.fileDescriptor, descriptor.startOffset, descriptor.length)
     }
 
     private fun applyListedDigest(): Boolean {

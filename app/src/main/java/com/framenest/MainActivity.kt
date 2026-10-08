@@ -17,7 +17,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             FrameNestTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    FrameNestApp()
+                    FrameNestApp(
+                        updateController = (application as FrameNestApplication).updateController,
+                    )
                 }
             }
         }

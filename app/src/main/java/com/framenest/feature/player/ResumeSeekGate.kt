@@ -32,6 +32,6 @@ internal class ResumeSeekGate {
 
 /** Picks the freshest retry position captured before the controller resets to Idle/0. */
 internal fun retryResumePosition(livePositionMs: Long?, lastSavedPositionMs: Long?): Long =
-    livePositionMs?.takeIf { it > 0L }
+    livePositionMs?.takeIf { it >= 0L }
         ?: lastSavedPositionMs?.takeIf { it > 0L }
         ?: 0L

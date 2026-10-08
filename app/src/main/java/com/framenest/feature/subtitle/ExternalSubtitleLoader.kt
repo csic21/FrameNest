@@ -9,6 +9,8 @@ import com.framenest.smb.SmbjClient
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -27,10 +29,10 @@ class ExternalSubtitleLoader(
     context: Context,
     private val clientFactory: () -> SmbClient = { SmbjClient() },
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
+    sessionCacheKey: String? = null,
 ) {
     private val appContext = context.applicationContext
-    private val cacheDir: File =
-        File(appContext.cacheDir, "subtitles").also { it.mkdirs() }
+    private val cache = SubtitleSessionCache(File(appContext.cacheDir, "subtitles"), sessionCacheKey)
 
     data class LoadRequest(
         val host: String,
@@ -73,10 +75,8 @@ class ExternalSubtitleLoader(
                     }
                     val bytes = randomAccess.readFullyAt(0L, size.toInt())
                     val decoded = SubtitleEncoding.decode(bytes)
-                    val target = cacheFileFor(request.share, request.remotePath, request.fileName)
-                    target.parentFile?.mkdirs()
-                    // UTF-8 without BOM — libVLC and SRT/ASS handle this well.
-                    target.writeText(decoded.text, StandardCharsets.UTF_8)
+                    currentCoroutineContext().ensureActive()
+                    val target = cache.write(request.share, request.remotePath, request.fileName, decoded.text)
                     Result.success(
                         LoadResult(
                             localFile = target,
@@ -96,25 +96,47 @@ class ExternalSubtitleLoader(
             }
         }
 
-    fun clearCache() {
-        runCatching {
-            cacheDir.listFiles()?.forEach { it.deleteRecursively() }
-        }
+    fun clearCache() = cache.clear()
+
+    companion object {
+        private const val TAG = "FrameNestSubtitle"
+        /** Cap to keep temp cache and memory bounded (16 MiB). */
+        const val MAX_SUBTITLE_BYTES: Long = 16L * 1024L * 1024L
+    }
+}
+
+/** A retiring video can neither delete nor repopulate the next video's temporary subtitles. */
+internal class SubtitleSessionCache(root: File, private val sessionKey: String?) {
+    init {
+        require(sessionKey == null || sessionKey.matches(Regex("[A-Za-z0-9-]{1,80}")))
     }
 
-    private fun cacheFileFor(share: String, remotePath: String, fileName: String): File {
+    private val directory = if (sessionKey == null) root else File(root, sessionKey)
+    private var closed = false
+
+    @Synchronized
+    fun write(share: String, remotePath: String, fileName: String, text: String): File {
+        check(!closed) { "Subtitle session closed" }
         val key = "$share|$remotePath"
         val digest = MessageDigest.getInstance("SHA-256")
             .digest(key.toByteArray(StandardCharsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
             .take(24)
         val safeName = fileName.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        return File(cacheDir, "$digest-$safeName")
+        val target = File(directory, "$digest-$safeName")
+        directory.mkdirs()
+        target.writeText(text, StandardCharsets.UTF_8)
+        return target
     }
 
-    companion object {
-        private const val TAG = "FrameNestSubtitle"
-        /** Cap to keep temp cache and memory bounded (16 MiB). */
-        const val MAX_SUBTITLE_BYTES: Long = 16L * 1024L * 1024L
+    @Synchronized
+    fun clear() {
+        if (sessionKey != null) {
+            if (closed) return
+            closed = true
+            directory.deleteRecursively()
+        } else {
+            directory.listFiles()?.forEach { it.deleteRecursively() }
+        }
     }
 }

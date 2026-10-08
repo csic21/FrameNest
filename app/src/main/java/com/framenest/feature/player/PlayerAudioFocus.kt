@@ -4,7 +4,6 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
-import android.os.Build
 
 /**
  * Minimal correct audio focus for video playback.
@@ -22,7 +21,11 @@ internal class PlayerAudioFocus(
     private var hasFocus: Boolean = false
     private var waitingForDelayedGain: Boolean = false
 
-    private val listener = AudioManager.OnAudioFocusChangeListener { change ->
+    private var requestGeneration = 0L
+
+    // A callback queued by an abandoned request must not grant a newer request.
+    private fun listener(generation: Long) = AudioManager.OnAudioFocusChangeListener { change ->
+        if (generation != requestGeneration || focusRequest == null) return@OnAudioFocusChangeListener
         when (change) {
             AudioManager.AUDIOFOCUS_LOSS,
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
@@ -36,36 +39,31 @@ internal class PlayerAudioFocus(
                 val shouldStartPlayback = waitingForDelayedGain
                 hasFocus = true
                 waitingForDelayedGain = false
-                if (shouldStartPlayback) {
-                    onFocusGained()
-                }
+                if (shouldStartPlayback) onFocusGained()
             }
         }
     }
 
     fun request(): AudioFocusRequestResult {
         if (hasFocus) return AudioFocusRequestResult.Granted
-        val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
-                        .build(),
-                )
-                .setOnAudioFocusChangeListener(listener)
-                .setAcceptsDelayedFocusGain(true)
-                .build()
-            focusRequest = req
-            audioManager.requestAudioFocus(req)
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.requestAudioFocus(
-                listener,
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN,
+        // minSdk is 26. Retire the old listener before creating a replacement.
+        abandon()
+        val generation = requestGeneration
+        val req = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
+                    .build(),
             )
-        }
+            .setOnAudioFocusChangeListener(
+                listener(generation),
+                android.os.Handler(android.os.Looper.getMainLooper()),
+            )
+            .setAcceptsDelayedFocusGain(true)
+            .build()
+        focusRequest = req
+        val result = audioManager.requestAudioFocus(req)
         val mapped = audioFocusRequestResult(result)
         hasFocus = mapped == AudioFocusRequestResult.Granted
         waitingForDelayedGain = mapped == AudioFocusRequestResult.Delayed
@@ -73,15 +71,13 @@ internal class PlayerAudioFocus(
     }
 
     fun abandon() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            focusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
-            focusRequest = null
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.abandonAudioFocus(listener)
-        }
+        // Invalidate before the platform call: it may enqueue a final callback.
+        requestGeneration++
+        val request = focusRequest
+        focusRequest = null
         hasFocus = false
         waitingForDelayedGain = false
+        request?.let { audioManager.abandonAudioFocusRequest(it) }
     }
 }
 

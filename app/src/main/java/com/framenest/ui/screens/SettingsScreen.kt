@@ -57,6 +57,8 @@ import com.framenest.data.settings.UserPreferences
 import com.framenest.feature.listen_translate.asr.VoskLanguageStatus
 import com.framenest.feature.listen_translate.asr.VoskModelInstaller
 import com.framenest.feature.listen_translate.mt.MlKitMtEngine
+import com.framenest.feature.update.UpdateController
+import com.framenest.feature.update.UpdateSettingsEntry
 import com.framenest.ui.theme.FrameNestDimens
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
@@ -65,7 +67,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun SettingsScreen(modifier: Modifier = Modifier) {
+fun SettingsScreen(
+    modifier: Modifier = Modifier,
+    updateController: UpdateController? = null,
+) {
     val context = LocalContext.current
     val container = remember(context) { ContextAppContainer(context) }
     val prefs = container.userPreferences
@@ -194,6 +199,11 @@ fun SettingsScreen(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.widthIn(max = FrameNestDimens.ReadableContentMaxWidth),
         )
+
+        updateController?.let { controller ->
+            Spacer(Modifier.height(16.dp))
+            UpdateSettingsEntry(controller)
+        }
 
         Spacer(Modifier.height(20.dp))
         Text(

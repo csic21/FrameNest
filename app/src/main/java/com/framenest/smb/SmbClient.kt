@@ -33,4 +33,11 @@ interface SmbClient : Closeable {
      * Force-close transport; subsequent calls fail until [connect].
      */
     fun disconnect()
+
+    /**
+     * Terminal cancellation/timeout cleanup. Implementations should skip graceful
+     * network logoff and close the transport first. Still call off the UI thread:
+     * socket teardown or a legacy implementation's [close] may block.
+     */
+    fun abort() = close()
 }

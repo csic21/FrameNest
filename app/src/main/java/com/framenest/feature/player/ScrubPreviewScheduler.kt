@@ -4,6 +4,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 
 /**
@@ -33,6 +35,9 @@ internal class ScrubPreviewScheduler(
     private var buffering: Boolean = false
     private var active: Boolean = false
     private var closed: Boolean = false
+    private var inFlight: Long? = null
+    private var inFlightEvicted: Boolean = false
+    private var gestureGeneration: Long = 0L
     private val wake = Channel<Unit>(Channel.CONFLATED)
 
     private val job: Job = scope.launch {
@@ -71,26 +76,55 @@ internal class ScrubPreviewScheduler(
             scrubbing = active && targetMs != null
             scrubTargetMs = if (scrubbing) targetMs else null
             // A new gesture can retry a bucket the previous drag missed.
-            if (starting) failed.clear()
+            if (starting) {
+                gestureGeneration += 1L
+                failed.clear()
+            }
         }
         wake.trySend(Unit)
     }
 
     fun readyBuckets(): Set<Long> = synchronized(lock) { ready.toSet() }
 
+    /**
+     * Memory eviction makes a bucket eligible for a later request, even if it
+     * was evicted inside [loadFrame] before its Ready result reached us. Do not
+     * wake here: a background strip may be larger than the retained cache.
+     */
+    fun invalidateReadyBuckets(buckets: Collection<Long>) {
+        synchronized(lock) {
+            if (closed) return
+            ready.removeAll(buckets.toSet())
+            if (inFlight in buckets) inFlightEvicted = true
+        }
+    }
+
     fun close() {
-        synchronized(lock) { closed = true }
+        synchronized(lock) {
+            if (closed) return
+            closed = true
+            ready.clear()
+            failed.clear()
+            scrubTargetMs = null
+        }
         job.cancel()
         wake.close()
     }
 
     private suspend fun drain() {
         var abandonedStreak: Long? = null
+        // A frame evicted while warming must not be reloaded forever in the
+        // same pass. A subsequent playback/gesture update can request it again.
+        val attempted = HashSet<Long>()
         while (true) {
-            val next = synchronized(lock) {
+            currentCoroutineContext().ensureActive()
+            val (next, generation) = synchronized(lock) {
                 if (closed) return
-                selectNextLocked()
-            } ?: return
+                val bucket = selectNextLocked(attempted) ?: return
+                inFlight = bucket
+                inFlightEvicted = false
+                bucket to gestureGeneration
+            }
             val outcome = try {
                 loadFrame(next)
             } catch (cancelled: CancellationException) {
@@ -98,16 +132,20 @@ internal class ScrubPreviewScheduler(
             } catch (_: Throwable) {
                 ScrubLoadResult.Failed
             }
+            currentCoroutineContext().ensureActive()
             val stop = synchronized(lock) {
+                inFlight = null
                 if (closed) return
                 when (outcome) {
                     ScrubLoadResult.Ready -> {
-                        ready += next
+                        if (!inFlightEvicted) ready += next
+                        attempted += next
                         abandonedStreak = null
                         false
                     }
                     ScrubLoadResult.Failed -> {
-                        failed += next
+                        if (generation == gestureGeneration) failed += next
+                        attempted += next
                         abandonedStreak = null
                         false
                     }
@@ -125,13 +163,13 @@ internal class ScrubPreviewScheduler(
         }
     }
 
-    private fun selectNextLocked(): Long? = ScrubPreviewPlan.nextExtractMs(
+    private fun selectNextLocked(attempted: Set<Long>): Long? = ScrubPreviewPlan.nextExtractMs(
         durationMs = durationMs,
         anchorMs = anchorMs,
         scrubTargetMs = if (scrubbing) scrubTargetMs else null,
         buffering = buffering,
         active = active,
-        ready = ready,
+        ready = ready + attempted,
         failed = failed,
     )
 }

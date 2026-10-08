@@ -14,8 +14,10 @@ import com.framenest.smb.SmbPathUtils
 import com.framenest.smb.SmbjClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
@@ -23,27 +25,45 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * SMB browse operations for a saved server.
- *
- * Listings run on [ioDispatcher]. Consecutive navigation on the same saved server
- * reuses one serialized SMB session; configuration changes, timeouts, cancellation
- * and SMB errors discard it. [releaseSession] can close the live transport from
- * another thread so a hung listing does not keep [sessionMutex] forever.
+ * Listings reuse a serialized session until cancellation, timeout or configuration
+ * change. Detaching a generation is synchronous; all transport teardown is queued
+ * on [cleanupDispatcher], never on the caller (which may be the main thread).
  */
 class BrowseRepository(
     private val serverRepository: ServerRepository,
     private val clientFactory: () -> SmbClient = { SmbjClient() },
     private val ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
     private val operationTimeoutMs: Long = DEFAULT_OPERATION_TIMEOUT_MS,
-    watchdogDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
+    private val watchdogDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
+    cleanupDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.IO,
 ) {
-    private val sessionMutex = Mutex()
     private val sessionGuard = Any()
-    private var sessionKey: BrowseConnectionKey? = null
-    private var sessionClient: SmbClient? = null
-    private val watchdogScope = CoroutineScope(SupervisorJob() + watchdogDispatcher)
+    private var generation = SessionGeneration()
+    private val cleanupScope = CoroutineScope(SupervisorJob() + cleanupDispatcher)
+
+    // A separate mutex for each generation lets reentry proceed even if old I/O
+    // or a third-party client's close is still unwinding on a worker thread.
+    internal class SessionGeneration {
+        val mutex = Mutex()
+        var retired = false
+        var session: OwnedSession? = null
+        var request: Request? = null
+    }
+
+    internal class OwnedSession(val key: BrowseConnectionKey, val client: SmbClient) {
+        val cleanupStarted = AtomicBoolean(false)
+        var connected = false
+    }
+
+    /** Identifies a caller's last load so late screen disposal cannot close its successor. */
+    class Request internal constructor(internal val generation: SessionGeneration)
+
+    fun newRequest(): Request = synchronized(sessionGuard) {
+        Request(generation).also { generation.request = it }
+    }
 
     sealed class BrowseContent {
         data class Shares(val entries: List<RemoteEntry>) : BrowseContent()
@@ -53,34 +73,54 @@ class BrowseRepository(
     suspend fun load(
         serverId: String,
         location: RemoteLocation,
+        request: Request = newRequest(),
     ): Result<BrowseContent> = withContext(ioDispatcher) {
-        sessionMutex.withLock {
-            loadSerialized(serverId, location)
+        val owner = request.generation
+        owner.mutex.withLock {
+            ensureCurrent(owner)
+            loadSerialized(owner, serverId, location)
         }
     }
 
     /**
-     * Close the current browse transport immediately. Safe to call while [load] is
-     * blocked in native/SMB I/O; the waiter then fails and the mutex can be released.
+     * Detach immediately, including a client still connecting. A supplied request
+     * only releases its own current generation; stale screen cleanup is harmless.
+     * The no-argument form explicitly releases the repository's current session.
      */
-    fun releaseSession() {
+    fun releaseSession(request: Request? = null) {
         val stale = synchronized(sessionGuard) {
-            val client = sessionClient
-            sessionClient = null
-            sessionKey = null
-            client
-        } ?: return
-        runCatching { stale.close() }
+            val owner = generation
+            if (request != null && (request.generation !== owner || owner.request !== request)) {
+                return
+            }
+            owner.retired = true
+            generation = SessionGeneration()
+            owner.session.also { owner.session = null }
+        }
+        stale?.let(::scheduleAbort)
     }
 
-    private fun abortClient(client: SmbClient) {
+    private fun abortSession(owner: SessionGeneration, owned: OwnedSession) {
         synchronized(sessionGuard) {
-            if (sessionClient === client) {
-                sessionClient = null
-                sessionKey = null
+            if (owner.session === owned) owner.session = null
+        }
+        scheduleAbort(owned)
+    }
+
+    private fun scheduleAbort(owned: OwnedSession) {
+        if (!owned.cleanupStarted.compareAndSet(false, true)) return
+        // This scope outlives the cancelled request / ViewModel. Never launch
+        // teardown in viewModelScope or wait for it while holding sessionGuard.
+        cleanupScope.launch { runCatching { owned.client.abort() } }
+    }
+
+    private fun ensureCurrent(owner: SessionGeneration, owned: OwnedSession? = null) {
+        synchronized(sessionGuard) {
+            if (owner.retired) throw CancellationException("Browse request released")
+            if (owned != null && owner.session !== owned) {
+                throw SmbException(SmbError.Disconnected("Browse session expired"))
             }
         }
-        runCatching { client.close() }
     }
 
     private fun logBrowse(message: String) {
@@ -88,18 +128,22 @@ class BrowseRepository(
     }
 
     private suspend fun loadSerialized(
+        owner: SessionGeneration,
         serverId: String,
         location: RemoteLocation,
     ): Result<BrowseContent> {
         var lastFailure: Throwable? = null
         repeat(MAX_ATTEMPTS) { attempt ->
+            coroutineContext.ensureActive()
+            ensureCurrent(owner)
             try {
-                return loadOnce(serverId, location)
+                return loadOnce(owner, serverId, location)
             } catch (cancelled: CancellationException) {
-                releaseSession()
                 throw cancelled
             } catch (t: Throwable) {
-                releaseSession()
+                // A released generation must never retry and reconnect itself.
+                coroutineContext.ensureActive()
+                ensureCurrent(owner)
                 if (attempt < MAX_ATTEMPTS - 1 && BrowseSessionRetryPolicy.shouldRetry(t)) {
                     logBrowse("Browse listing failed; retrying with a new session")
                     lastFailure = t
@@ -112,55 +156,86 @@ class BrowseRepository(
     }
 
     private suspend fun loadOnce(
+        owner: SessionGeneration,
         serverId: String,
         location: RemoteLocation,
     ): Result<BrowseContent> {
         val server = serverRepository.getServer(serverId)
             ?: return Result.failure(IllegalArgumentException("Server not found"))
-        val requestedKey = BrowseConnectionKey.from(server)
-        val client = ensureSession(server, requestedKey)
-        coroutineContext.ensureActive()
-        val watchdog = watchdogScope.launch {
-            delay(operationTimeoutMs)
-            logBrowse("Browse SMB operation timed out after ${operationTimeoutMs}ms")
-            abortClient(client)
-        }
+        val owned = acquireSession(owner, BrowseConnectionKey.from(server))
         try {
-            return if (location.isShareList) {
-                Result.success(BrowseContent.Shares(listShares(client, server)))
-            } else {
-                val relative = location.normalizedPath
-                val raw = client.listDirectory(location.share, relative)
-                coroutineContext.ensureActive()
-                val filtered = filterAndMap(serverId, location.share, raw)
-                Result.success(BrowseContent.Directory(filtered))
+            return coroutineScope {
+                val finished = AtomicBoolean(false)
+                // Undispatched start installs cancellation observation before any
+                // blocking connect/list. Cancellation of this child schedules an
+                // abort even while its parent is stuck in synchronous SMB I/O.
+                val watchdog = launch(watchdogDispatcher, start = CoroutineStart.UNDISPATCHED) {
+                    try {
+                        delay(operationTimeoutMs)
+                        logBrowse("Browse SMB operation timed out after ${operationTimeoutMs}ms")
+                    } finally {
+                        if (!finished.get()) abortSession(owner, owned)
+                    }
+                }
+                try {
+                    ensureConnected(owner, owned, server)
+                    val content = if (location.isShareList) {
+                        BrowseContent.Shares(listShares(owned.client, server))
+                    } else {
+                        val raw = owned.client.listDirectory(location.share, location.normalizedPath)
+                        BrowseContent.Directory(filterAndMap(serverId, location.share, raw))
+                    }
+                    coroutineContext.ensureActive()
+                    ensureCurrent(owner, owned)
+                    Result.success(content)
+                } finally {
+                    finished.set(true)
+                    watchdog.cancel()
+                }
             }
-        } finally {
-            watchdog.cancel()
+        } catch (t: Throwable) {
+            abortSession(owner, owned)
+            throw t
         }
     }
 
-    private suspend fun ensureSession(
-        server: SavedServer,
-        requestedKey: BrowseConnectionKey,
-    ): SmbClient {
-        synchronized(sessionGuard) {
-            if (
-                !BrowseSessionReusePolicy.requiresNewSession(
-                    current = sessionKey,
-                    requested = requestedKey,
-                    connected = sessionClient?.isConnected == true,
-                )
-            ) {
-                return checkNotNull(sessionClient)
-            }
+    private fun acquireSession(owner: SessionGeneration, requestedKey: BrowseConnectionKey): OwnedSession {
+        val current = synchronized(sessionGuard) {
+            ensureCurrent(owner)
+            owner.session
         }
-        releaseSession()
-        val password = serverRepository.getPassword(server)
-            ?: error("Missing credentials")
-        val nextClient = clientFactory()
+        // Client state can itself acquire transport locks. Do not call it while
+        // holding the short guard used by main-thread releaseSession.
+        if (current != null && !BrowseSessionReusePolicy.requiresNewSession(
+                current.key, requestedKey, current.connected && current.client.isConnected,
+            )
+        ) {
+            ensureCurrent(owner, current)
+            return current
+        }
+        val next = OwnedSession(requestedKey, clientFactory())
+        val stale = try {
+            synchronized(sessionGuard) {
+                ensureCurrent(owner)
+                owner.session.also { owner.session = next }
+            }
+        } catch (t: Throwable) {
+            scheduleAbort(next)
+            throw t
+        }
+        stale?.let(::scheduleAbort)
+        return next
+    }
+
+    private suspend fun ensureConnected(owner: SessionGeneration, owned: OwnedSession, server: SavedServer) {
+        coroutineContext.ensureActive()
+        ensureCurrent(owner, owned)
+        if (owned.connected && owned.client.isConnected) return
+        val password = serverRepository.getPassword(server) ?: error("Missing credentials")
         try {
-            nextClient.connect(
+            coroutineContext.ensureActive()
+            ensureCurrent(owner, owned)
+            owned.client.connect(
                 SmbCredentials(
                     host = server.host,
                     port = server.port,
@@ -169,14 +244,9 @@ class BrowseRepository(
                     domain = server.domain.orEmpty(),
                 ),
             )
-            synchronized(sessionGuard) {
-                sessionClient = nextClient
-                sessionKey = requestedKey
-            }
-            return nextClient
-        } catch (t: Throwable) {
-            runCatching { nextClient.close() }
-            throw t
+            coroutineContext.ensureActive()
+            ensureCurrent(owner, owned)
+            owned.connected = true
         } finally {
             password.fill('\u0000')
         }

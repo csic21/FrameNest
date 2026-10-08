@@ -30,7 +30,8 @@ class ResumeSeekGateTest {
     @Test
     fun `retry position prefers live snapshot before saved fallback`() {
         assertEquals(42_000L, retryResumePosition(42_000L, 40_000L))
-        assertEquals(40_000L, retryResumePosition(0L, 40_000L))
+        assertEquals(0L, retryResumePosition(0L, 40_000L))
+        assertEquals(40_000L, retryResumePosition(null, 40_000L))
         assertEquals(0L, retryResumePosition(null, null))
     }
 }

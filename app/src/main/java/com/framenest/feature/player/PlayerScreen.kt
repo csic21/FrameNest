@@ -76,6 +76,8 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -174,19 +176,24 @@ fun PlayerScreen(
     val siblingNav by vm.siblingNavState.collectAsStateWithLifecycle()
     val scrubFrames by vm.scrubPreviewFrames.collectAsStateWithLifecycle()
     val scrubFailed by vm.scrubPreviewFailed.collectAsStateWithLifecycle()
-    var showSubtitles by remember { mutableStateOf(false) }
-    var showListenTranslate by remember { mutableStateOf(false) }
-    var showAudioTracks by remember { mutableStateOf(false) }
-    var chromeVisible by remember { mutableStateOf(true) }
-    var controlsLocked by remember { mutableStateOf(false) }
-    var orientationLocked by remember { mutableStateOf(false) }
-    var fullscreenState by remember { mutableStateOf(PlayerLockPolicy.FullscreenState()) }
-    var userSeeking by remember { mutableStateOf(false) }
-    var showUnlockHint by remember { mutableStateOf(false) }
-    var autoNextArmed by remember { mutableStateOf(false) }
-    var chromeInteractionVersion by remember { mutableLongStateOf(0L) }
+    var showSubtitles by remember(vm) { mutableStateOf(false) }
+    var showListenTranslate by remember(vm) { mutableStateOf(false) }
+    var showAudioTracks by remember(vm) { mutableStateOf(false) }
+    var chromeVisible by remember(vm) { mutableStateOf(true) }
+    var controlsLocked by rememberSaveable(vm) { mutableStateOf(false) }
+    var orientationLocked by rememberSaveable(vm) { mutableStateOf(false) }
+    var fullscreenState by rememberSaveable(
+        vm,
+        stateSaver = listSaver(
+            save = { listOf(it.explicitLandscape, it.portraitExitPending) },
+            restore = { PlayerLockPolicy.FullscreenState(it[0], it[1]) },
+        ),
+    ) { mutableStateOf(PlayerLockPolicy.FullscreenState()) }
+    var userSeeking by remember(vm) { mutableStateOf(false) }
+    var showUnlockHint by remember(vm) { mutableStateOf(false) }
+    var autoNextArmed by remember(vm) { mutableStateOf(false) }
+    var chromeInteractionVersion by remember(vm) { mutableLongStateOf(0L) }
     val lifecycleOwner = LocalLifecycleOwner.current
-    var leftForAnotherApp by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
     // Orientation chrome only — not a device-model / width-bucket check.
     val landscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -201,19 +208,13 @@ fun PlayerScreen(
                             isChangingConfigurations = activity?.isChangingConfigurations == true,
                         )
                     ) {
-                        leftForAnotherApp = true
                         vm.onLeaveOrBackground()
                     }
                 }
                 // The first ON_START is the screen opening. Only a later return
                 // from another app has to attach the video surface again.
                 Lifecycle.Event.ON_START -> {
-                    if (
-                        PlayerRotationPolicy.shouldReattachVideoOnForeground(leftForAnotherApp)
-                    ) {
-                        leftForAnotherApp = false
-                        vm.onReturnToForeground()
-                    }
+                    vm.onReturnToForeground()
                 }
                 else -> Unit
             }
@@ -259,6 +260,7 @@ fun PlayerScreen(
         onDispose {
             vm.setScrubbing(false)
             vm.stopSpeedBoost()
+            if (activity?.isChangingConfigurations != true) vm.onLeave()
         }
     }
 
@@ -289,11 +291,13 @@ fun PlayerScreen(
 
     // Continuous play: after natural end, auto-open next sibling if present.
     // Cancelled if the user replays or leaves Ended before the delay elapses.
-    LaunchedEffect(state.phase, siblingNav.nextPath) {
+    LaunchedEffect(vm, state.phase, siblingNav.nextPath) {
         if (state.phase == PlayerState.Phase.Ended && siblingNav.nextPath != null) {
             autoNextArmed = true
             delay(AUTO_NEXT_DELAY_MS)
-            if (vm.playerState.value.phase == PlayerState.Phase.Ended) {
+            if (vm.playerState.value.phase == PlayerState.Phase.Ended &&
+                lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+            ) {
                 val next = siblingNav.nextPath
                 if (next != null) {
                     vm.onLeave()

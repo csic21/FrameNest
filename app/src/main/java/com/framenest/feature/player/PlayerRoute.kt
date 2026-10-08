@@ -133,7 +133,9 @@ private suspend fun buildPlaybackRequest(
     }
 
     val identity = PlaybackIdentity(serverId = serverId, share = share, path = normalizedPath)
-    val history = container.historyRepository.get(identity)
+    val history = PlaybackProgressPersistence.Shared.afterSaves {
+        container.historyRepository.get(identity)
+    }
     val resumeMs = history?.let {
         PlaybackProgressRules.resumePositionMs(it.positionMs, it.durationMs, it.completed)
     } ?: 0L

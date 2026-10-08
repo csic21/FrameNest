@@ -10,6 +10,7 @@ import com.framenest.player.MediaSource
 import com.framenest.player.PlayerState
 import com.framenest.player.VlcPlayerController
 import kotlin.math.abs
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -18,6 +19,27 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 @LargeTest
 class PlayerReplayRecoveryTest {
+
+    @Test
+    fun firstPrepare_doesNotCaptureUninitializedOpenSlesVolume_beforeFirstPlay() {
+        withPlayer { scenario, player ->
+            val restore = VlcPlayerController::class.java.getDeclaredField("seekPreviewRestoreVolume")
+                .apply { isAccessible = true }
+            var firstPositionMs = 0L
+            scenario.onActivity {
+                assertTrue("Bundled regression sample must include an audio track", player.state.value.audioTracks.any { it.id >= 0 })
+                assertNull("Initial output volume is not a valid mute restore snapshot", restore.get(player))
+                firstPositionMs = player.state.value.positionMs
+                player.play()
+                assertNull("First Play must not restore an uninitialized pre-play volume", restore.get(player))
+            }
+            awaitState(player, "first playback after audio-enabled prepare") { state ->
+                state.phase == PlayerState.Phase.Playing && state.positionMs > firstPositionMs + 150L
+            }
+            // This exercises real decode/start ordering, not acoustic output capture.
+            // Audible level and absence of a prepare burst still require device checks.
+        }
+    }
 
     @Test
     fun naturalEnd_replaysFromBeginningTwice_andReachesEndEachTime() {

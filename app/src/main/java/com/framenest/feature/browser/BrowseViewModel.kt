@@ -38,6 +38,7 @@ class BrowseViewModel(
     val uiState: StateFlow<BrowseUiState> = _ui.asStateFlow()
 
     private var loadJob: Job? = null
+    private var browseRequest: BrowseRepository.Request? = null
 
     init {
         viewModelScope.launch {
@@ -58,6 +59,8 @@ class BrowseViewModel(
 
     fun refresh() {
         abortInFlightLoad()
+        val request = browseRepository.newRequest()
+        browseRequest = request
         loadJob = viewModelScope.launch {
             val location = _ui.value.location
             _ui.update {
@@ -67,7 +70,7 @@ class BrowseViewModel(
                     isShareList = location.isShareList,
                 )
             }
-            val result = browseRepository.load(serverId, location)
+            val result = browseRepository.load(serverId, location, request)
             result.fold(
                 onSuccess = { content ->
                     val entries = when (content) {
@@ -117,6 +120,10 @@ class BrowseViewModel(
 
     override fun onCleared() {
         abortInFlightLoad()
+        // A completed listing still owns a reusable SMB session. Release it on
+        // exit too, without affecting a newer screen that has taken ownership.
+        browseRequest?.let(browseRepository::releaseSession)
+        browseRequest = null
         super.onCleared()
     }
 
@@ -126,8 +133,8 @@ class BrowseViewModel(
         if (previous != null && !previous.isCompleted) {
             previous.cancel()
             // cancel() is cooperative and will not interrupt blocking SMB I/O.
-            // Close the transport so the waiter unblocks and releases sessionMutex.
-            browseRepository.releaseSession()
+            // Detach synchronously; transport abort/cleanup runs off main.
+            browseRequest?.let(browseRepository::releaseSession)
         }
     }
 

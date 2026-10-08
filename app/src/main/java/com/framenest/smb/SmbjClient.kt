@@ -10,6 +10,7 @@ import com.hierynomus.mssmb2.SMB2ShareAccess
 import com.hierynomus.smbj.SMBClient
 import com.hierynomus.smbj.SmbConfig
 import com.hierynomus.smbj.auth.AuthenticationContext
+import com.hierynomus.smbj.event.SMBEventBus
 import com.hierynomus.smbj.connection.Connection
 import com.hierynomus.smbj.session.Session
 import com.hierynomus.smbj.share.DiskShare
@@ -24,14 +25,19 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * Threading: connection state is guarded by [lock], but connect / list / metadata /
  * tree-connect I/O run **outside** that lock. [close] and [disconnect] can therefore
- * tear down the transport while a listing is blocked and unblock the waiter.
+ * detach state while a listing is blocked. [abort] skips graceful SMB logoff.
  * Callers should still keep heavy work off the main thread.
  */
 class SmbjClient(
     private val config: SmbConfig = defaultConfig(),
+    private val clientFactory: (SmbConfig) -> SMBClient = { SMBClient(it) },
+    private val connectionFactory: (SmbConfig, SMBClient) -> Connection = { config, client ->
+        Connection(config, client, SMBEventBus(), client.serverList)
+    },
 ) : SmbClient {
 
-    private val client = SMBClient(config)
+    // Never share an SMBJ connection cache across reconnect generations.
+    private var connectingClient: SMBClient? = null
     private val lock = Any()
     private var connection: Connection? = null
     private var session: Session? = null
@@ -40,52 +46,68 @@ class SmbjClient(
     private val closed = AtomicBoolean(false)
 
     override val isConnected: Boolean
-        get() = synchronized(lock) {
-            !closed.get() && connection?.isConnected == true && session != null
+        get() {
+            val conn = synchronized(lock) {
+                if (closed.get() || session == null) null else connection
+            }
+            return conn?.isConnected == true
         }
 
     @Throws(SmbException::class)
     override fun connect(credentials: SmbCredentials) {
         ensureOpen()
-        disconnect()
         val host = credentials.host.trim()
-        if (host.isEmpty()) {
-            throw SmbException(SmbError.Network("Host is empty"))
+        if (host.isEmpty()) throw SmbException(SmbError.Network("Host is empty"))
+        val next = clientFactory(config)
+        val stale = synchronized(lock) {
+            ensureOpenLocked()
+            snapshotAndClearSession().also { connectingClient = next }
         }
-        SmbLog.i("Connecting ${credentials.safeSummary()}")
+        closeSessionSnapshot(stale, force = true)
+        runCatching { SmbLog.i("Connecting SMB transport port=${credentials.port}") }
+        var unpublishedConnection: Connection? = null
         try {
-            val conn = if (credentials.port == SmbCredentials.DEFAULT_PORT) {
-                client.connect(host)
-            } else {
-                client.connect(host, credentials.port)
+            // Construct the public SMBJ Connection before doing network I/O.
+            // SMBClient.connect hides it until negotiation completes, which
+            // would leave that phase unreachable to a cancellation/timeout.
+            val conn = connectionFactory(config, next)
+            unpublishedConnection = conn
+            synchronized(lock) {
+                ensureCurrentClient(next)
+                connection = conn
+                connectedHost = host
             }
-            val auth = AuthenticationContext(
-                credentials.username,
-                credentials.password,
-                credentials.domain,
+            conn.connect(host, credentials.port)
+            synchronized(lock) { ensureCurrentClient(next) }
+            unpublishedConnection = null
+            val sess = conn.authenticate(
+                AuthenticationContext(credentials.username, credentials.password, credentials.domain),
             )
-            val sess = conn.authenticate(auth)
-            val stale = try {
-                synchronized(lock) {
-                    ensureOpenLocked()
-                    val previous = snapshotAndClearSession()
-                    connection = conn
-                    session = sess
-                    connectedHost = host
-                    previous
-                }
-            } catch (t: Throwable) {
-                runCatching { sess.close() }
-                runCatching { conn.close() }
-                throw t
+            synchronized(lock) {
+                ensureCurrentClient(next)
+                session = sess
             }
-            closeSessionSnapshot(stale, closeClient = false)
-            SmbLog.i("Authenticated to host=$host port=${credentials.port}")
+            runCatching { SmbLog.i("Authenticated to host=$host port=${credentials.port}") }
         } catch (t: Throwable) {
+            // Socket creation can finish after a concurrent abort. Retire that
+            // late transport again before it can authenticate or publish state.
+            // Never touch the new generation's connection or SMBClient.
+            unpublishedConnection?.let(::abortConnection)
+            val failed = synchronized(lock) {
+                if (connectingClient === next) snapshotAndClearSession() else null
+            }
+            failed?.let { closeSessionSnapshot(it, force = true) }
             if (t is SmbException) throw t
             val error = SmbErrorMapper.map(t)
-            SmbLog.e("Connect failed type=${error::class.simpleName} msg=${error.message}", t)
+            runCatching { SmbLog.e("Connect failed type=${error::class.simpleName} msg=${error.message}", t) }
             throw SmbException(error)
+        }
+    }
+
+    private fun ensureCurrentClient(expected: SMBClient) {
+        ensureOpenLocked()
+        if (connectingClient !== expected) {
+            throw SmbException(SmbError.Disconnected("Connection attempt released"))
         }
     }
 
@@ -205,13 +227,19 @@ class SmbjClient(
 
     override fun disconnect() {
         val snapshot = snapshotAndClearSession()
-        closeSessionSnapshot(snapshot, closeClient = false)
+        closeSessionSnapshot(snapshot, force = true)
     }
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
         val snapshot = snapshotAndClearSession()
-        closeSessionSnapshot(snapshot, closeClient = true)
+        closeSessionSnapshot(snapshot, force = false)
+    }
+
+    override fun abort() {
+        if (!closed.compareAndSet(false, true)) return
+        val snapshot = snapshotAndClearSession()
+        closeSessionSnapshot(snapshot, force = true)
     }
 
     private fun snapshotAndClearSession(): SessionSnapshot {
@@ -221,43 +249,45 @@ class SmbjClient(
                 shares = shares.values.toList(),
                 session = session,
                 connection = connection,
+                client = connectingClient,
             )
             shares.clear()
             session = null
             connection = null
             connectedHost = null
+            connectingClient = null
             return snapshot
         }
     }
 
-    private fun closeSessionSnapshot(snapshot: SessionSnapshot, closeClient: Boolean) {
-        snapshot.shares.forEach { share ->
-            try {
-                share.close()
-            } catch (t: Throwable) {
-                SmbLog.w("Share close", t)
+    private fun closeSessionSnapshot(snapshot: SessionSnapshot, force: Boolean) {
+        if (force) {
+            // Supported SMBJ 0.14 API: close(true) disconnects the transport
+            // without tree-disconnect / session-logoff network round trips.
+            // Do NOT call Share.close or Session.close before this abort.
+            snapshot.connection?.let(::abortConnection)
+        } else {
+            snapshot.shares.forEach { share ->
+                runCatching { share.close() }.onFailure { SmbLog.w("Share close", it) }
             }
+            runCatching { snapshot.session?.close() }.onFailure { SmbLog.w("Session close", it) }
+            runCatching { snapshot.connection?.close() }.onFailure { SmbLog.w("Connection close", it) }
         }
-        try {
-            snapshot.session?.close()
-        } catch (t: Throwable) {
-            SmbLog.w("Session close", t)
-        }
-        try {
-            snapshot.connection?.close()
-        } catch (t: Throwable) {
-            SmbLog.w("Connection close", t)
-        }
-        if (closeClient) {
-            try {
-                client.close()
-            } catch (t: Throwable) {
-                SmbLog.w("SMBClient close", t)
-            }
-        }
-        if (snapshot.host != null) {
-            SmbLog.i("Disconnected host=${snapshot.host}")
-        }
+        // This SMBClient belongs solely to the detached generation. Late
+        // connect completion is handled by the identity check and forced close.
+        runCatching { snapshot.client?.close() }.onFailure { SmbLog.w("SMBClient close", it) }
+        if (snapshot.host != null) runCatching { SmbLog.i("Disconnected host=${snapshot.host}") }
+    }
+
+    private fun abortConnection(conn: Connection) {
+        runCatching { conn.close(true) }
+            .onFailure { runCatching { SmbLog.w("Connection abort", it) } }
+        // SMBJ stops its packet reader during close(true). A stopped reader does
+        // not report an error to outstanding request futures, so also notify its
+        // public error handler AFTER transport shutdown. This wakes blocked I/O;
+        // any ensuing session cleanup runs against the already closed transport.
+        runCatching { conn.handleError(IOException("SMB transport aborted")) }
+            .onFailure { runCatching { SmbLog.w("Connection abort notification", it) } }
     }
 
     private fun requireSession(): Session = synchronized(lock) { requireSessionLocked() }
@@ -266,7 +296,7 @@ class SmbjClient(
         ensureOpenLocked()
         val sess = session
         val conn = connection
-        if (sess == null || conn == null || !conn.isConnected) {
+        if (sess == null || conn == null) {
             throw SmbException(SmbError.Disconnected("Not connected"))
         }
         return sess
@@ -287,12 +317,12 @@ class SmbjClient(
         if (name.isEmpty()) {
             throw SmbException(SmbError.NotFound("Share name is empty"))
         }
-        synchronized(lock) {
-            shares[name]?.takeIf { it.isConnected }?.let { return it }
-            shares.remove(name)
+        val cached = synchronized(lock) { shares[name] }
+        if (cached?.isConnected == true) return cached
+        val sess = synchronized(lock) {
+            if (shares[name] === cached) shares.remove(name)
             requireSessionLocked()
         }
-        val sess = requireSession()
         val opened = try {
             val share = sess.connectShare(name)
             if (share !is DiskShare) {
@@ -304,19 +334,15 @@ class SmbjClient(
             if (t is SmbException) throw t
             throw SmbException(SmbErrorMapper.map(t))
         }
-        synchronized(lock) {
-            if (closed.get() || session !== sess || connection?.isConnected != true) {
-                runCatching { opened.close() }
-                throw SmbException(SmbError.Disconnected("Not connected"))
+        val selected = synchronized(lock) {
+            if (closed.get() || session !== sess || connection == null) {
+                null
+            } else {
+                shares[name] ?: opened.also { shares[name] = it }
             }
-            val cached = shares[name]
-            if (cached != null && cached.isConnected) {
-                if (cached !== opened) runCatching { opened.close() }
-                return cached
-            }
-            shares[name] = opened
-            return opened
         }
+        if (selected !== opened) runCatching { opened.close() }
+        return selected ?: throw SmbException(SmbError.Disconnected("Not connected"))
     }
 
     private fun openFile(share: DiskShare, relative: String): File {
@@ -352,6 +378,7 @@ class SmbjClient(
         val shares: List<DiskShare>,
         val session: Session?,
         val connection: Connection?,
+        val client: SMBClient?,
     )
 }
 

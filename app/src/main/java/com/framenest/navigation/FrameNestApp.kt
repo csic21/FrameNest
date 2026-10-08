@@ -39,6 +39,8 @@ import com.framenest.feature.browser.BrowseRoute
 import com.framenest.feature.player.PlaybackMediaFacts
 import com.framenest.feature.player.PlayerRoute
 import com.framenest.feature.servers.ServersRoute
+import com.framenest.feature.update.UpdateController
+import com.framenest.feature.update.UpdateHost
 import com.framenest.ui.screens.RecentScreen
 import com.framenest.ui.screens.SettingsScreen
 
@@ -55,6 +57,7 @@ fun FrameNestApp(
         NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo),
     navController: NavHostController = rememberNavController(),
     appContainer: AppContainer? = null,
+    updateController: UpdateController? = null,
 ) {
     val context = LocalContext.current
     val container = remember(appContainer, context) {
@@ -128,10 +131,14 @@ fun FrameNestApp(
             navController = navController,
             useListDetail = useListDetail,
             container = container,
+            updateController = updateController,
             modifier = Modifier
                 .fillMaxSize()
                 .testTag("nav_host"),
         )
+    }
+    updateController?.let { controller ->
+        UpdateHost(controller, isPlaybackRoute = isPlayerRoute(currentRoute))
     }
 }
 
@@ -149,6 +156,7 @@ private fun FrameNestNavHost(
     navController: NavHostController,
     useListDetail: Boolean,
     container: AppContainer,
+    updateController: UpdateController?,
     modifier: Modifier = Modifier,
 ) {
     NavHost(
@@ -257,7 +265,7 @@ private fun FrameNestNavHost(
         }
 
         composable(FrameNestRoutes.SETTINGS) {
-            SettingsScreen()
+            SettingsScreen(updateController = updateController)
         }
     }
 }

@@ -40,7 +40,7 @@ internal class ScrubPreviewVlc(
     private var setFormatCallbacks: Function? = null
     private var setCallbacks: Function? = null
     private var openedKey: String? = null
-    private var closed = false
+    private val closed = AtomicBoolean(false)
     private var broken = false
     private val sessionLock = ReentrantLock()
     @Volatile
@@ -59,11 +59,14 @@ internal class ScrubPreviewVlc(
     ): ScrubGrab {
         val result = try {
             sessionLock.withLock {
-                if (closed || broken) return ScrubGrab.Miss
+                if (closed.get() || broken) return ScrubGrab.Miss
                 if (abandon()) return ScrubGrab.Abandoned
                 try {
                     ensureOpen(host, port, share, path, username, password, domain)
-                    grab(timeMs.coerceAtLeast(0L), abandon)
+                    grab(timeMs.coerceAtLeast(0L)) { closed.get() || abandon() }
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    ScrubGrab.Abandoned
                 } catch (t: Throwable) {
                     if (player == null) broken = true
                     Log.w(
@@ -105,8 +108,10 @@ internal class ScrubPreviewVlc(
     }
 
     override fun close() {
+        // A waiting close must interrupt the poll loop before taking its lock.
+        if (!closed.compareAndSet(false, true)) return
         sessionLock.withLock {
-            closed = true
+            sink?.retire()
             runCatching { player?.stop() }
             releaseMedia()
             runCatching { player?.setEventListener(null) }
@@ -115,6 +120,8 @@ internal class ScrubPreviewVlc(
             runCatching { libVlc?.release() }
             libVlc = null
             sink = null
+            setFormatCallbacks = null
+            setCallbacks = null
             openedKey = null
             rawBuffer?.let { buffer ->
                 rawBuffer = null
@@ -172,10 +179,9 @@ internal class ScrubPreviewVlc(
     private fun grab(targetMs: Long, abandon: () -> Boolean): ScrubGrab {
         val playback = player ?: return ScrubGrab.Miss
         val output = sink ?: return ScrubGrab.Miss
-        val failed = AtomicBoolean(false)
-        playback.setEventListener { event ->
-            if (event.type == MediaPlayer.Event.EncounteredError) failed.set(true)
-        }
+        if (abandon()) return ScrubGrab.Abandoned
+        // Poll the current native state. A queued event from a previous media
+        // must not mark this grab failed after its listener has been replaced.
         playback.volume = 0
         if (playback.playerState != STATE_PLAYING) {
             runCatching { playback.play() }
@@ -185,7 +191,7 @@ internal class ScrubPreviewVlc(
             if (firstOpen) OPEN_BUDGET_MS else SEEK_BUDGET_MS
         var seekSent = false
         output.clear()
-        while (SystemClock.elapsedRealtime() < deadline && !failed.get()) {
+        while (SystemClock.elapsedRealtime() < deadline) {
             if (abandon()) return ScrubGrab.Abandoned
             if (playback.playerState == STATE_ERROR) break
             val timeMs = playback.time
@@ -214,7 +220,7 @@ internal class ScrubPreviewVlc(
         Log.w(
             TAG,
             "scrub vlc miss state=${playback.playerState} time=${playback.time} " +
-                "target=${targetMs}ms error=${failed.get()}",
+                "target=${targetMs}ms",
         )
         return ScrubGrab.Miss
     }
@@ -231,28 +237,40 @@ internal class ScrubPreviewVlc(
                 "--avcodec-hw=none",
             ),
         )
+        var raw: Pointer? = null
+        var created: MediaPlayer? = null
         try {
             NativeLibrary.addSearchPath("vlc", appContext.applicationInfo.nativeLibraryDir)
             val library = NativeLibrary.getInstance("vlc")
-            val raw = Pointer(Native.malloc((ThumbnailFrameGeometry.MAX_BYTES + 31).toLong()))
+            val format = library.getFunction("libvlc_video_set_format_callbacks")
+            val callbacks = library.getFunction("libvlc_video_set_callbacks")
+            val address = Native.malloc((ThumbnailFrameGeometry.MAX_BYTES + 31).toLong())
+            check(address != 0L) { "scrub frame allocation failed" }
+            raw = Pointer(address)
             val aligned = align32(raw)
-            val created = MediaPlayer(vlc)
+            created = MediaPlayer(vlc)
+            // Publish ownership only after every allocation/lookup succeeded.
             libVlc = vlc
             rawBuffer = raw
             framePointer = aligned
-            sink = FrameSink(aligned)
-            setFormatCallbacks = library.getFunction("libvlc_video_set_format_callbacks")
-            setCallbacks = library.getFunction("libvlc_video_set_callbacks")
+            setFormatCallbacks = format
+            setCallbacks = callbacks
             player = created
             return created
         } catch (t: Throwable) {
+            runCatching { created?.release() }
+            raw?.let { buffer -> runCatching { Native.free(Pointer.nativeValue(buffer)) } }
             runCatching { vlc.release() }
             throw t
         }
     }
 
     private fun bindMemoryOutput(playback: MediaPlayer) {
-        val output = sink ?: error("scrub frame sink missing")
+        // ensureOpen stopped the old media before rebinding. Retire its
+        // callbacks so a late display cannot become this media's first frame.
+        sink?.retire()
+        val output = FrameSink(requireNotNull(framePointer))
+        sink = output
         val format = setFormatCallbacks ?: error("libvlc_video_set_format_callbacks missing")
         val callbacks = setCallbacks ?: error("libvlc_video_set_callbacks missing")
         val instance = playback.instance
@@ -332,6 +350,7 @@ internal class ScrubPreviewVlc(
         private val snapshot = ByteArray(ThumbnailFrameGeometry.MAX_BYTES)
         private val pending = AtomicBoolean(false)
         private val displays = AtomicInteger(0)
+        private var retired = false
         private var size: ThumbnailFrameGeometry.Size = ThumbnailFrameGeometry.fit(16, 9)
 
         val format: Callback = object : Callback {
@@ -349,6 +368,7 @@ internal class ScrubPreviewVlc(
                         height?.getInt(0) ?: 0,
                     )
                     synchronized(snapshot) {
+                        if (retired) return 0
                         size = fitted
                         pending.set(false)
                     }
@@ -379,6 +399,7 @@ internal class ScrubPreviewVlc(
             fun invoke(opaque: Pointer?, picture: Pointer?) {
                 try {
                     synchronized(snapshot) {
+                        if (retired) return
                         val count = size.byteCount.coerceAtMost(snapshot.size)
                         plane.read(0, snapshot, 0, count)
                         displays.incrementAndGet()
@@ -394,7 +415,7 @@ internal class ScrubPreviewVlc(
 
         fun take(): Captured? {
             synchronized(snapshot) {
-                if (!pending.get()) return null
+                if (retired || !pending.get()) return null
                 pending.set(false)
                 val fitted = size
                 return Captured(snapshot.copyOf(fitted.byteCount), fitted)
@@ -403,6 +424,13 @@ internal class ScrubPreviewVlc(
 
         fun clear() {
             synchronized(snapshot) {
+                pending.set(false)
+            }
+        }
+
+        fun retire() {
+            synchronized(snapshot) {
+                retired = true
                 pending.set(false)
             }
         }

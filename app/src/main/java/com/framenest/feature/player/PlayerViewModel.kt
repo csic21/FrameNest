@@ -77,9 +77,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -98,13 +96,22 @@ class PlayerViewModel(
         VlcPlayerController(app, enableHwDecoder = true)
     },
     private val sidecarScanner: SidecarSubtitleScanner = SidecarSubtitleScanner(),
-    private val subtitleLoader: ExternalSubtitleLoader = ExternalSubtitleLoader(application),
+    private val subtitleLoader: ExternalSubtitleLoader = ExternalSubtitleLoader(
+        application, sessionCacheKey = java.util.UUID.randomUUID().toString(),
+    ),
     private val browseSessionReleaser: () -> Unit = {
         (application as? FrameNestApplication)?.container?.browseRepository?.releaseSession()
     },
+    private val directoryFileNamesLoader: ((share: String, parentPath: String) -> List<String>)? = null,
 ) : AndroidViewModel(application) {
 
     val controller: PlayerController = controllerFactory(application)
+
+    // Explicit navigation exit cancels this scope immediately; configuration changes
+    // keep the ViewModel/session alive. onCleared is only an idempotent fallback.
+    private val sessionJob = SupervisorJob(viewModelScope.coroutineContext[Job])
+    private val sessionScope = CoroutineScope(viewModelScope.coroutineContext + sessionJob)
+    private val progressPersistence = PlaybackProgressPersistence.Shared
 
     private val _scrubPreviewFrames = MutableStateFlow<Map<Long, Bitmap>>(emptyMap())
     val scrubPreviewFrames: StateFlow<Map<Long, Bitmap>> = _scrubPreviewFrames.asStateFlow()
@@ -117,21 +124,31 @@ class PlayerViewModel(
 
     @Volatile
     private var scrubFocusMs: Long = -1L
-    private val scrubPreviewScheduler = ScrubPreviewScheduler(viewModelScope) { bucket ->
+    @Volatile
+    private var scrubGestureGeneration = 0L
+    private val scrubPreviewScheduler: ScrubPreviewScheduler = ScrubPreviewScheduler(sessionScope) { bucket ->
         if (abandonScrubExtract(bucket)) return@ScrubPreviewScheduler ScrubLoadResult.Abandoned
+        val gesture = scrubGestureGeneration
+        var delivered: ScrubGrab? = null
         val grabbed = try {
             withContext(Dispatchers.IO) {
                 scrubPreviewExtractor.frameAt(bucket) { abandonScrubExtract(bucket) }
+                    .also { delivered = it }
             }
         } catch (cancelled: CancellationException) {
+            (delivered as? ScrubGrab.Image)?.bitmap?.let { if (!it.isRecycled) it.recycle() }
             throw cancelled
         } catch (t: Throwable) {
             Log.w(TAG, "scrub preview failed: ${t.javaClass.simpleName}")
             ScrubGrab.Miss
         }
-        if (!currentCoroutineContext().isActive) {
+        if (!currentCoroutineContext().isActive || !sessionJob.isActive) {
             if (grabbed is ScrubGrab.Image && !grabbed.bitmap.isRecycled) grabbed.bitmap.recycle()
             throw CancellationException()
+        }
+        if (gesture != scrubGestureGeneration || abandonScrubExtract(bucket)) {
+            if (grabbed is ScrubGrab.Image && !grabbed.bitmap.isRecycled) grabbed.bitmap.recycle()
+            return@ScrubPreviewScheduler ScrubLoadResult.Abandoned
         }
         if (scrubFocusMs < 0L) scrubPreviewExtractor.pause()
         when (grabbed) {
@@ -142,18 +159,18 @@ class PlayerViewModel(
             }
             is ScrubGrab.Image -> {
                 val bitmap = grabbed.bitmap
-                _scrubPreviewFrames.update { current ->
-                    val merged = HashMap<Long, Bitmap>(current.size + 1)
-                    merged.putAll(current)
-                    merged[bucket] = bitmap
-                    val keep = ScrubPreviewPlan.retain(
-                        keys = merged.keys,
-                        anchorMs = controller.state.value.positionMs,
-                        scrubTargetMs = scrubFocusMs.takeIf { it >= 0L },
-                        maxEntries = ScrubPreviewPlan.MAX_MEMORY_FRAMES,
-                    )
-                    merged.filterKeys { it in keep }
-                }
+                val current = _scrubPreviewFrames.value
+                val merged = HashMap<Long, Bitmap>(current.size + 1)
+                merged.putAll(current)
+                merged[bucket] = bitmap
+                val keep = ScrubPreviewPlan.retain(
+                    keys = merged.keys,
+                    anchorMs = controller.state.value.positionMs,
+                    scrubTargetMs = scrubFocusMs.takeIf { it >= 0L },
+                    maxEntries = ScrubPreviewPlan.MAX_MEMORY_FRAMES,
+                )
+                _scrubPreviewFrames.value = merged.filterKeys { it in keep }
+                scrubPreviewScheduler.invalidateReadyBuckets(merged.keys - keep)
                 ScrubLoadResult.Ready
             }
         }
@@ -174,7 +191,7 @@ class PlayerViewModel(
     }
 
     val playerState: StateFlow<PlayerState> = controller.state.stateIn(
-        scope = viewModelScope,
+        scope = sessionScope,
         started = SharingStarted.Eagerly,
         initialValue = controller.state.value,
     )
@@ -190,8 +207,11 @@ class PlayerViewModel(
     private val sherpaInstaller = SherpaModelInstaller(application)
     private val userPreferences = UserPreferences(application)
     private var realListenEngine: RealListenTranslateEngine? = null
+    private val listenClientLock = Any()
+    @Volatile
     private var listenOnlySmbClient: SmbjClient? = null
     private var listenPrepareJob: Job? = null
+    @Volatile
     private var listenPrepareGeneration: Long = 0L
     private val listenPrepareMutex = Mutex()
     private var listenRestartPendingAfterSourceChange = false
@@ -200,23 +220,36 @@ class PlayerViewModel(
     private val listenSession = ListenTranslateSession(
         repository = listenTranslateRepository,
         engine = PendingListenEngine,
-        scope = viewModelScope,
+        scope = sessionScope,
         identity = request.identity,
         contentKey = ListenCacheVariant.contentKey(listenBaseContentKey, null),
     )
     val listenTranslateUiState: StateFlow<ListenTranslateUiState> = listenSession.uiState
 
-    private var playPendingAudioFocus: Boolean = false
     private val audioFocus = PlayerAudioFocus(
         context = application,
-        onFocusLost = {
-            playPendingAudioFocus = false
-            pauseFromSystem()
+        onFocusLost = { playbackLifecycle.onFocusLost() },
+        onFocusGained = { playbackLifecycle.onFocusGained() },
+    )
+    private val playbackLifecycle: PlaybackLifecycle = PlaybackLifecycle(
+        controller = controller,
+        requestFocus = audioFocus::request,
+        abandonFocus = audioFocus::abandon,
+        restoreSurface = { ready ->
+            val vlc = controller as? VlcPlayerController
+            if (vlc != null) vlc.rebindVideoOutput(ready) else {
+                controller.refreshVideoSurfaces()
+                ready()
+            }
         },
-        onFocusGained = {
-            if (playPendingAudioFocus) {
-                playPendingAudioFocus = false
-                controller.play()
+        repaint = {
+            val snapshot = controller.state.value
+            if (com.framenest.player.PlayerRotationPolicy.shouldRepaintOnForeground(
+                    snapshot.firstFrameReady, snapshot.phase,
+                )
+            ) {
+                (controller as? VlcPlayerController)?.repaintCurrentFrame()
+                    ?: controller.seekTo(snapshot.positionMs)
             }
         },
     )
@@ -227,10 +260,11 @@ class PlayerViewModel(
     /** Volatile: read on a background teardown thread to skip a duplicate save. */
     @Volatile
     private var lastSavedPositionMs: Long? = null
-    /** Background progress save kicked by [onLeaveOrBackground]; cancelled in [onCleared]. */
-    private var leaveSaveJob: Job? = null
-    /** Preserved before an explicit route exit releases the controller immediately. */
-    private var exitStateSnapshot: PlayerState? = null
+    /** Only successful writes deduplicate; a queued final snapshot can retry a failed pause save. */
+    @Volatile
+    private var lastSavedProgress: Pair<Long, Long>? = null
+    private var preserveUnchangedHistory = false
+    private var progressTouched = false
     private var startPositionMs: Long = request.startPositionMs
     /**
      * One-shot latch for the resume-position seek. Replacing `startPositionMs > 0`
@@ -247,11 +281,13 @@ class PlayerViewModel(
         // transport. A half-dead browse socket after playback is what left the
         // folder spinner running indefinitely.
         browseSessionReleaser()
-        openJob = viewModelScope.launch {
+        openJob = sessionScope.launch {
             loadResumeAndOpen()
         }
-        viewModelScope.launch {
+        sessionScope.launch {
             controller.state.collect { state ->
+                if (playbackLifecycle.closed) return@collect
+                playbackLifecycle.onPlaybackState(state)
                 if (state.phase == PlayerState.Phase.Preparing && subtitleBootstrapDone) {
                     // EOF replay creates a fresh native media, so its subtitle slaves
                     // must be attached again when the new first frame is available.
@@ -271,6 +307,7 @@ class PlayerViewModel(
                     buffering = state.isBuffering,
                 )
                 if (state.phase == PlayerState.Phase.Playing) {
+                    progressTouched = true
                     ensureProgressLoop()
                 } else if (state.phase == PlayerState.Phase.Ended) {
                     saveProgressNow(force = true)
@@ -293,7 +330,7 @@ class PlayerViewModel(
                     buffering = state.isBuffering,
                     // A second SMB reader during playback competes with the picture.
                     // Remote previews wait until the finger is down.
-                    active = scrubWarmsDuringPlayback &&
+                    active = playbackLifecycle.foreground && scrubWarmsDuringPlayback &&
                         state.firstFrameReady &&
                         state.phase != PlayerState.Phase.Idle &&
                         state.phase != PlayerState.Phase.Preparing &&
@@ -304,6 +341,7 @@ class PlayerViewModel(
     }
 
     fun setListenTranslateEnabled(enabled: Boolean) {
+        if (playbackLifecycle.closed) return
         if (!enabled) {
             listenRestartPendingAfterSourceChange = false
             listenPrepareGeneration += 1L
@@ -316,7 +354,7 @@ class PlayerViewModel(
             val engine = realListenEngine
             realListenEngine = null
             if (engine != null) {
-                viewModelScope.launch(Dispatchers.IO) {
+                CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                     runCatching { engine.close() }
                 }
             }
@@ -327,6 +365,7 @@ class PlayerViewModel(
     }
 
     fun setListenSourceLang(code: String) {
+        if (playbackLifecycle.closed) return
         val restart = listenSession.uiState.value.let { it.enabled || it.isInstallingModels }
         if (restart) listenSession.setEnabled(false)
         listenSession.setSourceLang(code)
@@ -334,6 +373,7 @@ class PlayerViewModel(
     }
 
     fun setListenTargetLang(code: String) {
+        if (playbackLifecycle.closed) return
         val restart = listenSession.uiState.value.let { it.enabled || it.isInstallingModels }
         if (restart) listenSession.setEnabled(false)
         listenSession.setTargetLang(code)
@@ -341,6 +381,7 @@ class PlayerViewModel(
     }
 
     fun setListenDisplayMode(mode: ListenDisplayMode) {
+        if (playbackLifecycle.closed) return
         listenSession.setDisplayMode(mode)
     }
 
@@ -357,8 +398,16 @@ class PlayerViewModel(
             message = "正在切换到 $sourceLang→$targetLang…",
             error = null,
         )
-        listenPrepareJob = viewModelScope.launch {
+        listenPrepareJob = sessionScope.launch {
             enableRealListenTranslate(generation, sourceLang, targetLang)
+        }
+    }
+
+    private fun reportListenPreparation(generation: Long, message: String) {
+        sessionScope.launch {
+            if (generation == listenPrepareGeneration && !playbackLifecycle.closed) {
+                listenSession.setInstallingModels(installing = true, message = message)
+            }
         }
     }
 
@@ -371,9 +420,7 @@ class PlayerViewModel(
         if (generation != listenPrepareGeneration) return@withLock
         val previous = realListenEngine
         realListenEngine = null
-        withContext(Dispatchers.IO) {
-            runCatching { previous?.close() }
-        }
+        closeListenPreparationResources(listOf({ previous?.close() }))
         val asrSupport: AsrModelSupport = when (userPreferences.asrEngine()) {
             AsrEngineChoice.VOSK -> VoskAsrModelSupport(voskInstaller)
             AsrEngineChoice.SHERPA -> SherpaAsrModelSupport(sherpaInstaller)
@@ -405,7 +452,7 @@ class PlayerViewModel(
             pendingMt = null
         }
         val prepared = try {
-            withContext(Dispatchers.IO) {
+            val engine = withContext(Dispatchers.IO) {
                 ensureSmbConnectedForListen()
                 val audio = buildListenAudioSource()
                     ?: error("当前片源暂不支持听译音频（需要本地文件或 SMB 随机读）")
@@ -424,10 +471,7 @@ class PlayerViewModel(
                     val percent = (p * 100f).toInt().coerceIn(0, 100)
                     if (percent != lastProgressPercent) {
                         lastProgressPercent = percent
-                        listenSession.setInstallingModels(
-                            installing = true,
-                            message = "正在准备 $installingEngineLabel：$percent%",
-                        )
+                        reportListenPreparation(generation, "正在准备 $installingEngineLabel：$percent%")
                     }
                 }
                 currentCoroutineContext().ensureActive()
@@ -439,17 +483,11 @@ class PlayerViewModel(
                 val mt = MlKitMtEngine(allowMeteredDownloads = allowMeteredDownloads)
                 pendingAsr = asr
                 pendingMt = mt
-                listenSession.setInstallingModels(
-                    installing = true,
-                    message = "正在载入本机 ASR 模型 $sourceLang…",
-                )
+                reportListenPreparation(generation, "正在载入本机 ASR 模型 $sourceLang…")
                 val modelDir = asrSupport.modelDir(sourceLang)
                     ?: error(asrSupport.incompleteModelMessage(sourceLang))
                 asr.ensureModel(modelDir, sourceLang)
-                listenSession.setInstallingModels(
-                    installing = true,
-                    message = "正在准备本机翻译模型 $sourceLang→$targetLang…",
-                )
+                reportListenPreparation(generation, "正在准备本机翻译模型 $sourceLang→$targetLang…")
                 mt.ensureModel(sourceLang, targetLang)
                 currentCoroutineContext().ensureActive()
                 val engine = RealListenTranslateEngine(
@@ -464,12 +502,17 @@ class PlayerViewModel(
                 if (generation != listenPrepareGeneration) {
                     throw CancellationException("stale listen-translate preparation")
                 }
-                realListenEngine = engine
-                listenSession.setEngine(engine)
-                pendingAudio = null
-                pendingAsr = null
-                pendingMt = null
+                engine
             }
+            currentCoroutineContext().ensureActive()
+            if (generation != listenPrepareGeneration || playbackLifecycle.closed) {
+                throw CancellationException("stale listen-translate preparation")
+            }
+            realListenEngine = engine
+            listenSession.setEngine(engine)
+            pendingAudio = null
+            pendingAsr = null
+            pendingMt = null
             true
         } catch (cancelled: CancellationException) {
             closePendingResources()
@@ -549,8 +592,10 @@ class PlayerViewModel(
             is PlaybackDataSource.SeekableSmb -> {
                 // Never reuse the playback client: SMBJ can return the same cached
                 // DiskShare, and closing an auxiliary handle would break VLC reads.
-                runCatching { listenOnlySmbClient?.close() }
-                listenOnlySmbClient = null
+                val previous = synchronized(listenClientLock) {
+                    listenOnlySmbClient.also { listenOnlySmbClient = null }
+                }
+                runCatching { previous?.close() }
                 val client = SmbjClient()
                 val creds = SmbSessionCredentials(
                     host = ds.host,
@@ -561,14 +606,23 @@ class PlayerViewModel(
                 )
                 try {
                     client.connect(creds)
-                    listenOnlySmbClient = client
+                    currentCoroutineContext().ensureActive()
+                    synchronized(listenClientLock) {
+                        if (!sessionJob.isActive) throw CancellationException("player session closed")
+                        listenOnlySmbClient = client
+                    }
+                } catch (t: Throwable) {
+                    runCatching { client.close() }
+                    throw t
                 } finally {
                     creds.clearPassword()
                 }
             }
             is PlaybackDataSource.DirectSmbUrl -> {
-                runCatching { listenOnlySmbClient?.close() }
-                listenOnlySmbClient = null
+                val previous = synchronized(listenClientLock) {
+                    listenOnlySmbClient.also { listenOnlySmbClient = null }
+                }
+                runCatching { previous?.close() }
                 val client = SmbjClient()
                 val creds = SmbSessionCredentials(
                     host = ds.host,
@@ -579,7 +633,14 @@ class PlayerViewModel(
                 )
                 try {
                     client.connect(creds)
-                    listenOnlySmbClient = client
+                    currentCoroutineContext().ensureActive()
+                    synchronized(listenClientLock) {
+                        if (!sessionJob.isActive) throw CancellationException("player session closed")
+                        listenOnlySmbClient = client
+                    }
+                } catch (t: Throwable) {
+                    runCatching { client.close() }
+                    throw t
                 } finally {
                     creds.clearPassword()
                 }
@@ -589,35 +650,21 @@ class PlayerViewModel(
     }
 
     fun play() {
-        val phase = controller.state.value.phase
-        if (phase == PlayerState.Phase.Error) {
+        if (playbackLifecycle.closed) return
+        if (controller.state.value.phase == PlayerState.Phase.Error) {
             retry()
             return
         }
-        // User took over playback: cancel any pending resume-seek so a later Paused
-        // does not drag the viewer back to the resume point.
+        progressTouched = true
         resumeSeekGate.markFired()
         startPositionMs = 0L
-        when (audioFocus.request()) {
-            AudioFocusRequestResult.Granted -> {
-                playPendingAudioFocus = false
-                controller.play()
-            }
-            AudioFocusRequestResult.Delayed -> {
-                playPendingAudioFocus = true
-                Log.i(TAG, "Audio focus delayed; waiting before playback")
-            }
-            AudioFocusRequestResult.Failed -> {
-                playPendingAudioFocus = false
-                Log.w(TAG, "Audio focus denied; playback not started")
-            }
-        }
+        playbackLifecycle.play()
     }
 
     fun pause() {
-        if (controller.state.value.phase != PlayerState.Phase.Playing) return
-        controller.pause()
-        viewModelScope.launch { saveProgressNow(force = true) }
+        if (playbackLifecycle.closed) return
+        playbackLifecycle.pause()
+        saveProgressNow(force = true)
     }
 
     /**
@@ -632,6 +679,7 @@ class PlayerViewModel(
      */
     fun setScrubbing(active: Boolean) {
         if (!active) {
+            scrubGestureGeneration++
             scrubFocusMs = -1L
             scrubPreviewScheduler.setScrubbing(false, null)
             scrubPreviewExtractor.pause()
@@ -639,13 +687,18 @@ class PlayerViewModel(
     }
 
     fun previewSeekTo(positionMs: Long) {
+        if (playbackLifecycle.closed || !playbackLifecycle.foreground) return
         val starting = scrubFocusMs < 0L
         scrubFocusMs = positionMs
-        if (starting) _scrubPreviewFailed.value = emptySet()
+        if (starting) {
+            scrubGestureGeneration++
+            _scrubPreviewFailed.value = emptySet()
+        }
         scrubPreviewScheduler.setScrubbing(true, positionMs)
     }
 
     fun seekTo(positionMs: Long) {
+        scrubGestureGeneration++
         scrubFocusMs = -1L
         scrubPreviewScheduler.setScrubbing(false, null)
         scrubPreviewExtractor.pause()
@@ -653,6 +706,10 @@ class PlayerViewModel(
     }
 
     private fun commitSeek(positionMs: Long) {
+        if (playbackLifecycle.closed || !playbackLifecycle.foreground) return
+        val phase = controller.state.value.phase
+        if (phase == PlayerState.Phase.Idle || phase == PlayerState.Phase.Preparing || phase == PlayerState.Phase.Error) return
+        progressTouched = true
         resumeSeekGate.markFired()
         startPositionMs = 0L
         controller.seekTo(positionMs)
@@ -680,6 +737,7 @@ class PlayerViewModel(
     }
 
     fun selectAudioTrack(trackId: Int) {
+        if (playbackLifecycle.closed) return
         // Only re-key listen-translate after the native switch succeeds, so a
         // rejected switch cannot strand the cache on the wrong audio ordinal.
         if (!controller.selectAudioTrack(trackId)) return
@@ -692,12 +750,14 @@ class PlayerViewModel(
     }
 
     fun setPlaybackRate(rate: Float) {
+        if (playbackLifecycle.closed) return
         // An explicit rate choice always wins over a held speed boost.
         speedBoostSavedRate = null
         controller.setPlaybackRate(rate)
     }
 
     fun cyclePlaybackRate() {
+        if (playbackLifecycle.closed) return
         val boostedFrom = speedBoostSavedRate
         speedBoostSavedRate = null
         val boostedRate = controller.state.value.playbackRate
@@ -741,7 +801,7 @@ class PlayerViewModel(
      * failures leave [siblingNavState] empty (no prev/next UI).
      */
     fun loadSiblingPlaylist() {
-        viewModelScope.launch {
+        sessionScope.launch {
             _siblingNavState.value = _siblingNavState.value.copy(loading = true)
             val playlist = runCatching { listSiblingPlaylist() }
                 .onFailure { t ->
@@ -751,7 +811,10 @@ class PlayerViewModel(
                     )
                 }
                 .getOrDefault(SiblingPlaylist.Empty)
-            _siblingNavState.value = SiblingNavUiState.from(playlist, loading = false)
+            currentCoroutineContext().ensureActive()
+            if (!playbackLifecycle.closed) {
+                _siblingNavState.value = SiblingNavUiState.from(playlist, loading = false)
+            }
         }
     }
 
@@ -805,6 +868,7 @@ class PlayerViewModel(
         password: CharArray,
         domain: String,
     ): List<String> {
+        directoryFileNamesLoader?.let { return it(share, parentPath) }
         // Directory enumeration gets its own connection. SMBJ caches DiskShare by
         // name, so using the playback/listen client could close an active read handle.
         val client = SmbjClient()
@@ -828,15 +892,18 @@ class PlayerViewModel(
 
     /** Cycle BestFit → FitScreen → Fill → 16:9 → 4:3 → Original. */
     fun cycleVideoScaleMode() {
+        if (playbackLifecycle.closed) return
         val next = controller.state.value.videoScaleMode.next()
         controller.setVideoScaleMode(next)
     }
 
     fun setVideoScaleMode(mode: VideoScaleMode) {
+        if (playbackLifecycle.closed) return
         controller.setVideoScaleMode(mode)
     }
 
     fun selectSubtitleOff() {
+        if (playbackLifecycle.closed) return
         subtitleSelectionGate.advance()
         controller.disableSubtitles()
         _subtitleUiState.update {
@@ -845,6 +912,7 @@ class PlayerViewModel(
     }
 
     fun selectEmbeddedSubtitle(trackId: Int) {
+        if (playbackLifecycle.closed) return
         subtitleSelectionGate.advance()
         controller.selectSubtitleTrack(trackId)
         _subtitleUiState.update {
@@ -856,8 +924,9 @@ class PlayerViewModel(
     }
 
     fun selectExternalSubtitle(option: ExternalSubtitleOption) {
+        if (playbackLifecycle.closed) return
         val selectionGeneration = subtitleSelectionGate.advance()
-        viewModelScope.launch {
+        sessionScope.launch {
             loadAndSelectExternal(
                 option = option,
                 userInitiated = true,
@@ -867,12 +936,14 @@ class PlayerViewModel(
     }
 
     fun adjustSubtitleDelayMs(deltaMs: Long) {
+        if (playbackLifecycle.closed) return
         val next = (_subtitleUiState.value.delayMs + deltaMs).coerceIn(-10_000L, 10_000L)
         controller.setSubtitleDelayMs(next)
         _subtitleUiState.update { it.copy(delayMs = next) }
     }
 
     fun setSubtitleFontRelSize(relSize: Int) {
+        if (playbackLifecycle.closed) return
         val size = if (relSize in SubtitleFontSizes.ALL) {
             relSize
         } else {
@@ -883,12 +954,13 @@ class PlayerViewModel(
     }
 
     fun retry() {
+        if (playbackLifecycle.closed) return
         pauseListenForSourceChange()
         // Replace any in-flight open so rapid retries do not overlap.
         openJob?.cancel()
-        openJob = viewModelScope.launch {
+        openJob = sessionScope.launch {
             // Snapshot before closeCurrentMedia(), which intentionally resets state to Idle/0.
-            val livePositionBeforeClose = controller.state.value.positionMs.takeIf { it > 0L }
+            val livePositionBeforeClose = controller.progressState.positionMs.takeIf { it >= 0L }
             // Close proxy FD / media first so SmbRandomAccess can release cleanly,
             // then disconnect SMB off the main thread.
             (controller as? VlcPlayerController)?.closeCurrentMedia()
@@ -921,117 +993,80 @@ class PlayerViewModel(
         }
     }
 
-    /**
-     * Call when UI leaves or process goes to background pause policy.
-     *
-     * Progress is written on an application-style IO scope (not [viewModelScope]) so the
-     * write can finish after [onCleared] cancels the ViewModel scope during popBackStack.
-     */
+    /** Background retains the session and user intent; navigation uses [onLeave]. */
     fun onLeaveOrBackground() {
-        pauseFromSystem()
-        scheduleLeaveSave(controller.state.value)
+        if (playbackLifecycle.closed) return
+        val snapshot = controller.progressState
+        playbackLifecycle.onBackground()
+        stopSpeedBoost()
+        setScrubbing(false)
+        scrubPreviewScheduler.updatePlayback(
+            snapshot.durationMs, snapshot.positionMs, buffering = true, active = false,
+        )
+        scheduleProgressSave(snapshot, force = true)
     }
 
-    /**
-     * Call when the app returns to the foreground after [onLeaveOrBackground].
-     *
-     * Surface destruction removes libVLC's holder callback. A size refresh then
-     * returns immediately, and the new surface is never delivered, so play stays
-     * dead until the screen is opened again. Attach the layout first. Repaint
-     * only after that surface exists, and only while playback is resting.
-     */
-    fun onReturnToForeground() {
-        val vlc = controller as? com.framenest.player.VlcPlayerController
-        if (vlc != null) {
-            vlc.rebindVideoOutput {
-                val snapshot = controller.state.value
-                if (
-                    com.framenest.player.PlayerRotationPolicy.shouldRepaintOnForeground(
-                        firstFrameReady = snapshot.firstFrameReady,
-                        phase = snapshot.phase,
-                    )
-                ) {
-                    vlc.repaintCurrentFrame()
-                }
-            }
-            return
-        }
-        val snapshot = controller.state.value
-        controller.refreshVideoSurfaces()
-        if (
-            com.framenest.player.PlayerRotationPolicy.shouldRepaintOnForeground(
-                firstFrameReady = snapshot.firstFrameReady,
-                phase = snapshot.phase,
-            )
-        ) {
-            controller.seekTo(snapshot.positionMs)
-        }
-    }
+    /** Only a real background return restores playback; first entry stays paused. */
+    fun onReturnToForeground() = playbackLifecycle.onForeground()
 
-    private fun scheduleLeaveSave(state: PlayerState) {
-        if (state.phase == PlayerState.Phase.Idle ||
-            state.phase == PlayerState.Phase.Preparing ||
-            state.phase == PlayerState.Phase.Error
-        ) {
-            return
-        }
-        val position = state.positionMs
-        val duration = state.durationMs
-        val identity = request.identity
-        val name = request.displayName
-        // Skip if already persists to this exact position (races with periodic saves
-        // and with onCleared's fallback write).
-        if (lastSavedPositionMs == position) return
-        // Cancel any prior in-flight leave save so a newer snapshot wins; this is the
-        // single coordinated entry point (instead of an unmanaged CoroutineScope).
-        leaveSaveJob?.cancel()
-        leaveSaveJob = CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            try {
-                historyRepository.saveProgress(
-                    identity = identity,
-                    displayName = name,
-                    positionMs = position,
-                    durationMs = duration,
-                )
-                lastSavedPositionMs = position
-            } catch (t: Throwable) {
-                Log.w(TAG, "leave saveProgress failed: ${CredentialRedactor.redact(t.message)}")
-            }
-        }
-    }
-
-    /**
-     * Explicit destination exit. Snapshot/save without synchronously pausing native
-     * playback, then begin release. [VlcPlayerController.release] removes the visible
-     * host immediately but performs native stop/release away from the navigation frame.
-     */
+    /** Release every destination-owned resource now, without waiting for navigation to clear the VM. */
     fun onLeave() {
-        if (exitStateSnapshot != null) return
-        val snapshot = controller.state.value
-        exitStateSnapshot = snapshot
+        if (playbackLifecycle.closed) return
+        val snapshot = controller.progressState
+        scheduleProgressSave(snapshot, force = true)
+        if (!playbackLifecycle.close()) return
+        subtitleSelectionGate.advance()
+        listenPrepareGeneration++
+        sessionJob.cancel()
+        openJob = null
+        listenPrepareJob = null
+        stopProgressLoop()
         speedBoostSavedRate = null
-        scheduleLeaveSave(snapshot)
-        controller.release()
-    }
-
-    private fun pauseFromSystem() {
-        // A Ready/Paused UI may still be decoding a muted seek preview.
-        controller.pause()
+        scrubFocusMs = -1L
+        scrubPreviewScheduler.close()
+        _scrubPreviewFrames.value = emptyMap()
+        _scrubPreviewFailed.value = emptySet()
+        _subtitleUiState.value = SubtitleUiState()
+        _siblingNavState.value = SiblingNavUiState()
+        listenSession.setEnabled(false)
+        listenSession.setInstallingModels(false)
+        listenSession.release()
+        val engine = realListenEngine
+        realListenEngine = null
+        val client = synchronized(listenClientLock) {
+            listenOnlySmbClient.also { listenOnlySmbClient = null }
+        }
+        // Cancellation may still be unwinding an IO subtitle/ASR operation. Wait
+        // off-main before deleting this session's temporary files and closing input.
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            // FN-55: terminate the detached transport before waiting for a read
+            // that may ignore coroutine cancellation. This never runs on main.
+            runCatching { client?.abort() }
+            runCatching { scrubPreviewExtractor.close() }
+            sessionJob.join()
+            runCatching { engine?.close() }
+            runCatching { subtitleLoader.clearCache() }
+        }
     }
 
     private suspend fun loadResumeAndOpen(forceReloadHistory: Boolean = true) {
         if (forceReloadHistory) {
-            val history = historyRepository.get(request.identity)
+            val history = progressPersistence.afterSaves { historyRepository.get(request.identity) }
+            preserveUnchangedHistory = history != null
             if (history != null && request.startPositionMs <= 0L) {
                 startPositionMs = history.resumePositionMs
             }
         }
+        currentCoroutineContext().ensureActive()
+        if (playbackLifecycle.closed) return
         openSource()
     }
 
     private suspend fun openSource() {
         val mediaSource = try {
             resolveMediaSource(request.dataSource)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (se: SmbException) {
             val err = PlayerErrorMapper.fromSmb(se.error)
             Log.w(TAG, "SMB open failed code=${err.code} msg=${err.message}")
@@ -1048,6 +1083,8 @@ class PlayerViewModel(
         // Pass resume into the controller once. Direct SMB retains it until play(),
         // then applies one fast/keyframe seek instead of a precise paused seek.
         val initialPositionMs = startPositionMs.coerceAtLeast(0L)
+        currentCoroutineContext().ensureActive()
+        if (playbackLifecycle.closed) return
         controller.prepare(mediaSource, initialPositionMs)
         resumeSeekGate.markFired()
         startPositionMs = 0L
@@ -1080,7 +1117,7 @@ class PlayerViewModel(
 
     /** Decision 0005: drop local listen-translate rows when the media cannot be opened. */
     private fun purgeListenTranslateForMissingMedia() {
-        viewModelScope.launch {
+        sessionScope.launch {
             runCatching { listenTranslateRepository.purgeMedia(request.identity) }
         }
     }
@@ -1138,7 +1175,7 @@ class PlayerViewModel(
 
     private fun ensureProgressLoop() {
         if (progressJob?.isActive == true) return
-        progressJob = viewModelScope.launch {
+        progressJob = sessionScope.launch {
             while (isActive) {
                 delay(PlaybackProgressRules.PERIODIC_SAVE_INTERVAL_MS)
                 val state = controller.state.value
@@ -1154,31 +1191,35 @@ class PlayerViewModel(
         progressJob = null
     }
 
-    private suspend fun saveProgressNow(force: Boolean) {
-        val state = controller.state.value
-        if (state.phase == PlayerState.Phase.Idle ||
-            state.phase == PlayerState.Phase.Preparing ||
+    private fun saveProgressNow(force: Boolean) {
+        if (!playbackLifecycle.closed) scheduleProgressSave(controller.progressState, force)
+    }
+
+    private fun scheduleProgressSave(state: PlayerState, force: Boolean) {
+        // Merely opening a preview must preserve the entire existing row, including
+        // completion/duration, until Play or an explicit seek changes progress.
+        if (preserveUnchangedHistory && !progressTouched) return
+        if (state.phase == PlayerState.Phase.Idle || state.phase == PlayerState.Phase.Preparing ||
             state.phase == PlayerState.Phase.Error
-        ) {
-            return
-        }
-        val position = state.positionMs
-        val duration = state.durationMs
-        if (!force &&
-            !PlaybackProgressRules.shouldPersist(lastSavedPositionMs, position)
-        ) {
-            return
-        }
-        try {
-            historyRepository.saveProgress(
-                identity = request.identity,
-                displayName = request.displayName,
-                positionMs = position,
-                durationMs = duration,
-            )
-            lastSavedPositionMs = position
-        } catch (t: Throwable) {
-            Log.w(TAG, "saveProgress failed: ${CredentialRedactor.redact(t.message)}")
+        ) return
+        val snapshot = state.positionMs to state.durationMs
+        if (!force && !PlaybackProgressRules.shouldPersist(lastSavedPositionMs, state.positionMs)) return
+        progressPersistence.save {
+            if (lastSavedProgress == snapshot) return@save
+            try {
+                historyRepository.saveProgress(
+                    identity = request.identity,
+                    displayName = request.displayName,
+                    positionMs = state.positionMs,
+                    durationMs = state.durationMs,
+                )
+                lastSavedPositionMs = state.positionMs
+                lastSavedProgress = snapshot
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                Log.w(TAG, "saveProgress failed: ${CredentialRedactor.redact(t.message)}")
+            }
         }
     }
 
@@ -1198,7 +1239,7 @@ class PlayerViewModel(
         includeSiblings: Boolean,
     ) {
         val selectionGeneration = subtitleSelectionGate.snapshot()
-        viewModelScope.launch {
+        sessionScope.launch {
             val smbParams = smbSubtitleParamsOrNull()
             if (smbParams == null) {
                 if (includeSiblings) {
@@ -1258,6 +1299,10 @@ class PlayerViewModel(
                 smbParams.password.fill('\u0000')
             }
 
+            currentCoroutineContext().ensureActive()
+            if (playbackLifecycle.closed) return@launch
+            // A manual subtitle choice retires automatic selection, not this
+            // directory result: sibling navigation and scan completion still publish.
             featuresResult.fold(
                 onSuccess = { features ->
                     features.siblingPlaylist?.let { playlist ->
@@ -1346,7 +1391,8 @@ class PlayerViewModel(
             smbParams.password.fill('\u0000')
         }
 
-        if (!subtitleSelectionGate.isCurrent(selectionGeneration)) return
+        currentCoroutineContext().ensureActive()
+        if (playbackLifecycle.closed || !subtitleSelectionGate.isCurrent(selectionGeneration)) return
 
         loadResult.fold(
             onSuccess = { loaded ->
@@ -1472,8 +1518,9 @@ class PlayerViewModel(
     }
 
     private fun teardownSmbClientOnly() {
-        val listenClient = listenOnlySmbClient
-        listenOnlySmbClient = null
+        val listenClient = synchronized(listenClientLock) {
+            listenOnlySmbClient.also { listenOnlySmbClient = null }
+        }
         if (listenClient != null) {
             runCatching { listenClient.disconnect() }
             runCatching { listenClient.close() }
@@ -1481,81 +1528,7 @@ class PlayerViewModel(
     }
 
     override fun onCleared() {
-        // Snapshot everything needed for background teardown. Do not block the main
-        // thread here — popBackStack animation runs concurrently with onCleared.
-        val stateSnapshot = exitStateSnapshot ?: controller.state.value
-        val shouldSave =
-            stateSnapshot.phase != PlayerState.Phase.Idle &&
-                stateSnapshot.phase != PlayerState.Phase.Error &&
-                stateSnapshot.phase != PlayerState.Phase.Preparing
-        val savePosition = stateSnapshot.positionMs
-        val saveDuration = stateSnapshot.durationMs
-        val saveIdentity = request.identity
-        val saveDisplayName = request.displayName
-        val history = historyRepository
-
-        scrubPreviewScheduler.close()
-        val previewExtractor = scrubPreviewExtractor
-        listenSession.release()
-        listenPrepareGeneration += 1L
-        listenPrepareJob?.cancel()
-        listenPrepareJob = null
-        val listenEngine = realListenEngine
-        realListenEngine = null
-        stopProgressLoop()
-        audioFocus.abandon()
-        // Cancel the leave-save so a final snapshot wins and we don't double-write.
-        leaveSaveJob?.cancel()
-        leaveSaveJob = null
-
-        val player = controller
-        val clients = listOfNotNull(listenOnlySmbClient)
-        listenOnlySmbClient = null
-        val subtitles = subtitleLoader
-
-        // Leave already started an async save; this thread is a bounded backup plus
-        // VLC/ASR/SMB teardown that used to freeze the exit transition on the main thread.
-        Thread(
-            {
-                // Skip if the leave-save or a periodic save already persisted this exact
-                // position — read volatile lastSavedPositionMs to avoid double-writing
-                // (and potentially racing a stale earlier position) on popBack.
-                if (shouldSave && lastSavedPositionMs != savePosition) {
-                    runCatching {
-                        runBlocking {
-                            withTimeoutOrNull(1_500L) {
-                                history.saveProgress(
-                                    identity = saveIdentity,
-                                    displayName = saveDisplayName,
-                                    positionMs = savePosition,
-                                    durationMs = saveDuration,
-                                )
-                            }
-                        }
-                    }.onFailure { t ->
-                        Log.w(
-                            TAG,
-                            "teardown saveProgress: ${CredentialRedactor.redact(t.message)}",
-                        )
-                    }
-                }
-                // Order: stop player / close proxy AFD, then SMB sessions.
-                // Preview extraction uses its own SMB session and must not run on
-                // the main thread that is already leaving the player.
-                runCatching { previewExtractor.close() }
-                runCatching { player.release() }
-                runCatching { listenEngine?.close() }
-                clients.forEach { client ->
-                    runCatching { client.disconnect() }
-                    runCatching { client.close() }
-                }
-                runCatching { subtitles.clearCache() }
-            },
-            "framenest-player-teardown",
-        ).apply {
-            isDaemon = true
-            start()
-        }
+        onLeave()
         super.onCleared()
     }
 

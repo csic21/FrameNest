@@ -54,11 +54,21 @@ class VlcPlayerController(
     )
     override val state: StateFlow<PlayerState> = _state.asStateFlow()
 
+    override val progressState: PlayerState
+        get() = _state.value.copy(
+            positionMs = pendingSmbResumePositionMs.takeIf { it > 0L }
+                ?: remoteSeeks.latestTargetMs
+                ?: interruptedSeekTargetMs
+                ?: _state.value.positionMs,
+        )
+
     private var libVlc: LibVLC? = null
     private var mediaPlayer: MediaPlayer? = null
     private var videoLayout: VLCVideoLayout? = null
     private var viewsAttached: Boolean = false
     private var foregroundVoutCallback: IVLCVout.Callback? = null
+    private var foregroundSurfaceGeneration = 0L
+    private var pendingForegroundReady: (() -> Unit)? = null
 
     private var pendingSource: MediaSource? = null
     /** Source retained for replay or recovery after a seek reaches EOF. */
@@ -373,6 +383,10 @@ class VlcPlayerController(
             // VideoHelper exists only after attach — set scale once, not on every recomposition.
             applyVideoScale(player)
         }
+        pendingForegroundReady?.let { ready ->
+            pendingForegroundReady = null
+            rebindVideoOutput(ready)
+        }
         tryStartPendingIfReady()
     }
 
@@ -428,15 +442,7 @@ class VlcPlayerController(
     }
 
     override fun prepare(source: MediaSource, startPositionMs: Long) {
-        if (released) {
-            _state.update {
-                it.copy(
-                    phase = PlayerState.Phase.Error,
-                    error = PlayerError(PlayerError.Code.Released, "Player released"),
-                )
-            }
-            return
-        }
+        if (released) return
         when (source) {
             is MediaSource.Smb -> {
                 if (SmbMediaUri.embedsCredentials(source.uri)) {
@@ -581,9 +587,8 @@ class VlcPlayerController(
         }
         // User-initiated play cancels pause-scrub preview and continues for real.
         // A pending zero is an explicit seek-to-start, not the history "no resume"
-        // sentinel. An already issued seek can simply continue when Play is pressed.
-        val queuedSeekTarget = remoteSeeks.latestTargetMs.takeIf { remoteSeeks.hasPending }
-            ?: interruptedSeekTargetMs
+        // sentinel. Retain even an issued target until the native clock catches up.
+        val queuedSeekTarget = remoteSeeks.latestTargetMs ?: interruptedSeekTargetMs
         interruptedSeekTargetMs = null
         remoteSeeks.reset()
         mainHandler.removeCallbacks(remoteSeekRunnable)
@@ -600,10 +605,17 @@ class VlcPlayerController(
         val time = runCatching { player.time }.getOrDefault(-1L).coerceAtLeast(0L)
         endedWhileHolding = false
         Log.i(TAG, "play() phase=$phase time=$time length=$length")
-        val resumeTarget = queuedSeekTarget ?: pendingSmbResumePositionMs.takeIf { it > 0L }
+        // A foreground repaint is internal and may leave an interrupted zero
+        // target. Held history wins until an explicit seekTo clears it.
+        val resumeTarget = pendingSmbResumePositionMs.takeIf { it > 0L } ?: queuedSeekTarget
         if (resumeTarget != null) {
             val targetMs = resumeTarget
             pendingSmbResumePositionMs = 0L
+            // Own the target until a native clock acknowledges it; a queued
+            // near-zero TimeChanged from the preview must not erase resume.
+            remoteSeeks.submit(targetMs)
+            remoteSeeks.poll(SystemClock.elapsedRealtime())
+            mainHandler.postDelayed(remoteSeekRunnable, REMOTE_SEEK_POLL_MS)
             val applied = runCatching { player.setTime(targetMs, /* fast = */ true) }
                 .getOrDefault(-1L)
             _state.update { it.copy(positionMs = targetMs) }
@@ -1077,18 +1089,26 @@ class VlcPlayerController(
      */
     fun rebindVideoOutput(onSurfaceReady: () -> Unit) {
         if (released) return
-        val layout = videoLayout ?: return
-        val player = mediaPlayer ?: return
+        val layout = videoLayout
+        val player = mediaPlayer
+        if (layout == null || player == null) {
+            pendingForegroundReady = onSurfaceReady
+            return
+        }
+        pendingForegroundReady = null
         val vout = player.vlcVout
         clearForegroundVoutCallback(vout)
+        val surfaceGeneration = foregroundSurfaceGeneration
         val fired = AtomicBoolean(false)
         val callback = object : IVLCVout.Callback {
             override fun onSurfacesCreated(vout: IVLCVout) {
                 if (!fired.compareAndSet(false, true)) return
                 runCatching { vout.removeCallback(this) }
-                if (foregroundVoutCallback === this) foregroundVoutCallback = null
                 mainHandler.post {
-                    if (released) return@post
+                    if (released || surfaceGeneration != foregroundSurfaceGeneration ||
+                        foregroundVoutCallback !== this
+                    ) return@post
+                    foregroundVoutCallback = null
                     onSurfaceReady()
                 }
             }
@@ -1120,6 +1140,7 @@ class VlcPlayerController(
     }
 
     private fun clearForegroundVoutCallback(vout: IVLCVout?) {
+        foregroundSurfaceGeneration++
         val callback = foregroundVoutCallback ?: return
         foregroundVoutCallback = null
         if (vout != null) runCatching { vout.removeCallback(callback) }
@@ -1152,6 +1173,7 @@ class VlcPlayerController(
         clearForegroundVoutCallback(mediaPlayer?.vlcVout)
         val releaseStartedAtMs = SystemClock.elapsedRealtime()
         released = true
+        pendingForegroundReady = null
         discardPendingDescriptor()
         inputGeneration++
         val pendingStop = inputStopThread
@@ -1316,6 +1338,8 @@ class VlcPlayerController(
     }
 
     private fun invalidateInputEvents() {
+        // Media-input events and surface ownership have independent lifetimes.
+        // Retrying/preparing must not strand an in-flight foreground rebind.
         inputGeneration++
         suppressAllTerminalEvents = true
         mediaPlayer?.setEventListener(null)
@@ -1386,6 +1410,8 @@ class VlcPlayerController(
             player.media = media
             inputNeedsStop = true
             applyPlaybackRate(player)
+            // OpenSLES volume is not initialized until audio output starts. Do not
+            // capture it or treat a pre-play setVolume result as proof of mute.
             player.play()
         } catch (t: Throwable) {
             failOpen(CredentialRedactor.redact(t.message ?: "Failed to open media"))
@@ -1607,6 +1633,11 @@ class VlcPlayerController(
                 positionMs = time,
                 isSeekable = runCatching { player?.isSeekable == true }.getOrDefault(false),
             )
+        }
+        if (playRequested && pendingSmbResumePositionMs > 0L) {
+            val target = pendingSmbResumePositionMs
+            pendingSmbResumePositionMs = 0L
+            seekTo(target)
         }
         seekAfterReopenMs?.let { target ->
             seekAfterReopenMs = null

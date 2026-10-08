@@ -13,6 +13,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.framenest.R
+import com.framenest.core.model.PlaybackDataSource
+import com.framenest.core.model.PlaybackIdentity
+import com.framenest.core.model.PlaybackRequest
 import com.framenest.player.MediaSource
 import com.framenest.player.VlcPlayerController
 import com.framenest.ui.theme.FrameNestTheme
@@ -44,6 +47,22 @@ class PlayerSpikeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        if (intent.getBooleanExtra(EXTRA_PRODUCT_LIFECYCLE_SAMPLE, false)) {
+            // Local-only instrumentation mode: use the real product screen and
+            // Activity-owned ViewModel so recreation tests exercise its lifetime.
+            val request = PlaybackRequest(
+                identity = PlaybackIdentity("product-lifecycle", "samples", "sample_h264.mp4"),
+                displayName = "Product lifecycle sample",
+                dataSource = PlaybackDataSource.LocalRawResource(R.raw.sample_h264),
+            )
+            setContent {
+                FrameNestTheme {
+                    PlayerScreen(request = request, onBack = { finish() })
+                }
+            }
+            return
+        }
 
         val player = VlcPlayerController(applicationContext, enableHwDecoder = true)
         controller = player
@@ -108,6 +127,7 @@ class PlayerSpikeActivity : ComponentActivity() {
     }
 
     companion object {
+        const val EXTRA_PRODUCT_LIFECYCLE_SAMPLE = "product_lifecycle_sample"
         const val EXTRA_SMB_HOST = "smb_host"
         const val EXTRA_SMB_SHARE = "smb_share"
         const val EXTRA_SMB_PATH = "smb_path"
