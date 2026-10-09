@@ -56,6 +56,8 @@ import com.framenest.player.SmbCredentials
 import com.framenest.player.SmbMediaUri
 import com.framenest.player.VideoScaleMode
 import com.framenest.player.VlcPlayerController
+import com.framenest.smb.SmbClient
+import com.framenest.smb.SmbTransportOwner
 import com.framenest.smb.SmbException
 import com.framenest.smb.SmbPathUtils
 import com.framenest.smb.SmbjClient
@@ -103,6 +105,8 @@ class PlayerViewModel(
         (application as? FrameNestApplication)?.container?.browseRepository?.releaseSession()
     },
     private val directoryFileNamesLoader: ((share: String, parentPath: String) -> List<String>)? = null,
+    private val auxiliaryClientFactory: () -> SmbClient = { SmbjClient() },
+    private val retryTeardown: suspend () -> Unit = {},
 ) : AndroidViewModel(application) {
 
     val controller: PlayerController = controllerFactory(application)
@@ -207,9 +211,7 @@ class PlayerViewModel(
     private val sherpaInstaller = SherpaModelInstaller(application)
     private val userPreferences = UserPreferences(application)
     private var realListenEngine: RealListenTranslateEngine? = null
-    private val listenClientLock = Any()
-    @Volatile
-    private var listenOnlySmbClient: SmbjClient? = null
+    private var listenTransports = SmbTransportOwner()
     private var listenPrepareJob: Job? = null
     @Volatile
     private var listenPrepareGeneration: Long = 0L
@@ -257,6 +259,10 @@ class PlayerViewModel(
     private var progressJob: Job? = null
     /** Outstanding open lifecycle; retry replaces any in-flight open. */
     private var openJob: Job? = null
+    private var directoryJob: Job? = null
+    private var directoryGeneration = 0L
+    private var directoryTransports = SmbTransportOwner()
+    private val retryResumeLatch = RetryResumeLatch()
     /** Volatile: read on a background teardown thread to skip a duplicate save. */
     @Volatile
     private var lastSavedPositionMs: Long? = null
@@ -288,10 +294,14 @@ class PlayerViewModel(
             controller.state.collect { state ->
                 if (playbackLifecycle.closed) return@collect
                 playbackLifecycle.onPlaybackState(state)
+                if (state.firstFrameReady) retryResumeLatch.ready()
                 if (state.phase == PlayerState.Phase.Preparing && subtitleBootstrapDone) {
                     // EOF replay creates a fresh native media, so its subtitle slaves
                     // must be attached again when the new first frame is available.
+                    retireDirectoryScan()
+                    subtitleLoader.cancelPendingLoads()
                     subtitleBootstrapDone = false
+                    siblingBootstrapDone = false
                     subtitleSelectionGate.advance()
                 }
                 listenSession.setContentKey(
@@ -347,6 +357,7 @@ class PlayerViewModel(
             listenPrepareGeneration += 1L
             listenPrepareJob?.cancel()
             listenPrepareJob = null
+            retireListenTransports()
             listenSession.setEnabled(false)
             listenSession.setInstallingModels(installing = false)
             // Release the native recognizer (and its SMB audio handle) now instead
@@ -393,13 +404,15 @@ class PlayerViewModel(
         val targetLang = listenSession.uiState.value.targetLang
         val generation = ++listenPrepareGeneration
         listenPrepareJob?.cancel()
+        retireListenTransports()
+        val transports = listenTransports
         listenSession.setInstallingModels(
             installing = true,
             message = "正在切换到 $sourceLang→$targetLang…",
             error = null,
         )
         listenPrepareJob = sessionScope.launch {
-            enableRealListenTranslate(generation, sourceLang, targetLang)
+            enableRealListenTranslate(generation, sourceLang, targetLang, transports)
         }
     }
 
@@ -415,6 +428,7 @@ class PlayerViewModel(
         generation: Long,
         sourceLang: String,
         targetLang: String,
+        transports: SmbTransportOwner,
     ) = listenPrepareMutex.withLock {
         currentCoroutineContext().ensureActive()
         if (generation != listenPrepareGeneration) return@withLock
@@ -453,8 +467,8 @@ class PlayerViewModel(
         }
         val prepared = try {
             val engine = withContext(Dispatchers.IO) {
-                ensureSmbConnectedForListen()
-                val audio = buildListenAudioSource()
+                ensureSmbConnectedForListen(transports)
+                val audio = buildListenAudioSource(transports)
                     ?: error("当前片源暂不支持听译音频（需要本地文件或 SMB 随机读）")
                 pendingAudio = audio
                 var lastProgressPercent = -1
@@ -515,9 +529,11 @@ class PlayerViewModel(
             pendingMt = null
             true
         } catch (cancelled: CancellationException) {
+            transports.retire()
             closePendingResources()
             throw cancelled
         } catch (t: Throwable) {
+            transports.retire()
             closePendingResources()
             if (generation == listenPrepareGeneration) {
                 val msg = listenTranslatePreparationError(t)
@@ -541,31 +557,31 @@ class PlayerViewModel(
         listenSession.setEnabled(true)
     }
 
-    private fun buildListenAudioSource(): ListenAudioSource? {
+    private fun buildListenAudioSource(transports: SmbTransportOwner): ListenAudioSource? {
         val app = getApplication<Application>()
         return when (val ds = request.dataSource) {
             is PlaybackDataSource.LocalFile -> ListenAudioSources.forLocalFile(ds.path)
             is PlaybackDataSource.LocalRawResource ->
                 ListenAudioSources.forRaw(app, ds.resId)
             is PlaybackDataSource.SeekableSmb -> {
-                if (listenOnlySmbClient == null) return null
+                if (transports.currentClient() == null) return null
                 ListenAudioSources.forSmb(
-                    clientProvider = { listenOnlySmbClient },
+                    clientProvider = { transports.currentClient() },
                     reconnectClient = {
-                        ensureSmbConnectedForListen()
-                        listenOnlySmbClient
+                        ensureSmbConnectedForListen(transports)
+                        transports.currentClient()
                     },
                     share = ds.share,
                     path = ds.path,
                 )
             }
             is PlaybackDataSource.DirectSmbUrl -> {
-                if (listenOnlySmbClient == null) return null
+                if (transports.currentClient() == null) return null
                 ListenAudioSources.forSmb(
-                    clientProvider = { listenOnlySmbClient },
+                    clientProvider = { transports.currentClient() },
                     reconnectClient = {
-                        ensureSmbConnectedForListen()
-                        listenOnlySmbClient
+                        ensureSmbConnectedForListen(transports)
+                        transports.currentClient()
                     },
                     share = ds.share,
                     path = ds.path,
@@ -587,66 +603,36 @@ class PlayerViewModel(
     /**
      * Ensure an SMB session exists for second-path audio decode while VLC plays.
      */
-    private suspend fun ensureSmbConnectedForListen() = withContext(Dispatchers.IO) {
-        when (val ds = request.dataSource) {
-            is PlaybackDataSource.SeekableSmb -> {
-                // Never reuse the playback client: SMBJ can return the same cached
-                // DiskShare, and closing an auxiliary handle would break VLC reads.
-                val previous = synchronized(listenClientLock) {
-                    listenOnlySmbClient.also { listenOnlySmbClient = null }
-                }
-                runCatching { previous?.close() }
-                val client = SmbjClient()
-                val creds = SmbSessionCredentials(
-                    host = ds.host,
-                    port = ds.port,
-                    username = ds.username,
-                    password = ds.password.copyOf(),
-                    domain = ds.domain,
-                )
-                try {
-                    client.connect(creds)
-                    currentCoroutineContext().ensureActive()
-                    synchronized(listenClientLock) {
-                        if (!sessionJob.isActive) throw CancellationException("player session closed")
-                        listenOnlySmbClient = client
-                    }
-                } catch (t: Throwable) {
-                    runCatching { client.close() }
-                    throw t
-                } finally {
-                    creds.clearPassword()
-                }
-            }
-            is PlaybackDataSource.DirectSmbUrl -> {
-                val previous = synchronized(listenClientLock) {
-                    listenOnlySmbClient.also { listenOnlySmbClient = null }
-                }
-                runCatching { previous?.close() }
-                val client = SmbjClient()
-                val creds = SmbSessionCredentials(
-                    host = ds.host,
-                    port = ds.port ?: 445,
-                    username = ds.username,
-                    password = ds.password.toCharArray(),
-                    domain = ds.domain.orEmpty(),
-                )
-                try {
-                    client.connect(creds)
-                    currentCoroutineContext().ensureActive()
-                    synchronized(listenClientLock) {
-                        if (!sessionJob.isActive) throw CancellationException("player session closed")
-                        listenOnlySmbClient = client
-                    }
-                } catch (t: Throwable) {
-                    runCatching { client.close() }
-                    throw t
-                } finally {
-                    creds.clearPassword()
-                }
-            }
-            else -> Unit
+    private suspend fun ensureSmbConnectedForListen(transports: SmbTransportOwner) = withContext(Dispatchers.IO) {
+        transports.ensureActive()
+        val creds = when (val ds = request.dataSource) {
+            is PlaybackDataSource.SeekableSmb -> SmbSessionCredentials(
+                ds.host, ds.port, ds.username, ds.password.copyOf(), ds.domain,
+            )
+            is PlaybackDataSource.DirectSmbUrl -> SmbSessionCredentials(
+                ds.host, ds.port ?: 445, ds.username, ds.password.toCharArray(), ds.domain.orEmpty(),
+            )
+            else -> return@withContext
         }
+        transports.currentClient()?.let(transports::release)
+        val client = auxiliaryClientFactory()
+        try {
+            // Publish before connect, not after its potentially blocking negotiation.
+            transports.register(client)
+            client.connect(creds)
+            transports.ensureActive()
+            currentCoroutineContext().ensureActive()
+        } catch (t: Throwable) {
+            transports.release(client)
+            throw t
+        } finally {
+            creds.clearPassword()
+        }
+    }
+
+    private fun retireListenTransports() {
+        listenTransports.retire()
+        listenTransports = SmbTransportOwner()
     }
 
     fun play() {
@@ -711,6 +697,7 @@ class PlayerViewModel(
         if (phase == PlayerState.Phase.Idle || phase == PlayerState.Phase.Preparing || phase == PlayerState.Phase.Error) return
         progressTouched = true
         resumeSeekGate.markFired()
+        retryResumeLatch.userSeek(positionMs)
         startPositionMs = 0L
         controller.seekTo(positionMs)
     }
@@ -801,65 +788,23 @@ class PlayerViewModel(
      * failures leave [siblingNavState] empty (no prev/next UI).
      */
     fun loadSiblingPlaylist() {
-        sessionScope.launch {
-            _siblingNavState.value = _siblingNavState.value.copy(loading = true)
-            val playlist = runCatching { listSiblingPlaylist() }
-                .onFailure { t ->
-                    Log.w(
-                        TAG,
-                        "sibling list failed: ${CredentialRedactor.redact(t.message)}",
-                    )
-                }
-                .getOrDefault(SiblingPlaylist.Empty)
-            currentCoroutineContext().ensureActive()
-            if (!playbackLifecycle.closed) {
-                _siblingNavState.value = SiblingNavUiState.from(playlist, loading = false)
-            }
-        }
+        if (playbackLifecycle.closed) return
+        val includeSubtitles = !subtitleBootstrapDone || _subtitleUiState.value.scanning
+        subtitleBootstrapDone = true
+        siblingBootstrapDone = true
+        bootstrapDirectoryFeatures(controller.state.value, includeSubtitles, includeSiblings = true)
     }
 
-    private suspend fun listSiblingPlaylist(): SiblingPlaylist = withContext(Dispatchers.IO) {
-        val path = request.identity.path
-        val names = listSiblingFileNames()
-        SiblingPlaylistFactory.build(currentPath = path, directoryFileNames = names)
-    }
-
-    /** Use a short-lived listing session so playback/read handles remain isolated. */
-    private fun listSiblingFileNames(): List<String> {
-        return when (val ds = request.dataSource) {
-            is PlaybackDataSource.SeekableSmb ->
-                listDirectoryFileNames(
-                    share = ds.share,
-                    parentPath = SmbPathUtils.parentOf(ds.path),
-                    host = ds.host,
-                    port = ds.port,
-                    username = ds.username,
-                    password = ds.password,
-                    domain = ds.domain,
-                )
-            is PlaybackDataSource.DirectSmbUrl -> {
-                val chars = ds.password.toCharArray()
-                try {
-                    listDirectoryFileNames(
-                        share = ds.share,
-                        parentPath = SmbPathUtils.parentOf(ds.path),
-                        host = ds.host,
-                        port = ds.port ?: 445,
-                        username = ds.username,
-                        password = chars,
-                        domain = ds.domain.orEmpty(),
-                    )
-                } finally {
-                    chars.fill('\u0000')
-                }
-            }
-            is PlaybackDataSource.LocalFile,
-            is PlaybackDataSource.LocalRawResource,
-            -> emptyList()
-        }
+    private fun retireDirectoryScan() {
+        directoryGeneration++
+        directoryJob?.cancel()
+        directoryJob = null
+        directoryTransports.retire()
+        directoryTransports = SmbTransportOwner()
     }
 
     private fun listDirectoryFileNames(
+        transports: SmbTransportOwner,
         share: String,
         parentPath: String,
         host: String,
@@ -868,10 +813,11 @@ class PlayerViewModel(
         password: CharArray,
         domain: String,
     ): List<String> {
+        transports.ensureActive()
         directoryFileNamesLoader?.let { return it(share, parentPath) }
         // Directory enumeration gets its own connection. SMBJ caches DiskShare by
         // name, so using the playback/listen client could close an active read handle.
-        val client = SmbjClient()
+        val client = auxiliaryClientFactory()
         val creds = SmbSessionCredentials(
             host = host,
             port = port,
@@ -880,12 +826,14 @@ class PlayerViewModel(
             domain = domain,
         )
         return try {
+            transports.register(client)
             client.connect(creds)
+            transports.ensureActive()
             client.listDirectory(share, parentPath)
                 .filter { !it.isDirectory }
                 .map { it.name }
         } finally {
-            runCatching { client.close() }
+            transports.release(client)
             creds.clearPassword()
         }
     }
@@ -905,6 +853,7 @@ class PlayerViewModel(
     fun selectSubtitleOff() {
         if (playbackLifecycle.closed) return
         subtitleSelectionGate.advance()
+        subtitleLoader.cancelPendingLoads()
         controller.disableSubtitles()
         _subtitleUiState.update {
             it.copy(selectedKey = SubtitleSelectionKeys.OFF, errorMessage = null)
@@ -914,6 +863,7 @@ class PlayerViewModel(
     fun selectEmbeddedSubtitle(trackId: Int) {
         if (playbackLifecycle.closed) return
         subtitleSelectionGate.advance()
+        subtitleLoader.cancelPendingLoads()
         controller.selectSubtitleTrack(trackId)
         _subtitleUiState.update {
             it.copy(
@@ -926,6 +876,7 @@ class PlayerViewModel(
     fun selectExternalSubtitle(option: ExternalSubtitleOption) {
         if (playbackLifecycle.closed) return
         val selectionGeneration = subtitleSelectionGate.advance()
+        subtitleLoader.cancelPendingLoads()
         sessionScope.launch {
             loadAndSelectExternal(
                 option = option,
@@ -955,40 +906,33 @@ class PlayerViewModel(
 
     fun retry() {
         if (playbackLifecycle.closed) return
+        // Capture on main BEFORE replacing the job/closing native media. A second
+        // retry during I/O teardown must retain this target, not its synthetic Idle/0.
+        startPositionMs = retryResumeLatch.capture(
+            if (resumeSeekGate.hasFired) retryResumePosition(
+                controller.progressState.positionMs, lastSavedPositionMs,
+            ) else startPositionMs,
+        )
+        resumeSeekGate.reset()
         pauseListenForSourceChange()
-        // Replace any in-flight open so rapid retries do not overlap.
+        retireListenTransports()
+        retireDirectoryScan()
+        subtitleLoader.cancelPendingLoads()
+        subtitleSelectionGate.advance()
+        subtitleBootstrapDone = false
+        siblingBootstrapDone = false
+        stopProgressLoop()
         openJob?.cancel()
         openJob = sessionScope.launch {
-            // Snapshot before closeCurrentMedia(), which intentionally resets state to Idle/0.
-            val livePositionBeforeClose = controller.progressState.positionMs.takeIf { it >= 0L }
-            // Close proxy FD / media first so SmbRandomAccess can release cleanly,
-            // then disconnect SMB off the main thread.
             (controller as? VlcPlayerController)?.closeCurrentMedia()
-            withContext(Dispatchers.IO) {
-                teardownMediaResources()
-            }
-            subtitleBootstrapDone = false
-            subtitleSelectionGate.advance()
-            // Re-arm resume seek for the fresh open — never blindly restore
-            // request.startPositionMs:
-            // - If the gate already fired (or the user pressed play), jump back to
-            //   last persisted / live position so mid-playback recovery does not
-            //   rewind to the entry resume point.
-            // - If the open failed before fire, leave [startPositionMs] as-is so a
-            //   history-derived start is not wiped when request.startPositionMs == 0.
-            if (resumeSeekGate.hasFired) {
-                startPositionMs = retryResumePosition(
-                    livePositionMs = livePositionBeforeClose,
-                    lastSavedPositionMs = lastSavedPositionMs,
-                )
-            }
-            if (startPositionMs > 0L) {
-                resumeSeekGate.reset()
-            }
+            withContext(Dispatchers.IO) { retryTeardown() }
+            currentCoroutineContext().ensureActive()
             _subtitleUiState.value = SubtitleUiState(
                 delayMs = _subtitleUiState.value.delayMs,
                 fontRelSize = _subtitleUiState.value.fontRelSize,
             )
+            _siblingNavState.value = SiblingNavUiState()
+            startPositionMs = retryResumeLatch.capture(startPositionMs)
             loadResumeAndOpen(forceReloadHistory = false)
         }
     }
@@ -1016,6 +960,10 @@ class PlayerViewModel(
         scheduleProgressSave(snapshot, force = true)
         if (!playbackLifecycle.close()) return
         subtitleSelectionGate.advance()
+        retireDirectoryScan()
+        directoryTransports.retire()
+        subtitleLoader.close()
+        listenTransports.retire()
         listenPrepareGeneration++
         sessionJob.cancel()
         openJob = null
@@ -1033,15 +981,10 @@ class PlayerViewModel(
         listenSession.release()
         val engine = realListenEngine
         realListenEngine = null
-        val client = synchronized(listenClientLock) {
-            listenOnlySmbClient.also { listenOnlySmbClient = null }
-        }
         // Cancellation may still be unwinding an IO subtitle/ASR operation. Wait
         // off-main before deleting this session's temporary files and closing input.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-            // FN-55: terminate the detached transport before waiting for a read
-            // that may ignore coroutine cancellation. This never runs on main.
-            runCatching { client?.abort() }
+            // Auxiliary transports were detached above and abort independently on I/O.
             runCatching { scrubPreviewExtractor.close() }
             sessionJob.join()
             runCatching { engine?.close() }
@@ -1238,8 +1181,11 @@ class PlayerViewModel(
         includeSubtitles: Boolean,
         includeSiblings: Boolean,
     ) {
+        retireDirectoryScan()
+        val generation = directoryGeneration
+        val transports = directoryTransports
         val selectionGeneration = subtitleSelectionGate.snapshot()
-        sessionScope.launch {
+        directoryJob = sessionScope.launch {
             val smbParams = smbSubtitleParamsOrNull()
             if (smbParams == null) {
                 if (includeSiblings) {
@@ -1262,6 +1208,7 @@ class PlayerViewModel(
             val featuresResult = try {
                 val features = withContext(Dispatchers.IO) {
                     val fileNames = listDirectoryFileNames(
+                        transports = transports,
                         share = smbParams.share,
                         parentPath = SmbPathUtils.parentOf(smbParams.path),
                         host = smbParams.host,
@@ -1300,7 +1247,7 @@ class PlayerViewModel(
             }
 
             currentCoroutineContext().ensureActive()
-            if (playbackLifecycle.closed) return@launch
+            if (playbackLifecycle.closed || generation != directoryGeneration) return@launch
             // A manual subtitle choice retires automatic selection, not this
             // directory result: sibling navigation and scan completion still publish.
             featuresResult.fold(
@@ -1511,21 +1458,6 @@ class PlayerViewModel(
             )
             else -> null
         }
-
-    private fun teardownMediaResources() {
-        stopProgressLoop()
-        teardownSmbClientOnly()
-    }
-
-    private fun teardownSmbClientOnly() {
-        val listenClient = synchronized(listenClientLock) {
-            listenOnlySmbClient.also { listenOnlySmbClient = null }
-        }
-        if (listenClient != null) {
-            runCatching { listenClient.disconnect() }
-            runCatching { listenClient.close() }
-        }
-    }
 
     override fun onCleared() {
         onLeave()

@@ -34,4 +34,22 @@ class ResumeSeekGateTest {
         assertEquals(40_000L, retryResumePosition(null, 40_000L))
         assertEquals(0L, retryResumePosition(null, null))
     }
+
+    @Test fun `overlapping retry retains target across native idle reset`() {
+        val latch = RetryResumeLatch()
+        assertEquals(42_000L, latch.capture(42_000L))
+        assertEquals(42_000L, latch.capture(0L))
+        assertEquals(42_000L, latch.capture(0L))
+        latch.ready()
+        assertEquals(84_000L, latch.capture(84_000L))
+    }
+
+    @Test fun `explicit user seek zero overrides held retry target`() {
+        val latch = RetryResumeLatch()
+        latch.capture(42_000L)
+        latch.userSeek(0L)
+        assertEquals(0L, latch.capture(42_000L))
+        latch.ready()
+        assertEquals(0L, latch.capture(0L))
+    }
 }

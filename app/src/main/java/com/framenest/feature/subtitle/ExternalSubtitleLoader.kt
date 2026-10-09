@@ -5,6 +5,7 @@ import android.util.Log
 import com.framenest.player.CredentialRedactor
 import com.framenest.smb.SmbClient
 import com.framenest.smb.SmbCredentials
+import com.framenest.smb.SmbTransportOwner
 import com.framenest.smb.SmbjClient
 import java.io.File
 import java.nio.charset.StandardCharsets
@@ -34,6 +35,26 @@ class ExternalSubtitleLoader(
     private val appContext = context.applicationContext
     private val cache = SubtitleSessionCache(File(appContext.cacheDir, "subtitles"), sessionCacheKey)
 
+    private val transportLock = Any()
+    private var transports = SmbTransportOwner()
+    private var closed = false
+
+    /** Retire blocked loads immediately; a newer selection gets its own transport owner. */
+    fun cancelPendingLoads() {
+        synchronized(transportLock) {
+            transports.retire()
+            if (!closed) transports = SmbTransportOwner()
+        }
+    }
+
+    /** Called at navigation exit before waiting for the canceled session jobs. */
+    fun close() {
+        synchronized(transportLock) {
+            closed = true
+            transports.retire()
+        }
+    }
+
     data class LoadRequest(
         val host: String,
         val port: Int = 445,
@@ -53,8 +74,9 @@ class ExternalSubtitleLoader(
     /**
      * @return success with local UTF-8 file, or failure with a safe message.
      */
-    suspend fun loadToLocalFile(request: LoadRequest): Result<LoadResult> =
-        withContext(ioDispatcher) {
+    suspend fun loadToLocalFile(request: LoadRequest): Result<LoadResult> {
+        val owner = synchronized(transportLock) { transports }
+        return withContext(ioDispatcher) {
             val client = clientFactory()
             val credentials = SmbCredentials(
                 host = request.host,
@@ -64,7 +86,10 @@ class ExternalSubtitleLoader(
                 domain = request.domain,
             )
             try {
+                owner.register(client)
                 client.connect(credentials)
+                owner.ensureActive()
+                currentCoroutineContext().ensureActive()
                 val randomAccess = client.openRandomAccess(request.share, request.remotePath)
                 try {
                     val size = randomAccess.size
@@ -75,6 +100,7 @@ class ExternalSubtitleLoader(
                     }
                     val bytes = randomAccess.readFullyAt(0L, size.toInt())
                     val decoded = SubtitleEncoding.decode(bytes)
+                    owner.ensureActive()
                     currentCoroutineContext().ensureActive()
                     val target = cache.write(request.share, request.remotePath, request.fileName, decoded.text)
                     Result.success(
@@ -88,15 +114,21 @@ class ExternalSubtitleLoader(
                 }
             } catch (t: Throwable) {
                 if (t is kotlinx.coroutines.CancellationException) throw t
+                owner.ensureActive()
+                currentCoroutineContext().ensureActive()
                 val msg = CredentialRedactor.redact(t.message ?: "Subtitle download failed")
                 Log.w(TAG, "load failed: $msg")
                 Result.failure(IllegalStateException(msg, t))
             } finally {
-                runCatching { client.close() }
+                owner.release(client)
             }
         }
+    }
 
-    fun clearCache() = cache.clear()
+    fun clearCache() {
+        close()
+        cache.clear()
+    }
 
     companion object {
         private const val TAG = "FrameNestSubtitle"

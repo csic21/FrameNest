@@ -15,8 +15,13 @@ import com.framenest.data.history.PlaybackHistoryRepository
 import com.framenest.data.listen_translate.ListenTranslateRepository
 import com.framenest.data.server.AppDatabase
 import com.framenest.feature.subtitle.SubtitleSelectionKeys
+import com.framenest.smb.SmbClient
+import com.framenest.smb.SmbjClient
+import com.framenest.smb.GatedAuxiliarySmbClient
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.Job
 import com.framenest.player.MediaSource
 import com.framenest.player.PlayerController
 import com.framenest.player.PlayerState
@@ -295,6 +300,171 @@ class PlayerSessionBoundaryTest {
         }
     }
 
+    @Test fun retryDuringDelayedTeardown_preserves42Seconds() = verifyOverlappingRetries(explicitZero = false)
+
+    @Test fun retryAfterExplicitZero_doesNotRestoreOlder42Seconds() = verifyOverlappingRetries(explicitZero = true)
+
+    private fun verifyOverlappingRetries(explicitZero: Boolean) {
+        val firstEntered = CountDownLatch(1)
+        val firstRelease = CountDownLatch(1)
+        val secondEntered = CountDownLatch(1)
+        val secondRelease = CountDownLatch(1)
+        val calls = AtomicInteger()
+        withSession(retryTeardown = {
+            if (calls.incrementAndGet() == 1) {
+                firstEntered.countDown()
+                check(firstRelease.await(5, TimeUnit.SECONDS))
+            } else {
+                secondEntered.countDown()
+                check(secondRelease.await(5, TimeUnit.SECONDS))
+            }
+        }) { vm, player, _ ->
+            try {
+                readyPreview(player)
+                instrumentation.runOnMainSync {
+                    if (explicitZero) vm.seekTo(0L)
+                    vm.retry()
+                }
+                assertTrue(firstEntered.await(5, TimeUnit.SECONDS))
+                lateinit var oldOpen: Job
+                instrumentation.runOnMainSync {
+                    assertEquals(PlayerState.Phase.Idle, player.state.value.phase)
+                    oldOpen = job(vm, "openJob")
+                    vm.retry()
+                }
+                assertTrue(secondEntered.await(5, TimeUnit.SECONDS))
+                secondRelease.countDown()
+                awaitMain { player.state.value.phase == PlayerState.Phase.Preparing }
+                instrumentation.runOnMainSync {
+                    assertEquals(if (explicitZero) 0L else 42_000L, player.progressState.positionMs)
+                }
+                firstRelease.countDown()
+                runBlocking { withTimeout(5_000) { oldOpen.join() } }
+                instrumentation.runOnMainSync {
+                    assertEquals(if (explicitZero) 0L else 42_000L, player.progressState.positionMs)
+                }
+            } finally {
+                firstRelease.countDown()
+                secondRelease.countDown()
+            }
+        }
+    }
+
+    @Test fun retiredDirectoryFailureCannotClearSuccessfulRetryOptionsAndSiblings() {
+        val firstEntered = CountDownLatch(1)
+        val firstRelease = CountDownLatch(1)
+        val secondEntered = CountDownLatch(1)
+        val secondRelease = CountDownLatch(1)
+        val calls = AtomicInteger()
+        withSession(directoryFileNamesLoader = { _, _ ->
+            if (calls.incrementAndGet() == 1) {
+                firstEntered.countDown()
+                check(firstRelease.await(5, TimeUnit.SECONDS))
+                error("retired scan failure")
+            }
+            secondEntered.countDown()
+            check(secondRelease.await(5, TimeUnit.SECONDS))
+            listOf("a-new.mkv", "movie.mkv", "movie.en.srt", "z-new.mkv")
+        }) { vm, player, _ ->
+            try {
+                readyPreview(player)
+                assertTrue(firstEntered.await(5, TimeUnit.SECONDS))
+                lateinit var oldScan: Job
+                instrumentation.runOnMainSync {
+                    oldScan = job(vm, "directoryJob")
+                    vm.retry()
+                }
+                awaitMain { player.state.value.phase == PlayerState.Phase.Preparing }
+                readyPreview(player)
+                assertTrue(secondEntered.await(5, TimeUnit.SECONDS))
+                instrumentation.runOnMainSync { vm.selectSubtitleOff() }
+                secondRelease.countDown()
+                awaitMain { !vm.subtitleUiState.value.scanning && !vm.siblingNavState.value.loading }
+                firstRelease.countDown()
+                runBlocking { withTimeout(5_000) { oldScan.join() } }
+                instrumentation.runOnMainSync {
+                    assertEquals(listOf("movie.en.srt"), vm.subtitleUiState.value.externalOptions.map { it.fileName })
+                    assertEquals("z-new.mkv", vm.siblingNavState.value.nextPath)
+                    assertEquals(SubtitleSelectionKeys.OFF, vm.subtitleUiState.value.selectedKey)
+                }
+            } finally {
+                firstRelease.countDown()
+                secondRelease.countDown()
+            }
+        }
+    }
+
+    @Test fun exitAbortsBlockedDirectoryConnect() = verifyDirectoryExit(GatedAuxiliarySmbClient.Stage.CONNECT)
+
+    @Test fun exitAbortsBlockedDirectoryList() = verifyDirectoryExit(GatedAuxiliarySmbClient.Stage.LIST)
+
+    private fun verifyDirectoryExit(stage: GatedAuxiliarySmbClient.Stage) {
+        val client = GatedAuxiliarySmbClient(stage)
+        withSession(auxiliaryClientFactory = { client }) { vm, player, _ ->
+            try {
+                readyPreview(player)
+                assertTrue(client.entered.await(5, TimeUnit.SECONDS))
+                lateinit var scan: Job
+                instrumentation.runOnMainSync {
+                    scan = job(vm, "directoryJob")
+                    vm.onLeave()
+                }
+                assertTrue(client.aborted.await(5, TimeUnit.SECONDS))
+                assertFalse(client.abortThread === android.os.Looper.getMainLooper().thread)
+                runBlocking { withTimeout(5_000) { scan.join() } }
+                assertEquals(1, client.aborts.get())
+            } finally { client.unblock.countDown() }
+        }
+    }
+
+    @Test fun replacedListenPreparationAbortsOldConnectWithoutClosingNewTransport() {
+        val old = GatedAuxiliarySmbClient(GatedAuxiliarySmbClient.Stage.CONNECT)
+        val fresh = GatedAuxiliarySmbClient(GatedAuxiliarySmbClient.Stage.CONNECT)
+        val calls = AtomicInteger()
+        withSession(auxiliaryClientFactory = { if (calls.incrementAndGet() == 1) old else fresh }) { vm, _, _ ->
+            try {
+                // Leave native playback Preparing: no directory scan or ASR model download.
+                instrumentation.runOnMainSync { vm.setListenTranslateEnabled(true) }
+                assertTrue(old.entered.await(5, TimeUnit.SECONDS))
+                lateinit var oldPreparation: Job
+                instrumentation.runOnMainSync {
+                    oldPreparation = job(vm, "listenPrepareJob")
+                    vm.setListenSourceLang("en")
+                }
+                assertTrue(old.aborted.await(5, TimeUnit.SECONDS))
+                assertTrue(fresh.entered.await(5, TimeUnit.SECONDS))
+                runBlocking { withTimeout(5_000) { oldPreparation.join() } }
+                assertEquals(1, old.aborts.get())
+                assertEquals(0, fresh.aborts.get())
+                lateinit var freshPreparation: Job
+                instrumentation.runOnMainSync {
+                    freshPreparation = job(vm, "listenPrepareJob")
+                    vm.onLeave()
+                }
+                assertTrue(fresh.aborted.await(5, TimeUnit.SECONDS))
+                runBlocking { withTimeout(5_000) { freshPreparation.join() } }
+                assertEquals(1, fresh.aborts.get())
+                assertFalse(fresh.abortThread === android.os.Looper.getMainLooper().thread)
+            } finally {
+                old.unblock.countDown()
+                fresh.unblock.countDown()
+            }
+        }
+    }
+
+    private fun job(vm: PlayerViewModel, field: String): Job =
+        PlayerViewModel::class.java.getDeclaredField(field).apply { isAccessible = true }.get(vm) as Job
+
+    private fun awaitMain(condition: () -> Boolean) {
+        val deadline = SystemClock.elapsedRealtime() + 5_000
+        var done = false
+        while (!done && SystemClock.elapsedRealtime() < deadline) {
+            instrumentation.runOnMainSync { done = condition() }
+            if (!done) Thread.sleep(10)
+        }
+        assertTrue("Condition did not become true", done)
+    }
+
     private fun readyPreview(player: VlcPlayerController) = instrumentation.runOnMainSync {
         event(player, TestEvent(MediaPlayer.Event.Opening))
         event(player, TestEvent(MediaPlayer.Event.LengthChanged, 600_000L))
@@ -311,6 +481,8 @@ class PlayerSessionBoundaryTest {
         path: String = "movie.mkv",
         failFirstWrite: Boolean = false,
         directoryFileNamesLoader: ((String, String) -> List<String>)? = null,
+        retryTeardown: suspend () -> Unit = {},
+        auxiliaryClientFactory: (() -> SmbClient)? = null,
         block: (PlayerViewModel, VlcPlayerController, PlaybackHistoryRepository) -> Unit,
     ) {
         val db = AppDatabase.createInMemory(application)
@@ -340,11 +512,13 @@ class PlayerSessionBoundaryTest {
                 controllerFactory = { player },
                 browseSessionReleaser = {},
                 directoryFileNamesLoader = directoryFileNamesLoader,
+                retryTeardown = retryTeardown,
+                auxiliaryClientFactory = auxiliaryClientFactory ?: { SmbjClient() },
             )
             // Suppress network listing unless this test supplies a controlled scan.
             for (name in listOf("subtitleBootstrapDone", "siblingBootstrapDone")) {
                 PlayerViewModel::class.java.getDeclaredField(name).apply { isAccessible = true }
-                    .set(vm, directoryFileNamesLoader == null)
+                    .set(vm, directoryFileNamesLoader == null && auxiliaryClientFactory == null)
             }
         }
         try {
@@ -359,7 +533,7 @@ class PlayerSessionBoundaryTest {
             instrumentation.runOnMainSync {
                 for (name in listOf("subtitleBootstrapDone", "siblingBootstrapDone")) {
                     PlayerViewModel::class.java.getDeclaredField(name).apply { isAccessible = true }
-                        .set(vm, directoryFileNamesLoader == null)
+                        .set(vm, directoryFileNamesLoader == null && auxiliaryClientFactory == null)
                 }
             }
             block(vm, player, history)

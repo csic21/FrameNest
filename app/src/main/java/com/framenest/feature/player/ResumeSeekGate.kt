@@ -35,3 +35,17 @@ internal fun retryResumePosition(livePositionMs: Long?, lastSavedPositionMs: Lon
     livePositionMs?.takeIf { it >= 0L }
         ?: lastSavedPositionMs?.takeIf { it > 0L }
         ?: 0L
+
+/** Keeps a captured retry target across replacement jobs while teardown resets native state. */
+internal class RetryResumeLatch {
+    private var pending: Long? = null
+
+    fun capture(positionMs: Long): Long = pending ?: positionMs.coerceAtLeast(0L).also { pending = it }
+
+    fun userSeek(positionMs: Long) {
+        // Explicit zero is intent, unlike Idle/0 produced by closeCurrentMedia().
+        if (pending != null) pending = positionMs.coerceAtLeast(0L)
+    }
+
+    fun ready() { pending = null }
+}
