@@ -217,6 +217,7 @@ class PlayerViewModel(
     private var listenPrepareGeneration: Long = 0L
     private val listenPrepareMutex = Mutex()
     private var listenRestartPendingAfterSourceChange = false
+    private var listenPreparationPendingAfterBackground = false
     private val listenBaseContentKey = initialListenContentKey(application, request)
 
     private val listenSession = ListenTranslateSession(
@@ -315,6 +316,7 @@ class PlayerViewModel(
                     durationMs = state.durationMs,
                     playing = state.phase == PlayerState.Phase.Playing,
                     buffering = state.isBuffering,
+                    playbackRate = state.playbackRate,
                 )
                 if (state.phase == PlayerState.Phase.Playing) {
                     progressTouched = true
@@ -353,6 +355,7 @@ class PlayerViewModel(
     fun setListenTranslateEnabled(enabled: Boolean) {
         if (playbackLifecycle.closed) return
         if (!enabled) {
+            listenPreparationPendingAfterBackground = false
             listenRestartPendingAfterSourceChange = false
             listenPrepareGeneration += 1L
             listenPrepareJob?.cancel()
@@ -397,6 +400,12 @@ class PlayerViewModel(
     }
 
     private fun restartListenPreparation() {
+        if (playbackLifecycle.closed) return
+        if (!playbackLifecycle.foreground) {
+            listenPreparationPendingAfterBackground = true
+            return
+        }
+        listenPreparationPendingAfterBackground = false
         if (listenSession.uiState.value.enabled) {
             listenSession.setEnabled(false)
         }
@@ -619,6 +628,9 @@ class PlayerViewModel(
         try {
             // Publish before connect, not after its potentially blocking negotiation.
             transports.register(client)
+            // A cancelled reconnect may have raced a foreground/background detach.
+            // Register first, then check: either interrupt owns it or catch releases it.
+            currentCoroutineContext().ensureActive()
             client.connect(creds)
             transports.ensureActive()
             currentCoroutineContext().ensureActive()
@@ -700,6 +712,7 @@ class PlayerViewModel(
         retryResumeLatch.userSeek(positionMs)
         startPositionMs = 0L
         controller.seekTo(positionMs)
+        listenSession.onSeek(positionMs)
     }
 
     /**
@@ -942,6 +955,18 @@ class PlayerViewModel(
         if (playbackLifecycle.closed) return
         val snapshot = controller.progressState
         playbackLifecycle.onBackground()
+        listenSession.setForeground(false)
+        // Coroutine cancellation cannot interrupt a synchronous NAS read. Detach and
+        // abort its client off-main; the retained engine reconnects on foreground.
+        listenTransports.interruptClients()
+        if (listenPrepareJob?.isActive == true) {
+            listenPreparationPendingAfterBackground = true
+            listenPrepareGeneration++
+            listenPrepareJob?.cancel()
+            listenPrepareJob = null
+            retireListenTransports()
+            listenSession.setInstallingModels(installing = false)
+        }
         stopSpeedBoost()
         setScrubbing(false)
         scrubPreviewScheduler.updatePlayback(
@@ -951,7 +976,12 @@ class PlayerViewModel(
     }
 
     /** Only a real background return restores playback; first entry stays paused. */
-    fun onReturnToForeground() = playbackLifecycle.onForeground()
+    fun onReturnToForeground() {
+        if (playbackLifecycle.closed) return
+        playbackLifecycle.onForeground()
+        listenSession.setForeground(true)
+        if (listenPreparationPendingAfterBackground) restartListenPreparation()
+    }
 
     /** Release every destination-owned resource now, without waiting for navigation to clear the VM. */
     fun onLeave() {

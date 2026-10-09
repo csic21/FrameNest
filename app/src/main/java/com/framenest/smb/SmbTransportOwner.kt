@@ -52,6 +52,12 @@ internal class SmbTransportOwner(
         detached.forEach { client -> dispatchAbort { runCatching { client.abort() } } }
     }
 
+    /** Suspend I/O without retiring this owner; a later foreground window can reconnect. */
+    fun interruptClients() {
+        val detached = synchronized(lock) { clients.toList().also { clients.clear() } }
+        detached.forEach { client -> dispatchAbort { runCatching { client.abort() } } }
+    }
+
     companion object {
         private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }

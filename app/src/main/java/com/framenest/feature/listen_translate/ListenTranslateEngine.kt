@@ -18,6 +18,19 @@ interface ListenTranslateEngine {
         sourceLang: String,
         targetLang: String,
     ): ListenWindowResult
+
+    /**
+     * Publish a stable source cue before waiting for MT. The callback belongs to the
+     * calling coroutine: do not retain it or launch detached work. Legacy engines
+     * keep their one-result contract through this default implementation.
+     */
+    suspend fun processWindowWithProgress(
+        startMs: Long,
+        endMs: Long,
+        sourceLang: String,
+        targetLang: String,
+        onSourceRecognized: suspend (ListenWindowResult) -> Unit,
+    ): ListenWindowResult = processWindow(startMs, endMs, sourceLang, targetLang)
 }
 
 data class ListenWindowResult(

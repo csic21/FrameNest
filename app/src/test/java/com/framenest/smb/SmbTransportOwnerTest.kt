@@ -5,6 +5,13 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -78,6 +85,86 @@ class SmbTransportOwnerTest {
         assertEquals(1, pending.size)
         pending.single()()
         assertEquals(1, client.abortCount.get())
+    }
+
+    @Test fun `interrupt detaches off main and old cleanup cannot abort reconnected client`() {
+        val pending = mutableListOf<() -> Unit>()
+        val owner = SmbTransportOwner { pending += it }
+        val oldClient = BlockingClient()
+        owner.register(oldClient)
+        owner.interruptClients()
+        owner.interruptClients()
+        assertNull(owner.currentClient())
+        assertEquals(0, oldClient.abortCount.get())
+        assertEquals(1, pending.size)
+        owner.ensureActive()
+        val replacement = BlockingClient()
+        owner.register(replacement)
+        pending.single()()
+        owner.release(oldClient)
+        assertEquals(1, oldClient.abortCount.get())
+        assertEquals(0, replacement.abortCount.get())
+        assertSame(replacement, owner.currentClient())
+        owner.release(replacement)
+        owner.retire()
+        try {
+            owner.register(BlockingClient())
+            fail("Retired owner accepted a client after interrupt")
+        } catch (_: CancellationException) { }
+    }
+
+    @Test fun `interrupt releases a blocked read without retiring the session`() {
+        val worker = Executors.newSingleThreadExecutor()
+        val client = BlockingClient(Stage.READ)
+        val owner = SmbTransportOwner()
+        try {
+            owner.register(client)
+            val operation = worker.submit {
+                client.openRandomAccess("media", "sample.mp4").readAt(0, ByteArray(1), 0, 1)
+            }
+            assertTrue(client.entered.await(5, TimeUnit.SECONDS))
+            val caller = Thread.currentThread()
+            owner.interruptClients()
+            assertTrue(client.aborted.await(5, TimeUnit.SECONDS))
+            assertNotSame(caller, client.abortThread)
+            operation.get(5, TimeUnit.SECONDS)
+            owner.ensureActive()
+            assertNull(owner.currentClient())
+        } finally {
+            client.unblock.countDown()
+            worker.shutdownNow()
+        }
+    }
+
+    @Test fun `cancelled reconnect registering after interrupt is released before connect`() {
+        val enteredFactory = CountDownLatch(1)
+        val leaveFactory = CountDownLatch(1)
+        val client = BlockingClient(Stage.CONNECT)
+        val owner = SmbTransportOwner()
+        val job = CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            enteredFactory.countDown()
+            check(leaveFactory.await(5, TimeUnit.SECONDS))
+            try {
+                owner.register(client)
+                currentCoroutineContext().ensureActive()
+                client.connect(credentials())
+            } finally {
+                owner.release(client)
+            }
+        }
+        try {
+            assertTrue(enteredFactory.await(5, TimeUnit.SECONDS))
+            job.cancel()
+            owner.interruptClients()
+            leaveFactory.countDown()
+            runBlocking { job.join() }
+            assertEquals(1L, client.entered.count)
+            assertEquals(1, client.abortCount.get())
+            assertNull(owner.currentClient())
+        } finally {
+            leaveFactory.countDown()
+            job.cancel()
+        }
     }
 
     private enum class Stage { CONNECT, LIST, READ }

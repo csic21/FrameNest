@@ -21,15 +21,20 @@ internal object ListenPrefetchPolicy {
         playing: Boolean,
         buffering: Boolean,
         realtimeFactor: Double?,
+        playbackRate: Float = 1f,
     ): Long {
         if (!playing || buffering) return 0L
+        val effectiveFactor = realtimeFactor?.times(normalizedPlaybackRate(playbackRate))
         return when {
-            realtimeFactor == null -> BALANCED_LOOKAHEAD_MS
-            realtimeFactor <= FAST_REALTIME_FACTOR -> FAST_LOOKAHEAD_MS
-            realtimeFactor <= MAX_PREFETCH_REALTIME_FACTOR -> BALANCED_LOOKAHEAD_MS
+            effectiveFactor == null -> BALANCED_LOOKAHEAD_MS
+            effectiveFactor <= FAST_REALTIME_FACTOR -> FAST_LOOKAHEAD_MS
+            effectiveFactor <= MAX_PREFETCH_REALTIME_FACTOR -> BALANCED_LOOKAHEAD_MS
             else -> 0L
         }
     }
+
+    fun normalizedPlaybackRate(rate: Float): Float =
+        if (rate.isFinite() && rate > 0f) rate else 1f
 
     fun updateRealtimeFactor(
         previous: Double?,

@@ -32,6 +32,17 @@ class ListenPrefetchPolicyTest {
     }
 
     @Test
+    fun lookAhead_accountsForPlaybackRateAndRejectsInvalidRates() {
+        assertEquals(30_000L, ListenPrefetchPolicy.lookAheadMs(true, false, 0.5, 1f))
+        assertEquals(12_000L, ListenPrefetchPolicy.lookAheadMs(true, false, 0.5, 2f))
+        assertEquals(0L, ListenPrefetchPolicy.lookAheadMs(true, false, 0.6, 2f))
+        assertEquals(30_000L, ListenPrefetchPolicy.lookAheadMs(true, false, 1.2, 0.5f))
+        for (invalid in listOf(0f, -1f, Float.NaN, Float.POSITIVE_INFINITY)) {
+            assertEquals(30_000L, ListenPrefetchPolicy.lookAheadMs(true, false, 0.5, invalid))
+        }
+    }
+
+    @Test
     fun nextWindow_prioritizesCurrentThenScansPastCachedFuture() {
         assertEquals(
             3_000L to 6_000L,

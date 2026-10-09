@@ -32,6 +32,16 @@ class RealListenTranslateEngine(
         endMs: Long,
         sourceLang: String,
         targetLang: String,
+    ): ListenWindowResult = processWindowWithProgress(
+        startMs, endMs, sourceLang, targetLang, onSourceRecognized = {},
+    )
+
+    override suspend fun processWindowWithProgress(
+        startMs: Long,
+        endMs: Long,
+        sourceLang: String,
+        targetLang: String,
+        onSourceRecognized: suspend (ListenWindowResult) -> Unit,
     ): ListenWindowResult {
         val srcLang = sourceLang.lowercase()
         val tgtLang = targetLang.lowercase()
@@ -111,6 +121,12 @@ class RealListenTranslateEngine(
             ?.let { decodeStartMs + it.endMs }
             ?.coerceIn(cueStartMs, endMs)
             ?: endMs
+
+        // Keep source text visible and durable even if MT is slow or cancelled.
+        // This remains a single bounded window; no detached translation queue.
+        onSourceRecognized(
+            ListenWindowResult(textSrc, "", cueStartMs, cueEndMs),
+        )
 
         val textTgt = try {
             mt.translate(textSrc, srcLang, tgtLang)

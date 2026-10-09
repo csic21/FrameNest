@@ -9,12 +9,15 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -50,18 +53,25 @@ class ListenTranslateSession(
     private var lastDurationMs: Long = 0L
     private var isPlaying: Boolean = false
     private var isBuffering: Boolean = false
+    private var isForeground: Boolean = true
+    private var released: Boolean = false
+    private var workGeneration: Long = 0L
+    private var playbackRate: Float = 1f
     private var processingRealtimeFactor: Double? = null
 
     fun setContentKey(contentKey: String) {
         val normalized = contentKey.trim()
         if (normalized == this.contentKey) return
         this.contentKey = normalized
+        // Codec/network failures from the old audio variant must not block the new one.
+        retryPolicy.clear()
         if (_ui.value.enabled) {
             activate()
         }
     }
 
     fun setEnabled(enabled: Boolean) {
+        if (released) return
         // Preserve a preparation/processing failure when the caller disables the
         // session as part of failure cleanup. A fresh enable attempt clears it.
         _ui.update {
@@ -138,7 +148,9 @@ class ListenTranslateSession(
         durationMs: Long,
         playing: Boolean,
         buffering: Boolean = false,
+        playbackRate: Float = 1f,
     ) {
+        if (released) return
         val normalizedPosition = positionMs.coerceAtLeast(0L)
         val farSeek = ListenPrefetchPolicy.isFarSeek(lastPositionMs, normalizedPosition, windowMs)
         val enteredBuffering = buffering && !isBuffering
@@ -146,6 +158,8 @@ class ListenTranslateSession(
         lastDurationMs = durationMs.coerceAtLeast(0L)
         isPlaying = playing
         isBuffering = buffering
+        this.playbackRate = ListenPrefetchPolicy.normalizedPlaybackRate(playbackRate)
+        updateEffectiveRealtimeFactor()
         refreshActiveCue()
         if (_ui.value.enabled && (farSeek || enteredBuffering)) {
             // Cancel stale look-ahead immediately. The replacement poll either targets
@@ -156,7 +170,27 @@ class ListenTranslateSession(
         }
     }
 
+    /** Background retains enable intent/cache, but cannot start or publish window work. */
+    fun setForeground(foreground: Boolean) {
+        if (released || isForeground == foreground) return
+        isForeground = foreground
+        stopPolling()
+        _ui.update { it.copy(isProcessing = false, prefetchLookAheadMs = 0L) }
+        if (foreground && _ui.value.enabled && activationJob?.isActive != true) startPolling()
+    }
+
+    /** Explicit user seeks also cancel small jumps, before the next player tick arrives. */
+    fun onSeek(positionMs: Long) {
+        if (released) return
+        lastPositionMs = positionMs.coerceAtLeast(0L)
+        stopPolling()
+        _ui.update { it.copy(isProcessing = false) }
+        refreshActiveCue()
+        if (_ui.value.enabled && activationJob?.isActive != true) startPolling()
+    }
+
     fun release() {
+        released = true
         activationJob?.cancel()
         activationJob = null
         stopPolling()
@@ -164,9 +198,11 @@ class ListenTranslateSession(
     }
 
     private fun activate() {
+        if (released) return
         activationJob?.cancel()
         stopPolling()
         processingRealtimeFactor = null
+        updateEffectiveRealtimeFactor()
         activationJob = scope.launch {
             ensureJobAndRefresh()
             if (_ui.value.enabled) startPolling()
@@ -192,18 +228,21 @@ class ListenTranslateSession(
     }
 
     private fun startPolling() {
+        if (released || !isForeground) return
         if (pollJob?.isActive == true) return
+        val generation = workGeneration
         pollJob = scope.launch {
             while (isActive) {
-                if (_ui.value.enabled) {
-                    maybeFillAroundPosition()
-                }
-                delay(pollIntervalMs)
+                val progressed = if (_ui.value.enabled) maybeFillAroundPosition(generation) else false
+                // Drain only the bounded horizon while useful work exists. Fixed sleeping
+                // after every successful window wasted 500ms and was absent from the RTF.
+                if (progressed) yield() else delay(pollIntervalMs)
             }
         }
     }
 
     private fun stopPolling() {
+        workGeneration++
         pollJob?.cancel()
         pollJob = null
     }
@@ -239,11 +278,11 @@ class ListenTranslateSession(
         _ui.update { it.copy(activeCue = cue, overlayText = overlay) }
     }
 
-    private suspend fun maybeFillAroundPosition() {
-        if (!_ui.value.enabled) return
+    private suspend fun maybeFillAroundPosition(generation: Long): Boolean {
+        if (!_ui.value.enabled || !isForeground || released) return false
         if (isBuffering) {
             _ui.update { it.copy(prefetchLookAheadMs = 0L) }
-            return
+            return false
         }
         val position = lastPositionMs
         val duration = lastDurationMs
@@ -251,6 +290,7 @@ class ListenTranslateSession(
             playing = isPlaying,
             buffering = isBuffering,
             realtimeFactor = processingRealtimeFactor,
+            playbackRate = playbackRate,
         )
         _ui.update { it.copy(prefetchLookAheadMs = lookAheadMs) }
         val current = ListenTranslateWindows.windowContaining(position, windowMs, duration)
@@ -270,11 +310,12 @@ class ListenTranslateSession(
                 windowMs = windowMs,
                 lookAheadMs = lookAheadMs,
             )
-        } ?: return
-        processWindow(
+        } ?: return false
+        return processWindow(
             startMs = next.first,
             endMs = next.second,
             allowBlankRecovery = recoverCurrent && next == current,
+            generation = generation,
         )
     }
 
@@ -282,19 +323,40 @@ class ListenTranslateSession(
         startMs: Long,
         endMs: Long,
         allowBlankRecovery: Boolean = false,
-    ) {
-        if (endMs <= startMs) return
+        generation: Long,
+    ): Boolean {
+        if (endMs <= startMs) return false
         val attemptKey = ListenWindowAttemptKey(
             startMs = startMs,
             endMs = endMs,
             languages = _ui.value.languages,
         )
-        if (!retryPolicy.canAttempt(attemptKey)) return
-        processMutex.withLock {
+        if (!retryPolicy.canAttempt(attemptKey)) return false
+        return processMutex.withLock {
+            ensureCurrent(generation)
             // Re-check under lock.
             val needsFill = ListenTranslateWindows.needsFill(cachedCues, startMs, endMs)
-            if (!needsFill && !allowBlankRecovery) return
+            if (!needsFill && !allowBlankRecovery) return@withLock false
             val langs = _ui.value.languages
+            val windowContentKey = contentKey
+            val windowEngine = engine
+            val asrModel = windowEngine.asrModelId
+            val mtModel = windowEngine.mtModelId
+            val windowStartedAtMs = monotonicTimeMs()
+            var publishedSource: ListenWindowResult? = null
+            suspend fun publishSpeech(result: ListenWindowResult) {
+                ensureCurrent(generation)
+                val cueStart = (result.cueStartMs ?: startMs).coerceIn(startMs, endMs)
+                val cueEnd = (result.cueEndMs ?: endMs).coerceIn(cueStart, endMs)
+                val persistedSpeech = repository.upsertCueForExistingJob(
+                    identity, langs, cueStart, cueEnd, result.textSrc, result.textTgt,
+                    rev = 1, contentKey = windowContentKey, asrModel = asrModel, mtModel = mtModel,
+                )
+                ensureCurrent(generation)
+                cachedCues = ListenCueCache.upsert(cachedCues, persistedSpeech)
+                updateCueSummary()
+                refreshActiveCue()
+            }
             _ui.update {
                 it.copy(
                     isProcessing = true,
@@ -303,50 +365,46 @@ class ListenTranslateSession(
                 )
             }
             try {
-                val engineStartedAtMs = monotonicTimeMs()
-                val result = engine.processWindow(
+                val result = windowEngine.processWindowWithProgress(
                     startMs = startMs,
                     endMs = endMs,
                     sourceLang = langs.sourceLang,
                     targetLang = langs.targetLang,
+                    onSourceRecognized = { source ->
+                        ensureCurrent(generation)
+                        if (source.textSrc.isNotBlank()) {
+                            publishSpeech(source)
+                            publishedSource = source
+                        }
+                    },
                 )
+                ensureCurrent(generation)
                 if (result.blankReason == ListenBlankReason.EmptyPcm) {
                     _ui.update { it.copy(lastBlankReason = ListenBlankReason.EmptyPcm) }
                     throw ListenWindowStageException(
                         "当前音轨未读取到音频，请切换音轨或重新打开视频后重试",
                     )
                 }
-                processingRealtimeFactor = ListenPrefetchPolicy.updateRealtimeFactor(
-                    previous = processingRealtimeFactor,
-                    elapsedMs = monotonicTimeMs() - engineStartedAtMs,
-                    audioMs = endMs - startMs,
-                )
                 var speechCoversWindow = false
                 if (result.textSrc.isNotBlank() || result.textTgt.isNotBlank()) {
                     val cueStart = (result.cueStartMs ?: startMs).coerceIn(startMs, endMs)
                     val cueEnd = (result.cueEndMs ?: endMs).coerceIn(cueStart, endMs)
                     speechCoversWindow = cueStart == startMs && cueEnd == endMs
-                    val persistedSpeech = repository.upsertCueForExistingJob(
-                        identity = identity,
-                        languages = langs,
-                        startMs = cueStart,
-                        endMs = cueEnd,
-                        textSrc = result.textSrc,
-                        textTgt = result.textTgt,
-                        rev = 1,
-                        contentKey = contentKey,
-                        asrModel = engine.asrModelId,
-                        mtModel = engine.mtModelId,
-                    )
-                    cachedCues = ListenCueCache.upsert(cachedCues, persistedSpeech)
-                    // Make ASR text visible even when the following MT stage failed.
-                    // A source-only cue deliberately does not satisfy needsFill(), so
-                    // the same window remains eligible for the retry backoff below.
-                    updateCueSummary()
-                    refreshActiveCue()
+                    val source = publishedSource
+                    if (source == null || source.textSrc != result.textSrc ||
+                        source.textTgt != result.textTgt || source.cueStartMs != result.cueStartMs ||
+                        source.cueEndMs != result.cueEndMs
+                    ) publishSpeech(result)
                 }
                 result.retryableErrorMessage?.let { message ->
                     throw ListenWindowStageException(message)
+                }
+                if (result.textSrc.isNotBlank() && result.textTgt.isBlank() &&
+                    !langs.sourceLang.equals(langs.targetLang, ignoreCase = true)
+                ) {
+                    // A successful-but-empty MT result is not completed coverage. Without
+                    // backoff the immediate-drain loop could repeatedly re-run the same ASR.
+                    throw ListenWindowStageException("翻译未返回文本，请稍后重试")
                 }
                 var progressCommittedWithCoverage = false
                 if (!speechCoversWindow) {
@@ -370,10 +428,11 @@ class ListenTranslateSession(
                         },
                         coveredUntilMs = endMs,
                         durationMs = lastDurationMs.takeIf { it > 0L },
-                        contentKey = contentKey,
-                        asrModel = engine.asrModelId,
-                        mtModel = engine.mtModelId,
+                        contentKey = windowContentKey,
+                        asrModel = asrModel,
+                        mtModel = mtModel,
                     )
+                    ensureCurrent(generation)
                     cachedCues = ListenCueCache.upsert(cachedCues, persistedCoverage)
                     progressCommittedWithCoverage = true
                 }
@@ -386,6 +445,7 @@ class ListenTranslateSession(
                         durationMs = lastDurationMs.takeIf { it > 0L },
                     )
                 }
+                ensureCurrent(generation)
                 updateCueSummary()
                 if (result.blankReason == ListenBlankReason.UnrecognizedSpeech) {
                     retryPolicy.recordRecoverableBlank(attemptKey)
@@ -407,10 +467,18 @@ class ListenTranslateSession(
                     )
                 }
                 refreshActiveCue()
+                processingRealtimeFactor = ListenPrefetchPolicy.updateRealtimeFactor(
+                    previous = processingRealtimeFactor,
+                    elapsedMs = monotonicTimeMs() - windowStartedAtMs,
+                    audioMs = endMs - startMs,
+                )
+                updateEffectiveRealtimeFactor()
+                true
             } catch (cancelled: CancellationException) {
-                _ui.update { it.copy(isProcessing = false) }
+                if (generation == workGeneration) _ui.update { it.copy(isProcessing = false) }
                 throw cancelled
             } catch (t: Throwable) {
+                ensureCurrent(generation)
                 val msg = t.message?.take(160) ?: t.javaClass.simpleName
                 if (isNonRetryableListenFailure(t)) {
                     retryPolicy.recordPermanentFailure(attemptKey)
@@ -433,8 +501,20 @@ class ListenTranslateSession(
                         lastError = msg,
                     )
                 }
+                false
             }
         }
+    }
+
+    private suspend fun ensureCurrent(generation: Long) {
+        currentCoroutineContext().ensureActive()
+        if (released || !isForeground || !_ui.value.enabled || generation != workGeneration) {
+            throw CancellationException("stale listen-translate window")
+        }
+    }
+
+    private fun updateEffectiveRealtimeFactor() {
+        _ui.update { it.copy(effectiveRealtimeFactor = processingRealtimeFactor?.times(playbackRate)) }
     }
 
     private fun generatedCueCount(): Int =
