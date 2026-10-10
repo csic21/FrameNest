@@ -61,6 +61,10 @@ data class ListenTranslateUiState(
     val generatedCueCount: Int = 0,
     /** Most recent reason an attempted window produced no subtitle. */
     val lastBlankReason: ListenBlankReason? = null,
+    /** Session-only experiment; each new player session starts with the baseline. */
+    val experimentalSilenceGate: Boolean = false,
+    /** Last/current window only. Cleared on generation changes; never logged or persisted. */
+    val diagnostics: ListenPipelineDiagnostics? = null,
 ) {
     val languages: ListenLanguagePair
         get() = ListenLanguagePair(sourceLang, targetLang).normalized()

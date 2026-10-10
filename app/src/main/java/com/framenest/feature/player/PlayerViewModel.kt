@@ -394,6 +394,11 @@ class PlayerViewModel(
         if (restart) restartListenPreparation()
     }
 
+    fun setListenExperimentalSilenceGate(enabled: Boolean) {
+        if (playbackLifecycle.closed) return
+        listenSession.setExperimentalSilenceGate(enabled)
+    }
+
     fun setListenDisplayMode(mode: ListenDisplayMode) {
         if (playbackLifecycle.closed) return
         listenSession.setDisplayMode(mode)
@@ -441,6 +446,7 @@ class PlayerViewModel(
     ) = listenPrepareMutex.withLock {
         currentCoroutineContext().ensureActive()
         if (generation != listenPrepareGeneration) return@withLock
+        val experimentalSilenceGate = listenSession.uiState.value.experimentalSilenceGate
         val previous = realListenEngine
         realListenEngine = null
         closeListenPreparationResources(listOf({ previous?.close() }))
@@ -521,6 +527,7 @@ class PlayerViewModel(
                     selectedAudioTrackOrdinal = { selectedAudioTrackOrdinal() },
                     asrModelLabel = { asrSupport.modelLabel(sourceLang) },
                     mtModelLabel = { "mlkit-v1-$sourceLang-$targetLang" },
+                    experimentalSilenceGate = experimentalSilenceGate,
                 )
                 if (generation != listenPrepareGeneration) {
                     throw CancellationException("stale listen-translate preparation")

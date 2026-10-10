@@ -14,6 +14,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -51,6 +52,7 @@ class ListenTranslateProgressTest {
         session.setEnabled(true)
         runCurrent()
         session.setForeground(false)
+        assertNull(session.uiState.value.diagnostics)
         advanceTimeBy(10_000L)
         runCurrent()
         assertEquals(1, calls)
@@ -115,6 +117,7 @@ class ListenTranslateProgressTest {
         session.setEnabled(true)
         runCurrent()
         session.onSeek(3_000L) // Below the old 6s far-seek threshold.
+        assertNull(session.uiState.value.diagnostics)
         advanceTimeBy(1_000L)
         runCurrent()
 
@@ -133,6 +136,7 @@ class ListenTranslateProgressTest {
         session.setEnabled(true)
         runCurrent()
         session.release()
+        assertNull(session.uiState.value.diagnostics)
         session.setForeground(false)
         session.setForeground(true)
         session.setEnabled(true)

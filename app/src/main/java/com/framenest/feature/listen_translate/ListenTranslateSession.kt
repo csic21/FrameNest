@@ -118,6 +118,12 @@ class ListenTranslateSession(
         }
     }
 
+    /** Change only while stopped, before a new engine/cache identity is prepared. */
+    fun setExperimentalSilenceGate(enabled: Boolean) {
+        if (released || _ui.value.enabled || _ui.value.isInstallingModels) return
+        _ui.update { it.copy(experimentalSilenceGate = enabled, diagnostics = null) }
+    }
+
     fun setDisplayMode(mode: ListenDisplayMode) {
         _ui.update {
             val overlay = ListenTranslateWindows.formatOverlay(it.activeCue, mode)
@@ -243,6 +249,7 @@ class ListenTranslateSession(
 
     private fun stopPolling() {
         workGeneration++
+        _ui.update { it.copy(diagnostics = null) }
         pollJob?.cancel()
         pollJob = null
     }
@@ -332,6 +339,7 @@ class ListenTranslateSession(
             languages = _ui.value.languages,
         )
         if (!retryPolicy.canAttempt(attemptKey)) return false
+        val queuedAtMs = monotonicTimeMs()
         return processMutex.withLock {
             ensureCurrent(generation)
             // Re-check under lock.
@@ -343,11 +351,25 @@ class ListenTranslateSession(
             val asrModel = windowEngine.asrModelId
             val mtModel = windowEngine.mtModelId
             val windowStartedAtMs = monotonicTimeMs()
+            var diagnostics = ListenPipelineDiagnostics(
+                queueWaitMs = elapsedListenTimeMs(queuedAtMs, windowStartedAtMs),
+                windowBacklogMs = listenCueLatenessMs(lastPositionMs, startMs),
+                playbackRate = playbackRate,
+            )
+            fun publishDiagnostics(completed: Boolean = false, failed: Boolean = false) {
+                diagnostics = diagnostics.copy(
+                    totalMs = elapsedListenTimeMs(windowStartedAtMs, monotonicTimeMs()),
+                    completed = completed,
+                    failed = failed,
+                )
+                _ui.update { it.copy(diagnostics = diagnostics) }
+            }
             var publishedSource: ListenWindowResult? = null
             suspend fun publishSpeech(result: ListenWindowResult) {
                 ensureCurrent(generation)
                 val cueStart = (result.cueStartMs ?: startMs).coerceIn(startMs, endMs)
                 val cueEnd = (result.cueEndMs ?: endMs).coerceIn(cueStart, endMs)
+                val commitStartedAtMs = monotonicTimeMs()
                 val persistedSpeech = repository.upsertCueForExistingJob(
                     identity, langs, cueStart, cueEnd, result.textSrc, result.textTgt,
                     rev = 1, contentKey = windowContentKey, asrModel = asrModel, mtModel = mtModel,
@@ -356,12 +378,31 @@ class ListenTranslateSession(
                 cachedCues = ListenCueCache.upsert(cachedCues, persistedSpeech)
                 updateCueSummary()
                 refreshActiveCue()
+                val now = monotonicTimeMs()
+                diagnostics = diagnostics.copy(
+                    stages = result.stageTimings ?: diagnostics.stages,
+                    cacheCommitMs = diagnostics.cacheCommitMs + elapsedListenTimeMs(commitStartedAtMs, now),
+                    sourceReadyMs = diagnostics.sourceReadyMs ?: if (result.textSrc.isNotBlank()) {
+                        elapsedListenTimeMs(windowStartedAtMs, now)
+                    } else null,
+                    sourceLatenessMs = diagnostics.sourceLatenessMs ?: if (result.textSrc.isNotBlank()) {
+                        listenCueLatenessMs(lastPositionMs, cueStart)
+                    } else null,
+                    translationReadyMs = if (result.textTgt.isNotBlank()) {
+                        elapsedListenTimeMs(windowStartedAtMs, now)
+                    } else diagnostics.translationReadyMs,
+                    translationLatenessMs = if (result.textTgt.isNotBlank()) {
+                        listenCueLatenessMs(lastPositionMs, cueStart)
+                    } else diagnostics.translationLatenessMs,
+                )
+                publishDiagnostics()
             }
             _ui.update {
                 it.copy(
                     isProcessing = true,
                     status = ListenTranslateJobStatus.Running,
                     errorMessage = null,
+                    diagnostics = diagnostics,
                 )
             }
             try {
@@ -379,6 +420,7 @@ class ListenTranslateSession(
                     },
                 )
                 ensureCurrent(generation)
+                diagnostics = diagnostics.copy(stages = result.stageTimings ?: diagnostics.stages)
                 if (result.blankReason == ListenBlankReason.EmptyPcm) {
                     _ui.update { it.copy(lastBlankReason = ListenBlankReason.EmptyPcm) }
                     throw ListenWindowStageException(
@@ -406,6 +448,7 @@ class ListenTranslateSession(
                     // backoff the immediate-drain loop could repeatedly re-run the same ASR.
                     throw ListenWindowStageException("翻译未返回文本，请稍后重试")
                 }
+                val coverageStartedAtMs = monotonicTimeMs()
                 var progressCommittedWithCoverage = false
                 if (!speechCoversWindow) {
                     // Persist the whole attempted window, including silence. Writing this
@@ -446,6 +489,10 @@ class ListenTranslateSession(
                     )
                 }
                 ensureCurrent(generation)
+                diagnostics = diagnostics.copy(
+                    cacheCommitMs = diagnostics.cacheCommitMs +
+                        elapsedListenTimeMs(coverageStartedAtMs, monotonicTimeMs()),
+                )
                 updateCueSummary()
                 if (result.blankReason == ListenBlankReason.UnrecognizedSpeech) {
                     retryPolicy.recordRecoverableBlank(attemptKey)
@@ -473,12 +520,17 @@ class ListenTranslateSession(
                     audioMs = endMs - startMs,
                 )
                 updateEffectiveRealtimeFactor()
+                publishDiagnostics(completed = true)
                 true
             } catch (cancelled: CancellationException) {
                 if (generation == workGeneration) _ui.update { it.copy(isProcessing = false) }
                 throw cancelled
             } catch (t: Throwable) {
                 ensureCurrent(generation)
+                diagnostics = diagnostics.copy(
+                    stages = (t as? ListenPipelineException)?.stages ?: diagnostics.stages,
+                )
+                publishDiagnostics(failed = true)
                 val msg = t.message?.take(160) ?: t.javaClass.simpleName
                 if (isNonRetryableListenFailure(t)) {
                     retryPolicy.recordPermanentFailure(attemptKey)

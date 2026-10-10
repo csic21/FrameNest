@@ -36,7 +36,8 @@ class VoskAsrEngine : AsrEngine {
         mutex.withLock {
             val m = model ?: error("Vosk model not loaded")
             if (pcm16kMono.isEmpty()) return@withLock AsrRecognition.EMPTY
-            if (isNearSilencePcm(pcm16kMono)) return@withLock AsrRecognition.EMPTY
+            // The caller owns the selected silence policy. A second whole-window
+            // RMS gate here would discard quiet/short speech admitted by the experiment.
             val rec = Recognizer(m, PcmAudioMath.TARGET_SAMPLE_RATE_HZ.toFloat())
             try {
                 rec.setWords(true)

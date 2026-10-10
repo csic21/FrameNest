@@ -264,4 +264,8 @@
     <string name="settings_diagnostics_saved">已写入 %1$s</string>
     <string name="settings_diagnostics_failed">导出失败</string>
     <string name="settings_diagnostics_share">分享诊断日志</string>
+    <string name="listen_translate_experimental_gate">保守静音门控（实验，本次播放）</string>
+    <string name="listen_translate_experimental_gate_hint">默认关闭。仅跳过接近数字静音，不区分人声和音乐，不裁剪时间轴。先关闭听译再切换；下次启用将重新生成本片当前语言对的字幕。未验证真机提速，安静片段可能更慢。</string>
+    <string name="listen_translate_diagnostics">本机性能诊断（仅内存、不上传）</string>
+    <string name="listen_translate_diagnostics_waiting">等待新窗口；缓存命中不产生测量。未开始或进行中阶段显示 —；失败阶段显示已耗时。</string>
 </resources>
