@@ -1255,7 +1255,7 @@ class PlayerViewModel(
                         username = smbParams.username,
                         password = smbParams.password,
                         domain = smbParams.domain,
-                    requireEncryption = smbParams.requireEncryption,
+                        requireEncryption = smbParams.requireEncryption,
                     )
                     PlaybackDirectoryFeatures(
                         subtitleOptions = if (includeSubtitles) {

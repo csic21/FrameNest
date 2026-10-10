@@ -22,6 +22,15 @@ class SmbSecurityPolicyTest {
         assertTrue(config.isSigningEnabled)
         assertFalse(config.isEncryptData)
     }
+    @Test fun negotiationAndSessionRejectInsecureCapabilitiesWithoutFallback() {
+        assertTrue(runCatching { requireSmbEncryptionCapability(false) }.exceptionOrNull() is SmbException)
+        requireSmbEncryptionCapability(true)
+        for (values in listOf(listOf(true, true, false, false), listOf(false, false, false, false), listOf(true, true, true, true))) {
+            assertTrue(runCatching { requireSmbSessionSecurity(values[0], values[1], values[2], values[3]) }.exceptionOrNull() is SmbException)
+        }
+        requireSmbSessionSecurity(true, true, false, true)
+        requireSmbSessionSecurity(false, true, false, false)
+    }
     @Test fun securityFailureGivesActionableNonRetryingError() {
         val error = SmbError.Security()
         assertTrue(SmbUiMessages.fromSmbError(error).contains("服务器编辑"))

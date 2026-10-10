@@ -85,7 +85,7 @@ class ExternalSubtitleLoader(
                 username = request.username,
                 password = request.password,
                 domain = request.domain,
-            requireEncryption = request.requireEncryption,
+                requireEncryption = request.requireEncryption,
             )
             try {
                 owner.register(client)

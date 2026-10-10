@@ -60,24 +60,10 @@ class SherpaModelInstaller(
                 return@withContext it
             }
             File(packDir, READY_MARKER).delete()
-            val dir = packDir.also { it.mkdirs() }
-            onProgress(0.02f)
-            val totalBytes = FILES.sumOf { it.expectedBytes }
-            var doneBytes = 0L
-            FILES.forEach { spec ->
-                downloadFile(spec, File(dir, spec.name), allowMeteredDownloads) { read, total ->
-                    val overall = doneBytes + read.coerceAtMost(total)
-                    val p = if (totalBytes > 0) {
-                        0.02f + (overall.toDouble() / totalBytes.toDouble() * 0.95).toFloat()
-                    } else {
-                        0.4f
-                    }
-                    onProgress(p.coerceIn(0.02f, 0.97f))
-                }
-                doneBytes += spec.expectedBytes
+            val dir = packDir
+            installSherpaPack(dir, FILES, "$MODEL_ID\n$REVISION\n", onProgress) { spec, dest, progress ->
+                downloadFile(spec, dest, allowMeteredDownloads, progress)
             }
-            publishModelReady(dir, "$MODEL_ID\n$REVISION\n") { verifyPack(dir) }
-            onProgress(1f)
             dir
         }
     }
@@ -173,4 +159,30 @@ class SherpaModelInstaller(
         /** Download size shown before the user accepts (~240MB, one pack). */
         val APPROX_PACK_BYTES: Long = FILES.sumOf { it.expectedBytes }
     }
+}
+
+/** Production install seam: file verification has no dependency on an existing ready marker. */
+internal suspend fun installSherpaPack(
+    dir: File,
+    files: List<SherpaModelInstaller.ModelFile>,
+    marker: String,
+    onProgress: (Float) -> Unit = {},
+    download: suspend (SherpaModelInstaller.ModelFile, File, (Long, Long) -> Unit) -> Unit,
+) {
+    dir.mkdirs()
+    File(dir, ".ready").delete()
+    val total = files.sumOf { it.expectedBytes }
+    var completed = 0L
+    onProgress(0.02f)
+    files.forEach { spec ->
+        download(spec, File(dir, spec.name)) { read, size ->
+            val overall = completed + read.coerceAtMost(size)
+            onProgress((0.02f + overall.toDouble().div(total).times(0.95).toFloat()).coerceIn(0.02f, 0.97f))
+        }
+        completed += spec.expectedBytes
+    }
+    publishModelReady(dir, marker) {
+        files.all { verifiedModelFile(File(dir, it.name), it.expectedBytes, it.sha256) }
+    }
+    onProgress(1f)
 }

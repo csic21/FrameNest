@@ -573,7 +573,7 @@ class ListenTranslateSession(
 
     private suspend fun ensureCurrent(generation: Long) {
         currentCoroutineContext().ensureActive()
-        if (released || !isForeground || !_ui.value.enabled || generation != workGeneration) {
+        if (released || !isForeground || !_ui.value.enabled || generation != workGeneration || cacheLease?.active != true) {
             throw CancellationException("stale listen-translate window")
         }
     }

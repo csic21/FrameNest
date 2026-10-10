@@ -80,17 +80,19 @@ class SmbjClient(
             }
             conn.connect(host, credentials.port)
             synchronized(lock) { ensureCurrentClient(next) }
-            if (credentials.requireEncryption && !conn.connectionContext.clientPrefersEncryption()) {
-                throw SmbException(SmbError.Security())
+            if (credentials.requireEncryption) {
+                requireSmbEncryptionCapability(conn.connectionContext.clientPrefersEncryption())
             }
             unpublishedConnection = null
             val sess = conn.authenticate(
                 AuthenticationContext(credentials.username, credentials.password, credentials.domain),
             )
-            if (!sess.isSigningRequired || sess.isGuest || sess.isAnonymous ||
-                (credentials.requireEncryption && !sess.shouldEncryptData())) {
-                throw SmbException(SmbError.Security())
-            }
+            requireSmbSessionSecurity(
+                requireEncryption = credentials.requireEncryption,
+                signingRequired = sess.isSigningRequired,
+                guestOrAnonymous = sess.isGuest || sess.isAnonymous,
+                encrypted = credentials.requireEncryption && sess.shouldEncryptData(),
+            )
             synchronized(lock) {
                 ensureCurrentClient(next)
                 session = sess
@@ -440,5 +442,15 @@ internal class SmbjRandomAccess(
                 SmbLog.w("File close", t)
             }
         }
+    }
+}
+
+internal fun requireSmbEncryptionCapability(supported: Boolean) {
+    if (!supported) throw SmbException(SmbError.Security())
+}
+
+internal fun requireSmbSessionSecurity(requireEncryption: Boolean, signingRequired: Boolean, guestOrAnonymous: Boolean, encrypted: Boolean) {
+    if (!signingRequired || guestOrAnonymous || (requireEncryption && !encrypted)) {
+        throw SmbException(SmbError.Security())
     }
 }

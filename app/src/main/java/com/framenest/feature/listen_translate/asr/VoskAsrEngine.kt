@@ -84,9 +84,11 @@ class VoskAsrEngine : AsrEngine {
 
     private fun parseResult(json: String?): VoskRecognition {
         if (json.isNullOrBlank()) return VoskRecognition.EMPTY
+        check(json.length <= 1_048_576) { "Vosk result exceeds bounded window output" }
         val root = JSONObject(json)
         val text = root.optString("text").trim()
         val result = root.optJSONArray("result") ?: return VoskRecognition(text, emptyList())
+        check(result.length() <= 4_096) { "Vosk word count exceeds bounded window output" }
         val words = buildList {
             for (index in 0 until result.length()) {
                 val item = result.optJSONObject(index) ?: continue

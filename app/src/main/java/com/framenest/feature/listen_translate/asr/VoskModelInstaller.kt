@@ -86,7 +86,7 @@ class VoskModelInstaller(
                 onProgress(0.88f)
                 if (stagingDir.exists()) stagingDir.deleteRecursively()
                 stagingDir.mkdirs()
-                unzip(zipFile, stagingDir)
+                extractVoskArchive(zipFile, stagingDir)
                 val stagedModel = File(stagingDir, spec.folderName)
                 if (!isCompleteVoskModel(stagedModel)) {
                     error("Vosk 模型解压后校验失败（$lang）")
@@ -120,7 +120,7 @@ class VoskModelInstaller(
     }
 
     private fun isReady(dir: File): Boolean {
-        return isCompleteVoskModel(dir)
+        return File(dir, READY_MARKER).isFile && isCompleteVoskModel(dir)
     }
 
     private suspend fun download(
@@ -131,44 +131,6 @@ class VoskModelInstaller(
     ) = downloadVerifiedModel(spec.url, dest, spec.archiveBytes, spec.sha256,
         requireNetwork = { ModelDownloadNetworkPolicy.requireAllowed(appContext, allowMeteredDownloads) },
         onBytes = onBytes)
-
-    private suspend fun unzip(zipFile: File, destDir: File) {
-        val destinationRoot = destDir.canonicalFile
-        ZipInputStream(BufferedInputStream(zipFile.inputStream())).use { zis ->
-            var entry = zis.nextEntry
-            val buf = ByteArray(64 * 1024)
-            var entries = 0
-            var expandedBytes = 0L
-            val seen = HashSet<String>()
-            while (entry != null) {
-                currentCoroutineContext().ensureActive()
-                check(++entries <= 10_000) { "Vosk 模型压缩包文件数超限" }
-                check(entry.name.length <= 1_024) { "Vosk 模型压缩包路径过长" }
-                val outFile = File(destinationRoot, entry.name).canonicalFile
-                check(seen.add(outFile.path)) { "Vosk 模型压缩包包含重复路径" }
-                check(outFile.path.startsWith(destinationRoot.path + File.separator)) {
-                    "Vosk 模型压缩包包含非法路径"
-                }
-                if (entry.isDirectory) {
-                    outFile.mkdirs()
-                } else {
-                    outFile.parentFile?.mkdirs()
-                    FileOutputStream(outFile).use { out ->
-                        while (true) {
-                            currentCoroutineContext().ensureActive()
-                            val n = zis.read(buf)
-                            if (n < 0) break
-                            check(n.toLong() <= MAX_EXPANDED_BYTES - expandedBytes) { "Vosk 模型解压大小超限" }
-                            out.write(buf, 0, n)
-                            expandedBytes += n
-                        }
-                    }
-                }
-                zis.closeEntry()
-                entry = zis.nextEntry
-            }
-        }
-    }
 
     private fun dirSize(dir: File): Long {
         if (!dir.exists()) return 0L
@@ -185,7 +147,6 @@ class VoskModelInstaller(
     }
 
     companion object {
-        private const val MAX_EXPANDED_BYTES = 512L * 1024L * 1024L
         private const val BASE = "https://alphacephei.com/vosk/models"
         private const val READY_MARKER = ".ready"
         private const val PART_SUFFIX = ".part"
@@ -296,3 +257,42 @@ internal fun sha256(file: File): String {
     }
     return digest.digest().joinToString(separator = "") { byte -> "%02x".format(byte) }
 }
+
+internal suspend fun extractVoskArchive(zipFile: File, destDir: File, maxExpandedBytes: Long = 512L * 1024L * 1024L, maxEntries: Int = 10_000) {
+    val destinationRoot = destDir.canonicalFile
+    ZipInputStream(BufferedInputStream(zipFile.inputStream())).use { zis ->
+        var entry = zis.nextEntry
+        val buf = ByteArray(64 * 1024)
+        var entries = 0
+        var expandedBytes = 0L
+        val seen = HashSet<String>()
+        while (entry != null) {
+            currentCoroutineContext().ensureActive()
+            check(++entries <= maxEntries) { "Vosk 模型压缩包文件数超限" }
+            check(entry.name.length <= 1_024) { "Vosk 模型压缩包路径过长" }
+            val outFile = File(destinationRoot, entry.name).canonicalFile
+            check(seen.add(outFile.path)) { "Vosk 模型压缩包包含重复路径" }
+            check(outFile.path.startsWith(destinationRoot.path + File.separator)) {
+                "Vosk 模型压缩包包含非法路径"
+            }
+            if (entry.isDirectory) {
+                outFile.mkdirs()
+            } else {
+                outFile.parentFile?.mkdirs()
+                FileOutputStream(outFile).use { out ->
+                    while (true) {
+                        currentCoroutineContext().ensureActive()
+                        val n = zis.read(buf)
+                        if (n < 0) break
+                        check(n.toLong() <= maxExpandedBytes - expandedBytes) { "Vosk 模型解压大小超限" }
+                        out.write(buf, 0, n)
+                        expandedBytes += n
+                    }
+                }
+            }
+            zis.closeEntry()
+            entry = zis.nextEntry
+        }
+    }
+}
+

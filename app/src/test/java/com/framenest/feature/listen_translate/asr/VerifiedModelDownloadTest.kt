@@ -80,6 +80,75 @@ class VerifiedModelDownloadTest {
             assertFalse(allowedModelUrl(URL(url)))
         }
     }
+    @Test fun extractionRejectsTraversalAndExpansionLimit() = runBlocking {
+        val root = temp()
+        try {
+            fun archive(name: String, contents: ByteArray): File {
+                val file = File(root, "archive.zip")
+                java.util.zip.ZipOutputStream(file.outputStream()).use { zip ->
+                    zip.putNextEntry(java.util.zip.ZipEntry(name))
+                    zip.write(contents)
+                    zip.closeEntry()
+                }
+                return file
+            }
+            val destination = File(root, "stage").apply { mkdirs() }
+            assertTrue(runCatching { extractVoskArchive(archive("../escape", byteArrayOf(1)), destination) }.isFailure)
+            assertFalse(File(root, "escape").exists())
+            assertTrue(runCatching { extractVoskArchive(archive("model/data", ByteArray(128)), destination, maxExpandedBytes = 64) }.isFailure)
+            assertTrue(File(destination, "model/data").length() <= 64L)
+            assertTrue(runCatching { extractVoskArchive(archive("model/small", byteArrayOf(1)), destination, maxEntries = 0) }.isFailure)
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun truncatedDownloadRetainsBoundedPrefixAndOversizeDiscardsIt() = runBlocking {
+        val root = temp()
+        try {
+            val source = File(root, "source").apply { writeText("abcdefghij") }
+            val dest = File(root, "download")
+            val part = File(dest.path + ".part")
+            fun connection(bytes: ByteArray) = object : HttpURLConnection(URL("https://huggingface.co/test")) {
+                override fun disconnect() = Unit
+                override fun usingProxy() = false
+                override fun connect() = Unit
+                override fun getResponseCode() = 200
+                override fun getContentLengthLong() = -1L
+                override fun getInputStream() = ByteArrayInputStream(bytes)
+            }
+            assertTrue(runCatching { downloadVerifiedModel("unused", dest, 10, sha256(source), {}, { _, _ -> }) { _, _ -> connection("abc".toByteArray()) } }.isFailure)
+            assertEquals(3L, part.length())
+            assertFalse(dest.exists())
+            assertTrue(runCatching { downloadVerifiedModel("unused", dest, 10, sha256(source), {}, { _, _ -> }) { _, _ -> connection(ByteArray(128)) } }.exceptionOrNull() is InvalidModelDownload)
+            assertFalse(part.exists())
+            assertFalse(dest.exists())
+        } finally { root.deleteRecursively() }
+    }
+
+    @Test fun productionSherpaInstallWorksWithoutMarkerAndRetryAfterInterruption() = runBlocking {
+        val root = temp()
+        try {
+            val source = File(root, "source").apply { writeText("abc") }
+            val files = listOf("model.int8.onnx", "tokens.txt").map {
+                SherpaModelInstaller.ModelFile(it, "unused", 3L, sha256(source))
+            }
+            val installed = File(root, "pack")
+            var count = 0
+            assertTrue(runCatching {
+                installSherpaPack(installed, files, "revision") { _, dest, _ ->
+                    if (++count == 2) throw kotlinx.coroutines.CancellationException("interrupted")
+                    dest.writeText("abc")
+                }
+            }.isFailure)
+            assertFalse(File(installed, ".ready").exists())
+            installSherpaPack(installed, files, "revision") { _, dest, _ -> dest.writeText("abc") }
+            assertEquals("revision", File(installed, ".ready").readText())
+            assertTrue(runCatching {
+                installSherpaPack(installed, files, "revision") { _, dest, _ -> dest.writeText("bad") }
+            }.isFailure)
+            assertFalse(File(installed, ".ready").exists())
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun tokenSidecarHasVerifiedPinnedSha() {
         assertEquals("f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc", SherpaModelInstaller.FILES.single { it.name == "tokens.txt" }.sha256)
     }
