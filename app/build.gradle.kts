@@ -12,8 +12,8 @@ android {
         applicationId = "com.framenest"
         minSdk = 26
         targetSdk = 36
-        versionCode = 14
-        versionName = "0.6.3-internal"
+        versionCode = 15
+        versionName = "0.6.4-internal"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
