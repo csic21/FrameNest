@@ -58,16 +58,16 @@ jobs:
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
 
       - name: Assemble debug
-        run: ./gradlew assembleDebug --write-verification-metadata sha256 --stacktrace
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Unit tests
-        run: ./gradlew testDebugUnitTest --write-verification-metadata sha256 --stacktrace
+        run: ./gradlew testDebugUnitTest --stacktrace
 
       - name: Compile instrumentation tests
-        run: ./gradlew assembleDebugAndroidTest --write-verification-metadata sha256 --stacktrace
+        run: ./gradlew assembleDebugAndroidTest --stacktrace
 
       - name: Lint
-        run: ./gradlew lintDebug --write-verification-metadata sha256 --stacktrace
+        run: ./gradlew lintDebug --stacktrace
 
       - name: Upload debug APKs
         if: success()
@@ -104,12 +104,4 @@ jobs:
         with:
           name: room-schemas
           path: app/schemas/
-          if-no-files-found: warn
-
-      - name: Upload dependency verification bootstrap
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: dependency-verification-bootstrap
-          path: gradle/verification-metadata.xml
           if-no-files-found: warn

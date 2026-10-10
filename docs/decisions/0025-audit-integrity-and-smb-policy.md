@@ -19,3 +19,11 @@ https://developers.google.com/ml-kit/android-data-disclosure
 https://developers.google.com/ml-kit/terms
 
 固定证书、签名 Secrets 和既有发布请求防护不变。没有真实 Android/NAS/网络抓包、温度、功耗和语音质量实测。仪器测试编译不代表设备执行通过。
+
+
+## 构建依赖校验
+
+- GitHub Actions 固定至官方标签解析出的不可变 commit；Gradle 9.6.1 分发 SHA-256 来自官方 services.gradle.org 的校验文件。
+- `gradle/verification-metadata.xml` 记录 GitHub Actions 实际解析的 623 个组件、1053 个产物的 SHA-256，包含元数据验证，没有 trusted-artifact 跳过例外。初始摘要在两次独立 Actions 构建产物中一致，随后提交并移除所有自动更新校验清单的 bootstrap 参数。后续 CI/发布必须使用严格校验，漂移时失败关闭。
+- 这是对当前可信传输和现有依赖的初始摘要固定，不等同于每个原生库和依赖源代码的完整安全审查。没有升级业务依赖或改变已有签名 Secrets。
+- Debug CI 不拥有发布私钥；Release 完整构建仍由既有显式请求工作流在证书固定值核验后执行，不绕过 requireReleaseSigning。
