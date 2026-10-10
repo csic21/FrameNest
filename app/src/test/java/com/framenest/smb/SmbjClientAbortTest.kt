@@ -149,7 +149,7 @@ class SmbjClientAbortTest {
         }
     }
 
-    private fun credentials() = SmbCredentials(host = "example.invalid", username = "", password = charArrayOf())
+    private fun credentials() = SmbCredentials(host = "example.invalid", username = "", password = charArrayOf(), requireEncryption = false)
 }
 
 private class TestBackend(
@@ -186,6 +186,7 @@ private class TestConnection(
     val finishAuthentication = CountDownLatch(1)
     @Volatile private var connected = true
     private val fakeSession = object : Session(this, config, null, null, null, null, null) {
+        override fun isSigningRequired() = true
         override fun close() { sessionCloseCount.incrementAndGet(); error("Graceful close must be skipped") }
     }
     override fun connect(hostname: String, port: Int) { backend.awaitConnect() }

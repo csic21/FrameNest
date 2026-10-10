@@ -9,6 +9,11 @@ object PlayerErrorMapper {
     fun fromSmb(error: SmbError): PlayerError {
         val message = CredentialRedactor.redact(error.message)
         return when (error) {
+            is SmbError.Security -> PlayerError(
+                code = PlayerError.Code.OpenFailed,
+                message = message,
+                retryable = false,
+            )
             is SmbError.Auth -> PlayerError(
                 code = PlayerError.Code.Auth,
                 message = message.ifBlank { "Authentication failed" },

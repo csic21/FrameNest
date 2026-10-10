@@ -79,6 +79,7 @@ sealed class PlaybackDataSource {
         val username: String,
         val password: CharArray,
         val domain: String = "",
+        val requireEncryption: Boolean = true,
         val share: String,
         val path: String,
     ) : PlaybackDataSource() {
@@ -98,6 +99,7 @@ sealed class PlaybackDataSource {
         val username: String = "",
         val password: String = "",
         val domain: String? = null,
+        val requireEncryption: Boolean = true,
     ) : PlaybackDataSource() {
         override fun toString(): String =
             "DirectSmbUrl(host=$host, share=$share, path=$path, user=***)"

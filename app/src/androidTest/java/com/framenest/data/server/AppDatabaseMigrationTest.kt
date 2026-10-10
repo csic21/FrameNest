@@ -19,7 +19,7 @@ class AppDatabaseMigrationTest {
     )
 
     @Test
-    fun migrate1To2_preservesExistingRows_andCreatesListenTables() {
+    fun migrate1To3_preservesExistingRows_andDefaultsToEncryptedSmb() {
         helper.createDatabase(TEST_DB, 1).apply {
             execSQL(
                 """
@@ -48,14 +48,16 @@ class AppDatabaseMigrationTest {
 
         val migrated = helper.runMigrationsAndValidate(
             TEST_DB,
-            2,
+            3,
             true,
             AppDatabase.MIGRATION_1_2,
+            AppDatabase.MIGRATION_2_3,
         )
-        migrated.query("SELECT `name`, `credentialAlias` FROM `servers`").use { cursor ->
+        migrated.query("SELECT `name`, `credentialAlias`, `requireEncryption` FROM `servers`").use { cursor ->
             assertTrue(cursor.moveToFirst())
             assertEquals("NAS", cursor.getString(0))
             assertEquals("credential-ref", cursor.getString(1))
+            assertEquals(1, cursor.getInt(2))
         }
         migrated.query(
             "SELECT `position_ms`, `duration_ms` FROM `playback_history`",

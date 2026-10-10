@@ -60,6 +60,7 @@ internal class ScrubPreviewExtractor(
                 username = source.username,
                 password = source.password.copyOf(),
                 domain = source.domain,
+                requireEncryption = source.requireEncryption,
                 share = source.share,
                 path = source.path,
                 timeMs = bucketStartMs,
@@ -71,6 +72,7 @@ internal class ScrubPreviewExtractor(
                 username = source.username,
                 password = source.password.toCharArray(),
                 domain = source.domain.orEmpty(),
+                requireEncryption = source.requireEncryption,
                 share = source.share,
                 path = source.path,
                 timeMs = bucketStartMs,
@@ -132,6 +134,7 @@ internal class ScrubPreviewExtractor(
                 username = source.username,
                 password = source.password.copyOf(),
                 domain = source.domain,
+                requireEncryption = source.requireEncryption,
                 share = source.share,
                 path = source.path,
             )
@@ -141,6 +144,7 @@ internal class ScrubPreviewExtractor(
                 username = source.username,
                 password = source.password.toCharArray(),
                 domain = source.domain.orEmpty(),
+                requireEncryption = source.requireEncryption,
                 share = source.share,
                 path = source.path,
             )
@@ -261,6 +265,7 @@ internal class ScrubPreviewExtractor(
         username: String,
         password: CharArray,
         domain: String,
+        requireEncryption: Boolean,
         share: String,
         path: String,
     ) {
@@ -271,6 +276,7 @@ internal class ScrubPreviewExtractor(
             username = username,
             password = password,
             domain = domain,
+            requireEncryption = requireEncryption,
         )
         try {
             nextClient.connect(credentials)

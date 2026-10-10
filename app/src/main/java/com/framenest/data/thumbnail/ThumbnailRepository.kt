@@ -374,6 +374,7 @@ class ThumbnailRepository(
                     username = server.username,
                     password = password,
                     domain = server.domain.orEmpty(),
+                            requireEncryption = server.requireEncryption,
                     active = { job?.isActive != false },
                 )
             } finally {
@@ -397,6 +398,7 @@ class ThumbnailRepository(
                 port = server.port,
                 username = server.username,
                 domain = server.domain.orEmpty(),
+                            requireEncryption = server.requireEncryption,
                 credentialAlias = server.credentialAlias,
             )
             if (
@@ -417,6 +419,7 @@ class ThumbnailRepository(
                             username = server.username,
                             password = password,
                             domain = server.domain.orEmpty(),
+                            requireEncryption = server.requireEncryption,
                         ),
                     )
                     client = nextClient
@@ -534,6 +537,7 @@ internal data class ThumbnailConnectionKey(
     val username: String,
     val domain: String,
     val credentialAlias: String,
+    val requireEncryption: Boolean = true,
 )
 
 internal object ThumbnailSessionReusePolicy {

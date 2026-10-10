@@ -44,7 +44,7 @@ class SherpaAsrEngine(
                 closeLocked()
                 val onnx = File(modelDir, SherpaModelInstaller.MODEL_FILE)
                 val tokens = File(modelDir, SherpaModelInstaller.TOKENS_FILE)
-                if (!onnx.isFile || !tokens.isFile) {
+                if (!SherpaModelInstaller.verifyPack(modelDir)) {
                     error("SenseVoice 模型缺失（${SherpaModelInstaller.MODEL_ID}）")
                 }
                 val senseVoice = OfflineSenseVoiceModelConfig(

@@ -142,8 +142,8 @@ class ListenPipelineDiagnosticsTest {
     }
 
     @Test
-    fun experimentUsesDistinctCacheIdentityWhileBaselineRemainsUnchanged() {
-        assertEquals("sensevoice-v1", listenAsrCacheModelId("sensevoice-v1", false))
+    fun newBaselineInvalidatesLegacyRmsSilenceIdentity() {
+        assertEquals("sensevoice-v1|digital-zero-v2", listenAsrCacheModelId("sensevoice-v1", false))
         assertEquals("sensevoice-v1|silence-gate-v1", listenAsrCacheModelId("sensevoice-v1", true))
     }
 

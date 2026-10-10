@@ -33,6 +33,7 @@ data class ServerEditorState(
     val domain: String = "",
     val defaultShare: String = "",
     val password: String = "",
+    val requireEncryption: Boolean = true,
     val isPasswordRequired: Boolean = true,
     val isTesting: Boolean = false,
     val isSaving: Boolean = false,
@@ -116,6 +117,7 @@ class ServersViewModel(
                     username = server.username,
                     domain = server.domain.orEmpty(),
                     defaultShare = server.defaultShare.orEmpty(),
+                    requireEncryption = server.requireEncryption,
                     password = "",
                     isPasswordRequired = false,
                 ),
@@ -289,12 +291,13 @@ class ServersViewModel(
                         username = parsed.username,
                         domain = parsed.domain,
                         password = passwordChars,
+                        requireEncryption = editor.requireEncryption,
                     )
                 } finally {
                     passwordChars.fill('\u0000')
                 }
             } else if (editor.editingId != null) {
-                serverRepository.testSavedServer(editor.editingId)
+                serverRepository.testSavedServer(editor.editingId, requireEncryptionOverride = editor.requireEncryption)
             } else {
                 Result.failure(IllegalArgumentException("请输入密码"))
             }
@@ -347,6 +350,7 @@ class ServersViewModel(
                             domain = parsed.domain,
                             defaultShare = parsed.defaultShare,
                             password = password,
+                            requireEncryption = editor.requireEncryption,
                         )
                     } finally {
                         password.fill('\u0000')
@@ -372,6 +376,7 @@ class ServersViewModel(
                             domain = parsed.domain,
                             defaultShare = parsed.defaultShare,
                             newPassword = newPassword,
+                            requireEncryption = editor.requireEncryption,
                         )
                     } finally {
                         newPassword?.fill('\u0000')

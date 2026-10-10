@@ -58,7 +58,8 @@ class SmbjClient(
         ensureOpen()
         val host = credentials.host.trim()
         if (host.isEmpty()) throw SmbException(SmbError.Network("Host is empty"))
-        val next = clientFactory(config)
+        val effectiveConfig = secureConfig(config, credentials.requireEncryption)
+        val next = clientFactory(effectiveConfig)
         val stale = synchronized(lock) {
             ensureOpenLocked()
             snapshotAndClearSession().also { connectingClient = next }
@@ -70,7 +71,7 @@ class SmbjClient(
             // Construct the public SMBJ Connection before doing network I/O.
             // SMBClient.connect hides it until negotiation completes, which
             // would leave that phase unreachable to a cancellation/timeout.
-            val conn = connectionFactory(config, next)
+            val conn = connectionFactory(effectiveConfig, next)
             unpublishedConnection = conn
             synchronized(lock) {
                 ensureCurrentClient(next)
@@ -79,10 +80,17 @@ class SmbjClient(
             }
             conn.connect(host, credentials.port)
             synchronized(lock) { ensureCurrentClient(next) }
+            if (credentials.requireEncryption && !conn.connectionContext.clientPrefersEncryption()) {
+                throw SmbException(SmbError.Security())
+            }
             unpublishedConnection = null
             val sess = conn.authenticate(
                 AuthenticationContext(credentials.username, credentials.password, credentials.domain),
             )
+            if (!sess.isSigningRequired || sess.isGuest || sess.isAnonymous ||
+                (credentials.requireEncryption && !sess.shouldEncryptData())) {
+                throw SmbException(SmbError.Security())
+            }
             synchronized(lock) {
                 ensureCurrentClient(next)
                 session = sess
@@ -363,8 +371,14 @@ class SmbjClient(
     }
 
     companion object {
+        internal fun secureConfig(base: SmbConfig, requireEncryption: Boolean): SmbConfig =
+            SmbConfig.builder(base).withSigningRequired(true).withSigningEnabled(true)
+                .withEncryptData(requireEncryption).build()
+
         fun defaultConfig(): SmbConfig =
             SmbConfig.builder()
+                .withSigningRequired(true)
+                .withEncryptData(true)
                 .withTimeout(30, TimeUnit.SECONDS)
                 .withSoTimeout(30, TimeUnit.SECONDS)
                 .withDfsEnabled(false)

@@ -31,7 +31,7 @@ import com.framenest.data.listen_translate.ListenTranslateJobEntity
         ListenTranslateJobEntity::class,
         ListenTranslateCueEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -52,7 +52,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     NAME,
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { instance = it }
             }
@@ -69,6 +69,12 @@ abstract class AppDatabase : RoomDatabase() {
          * FN-11 added listen-translate jobs/cues to the original server/history DB.
          * Existing v1 rows stay untouched; the two new tables start empty.
          */
+        val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `servers` ADD COLUMN `requireEncryption` INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         val MIGRATION_1_2: Migration = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(

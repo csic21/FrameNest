@@ -55,10 +55,11 @@ class SherpaModelInstaller(
             if (!isSupported(lang)) {
                 error("源语言「$lang」暂无离线 SenseVoice 支持（仅中/粤/英/日/韩）")
             }
-            modelDir(lang)?.let {
+            modelDir(lang)?.takeIf { verifyPack(it) }?.let {
                 onProgress(1f)
                 return@withContext it
             }
+            File(packDir, READY_MARKER).delete()
             val dir = packDir.also { it.mkdirs() }
             onProgress(0.02f)
             val totalBytes = FILES.sumOf { it.expectedBytes }
@@ -75,10 +76,7 @@ class SherpaModelInstaller(
                 }
                 doneBytes += spec.expectedBytes
             }
-            if (!isCompletePack(dir)) {
-                error("SenseVoice 模型安装后校验失败")
-            }
-            File(dir, READY_MARKER).writeText("$MODEL_ID\n$REVISION\n")
+            publishModelReady(dir, "$MODEL_ID\n$REVISION\n") { verifyPack(dir) }
             onProgress(1f)
             dir
         }
@@ -111,100 +109,10 @@ class SherpaModelInstaller(
         spec: ModelFile,
         dest: File,
         allowMeteredDownloads: Boolean,
-        onBytes: (read: Long, total: Long) -> Unit,
-    ) {
-        dest.parentFile?.mkdirs()
-        val part = File(dest.absolutePath + PART_SUFFIX)
-
-        if (dest.isFile && verifyFile(dest, spec)) {
-            onBytes(spec.expectedBytes, spec.expectedBytes)
-            return
-        }
-        if (dest.exists()) dest.delete()
-        if (part.length() > spec.expectedBytes) part.delete()
-        if (part.length() == spec.expectedBytes) {
-            if (verifyFile(part, spec)) {
-                promote(part, dest)
-                onBytes(spec.expectedBytes, spec.expectedBytes)
-                return
-            }
-            part.delete()
-        }
-
-        ModelDownloadNetworkPolicy.requireAllowed(appContext, allowMeteredDownloads)
-        val requestedOffset = part.length()
-        val conn = (URL(spec.url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 30_000
-            readTimeout = 30_000
-            instanceFollowRedirects = true
-            requestMethod = "GET"
-            if (requestedOffset > 0L) {
-                setRequestProperty("Range", "bytes=$requestedOffset-")
-            }
-        }
-        try {
-            val code = conn.responseCode
-            if (code !in 200..299) error("下载 SenseVoice 模型失败 HTTP $code")
-            val plan = resumeDownloadPlan(requestedOffset, code)
-            if (plan.append) {
-                val contentRange = conn.getHeaderField("Content-Range").orEmpty()
-                check(contentRange.startsWith("bytes $requestedOffset-")) {
-                    "SenseVoice 模型服务器未返回预期的续传范围"
-                }
-            }
-            val contentLength = conn.contentLengthLong
-            val expectedFromResponse = if (contentLength > 0L) {
-                plan.startBytes + contentLength
-            } else {
-                spec.expectedBytes
-            }
-            check(expectedFromResponse == spec.expectedBytes) {
-                "SenseVoice 模型大小与固定清单不一致"
-            }
-            conn.inputStream.use { input ->
-                BufferedInputStream(input).use { bis ->
-                    FileOutputStream(part, plan.append).use { out ->
-                        val buf = ByteArray(64 * 1024)
-                        var readTotal = plan.startBytes
-                        onBytes(readTotal, spec.expectedBytes)
-                        while (true) {
-                            currentCoroutineContext().ensureActive()
-                            val n = bis.read(buf)
-                            if (n < 0) break
-                            out.write(buf, 0, n)
-                            readTotal += n
-                            onBytes(readTotal, spec.expectedBytes)
-                        }
-                        out.fd.sync()
-                        if (readTotal != spec.expectedBytes) {
-                            error("SenseVoice 模型下载不完整：$readTotal/${spec.expectedBytes} bytes")
-                        }
-                    }
-                }
-            }
-            if (!verifyFile(part, spec)) {
-                part.delete()
-                error("SenseVoice 模型完整性校验失败")
-            }
-            promote(part, dest)
-        } finally {
-            conn.disconnect()
-        }
-    }
-
-    private fun verifyFile(file: File, spec: ModelFile): Boolean {
-        if (file.length() != spec.expectedBytes) return false
-        val sha = spec.sha256 ?: return true
-        return sha256(file).equals(sha, ignoreCase = true)
-    }
-
-    private fun promote(source: File, dest: File) {
-        if (dest.exists()) dest.delete()
-        if (!source.renameTo(dest)) {
-            source.copyTo(dest, overwrite = true)
-            source.delete()
-        }
-    }
+        onBytes: (Long, Long) -> Unit,
+    ) = downloadVerifiedModel(spec.url, dest, spec.expectedBytes, spec.sha256,
+        requireNetwork = { ModelDownloadNetworkPolicy.requireAllowed(appContext, allowMeteredDownloads) },
+        onBytes = onBytes)
 
     private fun dirSize(dir: File): Long {
         if (!dir.exists()) return 0L
@@ -215,11 +123,16 @@ class SherpaModelInstaller(
         val name: String,
         val url: String,
         val expectedBytes: Long,
-        /** Null means size-only verification (tiny sidecar without published hash). */
-        val sha256: String?,
+        /** SHA-256 of this exact immutable-revision file. */
+        val sha256: String,
     )
 
     companion object {
+        /** Full integrity check runs before activation/native load, never on each UI/window poll. */
+        internal fun verifyPack(dir: File): Boolean = FILES.all {
+            verifiedModelFile(File(dir, it.name), it.expectedBytes, it.sha256)
+        }
+
         const val MODEL_ID = "sensevoice-2024-07-17-int8"
 
         /** Cache/model label: intentionally distinct from any Vosk tag. */
@@ -253,7 +166,7 @@ class SherpaModelInstaller(
                 name = TOKENS_FILE,
                 url = "$HF_BASE/tokens.txt",
                 expectedBytes = 315_894L,
-                sha256 = null,
+                sha256 = "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
             ),
         )
 

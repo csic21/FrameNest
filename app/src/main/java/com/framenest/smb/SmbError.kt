@@ -8,6 +8,11 @@ sealed class SmbError(
     open val message: String,
     open val cause: Throwable? = null,
 ) {
+    data class Security(
+        override val message: String = "NAS 不满足 SMB 安全要求。默认需要 SMB3 加密和签名；如确需旧设备兼容，请在服务器编辑中明确选择仅签名模式。",
+        override val cause: Throwable? = null,
+    ) : SmbError(message, cause)
+
     data class Auth(
         override val message: String = "Authentication failed",
         override val cause: Throwable? = null,

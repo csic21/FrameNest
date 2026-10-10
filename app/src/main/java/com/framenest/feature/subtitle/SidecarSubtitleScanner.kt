@@ -24,6 +24,7 @@ class SidecarSubtitleScanner(
         val username: String,
         val password: CharArray,
         val domain: String = "",
+        val requireEncryption: Boolean = true,
         val share: String,
         /** Share-relative path of the video file. */
         val videoPath: String,
@@ -44,6 +45,7 @@ class SidecarSubtitleScanner(
             username = request.username,
             password = request.password,
             domain = request.domain,
+            requireEncryption = request.requireEncryption,
         )
         try {
             client.connect(credentials)

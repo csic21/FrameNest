@@ -24,6 +24,7 @@ object SmbUiMessages {
     }
 
     fun fromSmbError(error: SmbError): String = when (error) {
+        is SmbError.Security -> error.message
         is SmbError.Auth -> "认证失败，请检查用户名和密码后重试"
         is SmbError.Network -> "网络错误，请检查主机地址、端口与局域网连接"
         is SmbError.NotFound -> "共享或路径不存在"

@@ -1,6 +1,9 @@
 package com.framenest.data.listen_translate
 
 import com.framenest.core.model.PlaybackIdentity
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -14,6 +17,35 @@ class ListenTranslateRepository(
     private val dao: ListenTranslateDao,
     private val timeSource: () -> Long = { System.currentTimeMillis() },
 ) {
+    private val writeMutex = Mutex()
+    private val leaseLock = Any()
+    private val leases = mutableSetOf<CacheLease>()
+
+    class CacheLease internal constructor(internal val key: List<String>) : AutoCloseable {
+        @Volatile internal var active = true
+        override fun close() { active = false }
+    }
+
+    private fun key(identity: PlaybackIdentity, languages: ListenLanguagePair): List<String> =
+        languages.normalized().let { listOf(identity.serverId, identity.share, identity.normalizedPath(), it.sourceLang, it.targetLang) }
+
+    fun acquireLease(identity: PlaybackIdentity, languages: ListenLanguagePair): CacheLease =
+        synchronized(leaseLock) {
+            leases.removeAll { !it.active }
+            CacheLease(key(identity, languages)).also { leases += it }
+        }
+
+    private fun checkLease(lease: CacheLease?, identity: PlaybackIdentity, languages: ListenLanguagePair) {
+        if (lease != null && (!lease.active || lease.key != key(identity, languages))) {
+            throw CancellationException("listen cache lease retired")
+        }
+    }
+
+    private fun revokeLeases(matches: (List<String>) -> Boolean) = synchronized(leaseLock) {
+        leases.filter { matches(it.key) }.forEach { it.close() }
+        leases.removeAll { !it.active }
+    }
+
     /**
      * Load job for [identity] + [languages]. If [contentKey] is non-blank and differs
      * from the stored key, the job and cues are dropped and this returns null.
@@ -22,7 +54,7 @@ class ListenTranslateRepository(
         identity: PlaybackIdentity,
         languages: ListenLanguagePair,
         contentKey: String = "",
-    ): ListenTranslateJob? {
+    ): ListenTranslateJob? = writeMutex.withLock {
         val path = identity.normalizedPath()
         val lang = languages.normalized()
         val row = dao.getJob(
@@ -31,7 +63,7 @@ class ListenTranslateRepository(
             path,
             lang.sourceLang,
             lang.targetLang,
-        ) ?: return null
+        ) ?: return@withLock null
         if (shouldInvalidate(row.contentKey, contentKey)) {
             dao.deleteJob(
                 identity.serverId,
@@ -40,15 +72,29 @@ class ListenTranslateRepository(
                 lang.sourceLang,
                 lang.targetLang,
             )
-            return null
+            return@withLock null
         }
-        return row.toModel()
+        return@withLock row.toModel()
     }
 
     /**
      * Create or refresh job metadata. Invalidates cues when [contentKey] changes.
      */
     suspend fun ensureJob(
+        identity: PlaybackIdentity,
+        languages: ListenLanguagePair,
+        contentKey: String = "",
+        durationMs: Long = 0L,
+        asrModel: String = "",
+        mtModel: String = "",
+        status: ListenTranslateJobStatus = ListenTranslateJobStatus.Idle,
+        lease: CacheLease? = null,
+    ): ListenTranslateJob = writeMutex.withLock {
+        checkLease(lease, identity, languages)
+        ensureJobLocked(identity, languages, contentKey, durationMs, asrModel, mtModel, status)
+    }
+
+    private suspend fun ensureJobLocked(
         identity: PlaybackIdentity,
         languages: ListenLanguagePair,
         contentKey: String = "",
@@ -98,6 +144,7 @@ class ListenTranslateRepository(
             lastError = previous?.lastError.orEmpty(),
         )
         dao.upsertJob(entity)
+        maintainCacheLocked(protectedKey = key(identity, lang))
         return entity.toModel()
     }
 
@@ -108,7 +155,7 @@ class ListenTranslateRepository(
         status: ListenTranslateJobStatus? = null,
         lastError: String? = null,
         durationMs: Long? = null,
-    ) {
+    ) = writeMutex.withLock {
         val path = identity.normalizedPath()
         val lang = languages.normalized()
         dao.updateJobProgress(
@@ -138,21 +185,21 @@ class ListenTranslateRepository(
         textTgt: String,
         rev: Int = 1,
         contentKey: String = "",
-    ): ListenTranslateCue {
+    ): ListenTranslateCue = writeMutex.withLock {
         require(endMs >= startMs) { "endMs >= startMs" }
         val path = identity.normalizedPath()
         val lang = languages.normalized()
-        ensureJob(identity, lang, contentKey = contentKey)
+        ensureJobLocked(identity, lang, contentKey = contentKey)
         val entity = cueEntity(identity, lang, path, startMs, endMs, textSrc, textTgt, rev)
         val id = dao.replaceCueAtRange(entity)
         // ensureJob already refreshes updatedAt immediately before the cue write;
         // querying and upserting the same parent again only added two Room round trips.
-        return entity.copy(id = id).toModel()
+        return@withLock entity.copy(id = id).toModel()
     }
 
     /**
      * Session fast path after activation has validated content/model identity and created the job.
-     * If settings or another owner removed the parent concurrently, rebuild it and retry once.
+     * Missing/cleared parents stop stale work; only a fresh activation may recreate a job.
      */
     suspend fun upsertCueForExistingJob(
         identity: PlaybackIdentity,
@@ -165,24 +212,15 @@ class ListenTranslateRepository(
         contentKey: String = "",
         asrModel: String = "",
         mtModel: String = "",
-    ): ListenTranslateCue {
+        lease: CacheLease? = null,
+    ): ListenTranslateCue = writeMutex.withLock {
+        checkLease(lease, identity, languages)
         require(endMs >= startMs) { "endMs >= startMs" }
         val path = identity.normalizedPath()
         val lang = languages.normalized()
         val entity = cueEntity(identity, lang, path, startMs, endMs, textSrc, textTgt, rev)
         var id = dao.replaceCueForExistingJob(entity, timeSource())
-        if (id == null) {
-            ensureJob(
-                identity = identity,
-                languages = lang,
-                contentKey = contentKey,
-                asrModel = asrModel,
-                mtModel = mtModel,
-                status = ListenTranslateJobStatus.Partial,
-            )
-            id = dao.replaceCueForExistingJob(entity, timeSource())
-        }
-        return entity.copy(id = checkNotNull(id) { "listen job missing after ensure" }).toModel()
+        return@withLock entity.copy(id = (id ?: throw CancellationException("listen cache was cleared"))).toModel()
     }
 
     /** Commit a whole-window coverage cue and its progress in one transaction. */
@@ -199,7 +237,9 @@ class ListenTranslateRepository(
         contentKey: String = "",
         asrModel: String = "",
         mtModel: String = "",
-    ): ListenTranslateCue {
+        lease: CacheLease? = null,
+    ): ListenTranslateCue = writeMutex.withLock {
+        checkLease(lease, identity, languages)
         require(endMs >= startMs) { "endMs >= startMs" }
         val path = identity.normalizedPath()
         val lang = languages.normalized()
@@ -211,25 +251,7 @@ class ListenTranslateRepository(
             durationMs = durationMs?.coerceAtLeast(0L),
             updatedAtEpochMs = timeSource(),
         )
-        if (id == null) {
-            ensureJob(
-                identity = identity,
-                languages = lang,
-                contentKey = contentKey,
-                durationMs = durationMs?.coerceAtLeast(0L) ?: 0L,
-                asrModel = asrModel,
-                mtModel = mtModel,
-                status = ListenTranslateJobStatus.Partial,
-            )
-            id = dao.replaceCueAndUpdateProgressForExistingJob(
-                entity = entity,
-                coveredUntilMs = coveredUntilMs.coerceAtLeast(0L),
-                status = ListenTranslateJobStatus.Partial.name,
-                durationMs = durationMs?.coerceAtLeast(0L),
-                updatedAtEpochMs = timeSource(),
-            )
-        }
-        return entity.copy(id = checkNotNull(id) { "listen job missing after ensure" }).toModel()
+        return@withLock entity.copy(id = (id ?: throw CancellationException("listen cache was cleared"))).toModel()
     }
 
     fun observeCues(
@@ -280,7 +302,8 @@ class ListenTranslateRepository(
     }
 
     /** Drop all language pairs for this media (open failed / file gone). */
-    suspend fun purgeMedia(identity: PlaybackIdentity) {
+    suspend fun purgeMedia(identity: PlaybackIdentity) = writeMutex.withLock {
+        revokeLeases { it.take(3) == listOf(identity.serverId, identity.share, identity.normalizedPath()) }
         dao.deleteJobsForMedia(
             identity.serverId,
             identity.share,
@@ -289,39 +312,43 @@ class ListenTranslateRepository(
     }
 
     /** Drop all jobs for a deleted server. */
-    suspend fun purgeServer(serverId: String) {
-        if (serverId.isBlank()) return
+    suspend fun purgeServer(serverId: String) = writeMutex.withLock {
+        if (serverId.isBlank()) return@withLock
+        revokeLeases { it[0] == serverId }
         dao.deleteJobsForServer(serverId)
     }
 
-    suspend fun purgeAll() {
+    suspend fun purgeAll() = writeMutex.withLock {
+        revokeLeases { true }
         dao.deleteAllJobs()
     }
 
-    suspend fun purgeOlderThan(epochMs: Long) {
-        dao.deleteJobsOlderThan(epochMs)
+    suspend fun purgeOlderThan(epochMs: Long) = writeMutex.withLock {
+        maintainCacheLocked(maxJobs = Int.MAX_VALUE, oldestAllowed = epochMs)
     }
 
-    /**
-     * Keep at most [maxJobs] jobs (LRU by [ListenTranslateJobEntity.updatedAtEpochMs]).
-     * @return number of jobs removed
-     */
-    suspend fun enforceMaxJobs(maxJobs: Int = DEFAULT_MAX_JOBS): Int {
+    suspend fun enforceMaxJobs(maxJobs: Int = DEFAULT_MAX_JOBS): Int = writeMutex.withLock {
         require(maxJobs >= 0)
-        val count = dao.countJobs()
-        if (count <= maxJobs) return 0
-        val toRemove = count - maxJobs
-        val oldest = dao.listOldestJobs(toRemove)
-        for (job in oldest) {
-            dao.deleteJob(
-                job.serverId,
-                job.share,
-                job.path,
-                job.sourceLang,
-                job.targetLang,
-            )
+        maintainCacheLocked(maxJobs = maxJobs, oldestAllowed = Long.MIN_VALUE)
+    }
+
+    private suspend fun maintainCacheLocked(
+        maxJobs: Int = DEFAULT_MAX_JOBS,
+        oldestAllowed: Long = timeSource() - RETENTION_MS,
+        protectedKey: List<String>? = null,
+    ): Int {
+        val jobs = dao.listOldestJobs(Int.MAX_VALUE)
+        var remaining = jobs.size
+        var removed = 0
+        for (job in jobs) {
+            val jobKey = listOf(job.serverId, job.share, job.path, job.sourceLang, job.targetLang)
+            val protected = jobKey == protectedKey || synchronized(leaseLock) { leases.any { it.active && it.key == jobKey } }
+            if (protected || (remaining <= maxJobs && job.updatedAtEpochMs >= oldestAllowed)) continue
+            dao.deleteJob(job.serverId, job.share, job.path, job.sourceLang, job.targetLang)
+            remaining--
+            removed++
         }
-        return oldest.size
+        return removed
     }
 
     suspend fun countCues(): Int = dao.countCues()
@@ -372,6 +399,7 @@ class ListenTranslateRepository(
 
     companion object {
         const val DEFAULT_MAX_JOBS: Int = 100
+        const val RETENTION_MS: Long = 30L * 24L * 60L * 60L * 1_000L
     }
 }
 

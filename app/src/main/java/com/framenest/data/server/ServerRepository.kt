@@ -46,6 +46,7 @@ class ServerRepository(
         domain: String? = null,
         defaultShare: String? = null,
         password: CharArray,
+        requireEncryption: Boolean = true,
     ): SavedServer = withContext(ioDispatcher) {
         val now = timeSource()
         val id = UUID.randomUUID().toString()
@@ -60,6 +61,7 @@ class ServerRepository(
             domain = domain?.trim()?.ifEmpty { null },
             credentialAlias = alias,
             defaultShare = defaultShare?.trim()?.ifEmpty { null },
+            requireEncryption = requireEncryption,
         )
         try {
             serverDao.upsert(ServerEntity.fromModel(model, createdAtMs = now, updatedAtMs = now))
@@ -85,6 +87,7 @@ class ServerRepository(
         domain: String? = null,
         defaultShare: String? = null,
         newPassword: CharArray? = null,
+        requireEncryption: Boolean? = null,
     ): SavedServer = withContext(ioDispatcher) {
         val existing = serverDao.getById(id)
             ?: throw IllegalArgumentException("Server not found: $id")
@@ -103,6 +106,7 @@ class ServerRepository(
             username = username.trim(),
             domain = domain?.trim()?.ifEmpty { null },
             credentialAlias = existing.credentialAlias,
+            requireEncryption = requireEncryption ?: existing.requireEncryption,
             defaultShare = defaultShare?.trim()?.ifEmpty { null },
         )
         try {
@@ -157,6 +161,7 @@ class ServerRepository(
         username: String,
         domain: String?,
         password: CharArray,
+        requireEncryption: Boolean = true,
     ): Result<Unit> = withContext(ioDispatcher) {
         val client = clientFactory()
         val credentials = SmbCredentials(
@@ -165,6 +170,7 @@ class ServerRepository(
             username = username.trim(),
             password = password,
             domain = domain?.trim().orEmpty(),
+            requireEncryption = requireEncryption,
         )
         try {
             client.connect(credentials)
@@ -192,6 +198,7 @@ class ServerRepository(
     suspend fun testSavedServer(
         serverId: String,
         passwordOverride: CharArray? = null,
+        requireEncryptionOverride: Boolean? = null,
     ): Result<Unit> = withContext(ioDispatcher) {
         val server = serverDao.getById(serverId)?.toModel()
             ?: return@withContext Result.failure(IllegalArgumentException("Server not found"))
@@ -208,6 +215,7 @@ class ServerRepository(
             username = server.username,
             domain = server.domain,
             password = password,
+            requireEncryption = requireEncryptionOverride ?: server.requireEncryption,
         )
     }
 }

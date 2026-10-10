@@ -14,7 +14,7 @@ import org.junit.Test
 
 class RealListenPipelineTest {
     @Test
-    fun experimentPassesFullQuietWindowAndPreservesContextCueOffsets() = runBlocking {
+    fun defaultPassesFullQuietWindowAndPreservesContextCueOffsets() = runBlocking {
         val pcm = ShortArray(72_000) // 4.5 seconds, including context.
         pcm[16_000] = 30 // Very short/quiet onset, diluted by whole-window RMS.
         val original = pcm.copyOf()
@@ -39,7 +39,7 @@ class RealListenPipelineTest {
         }
         val engine = RealListenTranslateEngine(
             audio, asr, MlKitMtEngine(), FakeModels,
-            experimentalSilenceGate = true, monotonicTimeMs = { now },
+            experimentalSilenceGate = false, monotonicTimeMs = { now },
         )
         var source: ListenWindowResult? = null
         val result = engine.processWindowWithProgress(3_000L, 6_000L, "en", "en") {
@@ -60,7 +60,7 @@ class RealListenPipelineTest {
     @Test
     fun defaultGateAndExperimentHandleSilenceQuietAndEmptySeparately() {
         val quiet = ShortArray(72_000).apply { this[32_000] = 30 }
-        assertEquals(ListenBlankReason.NearSilence, listenPcmBlankReason(quiet))
+        assertNull(listenPcmBlankReason(quiet))
         assertNull(listenPcmBlankReason(quiet, experimentalSilenceGate = true))
         assertEquals(ListenBlankReason.NearSilence, listenPcmBlankReason(ShortArray(16_000), true))
         assertEquals(ListenBlankReason.EmptyPcm, listenPcmBlankReason(shortArrayOf(), true))

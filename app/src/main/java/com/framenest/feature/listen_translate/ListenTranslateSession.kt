@@ -42,6 +42,7 @@ class ListenTranslateSession(
         this.engine = engine
     }
 
+    private var cacheLease: ListenTranslateRepository.CacheLease? = null
     private val processMutex = Mutex()
     private val retryPolicy = ListenWindowRetryPolicy()
     private var contentKey: String = contentKey
@@ -83,6 +84,8 @@ class ListenTranslateSession(
         if (enabled) {
             activate()
         } else {
+            cacheLease?.close()
+            cacheLease = null
             activationJob?.cancel()
             activationJob = null
             stopPolling()
@@ -197,6 +200,8 @@ class ListenTranslateSession(
 
     fun release() {
         released = true
+        cacheLease?.close()
+        cacheLease = null
         activationJob?.cancel()
         activationJob = null
         stopPolling()
@@ -257,6 +262,9 @@ class ListenTranslateSession(
     private suspend fun ensureJobAndRefresh() {
         val langs = _ui.value.languages
         stopObserving()
+        cacheLease?.close()
+        val lease = repository.acquireLease(identity, langs)
+        cacheLease = lease
         val job = repository.ensureJob(
             identity = identity,
             languages = langs,
@@ -264,7 +272,9 @@ class ListenTranslateSession(
             asrModel = engine.asrModelId,
             mtModel = engine.mtModelId,
             status = ListenTranslateJobStatus.Partial,
+            lease = lease,
         )
+        currentCoroutineContext().ensureActive()
         cachedCues = repository.listCues(identity, langs)
         _ui.update {
             it.copy(
@@ -347,6 +357,7 @@ class ListenTranslateSession(
             if (!needsFill && !allowBlankRecovery) return@withLock false
             val langs = _ui.value.languages
             val windowContentKey = contentKey
+            val windowLease = cacheLease
             val windowEngine = engine
             val asrModel = windowEngine.asrModelId
             val mtModel = windowEngine.mtModelId
@@ -373,6 +384,7 @@ class ListenTranslateSession(
                 val persistedSpeech = repository.upsertCueForExistingJob(
                     identity, langs, cueStart, cueEnd, result.textSrc, result.textTgt,
                     rev = 1, contentKey = windowContentKey, asrModel = asrModel, mtModel = mtModel,
+                    lease = windowLease,
                 )
                 ensureCurrent(generation)
                 cachedCues = ListenCueCache.upsert(cachedCues, persistedSpeech)
@@ -474,6 +486,7 @@ class ListenTranslateSession(
                         contentKey = windowContentKey,
                         asrModel = asrModel,
                         mtModel = mtModel,
+                        lease = windowLease,
                     )
                     ensureCurrent(generation)
                     cachedCues = ListenCueCache.upsert(cachedCues, persistedCoverage)

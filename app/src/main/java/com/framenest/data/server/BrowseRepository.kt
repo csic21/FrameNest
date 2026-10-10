@@ -242,6 +242,7 @@ class BrowseRepository(
                     username = server.username,
                     password = password,
                     domain = server.domain.orEmpty(),
+                            requireEncryption = server.requireEncryption,
                 ),
             )
             coroutineContext.ensureActive()
@@ -349,6 +350,7 @@ internal data class BrowseConnectionKey(
             port = server.port,
             username = server.username,
             domain = server.domain.orEmpty(),
+                            requireEncryption = server.requireEncryption,
             credentialAlias = server.credentialAlias,
         )
     }

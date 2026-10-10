@@ -41,11 +41,6 @@ data class AsrWord(
     val endMs: Long,
 )
 
-/**
- * Shared near-silence gate (previously Vosk-only; same threshold, same
- * behavior). Callers check this before spending a decode on quiet windows.
- */
-internal const val ASR_MIN_SPEECH_RMS: Float = 0.008f
-
+/** Default only skips exact digital zero; weak/short signals always reach ASR. */
 internal fun isNearSilencePcm(pcm16kMono: ShortArray): Boolean =
-    PcmAudioMath.rmsNormalized(pcm16kMono) < ASR_MIN_SPEECH_RMS
+    pcm16kMono.isNotEmpty() && pcm16kMono.all { it == 0.toShort() }

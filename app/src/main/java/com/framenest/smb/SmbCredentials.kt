@@ -12,6 +12,7 @@ data class SmbCredentials(
     val username: String,
     val password: CharArray,
     val domain: String = "",
+    val requireEncryption: Boolean = true,
 ) {
     fun safeSummary(): String =
         "smb://${host.trim()}:$port domain=${domain.ifBlank { "<empty>" }} user=${username.ifBlank { "<empty>" }}"
@@ -30,6 +31,7 @@ data class SmbCredentials(
             port == other.port &&
             username == other.username &&
             domain == other.domain &&
+            requireEncryption == other.requireEncryption &&
             password.contentEquals(other.password)
     }
 
@@ -39,6 +41,7 @@ data class SmbCredentials(
         result = 31 * result + username.hashCode()
         result = 31 * result + password.contentHashCode()
         result = 31 * result + domain.hashCode()
+        result = 31 * result + requireEncryption.hashCode()
         return result
     }
 

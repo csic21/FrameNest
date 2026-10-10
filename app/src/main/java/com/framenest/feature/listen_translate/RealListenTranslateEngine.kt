@@ -210,7 +210,7 @@ internal fun listenPcmBlankReason(
 
 /** Do not reuse baseline silence coverage when the experimental gate is selected. */
 internal fun listenAsrCacheModelId(modelId: String, experimentalSilenceGate: Boolean): String =
-    if (experimentalSilenceGate) "$modelId|silence-gate-v1" else modelId
+    if (experimentalSilenceGate) "$modelId|silence-gate-v1" else "$modelId|digital-zero-v2"
 
 internal fun selectWordsForWindow(
     words: List<AsrWord>,

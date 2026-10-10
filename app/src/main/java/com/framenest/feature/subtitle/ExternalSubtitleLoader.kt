@@ -61,6 +61,7 @@ class ExternalSubtitleLoader(
         val username: String,
         val password: CharArray,
         val domain: String = "",
+        val requireEncryption: Boolean = true,
         val share: String,
         val remotePath: String,
         val fileName: String,
@@ -84,6 +85,7 @@ class ExternalSubtitleLoader(
                 username = request.username,
                 password = request.password,
                 domain = request.domain,
+            requireEncryption = request.requireEncryption,
             )
             try {
                 owner.register(client)

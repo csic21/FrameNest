@@ -19,6 +19,8 @@ data class SavedServer(
      * default entry point when opening the browser.
      */
     val defaultShare: String? = null,
+    /** SMBJ browsing/auxiliary reads only; direct libVLC playback negotiates separately. */
+    val requireEncryption: Boolean = true,
 ) {
     companion object {
         const val DEFAULT_PORT: Int = 445

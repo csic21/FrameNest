@@ -46,6 +46,7 @@ object PlaybackRequestFactory {
                 // Defensive copy so callers can zero their buffer after building.
                 password = password.copyOf(),
                 domain = server.domain.orEmpty(),
+                            requireEncryption = server.requireEncryption,
                 share = share,
                 path = normalized,
             ),
