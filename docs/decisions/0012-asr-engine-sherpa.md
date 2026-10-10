@@ -31,7 +31,9 @@ FN-14 落地的 Vosk small（`small-cn-0.22`，2022 年 Kaldi TDNN）是听译�
   本仓 abiFilters 只留 arm64-v8a/x86_64）。注意 1.12.32 的 Android API 是
   **Kotlin data class 风格**（`OfflineSenseVoiceModelConfig(model=…, language=…, …)`，
   `OfflineRecognizer(assetManager, config)`），不是 master 分支 Java `builder()` 写法；
-  CI 已用 javap 锁定签名。arm64 natives 约 30MB（未压缩；onnxruntime 19.3 +
+  CI 已用 javap 锁定签名。模型路径为私有存储绝对路径时必须让 `assetManager`
+  保持默认 `null`（原生 `newFromFile`），否则 sherpa-onnx 对绝对路径直接
+  `exit(255)`；见决策 0026。arm64 natives 约 30MB（未压缩；onnxruntime 19.3 +
   c-api 4.8 + jni 5.1），release 包体增量以 CI 产物实测为准。
 - Java API（master 已核对签名）：`OfflineRecognizer(OfflineRecognizerConfig)` →
   `createStream()` → `acceptWaveform(float[], 16000)` → `decode()` →

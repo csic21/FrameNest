@@ -1,6 +1,5 @@
 package com.framenest.feature.listen_translate.asr
 
-import android.content.res.AssetManager
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
@@ -24,11 +23,14 @@ import kotlinx.coroutines.withContext
  * [UnsatisfiedLinkError] unwrapped lets `listenTranslatePreparationError`
  * recognize a broken native install instead of showing an opaque message.
  *
- * @param assetManager process asset manager (native layer requires one even
- *   when models come from absolute private-storage paths).
+ * Never pass an Android [android.content.res.AssetManager] to
+ * [OfflineRecognizer]: models always load from absolute private-storage paths,
+ * and sherpa-onnx 1.12.32 aborts the whole process on the `newFromAsset` route
+ * for such paths ("Please set assetManager to null when you load model files
+ * from the SD card", then exit 255). The default null asset manager selects the
+ * filesystem `newFromFile` route.
  */
 class SherpaAsrEngine(
-    private val assetManager: AssetManager,
     private val numThreads: Int = DEFAULT_NUM_THREADS,
 ) : AsrEngine {
 
@@ -64,7 +66,7 @@ class SherpaAsrEngine(
                     decodingMethod = "greedy_search",
                     maxActivePaths = 4,
                 )
-                recognizer = OfflineRecognizer(assetManager, config)
+                recognizer = OfflineRecognizer(config = config)
                 loadedKey = key
             }
         }

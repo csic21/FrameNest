@@ -1108,3 +1108,17 @@ unit test、lint、debug/release assemble 与 AndroidTest 编译通过。真实 
 **目标**：修复本轮审计确认的问题，保留原有播放时间轴/代次边界，验证后沿既有签名发布流程发布内部版。
 
 验收：覆盖全新模型安装、损坏/超限/续传下载、实际 rev=1 空白覆盖平局、弱短语音默认行为、缓存容量与活动所有权、SMB 加密默认及显式仅签名兼容、保数据迁移。真实运行 Android Debug/Release 构建、单测、Lint、AndroidTest 编译；独立审查精确提交树；公开 APK 摘要、固定签名和 update.json 核验。真机/NAS/热功耗未测必须如实说明。不访问真实 NAS、修改凭证或删除真实用户数据。
+
+## FN-64：0.6.3 听译闪退修复（sherpa 绝对路径 + AssetManager）
+
+**依赖**：FN-63
+**拥有路径**：`feature/listen_translate/asr/SherpaAsrEngine.kt`、听译接线的引擎构造、对应单元测试/决策/交接记录。
+**目标**：修复已安装 SenseVoice 模型时开启听译即进程退出（`EXIT_SELF status=255`）的回归；模型只从私有存储文件加载，不改变窗口、缓存身份、模型安装和播放行为。
+
+验收：开启听译不再触发 `newFromAsset` 进程退出；回归测试锁定构造函数不得再接受 `AssetManager`；真机 0.6.3-internal 覆盖安装验证听译可用；单测/构建通过，未测项如实记录。
+
+- 真机根因证据：`F sherpa-onnx: Read binary file: Load '.../tokens.txt' failed`；
+  native 栈 `OfflineRecognizer_newFromAsset` → `exit` → Zygote `exited cleanly (255)`；
+  `ApplicationExitInfo reason=1 (EXIT_SELF) status=255`，无 Java FATAL。
+- 修复：`OfflineRecognizer(config)` 走 `newFromFile`（`assetManager` 默认 null）。
+- 不修改：3 秒窗口、静音策略、`|digital-zero-v2` 缓存身份、Vosk/ML Kit、下载与迁移。
