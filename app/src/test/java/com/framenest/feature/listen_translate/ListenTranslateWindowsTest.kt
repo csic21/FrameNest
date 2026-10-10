@@ -95,11 +95,14 @@ class ListenTranslateWindowsTest {
     @Test
     fun blankCoverage_preventsRefill_butSpeechCueWinsOverlay() {
         val cues = listOf(
-            cue(0, 3_000, "", "", rev = 0),
+            cue(0, 3_000, "", "", rev = 1),
             cue(0, 1_800, "hello", "你好"),
         )
         assertFalse(ListenTranslateWindows.needsFill(cues, 0, 3_000))
         assertEquals("hello", ListenTranslateWindows.cueAt(cues, 1_000L)?.textSrc)
+        assertEquals("hello", ListenTranslateWindows.cueAt(cues.reversed(), 1_000L)?.textSrc)
+        val published = ListenCueCache.upsert(listOf(cues[1]), cues[0])
+        assertEquals("hello", ListenTranslateWindows.cueAt(published, 1_000L)?.textSrc)
         assertEquals("", ListenTranslateWindows.cueAt(cues, 2_500L)?.textSrc)
     }
 

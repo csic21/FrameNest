@@ -36,7 +36,8 @@ class VoskAsrEngine : AsrEngine {
         mutex.withLock {
             val m = model ?: error("Vosk model not loaded")
             if (pcm16kMono.isEmpty()) return@withLock AsrRecognition.EMPTY
-            if (isNearSilencePcm(pcm16kMono)) return@withLock AsrRecognition.EMPTY
+            // The caller owns the selected silence policy. A second whole-window
+            // RMS gate here would discard quiet/short speech admitted by the experiment.
             val rec = Recognizer(m, PcmAudioMath.TARGET_SAMPLE_RATE_HZ.toFloat())
             try {
                 rec.setWords(true)
@@ -83,9 +84,11 @@ class VoskAsrEngine : AsrEngine {
 
     private fun parseResult(json: String?): VoskRecognition {
         if (json.isNullOrBlank()) return VoskRecognition.EMPTY
+        check(json.length <= 1_048_576) { "Vosk result exceeds bounded window output" }
         val root = JSONObject(json)
         val text = root.optString("text").trim()
         val result = root.optJSONArray("result") ?: return VoskRecognition(text, emptyList())
+        check(result.length() <= 4_096) { "Vosk word count exceeds bounded window output" }
         val words = buildList {
             for (index in 0 until result.length()) {
                 val item = result.optJSONObject(index) ?: continue

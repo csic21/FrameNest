@@ -52,9 +52,15 @@ object ListenTranslateWindows {
     private fun hasHigherPriority(
         candidate: ListenTranslateCue,
         current: ListenTranslateCue?,
-    ): Boolean = current == null ||
-        candidate.startMs > current.startMs ||
-        (candidate.startMs == current.startMs && candidate.rev > current.rev)
+    ): Boolean {
+        if (current == null) return true
+        // Coverage records describe processing, not display. They must never hide speech.
+        val candidateHasText = candidate.textSrc.isNotBlank() || candidate.textTgt.isNotBlank()
+        val currentHasText = current.textSrc.isNotBlank() || current.textTgt.isNotBlank()
+        if (candidateHasText != currentHasText) return candidateHasText
+        return compareValuesBy(candidate, current,
+            { it.startMs }, { it.rev }, { it.endMs }, { it.id }) > 0
+    }
 
     /**
      * True when no cue fully covers [startMs, endMs) (allowing tiny edge slack).
@@ -135,7 +141,7 @@ internal object ListenCueCache {
 
     private fun compare(left: ListenTranslateCue, right: ListenTranslateCue): Int {
         val start = left.startMs.compareTo(right.startMs)
-        return if (start != 0) start else left.rev.compareTo(right.rev)
+        return if (start != 0) start else compareValuesBy(left, right, { it.rev }, { it.endMs }, { it.id })
     }
 }
 

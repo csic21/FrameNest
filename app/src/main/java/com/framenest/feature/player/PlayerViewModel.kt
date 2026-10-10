@@ -394,6 +394,11 @@ class PlayerViewModel(
         if (restart) restartListenPreparation()
     }
 
+    fun setListenExperimentalSilenceGate(enabled: Boolean) {
+        if (playbackLifecycle.closed) return
+        listenSession.setExperimentalSilenceGate(enabled)
+    }
+
     fun setListenDisplayMode(mode: ListenDisplayMode) {
         if (playbackLifecycle.closed) return
         listenSession.setDisplayMode(mode)
@@ -441,6 +446,7 @@ class PlayerViewModel(
     ) = listenPrepareMutex.withLock {
         currentCoroutineContext().ensureActive()
         if (generation != listenPrepareGeneration) return@withLock
+        val experimentalSilenceGate = listenSession.uiState.value.experimentalSilenceGate
         val previous = realListenEngine
         realListenEngine = null
         closeListenPreparationResources(listOf({ previous?.close() }))
@@ -521,6 +527,7 @@ class PlayerViewModel(
                     selectedAudioTrackOrdinal = { selectedAudioTrackOrdinal() },
                     asrModelLabel = { asrSupport.modelLabel(sourceLang) },
                     mtModelLabel = { "mlkit-v1-$sourceLang-$targetLang" },
+                    experimentalSilenceGate = experimentalSilenceGate,
                 )
                 if (generation != listenPrepareGeneration) {
                     throw CancellationException("stale listen-translate preparation")
@@ -616,10 +623,10 @@ class PlayerViewModel(
         transports.ensureActive()
         val creds = when (val ds = request.dataSource) {
             is PlaybackDataSource.SeekableSmb -> SmbSessionCredentials(
-                ds.host, ds.port, ds.username, ds.password.copyOf(), ds.domain,
+                ds.host, ds.port, ds.username, ds.password.copyOf(), ds.domain, ds.requireEncryption,
             )
             is PlaybackDataSource.DirectSmbUrl -> SmbSessionCredentials(
-                ds.host, ds.port ?: 445, ds.username, ds.password.toCharArray(), ds.domain.orEmpty(),
+                ds.host, ds.port ?: 445, ds.username, ds.password.toCharArray(), ds.domain.orEmpty(), ds.requireEncryption,
             )
             else -> return@withContext
         }
@@ -825,6 +832,7 @@ class PlayerViewModel(
         username: String,
         password: CharArray,
         domain: String,
+        requireEncryption: Boolean,
     ): List<String> {
         transports.ensureActive()
         directoryFileNamesLoader?.let { return it(share, parentPath) }
@@ -837,6 +845,7 @@ class PlayerViewModel(
             username = username,
             password = password.copyOf(),
             domain = domain,
+            requireEncryption = requireEncryption,
         )
         return try {
             transports.register(client)
@@ -1246,6 +1255,7 @@ class PlayerViewModel(
                         username = smbParams.username,
                         password = smbParams.password,
                         domain = smbParams.domain,
+                        requireEncryption = smbParams.requireEncryption,
                     )
                     PlaybackDirectoryFeatures(
                         subtitleOptions = if (includeSubtitles) {
@@ -1358,6 +1368,7 @@ class PlayerViewModel(
                     username = smbParams.username,
                     password = passwordCopy,
                     domain = smbParams.domain,
+                    requireEncryption = smbParams.requireEncryption,
                     share = smbParams.share,
                     remotePath = option.remotePath,
                     fileName = option.fileName,
@@ -1462,6 +1473,7 @@ class PlayerViewModel(
         val username: String,
         val password: CharArray,
         val domain: String,
+        val requireEncryption: Boolean,
         val share: String,
         val path: String,
     )
@@ -1474,6 +1486,7 @@ class PlayerViewModel(
                 username = ds.username,
                 password = ds.password.copyOf(),
                 domain = ds.domain,
+                requireEncryption = ds.requireEncryption,
                 share = ds.share,
                 path = ds.path,
             )
@@ -1483,6 +1496,7 @@ class PlayerViewModel(
                 username = ds.username,
                 password = ds.password.toCharArray(),
                 domain = ds.domain.orEmpty(),
+                requireEncryption = ds.requireEncryption,
                 share = ds.share,
                 path = ds.path,
             )

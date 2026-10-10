@@ -43,6 +43,8 @@ data class ListenWindowResult(
     val retryableErrorMessage: String? = null,
     /** Why an otherwise successful window produced no cue. */
     val blankReason: ListenBlankReason? = null,
+    /** Local measurements only; never persisted with subtitle content. */
+    val stageTimings: ListenStageTimings? = null,
 )
 
 enum class ListenBlankReason {

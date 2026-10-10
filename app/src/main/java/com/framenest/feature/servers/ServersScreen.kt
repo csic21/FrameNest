@@ -719,6 +719,17 @@ private fun ServerEditorDialog(
                         .fillMaxWidth()
                         .testTag("server_field_share"),
                 )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.Checkbox(
+                        checked = !state.requireEncryption,
+                        onCheckedChange = { allowSignedOnly -> onUpdate { it.copy(requireEncryption = !allowSignedOnly) } },
+                        enabled = canEditServerEditor(state.isTesting, state.isSaving),
+                        modifier = Modifier.testTag("server_signed_only_compatibility"),
+                    )
+                    Text("兼容模式：仅要求 SMB 签名，允许未加密的目录和辅助读取")
+                }
+                Text("默认要求 SMB3 加密；不支持时连接会停止，不会自动降级。此设置不代表独立的 libVLC 视频传输已加密。",
+                    style = MaterialTheme.typography.bodySmall)
                 state.formError?.let {
                     Text(it, color = MaterialTheme.colorScheme.error)
                 }

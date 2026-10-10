@@ -16,6 +16,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -33,6 +37,7 @@ fun ListenTranslateControls(
     onTargetLang: (String) -> Unit,
     onDisplayMode: (ListenDisplayMode) -> Unit,
     modifier: Modifier = Modifier,
+    onExperimentalSilenceGate: (Boolean) -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -74,6 +79,45 @@ fun ListenTranslateControls(
                 onCheckedChange = null,
                 enabled = !uiState.isInstallingModels,
                 modifier = Modifier.testTag("listen_translate_enable"),
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+        val canChangeGate = !uiState.enabled && !uiState.isInstallingModels
+        Row(
+            modifier = Modifier.fillMaxWidth().toggleable(
+                value = uiState.experimentalSilenceGate,
+                enabled = canChangeGate,
+                role = Role.Switch,
+                onValueChange = onExperimentalSilenceGate,
+            ).testTag("listen_silence_gate"),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.listen_translate_experimental_gate),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Switch(uiState.experimentalSilenceGate, onCheckedChange = null, enabled = canChangeGate)
+        }
+        Text(
+            stringResource(R.string.listen_translate_experimental_gate_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        var showDiagnostics by remember { mutableStateOf(false) }
+        FilterChip(
+            selected = showDiagnostics,
+            onClick = { showDiagnostics = !showDiagnostics },
+            label = { Text(stringResource(R.string.listen_translate_diagnostics)) },
+            modifier = Modifier.testTag("listen_diagnostics_toggle"),
+        )
+        if (showDiagnostics) {
+            Text(
+                text = uiState.diagnostics?.let(::formatListenDiagnostics)
+                    ?: stringResource(R.string.listen_translate_diagnostics_waiting),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.testTag("listen_diagnostics"),
             )
         }
 

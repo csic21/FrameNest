@@ -70,7 +70,7 @@ class ListenTranslateRoomUpsertTest {
             repository.upsertCueForExistingJob(
                 identity = identity,
                 languages = languages,
-                startMs = 500L,
+                startMs = 0L,
                 endMs = 2_000L,
                 textSrc = "hello",
                 textTgt = "你好",
@@ -96,7 +96,8 @@ class ListenTranslateRoomUpsertTest {
             val cues = repository.listCues(identity, languages)
             val job = repository.getJob(identity, languages)
             assertEquals(2, cues.size)
-            assertEquals("hello", cues.single { it.startMs == 500L }.textSrc)
+            assertEquals("hello", repository.cueAt(identity, languages, 1_000L)?.textSrc)
+            assertEquals("hello", com.framenest.feature.listen_translate.ListenTranslateWindows.cueAt(cues, 1_000L)?.textSrc)
             assertEquals(3_000L, job?.coveredUntilMs)
             assertEquals(60_000L, job?.durationMs)
             assertEquals(ListenTranslateJobStatus.Partial, job?.status)

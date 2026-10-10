@@ -242,6 +242,7 @@ class BrowseRepository(
                     username = server.username,
                     password = password,
                     domain = server.domain.orEmpty(),
+                    requireEncryption = server.requireEncryption,
                 ),
             )
             coroutineContext.ensureActive()
@@ -341,6 +342,7 @@ internal data class BrowseConnectionKey(
     val username: String,
     val domain: String,
     val credentialAlias: String,
+    val requireEncryption: Boolean = true,
 ) {
     companion object {
         fun from(server: SavedServer): BrowseConnectionKey = BrowseConnectionKey(
@@ -349,6 +351,7 @@ internal data class BrowseConnectionKey(
             port = server.port,
             username = server.username,
             domain = server.domain.orEmpty(),
+            requireEncryption = server.requireEncryption,
             credentialAlias = server.credentialAlias,
         )
     }

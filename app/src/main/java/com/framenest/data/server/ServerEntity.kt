@@ -1,5 +1,6 @@
 package com.framenest.data.server
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.framenest.core.model.SavedServer
@@ -21,6 +22,7 @@ data class ServerEntity(
     val defaultShare: String?,
     val createdAtMs: Long,
     val updatedAtMs: Long,
+    @ColumnInfo(defaultValue = "1") val requireEncryption: Boolean = true,
 ) {
     fun toModel(): SavedServer = SavedServer(
         id = id,
@@ -31,6 +33,7 @@ data class ServerEntity(
         domain = domain,
         credentialAlias = credentialAlias,
         defaultShare = defaultShare,
+        requireEncryption = requireEncryption,
     )
 
     companion object {
@@ -44,6 +47,7 @@ data class ServerEntity(
                 domain = server.domain,
                 credentialAlias = server.credentialAlias,
                 defaultShare = server.defaultShare,
+                requireEncryption = server.requireEncryption,
                 createdAtMs = createdAtMs,
                 updatedAtMs = updatedAtMs,
             )

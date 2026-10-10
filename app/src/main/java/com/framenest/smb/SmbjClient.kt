@@ -58,7 +58,8 @@ class SmbjClient(
         ensureOpen()
         val host = credentials.host.trim()
         if (host.isEmpty()) throw SmbException(SmbError.Network("Host is empty"))
-        val next = clientFactory(config)
+        val effectiveConfig = secureConfig(config, credentials.requireEncryption)
+        val next = clientFactory(effectiveConfig)
         val stale = synchronized(lock) {
             ensureOpenLocked()
             snapshotAndClearSession().also { connectingClient = next }
@@ -70,7 +71,7 @@ class SmbjClient(
             // Construct the public SMBJ Connection before doing network I/O.
             // SMBClient.connect hides it until negotiation completes, which
             // would leave that phase unreachable to a cancellation/timeout.
-            val conn = connectionFactory(config, next)
+            val conn = connectionFactory(effectiveConfig, next)
             unpublishedConnection = conn
             synchronized(lock) {
                 ensureCurrentClient(next)
@@ -79,9 +80,18 @@ class SmbjClient(
             }
             conn.connect(host, credentials.port)
             synchronized(lock) { ensureCurrentClient(next) }
+            if (credentials.requireEncryption) {
+                requireSmbEncryptionCapability(conn.connectionContext.clientPrefersEncryption())
+            }
             unpublishedConnection = null
             val sess = conn.authenticate(
                 AuthenticationContext(credentials.username, credentials.password, credentials.domain),
+            )
+            requireSmbSessionSecurity(
+                requireEncryption = credentials.requireEncryption,
+                signingRequired = sess.isSigningRequired,
+                guestOrAnonymous = sess.isGuest || sess.isAnonymous,
+                encrypted = credentials.requireEncryption && sess.shouldEncryptData(),
             )
             synchronized(lock) {
                 ensureCurrentClient(next)
@@ -363,8 +373,14 @@ class SmbjClient(
     }
 
     companion object {
+        internal fun secureConfig(base: SmbConfig, requireEncryption: Boolean): SmbConfig =
+            SmbConfig.builder(base).withSigningRequired(true).withSigningEnabled(true)
+                .withEncryptData(requireEncryption).build()
+
         fun defaultConfig(): SmbConfig =
             SmbConfig.builder()
+                .withSigningRequired(true)
+                .withEncryptData(true)
                 .withTimeout(30, TimeUnit.SECONDS)
                 .withSoTimeout(30, TimeUnit.SECONDS)
                 .withDfsEnabled(false)
@@ -426,5 +442,15 @@ internal class SmbjRandomAccess(
                 SmbLog.w("File close", t)
             }
         }
+    }
+}
+
+internal fun requireSmbEncryptionCapability(supported: Boolean) {
+    if (!supported) throw SmbException(SmbError.Security())
+}
+
+internal fun requireSmbSessionSecurity(requireEncryption: Boolean, signingRequired: Boolean, guestOrAnonymous: Boolean, encrypted: Boolean) {
+    if (!signingRequired || guestOrAnonymous || (requireEncryption && !encrypted)) {
+        throw SmbException(SmbError.Security())
     }
 }

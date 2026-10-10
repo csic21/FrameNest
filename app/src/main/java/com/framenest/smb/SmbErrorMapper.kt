@@ -82,6 +82,8 @@ object SmbErrorMapper {
         val msg = error.message.orEmpty()
         val suffix = codeName?.let { " ($it)" }.orEmpty()
         return when {
+            msg.contains("signing", ignoreCase = true) || msg.contains("signature", ignoreCase = true) ||
+                msg.contains("encryption", ignoreCase = true) -> SmbError.Security(cause = error)
             looksLikeAuth(msg) -> SmbError.Auth("Authentication failed$suffix", error)
             looksLikeNotFound(msg) -> SmbError.NotFound("Not found$suffix", error)
             looksLikeNetwork(msg) || defaultNetwork ->

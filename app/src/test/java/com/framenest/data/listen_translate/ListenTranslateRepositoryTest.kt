@@ -240,28 +240,49 @@ class ListenTranslateRepositoryTest {
     }
 
     @Test
-    fun existingJobFastWrite_rebuildsMissingParentOnce() = runBlocking {
+    fun existingJobFastWrite_doesNotResurrectClearedParent() = runBlocking {
         val dao = FakeListenTranslateDao()
-        val repo = ListenTranslateRepository(dao, timeSource = { 9_000L })
+        val repo = ListenTranslateRepository(dao)
+        val lease = repo.acquireLease(identity, langs)
+        repo.ensureJob(identity, langs, lease = lease)
+        repo.purgeAll()
+        val failure = runCatching { repo.upsertCueForExistingJob(identity, langs, 0L, 3_000L, "stale", "stale", lease = lease) }.exceptionOrNull()
+        assertTrue(failure is kotlinx.coroutines.CancellationException)
+        assertEquals(0, dao.jobRows.size)
+        assertEquals(0, dao.cueRows.size)
+    }
 
-        repo.upsertCueForExistingJob(
-            identity = identity,
-            languages = langs,
-            startMs = 0L,
-            endMs = 3_000L,
-            textSrc = "recovered",
-            textTgt = "已恢复",
-            contentKey = "content",
-            asrModel = "asr",
-            mtModel = "mt",
-        )
+    @Test
+    fun productionRetention_keepsAtMost100JobsAndProtectsActiveLease() = runBlocking {
+        val dao = FakeListenTranslateDao()
+        var now = 1L
+        val repo = ListenTranslateRepository(dao, timeSource = { now })
+        val lease = repo.acquireLease(identity, langs)
+        repo.ensureJob(identity, langs, lease = lease)
+        repeat(120) { index ->
+            now++
+            repo.ensureJob(PlaybackIdentity("other", "media", "$index.mkv"), langs)
+        }
+        assertEquals(100, repo.countJobs())
+        assertNotNull(repo.getJob(identity, langs))
+        now += ListenTranslateRepository.RETENTION_MS + 1L
+        repo.ensureJob(PlaybackIdentity("other", "media", "fresh.mkv"), langs)
+        assertEquals(2, repo.countJobs())
+        lease.close()
+        repo.purgeOlderThan(now)
+        assertNull(repo.getJob(identity, langs))
+    }
 
-        assertEquals(2, dao.touchJobCount)
-        assertEquals(1, dao.getJobCount)
-        assertEquals(1, dao.upsertJobCount)
-        assertEquals("content", dao.jobRows.values.single().contentKey)
-        assertEquals("asr", dao.jobRows.values.single().asrModel)
-        assertEquals(1, dao.cueRows.size)
+    @Test
+    fun oldLeaseCannotWriteIntoReplacementModelJob() = runBlocking {
+        val repo = ListenTranslateRepository(FakeListenTranslateDao())
+        val old = repo.acquireLease(identity, langs)
+        repo.ensureJob(identity, langs, asrModel = "old", lease = old)
+        val fresh = repo.acquireLease(identity, langs)
+        repo.ensureJob(identity, langs, asrModel = "new", lease = fresh)
+        assertTrue(runCatching { repo.upsertCueForExistingJob(identity, langs, 0, 3_000, "stale", "stale", lease = old) }.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+        repo.upsertCueForExistingJob(identity, langs, 0, 3_000, "new", "new", lease = fresh)
+        assertEquals("new", repo.listCues(identity, langs).single().textSrc)
     }
 
     @Test

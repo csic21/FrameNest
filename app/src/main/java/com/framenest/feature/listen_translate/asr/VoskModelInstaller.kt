@@ -86,7 +86,7 @@ class VoskModelInstaller(
                 onProgress(0.88f)
                 if (stagingDir.exists()) stagingDir.deleteRecursively()
                 stagingDir.mkdirs()
-                unzip(zipFile, stagingDir)
+                extractVoskArchive(zipFile, stagingDir)
                 val stagedModel = File(stagingDir, spec.folderName)
                 if (!isCompleteVoskModel(stagedModel)) {
                     error("Vosk 模型解压后校验失败（$lang）")
@@ -98,7 +98,7 @@ class VoskModelInstaller(
                 check(isCompleteVoskModel(unpackDir)) {
                     "Vosk 模型安装未完整落盘（$lang）"
                 }
-                File(unpackDir, READY_MARKER).writeText("${spec.folderName}\n${spec.sha256}\n")
+                publishModelReady(unpackDir, "${spec.folderName}\n${spec.sha256}\n") { isCompleteVoskModel(unpackDir) }
                 installed = true
                 onProgress(1f)
                 unpackDir
@@ -120,134 +120,17 @@ class VoskModelInstaller(
     }
 
     private fun isReady(dir: File): Boolean {
-        return isCompleteVoskModel(dir)
+        return File(dir, READY_MARKER).isFile && isCompleteVoskModel(dir)
     }
 
     private suspend fun download(
         spec: Spec,
         dest: File,
         allowMeteredDownloads: Boolean,
-        onBytes: (read: Long, total: Long) -> Unit,
-    ) {
-        dest.parentFile?.mkdirs()
-        val part = File(dest.absolutePath + PART_SUFFIX)
-
-        if (dest.isFile && verifyArchive(dest, spec)) {
-            onBytes(spec.archiveBytes, spec.archiveBytes)
-            return
-        }
-        if (dest.exists()) dest.delete()
-        if (part.length() > spec.archiveBytes) part.delete()
-        if (part.length() == spec.archiveBytes) {
-            if (verifyArchive(part, spec)) {
-                promote(part, dest)
-                onBytes(spec.archiveBytes, spec.archiveBytes)
-                return
-            }
-            part.delete()
-        }
-
-        ModelDownloadNetworkPolicy.requireAllowed(appContext, allowMeteredDownloads)
-        val requestedOffset = part.length()
-        val conn = (URL(spec.url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 30_000
-            readTimeout = 30_000
-            instanceFollowRedirects = true
-            requestMethod = "GET"
-            if (requestedOffset > 0L) {
-                setRequestProperty("Range", "bytes=$requestedOffset-")
-            }
-        }
-        try {
-            val code = conn.responseCode
-            if (code !in 200..299) error("下载 Vosk 模型失败 HTTP $code")
-            val plan = resumeDownloadPlan(requestedOffset, code)
-            if (plan.append) {
-                val contentRange = conn.getHeaderField("Content-Range").orEmpty()
-                check(contentRange.startsWith("bytes $requestedOffset-")) {
-                    "Vosk 模型服务器未返回预期的续传范围"
-                }
-            }
-            val contentLength = conn.contentLengthLong
-            val expectedFromResponse = if (contentLength > 0L) {
-                plan.startBytes + contentLength
-            } else {
-                spec.archiveBytes
-            }
-            check(expectedFromResponse == spec.archiveBytes) {
-                "Vosk 模型大小与固定清单不一致"
-            }
-            conn.inputStream.use { input ->
-                BufferedInputStream(input).use { bis ->
-                    FileOutputStream(part, plan.append).use { out ->
-                        val buf = ByteArray(64 * 1024)
-                        var readTotal = plan.startBytes
-                        onBytes(readTotal, spec.archiveBytes)
-                        while (true) {
-                            currentCoroutineContext().ensureActive()
-                            val n = bis.read(buf)
-                            if (n < 0) break
-                            out.write(buf, 0, n)
-                            readTotal += n
-                            onBytes(readTotal, spec.archiveBytes)
-                        }
-                        out.fd.sync()
-                        if (readTotal != spec.archiveBytes) {
-                            error("Vosk 模型下载不完整：$readTotal/${spec.archiveBytes} bytes")
-                        }
-                    }
-                }
-            }
-            if (!verifyArchive(part, spec)) {
-                part.delete()
-                error("Vosk 模型 SHA-256 校验失败")
-            }
-            promote(part, dest)
-        } finally {
-            conn.disconnect()
-        }
-    }
-
-    private fun verifyArchive(file: File, spec: Spec): Boolean =
-        file.length() == spec.archiveBytes && sha256(file).equals(spec.sha256, ignoreCase = true)
-
-    private fun promote(source: File, dest: File) {
-        if (dest.exists()) dest.delete()
-        if (!source.renameTo(dest)) {
-            source.copyTo(dest, overwrite = true)
-            source.delete()
-        }
-    }
-
-    private suspend fun unzip(zipFile: File, destDir: File) {
-        val destinationRoot = destDir.canonicalFile
-        ZipInputStream(BufferedInputStream(zipFile.inputStream())).use { zis ->
-            var entry = zis.nextEntry
-            val buf = ByteArray(64 * 1024)
-            while (entry != null) {
-                currentCoroutineContext().ensureActive()
-                val outFile = File(destinationRoot, entry.name).canonicalFile
-                check(outFile.path.startsWith(destinationRoot.path + File.separator)) {
-                    "Vosk 模型压缩包包含非法路径"
-                }
-                if (entry.isDirectory) {
-                    outFile.mkdirs()
-                } else {
-                    outFile.parentFile?.mkdirs()
-                    FileOutputStream(outFile).use { out ->
-                        while (true) {
-                            currentCoroutineContext().ensureActive()
-                            val n = zis.read(buf)
-                            if (n < 0) break
-                            out.write(buf, 0, n)
-                        }
-                    }
-                }
-                zis.closeEntry()
-                entry = zis.nextEntry
-            }
-        }
-    }
+        onBytes: (Long, Long) -> Unit,
+    ) = downloadVerifiedModel(spec.url, dest, spec.archiveBytes, spec.sha256,
+        requireNetwork = { ModelDownloadNetworkPolicy.requireAllowed(appContext, allowMeteredDownloads) },
+        onBytes = onBytes)
 
     private fun dirSize(dir: File): Long {
         if (!dir.exists()) return 0L
@@ -373,4 +256,42 @@ internal fun sha256(file: File): String {
         }
     }
     return digest.digest().joinToString(separator = "") { byte -> "%02x".format(byte) }
+}
+
+internal suspend fun extractVoskArchive(zipFile: File, destDir: File, maxExpandedBytes: Long = 512L * 1024L * 1024L, maxEntries: Int = 10_000) {
+    val destinationRoot = destDir.canonicalFile
+    ZipInputStream(BufferedInputStream(zipFile.inputStream())).use { zis ->
+        var entry = zis.nextEntry
+        val buf = ByteArray(64 * 1024)
+        var entries = 0
+        var expandedBytes = 0L
+        val seen = HashSet<String>()
+        while (entry != null) {
+            currentCoroutineContext().ensureActive()
+            check(++entries <= maxEntries) { "Vosk 模型压缩包文件数超限" }
+            check(entry.name.length <= 1_024) { "Vosk 模型压缩包路径过长" }
+            val outFile = File(destinationRoot, entry.name).canonicalFile
+            check(seen.add(outFile.path)) { "Vosk 模型压缩包包含重复路径" }
+            check(outFile.path.startsWith(destinationRoot.path + File.separator)) {
+                "Vosk 模型压缩包包含非法路径"
+            }
+            if (entry.isDirectory) {
+                outFile.mkdirs()
+            } else {
+                outFile.parentFile?.mkdirs()
+                FileOutputStream(outFile).use { out ->
+                    while (true) {
+                        currentCoroutineContext().ensureActive()
+                        val n = zis.read(buf)
+                        if (n < 0) break
+                        check(n.toLong() <= maxExpandedBytes - expandedBytes) { "Vosk 模型解压大小超限" }
+                        out.write(buf, 0, n)
+                        expandedBytes += n
+                    }
+                }
+            }
+            zis.closeEntry()
+            entry = zis.nextEntry
+        }
+    }
 }
