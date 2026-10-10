@@ -89,6 +89,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -102,6 +103,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -806,6 +808,41 @@ private fun PlayerSurfaceStack(
 
     val context = LocalContext.current
     val hostView = LocalView.current
+    // Viewport of the full-window surface host: the same area libVLC lays its
+    // video surface out in, used to place app-drawn captions on the picture band.
+    var viewportSize by remember { mutableStateOf(IntSize.Zero) }
+    val density = LocalDensity.current
+    val isPortrait = LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
+    val ccActive = state.selectedSubtitleTrackId?.let { it >= 0 } == true
+    val listenCaptionBottom = remember(
+        viewportSize,
+        state.videoSize,
+        state.videoScaleMode,
+        isPortrait,
+        ccActive,
+        state.subtitleFontRelSize,
+        density,
+    ) {
+        val bounds = state.videoSize?.let { video ->
+            PlayerCaptionGeometry.videoDisplayBounds(
+                viewportWidth = viewportSize.width,
+                viewportHeight = viewportSize.height,
+                video = video,
+                scaleMode = state.videoScaleMode,
+                isPortrait = isPortrait,
+            )
+        }
+        with(density) {
+            PlayerCaptionGeometry.listenOverlayBottomPx(
+                viewportHeight = viewportSize.height,
+                bounds = bounds,
+                ccActive = ccActive,
+                subtitleFontRelSize = state.subtitleFontRelSize,
+                gapPx = 12.dp.toPx(),
+                fallbackPx = (if (ccActive) 72.dp else 20.dp).toPx(),
+            ).toDp()
+        }
+    }
     val gestureController = remember(context, hostView) {
         BrightnessVolumeController(context, hostView)
     }
@@ -855,6 +892,7 @@ private fun PlayerSurfaceStack(
     Box(
         modifier = modifier
             .background(Color.Black)
+            .onSizeChanged { viewportSize = it }
             .testTag("player_video_surface"),
         contentAlignment = Alignment.Center,
     ) {
@@ -989,7 +1027,7 @@ private fun PlayerSurfaceStack(
             ListenTranslateOverlay(
                 text = listenUi.overlayText,
                 modifier = Modifier.align(Alignment.BottomCenter),
-                bottomPadding = if (state.selectedSubtitleTrackId != null) 72.dp else 20.dp,
+                bottomPadding = listenCaptionBottom,
             )
         }
 

@@ -1122,3 +1122,11 @@ unit test、lint、debug/release assemble 与 AndroidTest 编译通过。真实 
   `ApplicationExitInfo reason=1 (EXIT_SELF) status=255`，无 Java FATAL。
 - 修复：`OfflineRecognizer(config)` 走 `newFromFile`（`assetManager` 默认 null）。
 - 不修改：3 秒窗口、静音策略、`|digital-zero-v2` 缓存身份、Vosk/ML Kit、下载与迁移。
+
+## FN-65：听译字幕位置对齐 CC 与分层显示
+
+**依赖**：FN-64
+**拥有路径**：`player/PlayerState.kt` 与 `player/VlcPlayerController.kt` 的视频尺寸暴露、新的播放器字幕几何纯函数与测试、`feature/player/PlayerScreen.kt` 的听译叠加定位、对应决策/交接。
+**目标**：听译字幕显示在 libVLC CC 相同的画面底部区域；CC 开启时两层并存（听译在 CC 正上方）不重叠；不改字幕轨状态与听译管线。
+
+验收：纯几何函数单测覆盖各画面比例/缩放模式/横竖屏；真机截图对比 CC 与听译的相对位置和分层；关闭听译后 CC 行为不变。

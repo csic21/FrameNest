@@ -30,6 +30,11 @@ data class PlayerState(
      */
     val videoScaleMode: VideoScaleMode = VideoScaleMode.BestFit,
     /**
+     * Decoded frame size of the current video track; null until libVLC reports
+     * a vout/track. Lets overlays mirror libVLC's own display placement.
+     */
+    val videoSize: PlayerVideoSize? = null,
+    /**
      * Playback rate multiplier (1.0 = normal). Discrete steps in [PlaybackRates.ALL].
      */
     val playbackRate: Float = PlaybackRates.DEFAULT,

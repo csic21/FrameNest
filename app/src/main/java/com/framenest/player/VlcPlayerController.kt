@@ -1699,12 +1699,25 @@ class VlcPlayerController(
                 )
             }
             .orEmpty()
+        // Video geometry for caption placement; keep the previous value when a
+        // track event arrives before the vout has reported a frame.
+        val videoSize = runCatching { player.currentVideoTrack }
+            .getOrNull()
+            ?.let { track ->
+                PlayerVideoSize(
+                    width = track.width,
+                    height = track.height,
+                    sarNum = track.sarNum,
+                    sarDen = track.sarDen,
+                ).takeIf { it.width > 0 && it.height > 0 }
+            }
         _state.update {
             it.copy(
                 audioTracks = audio,
                 subtitleTracks = subs,
                 selectedAudioTrackId = player.audioTrack.takeIf { id -> id >= 0 },
                 selectedSubtitleTrackId = player.spuTrack,
+                videoSize = videoSize ?: it.videoSize,
             )
         }
     }
