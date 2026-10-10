@@ -67,8 +67,8 @@
 | FN-58 应用内安全更新 | 待集成 | Codex | `agent/FN-57-state-experience` | FN-54, FN-56 | [FN-58](handoffs/FN-58.md) |
 | FN-59 固定签名可复用发布 | 进行中 | Codex | `agent/FN-57-state-experience` | FN-56, FN-58 | [FN-59](handoffs/FN-59.md) |
 | FN-62 听译本机诊断与保守静音实验 | 进行中 | Codex | `agent/FN-62-local-speech-diagnostics` | FN-61 | [FN-62](handoffs/FN-62.md) |
-| FN-64 0.6.3 听译闪退修复（sherpa 绝对路径 + AssetManager） | 待集成 | Codex | `agent/FN-64-sherpa-file-model-crash` | FN-63 | [FN-64](handoffs/FN-64.md) |
-| FN-65 听译字幕位置对齐 CC 与分层显示 | 进行中 | Codex | `agent/FN-65-caption-stacking` | FN-64 | [FN-65](handoffs/FN-65.md) |
+| FN-64 0.6.3 听译闪退修复（sherpa 绝对路径 + AssetManager） | 已完成 | Codex | `agent/FN-64-sherpa-file-model-crash` → main | FN-63 | [FN-64](handoffs/FN-64.md) |
+| FN-65 听译字幕位置对齐 CC 与分层显示 | 待集成 | Codex | `agent/FN-65-caption-stacking` → main | FN-64 | [FN-65](handoffs/FN-65.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。
