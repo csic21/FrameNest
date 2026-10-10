@@ -20,6 +20,28 @@ import org.junit.Test
 class ListenTranslateSessionTest {
 
     @Test
+    fun actualRevOneCoverageNeverHidesSameStartShortSpeech() = runTest {
+        val repository = ListenTranslateRepository(FakeListenTranslateDao())
+        val identity = PlaybackIdentity("server", "media", "short.mkv")
+        val engine = object : ListenTranslateEngine {
+            override val asrModelId = "asr-test"
+            override val mtModelId = "mt-test"
+            override suspend fun processWindow(startMs: Long, endMs: Long, sourceLang: String, targetLang: String) =
+                ListenWindowResult("short speech", "短句", cueStartMs = 0L, cueEndMs = 1_800L)
+        }
+        val session = ListenTranslateSession(repository, engine, this, identity, pollIntervalMs = 60_000L)
+        session.onPlaybackTick(1_000L, 3_000L, playing = false)
+        session.setEnabled(true)
+        runCurrent()
+        assertEquals("short speech\n短句", session.uiState.value.overlayText)
+        val cues = repository.listCues(identity, session.uiState.value.languages)
+        assertEquals(2, cues.size)
+        assertTrue(cues.all { it.rev == 1 })
+        assertEquals("short speech", ListenTranslateWindows.cueAt(cues.reversed(), 1_000L)?.textSrc)
+        session.release()
+    }
+
+    @Test
     fun legacyBlankAtCurrentPlayhead_isRecoveredAndCounted() = runTest {
         val identity = PlaybackIdentity("server", "media", "movie.mkv")
         val languages = ListenLanguagePair("ja", "zh")

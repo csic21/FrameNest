@@ -106,7 +106,7 @@ adb shell am start -n com.framenest/.MainActivity
 4. 将 [任务卡](tasks/TASKS.md) 中对应的 `FN-XX` 段落直接交给 Agent。
 5. 要求每个 Agent 按 [交接模板](tasks/HANDOFF.md) 回报。
 
-内部测试版：`0.5.2-internal`。安装：
+内部测试版：`0.6.3-internal`。安装：
 
 ```bash
 ./gradlew assembleDebug
@@ -115,3 +115,14 @@ adb install -r app/build/outputs/apk/debug/app-universal-debug.apk
 # 或真机 arm64 分包更小：
 # adb install -r app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
 ```
+
+
+## SMB 安全策略（0.6.3）
+
+SMBJ 浏览、目录/字幕及听译辅助读取默认要求签名和 SMB3 加密。不支持时会停止并提示；
+如确需旧 NAS 兼容，可以在该服务器的编辑页主动选择“仅要求签名、允许未加密”模式。
+此选项按服务器保存，没有自动降级。独立 libVLC 视频播放和 VLC 抓帧另行协商，不能把
+SMBJ 策略视为其加密保证。升级保留服务器与凭证引用，已有服务器默认进入加密模式。
+
+本机听译诊断不上传音频/字幕。ML Kit 自身的 SDK 统计遵循 Google 的
+[数据披露](https://developers.google.com/ml-kit/android-data-disclosure)；不能宣称零遥测。

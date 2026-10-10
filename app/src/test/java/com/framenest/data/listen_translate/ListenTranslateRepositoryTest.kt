@@ -274,6 +274,18 @@ class ListenTranslateRepositoryTest {
     }
 
     @Test
+    fun oldLeaseCannotWriteIntoReplacementModelJob() = runBlocking {
+        val repo = ListenTranslateRepository(FakeListenTranslateDao())
+        val old = repo.acquireLease(identity, langs)
+        repo.ensureJob(identity, langs, asrModel = "old", lease = old)
+        val fresh = repo.acquireLease(identity, langs)
+        repo.ensureJob(identity, langs, asrModel = "new", lease = fresh)
+        assertTrue(runCatching { repo.upsertCueForExistingJob(identity, langs, 0, 3_000, "stale", "stale", lease = old) }.exceptionOrNull() is kotlinx.coroutines.CancellationException)
+        repo.upsertCueForExistingJob(identity, langs, 0, 3_000, "new", "new", lease = fresh)
+        assertEquals("new", repo.listCues(identity, langs).single().textSrc)
+    }
+
+    @Test
     fun updateProgress_usesTargetedUpdate_withoutParentRead() = runBlocking {
         val dao = FakeListenTranslateDao()
         val repo = ListenTranslateRepository(dao, timeSource = { 10_000L })

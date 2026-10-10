@@ -2,11 +2,7 @@ package com.framenest.feature.listen_translate.asr
 
 import android.content.Context
 import com.framenest.feature.listen_translate.ModelDownloadNetworkPolicy
-import java.io.BufferedInputStream
 import java.io.File
-import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -24,7 +20,7 @@ import kotlinx.coroutines.withContext
  *
  * Integrity mirrors [VoskModelInstaller]: revision-pinned HTTPS URLs (the
  * Hugging Face commit cannot move under us), exact byte sizes, SHA-256 for
- * the 239MB weight file, resumable `.part` downloads, and downloads gated by
+ * both the weight and token files, resumable `.part` downloads, and downloads gated by
  * [ModelDownloadNetworkPolicy] (default Wi-Fi/Ethernet only).
  */
 class SherpaModelInstaller(
@@ -133,7 +129,6 @@ class SherpaModelInstaller(
             "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17" +
                 "/resolve/$REVISION"
         private const val READY_MARKER = ".ready"
-        private const val PART_SUFFIX = ".part"
         private val INSTALL_MUTEX = Mutex()
 
         /**
@@ -181,6 +176,7 @@ internal suspend fun installSherpaPack(
         }
         completed += spec.expectedBytes
     }
+    currentCoroutineContext().ensureActive()
     publishModelReady(dir, marker) {
         files.all { verifiedModelFile(File(dir, it.name), it.expectedBytes, it.sha256) }
     }

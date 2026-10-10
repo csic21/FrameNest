@@ -44,6 +44,7 @@ internal suspend fun copyModelBytes(input: InputStream, out: FileOutputStream, s
     while (true) {
         currentCoroutineContext().ensureActive()
         val count = input.read(buffer)
+        currentCoroutineContext().ensureActive()
         if (count < 0) break
         if (count == 0) continue
         if (count.toLong() > expected - total) throw InvalidModelDownload("模型下载超过固定大小上限")
@@ -127,7 +128,9 @@ internal suspend fun downloadVerifiedModel(
                 copyModelBytes(input, out, plan.startBytes, expected, onBytes)
             }
         }
+        currentCoroutineContext().ensureActive()
         if (!verifiedModelFile(part, expected, hash)) throw InvalidModelDownload("模型 SHA-256 校验失败")
+        currentCoroutineContext().ensureActive()
         atomicModelMove(part, dest)
     } catch (invalid: InvalidModelDownload) {
         part.delete()

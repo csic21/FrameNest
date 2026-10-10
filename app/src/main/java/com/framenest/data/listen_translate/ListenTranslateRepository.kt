@@ -91,7 +91,7 @@ class ListenTranslateRepository(
         lease: CacheLease? = null,
     ): ListenTranslateJob = writeMutex.withLock {
         checkLease(lease, identity, languages)
-        ensureJobLocked(identity, languages, contentKey, durationMs, asrModel, mtModel, status)
+        ensureJobLocked(identity, languages, contentKey, durationMs, asrModel, mtModel, status, lease)
     }
 
     private suspend fun ensureJobLocked(
@@ -102,6 +102,7 @@ class ListenTranslateRepository(
         asrModel: String = "",
         mtModel: String = "",
         status: ListenTranslateJobStatus = ListenTranslateJobStatus.Idle,
+        lease: CacheLease? = null,
     ): ListenTranslateJob {
         val path = identity.normalizedPath()
         val lang = languages.normalized()
@@ -117,6 +118,10 @@ class ListenTranslateRepository(
                 shouldInvalidateModel(existing.asrModel, asrModel) ||
                 shouldInvalidateModel(existing.mtModel, mtModel))
         if (invalidated) {
+            synchronized(leaseLock) {
+                leases.filter { it !== lease && it.key == key(identity, lang) }.forEach { it.close() }
+                leases.removeAll { !it.active }
+            }
             dao.deleteJob(
                 identity.serverId,
                 identity.share,
