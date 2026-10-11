@@ -200,6 +200,8 @@ internal class CachingListenAudioSource(
     private var cacheEndMs = 0L
     private var cacheTrackOrdinal: Int? = null
     private var cache = ShortArray(0)
+    private var previousStartMs: Long? = null
+    private var previousEndMs = 0L
 
     override suspend fun pcmWindow(
         startMs: Long,
@@ -207,12 +209,18 @@ internal class CachingListenAudioSource(
         preferredAudioTrackOrdinal: Int?,
     ): ShortArray = mutex.withLock {
         if (!contains(startMs, endMs, preferredAudioTrackOrdinal)) {
-            val decodeEndMs = endMs + readAheadMs
+            // First request / distant seek: do not put speculative decode ahead of ASR.
+            // Adjacent windows regain read-ahead to amortize extractor/codec startup.
+            val sequential = cacheTrackOrdinal == preferredAudioTrackOrdinal &&
+                previousStartMs?.let { startMs > it && startMs <= previousEndMs } == true
+            val decodeEndMs = endMs + if (sequential) readAheadMs else 0L
             cache = delegate.pcmWindow(startMs, decodeEndMs, preferredAudioTrackOrdinal)
             cacheStartMs = startMs
             cacheEndMs = startMs + samplesToMs(cache.size)
             cacheTrackOrdinal = preferredAudioTrackOrdinal
         }
+        previousStartMs = startMs
+        previousEndMs = endMs
         slice(startMs, endMs)
     }
 
@@ -220,6 +228,7 @@ internal class CachingListenAudioSource(
         runBlocking {
             mutex.withLock {
                 cache = ShortArray(0)
+                previousStartMs = null
                 delegate.close()
             }
         }

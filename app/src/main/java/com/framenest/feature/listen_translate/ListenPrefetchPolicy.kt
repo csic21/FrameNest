@@ -82,6 +82,29 @@ internal object ListenPrefetchPolicy {
 
     fun isFarSeek(previousMs: Long, currentMs: Long, windowMs: Long): Boolean =
         abs(currentMs - previousMs) >= max(windowMs * 2L, 6_000L)
+
+    /** Completed windows only: a later cached cue cannot hide an earlier gap. */
+    fun contiguousAheadMs(
+        cues: List<ListenTranslateCue>,
+        positionMs: Long,
+        durationMs: Long,
+        windowMs: Long,
+    ): Long {
+        val position = positionMs.coerceAtLeast(0L)
+        if (durationMs > 0L && position >= durationMs) return 0L
+        var (start, end) = ListenTranslateWindows.windowContaining(position, windowMs, durationMs)
+        var covered = position
+        val horizon = (position + FAST_LOOKAHEAD_MS).let {
+            if (durationMs > 0L) it.coerceAtMost(durationMs) else it
+        }
+        while (start < horizon && end > start) {
+            if (ListenTranslateWindows.needsFill(cues, start, end)) break
+            covered = end
+            start = end
+            end = (start + windowMs).let { if (durationMs > 0L) it.coerceAtMost(durationMs) else it }
+        }
+        return (covered - position).coerceAtLeast(0L)
+    }
 }
 
 /** Audio selection is part of cache validity, without retaining credential material. */

@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="listen_translate_prepare">暂停并准备后续字幕</string>
+    <string name="listen_translate_stop_prepare">停止准备</string>
+    <string name="listen_translate_prepare_hint">先开启听译，可暂停准备后续约 12 秒字幕。完成后保持暂停，按播放继续；离开、拖动或切换语言会停止准备。</string>
+    <string name="listen_translate_ready_ahead">当前位置连续已准备：%1$d 秒</string>
     <string name="app_name">FrameNest</string>
     <string name="smb_spike_label">FrameNest SMB Spike</string>
     <string name="pcm_spike_label">FrameNest PCM Spike</string>

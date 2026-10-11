@@ -20,6 +20,101 @@ import org.junit.Test
 class ListenTranslateSessionTest {
 
     @Test
+    fun explicitPausedPreparationStopsAtContiguousTargetAndNeverStartsPlayback() = runTest {
+        val calls = mutableListOf<Long>()
+        val engine = object : ListenTranslateEngine {
+            override val asrModelId = "test"
+            override val mtModelId = "mt"
+            override suspend fun processWindow(startMs: Long, endMs: Long, sourceLang: String, targetLang: String): ListenWindowResult {
+                calls += startMs
+                return ListenWindowResult("source", "target")
+            }
+        }
+        val session = ListenTranslateSession(ListenTranslateRepository(FakeListenTranslateDao()), engine,
+            this, PlaybackIdentity("s", "m", "prepare.mkv"))
+        session.onPlaybackTick(0L, 60_000L, playing = false)
+        session.setEnabled(true)
+        runCurrent()
+        assertEquals(listOf(0L), calls)
+        session.setPreparingSubtitles(true)
+        runCurrent()
+        assertEquals(listOf(0L, 3_000L, 6_000L, 9_000L), calls)
+        assertEquals(12_000L, session.uiState.value.preparedAheadMs)
+        assertFalse(session.uiState.value.preparingSubtitles)
+        advanceTimeBy(1_000L)
+        runCurrent()
+        assertEquals(4, calls.size)
+        session.release()
+    }
+
+    @Test
+    fun sourceOnlyUsesIndependentCoverageAndModeSwitchRejectsLateTranslation() = runTest {
+        val pairs = mutableListOf<String>()
+        val engine = object : ListenTranslateEngine {
+            override val asrModelId = "test"
+            override val mtModelId = "mt"
+            override suspend fun processWindow(startMs: Long, endMs: Long, sourceLang: String, targetLang: String): ListenWindowResult {
+                pairs += "$sourceLang:$targetLang"
+                if (targetLang == "zh") delay(5_000L)
+                return ListenWindowResult("source", if (targetLang == sourceLang) "source" else "译文")
+            }
+        }
+        val session = ListenTranslateSession(ListenTranslateRepository(FakeListenTranslateDao()), engine,
+            this, PlaybackIdentity("s", "m", "mode.mkv"))
+        session.onPlaybackTick(0L, 3_000L, playing = false)
+        session.setEnabled(true)
+        runCurrent()
+        session.setDisplayMode(ListenDisplayMode.SourceOnly)
+        runCurrent()
+        assertEquals(listOf("en:zh", "en:en"), pairs)
+        assertEquals("source", session.uiState.value.overlayText)
+        assertEquals(3_000L, session.uiState.value.preparedAheadMs)
+        session.setDisplayMode(ListenDisplayMode.Bilingual)
+        runCurrent()
+        assertEquals(0L, session.uiState.value.preparedAheadMs)
+        advanceTimeBy(5_001L)
+        runCurrent()
+        assertEquals("source\n译文", session.uiState.value.overlayText)
+        session.release()
+    }
+
+    @Test
+    fun seekAndBackgroundCancelExplicitPreparation() = runTest {
+        val calls = mutableListOf<Long>()
+        val engine = object : ListenTranslateEngine {
+            override val asrModelId = "test"
+            override val mtModelId = "mt"
+            override suspend fun processWindow(startMs: Long, endMs: Long, sourceLang: String, targetLang: String): ListenWindowResult {
+                calls += startMs
+                delay(100L)
+                return ListenWindowResult("source", "target")
+            }
+        }
+        val session = ListenTranslateSession(ListenTranslateRepository(FakeListenTranslateDao()), engine,
+            this, PlaybackIdentity("s", "m", "cancel.mkv"))
+        session.onPlaybackTick(0L, 60_000L, playing = false)
+        session.setEnabled(true)
+        runCurrent()
+        session.setPreparingSubtitles(true)
+        runCurrent()
+        session.onSeek(30_000L)
+        runCurrent()
+        assertFalse(session.uiState.value.preparingSubtitles)
+        advanceTimeBy(101L)
+        runCurrent()
+        assertEquals(30_000L, calls.last())
+        session.setPreparingSubtitles(true)
+        runCurrent()
+        session.setForeground(false)
+        val count = calls.size
+        advanceTimeBy(2_000L)
+        runCurrent()
+        assertEquals(count, calls.size)
+        assertFalse(session.uiState.value.preparingSubtitles)
+        session.release()
+    }
+
+    @Test
     fun actualRevOneCoverageNeverHidesSameStartShortSpeech() = runTest {
         val repository = ListenTranslateRepository(FakeListenTranslateDao())
         val identity = PlaybackIdentity("server", "media", "short.mkv")

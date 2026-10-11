@@ -93,6 +93,8 @@ class ListenTranslateSession(
             retryPolicy.clear()
             _ui.update {
                 it.copy(
+                    preparingSubtitles = false,
+                    preparedAheadMs = 0L,
                     activeCue = null,
                     overlayText = "",
                     isProcessing = false,
@@ -128,10 +130,23 @@ class ListenTranslateSession(
     }
 
     fun setDisplayMode(mode: ListenDisplayMode) {
+        val previousLanguages = _ui.value.languages
         _ui.update {
             val overlay = ListenTranslateWindows.formatOverlay(it.activeCue, mode)
             it.copy(displayMode = mode, overlayText = overlay)
         }
+        if (previousLanguages != _ui.value.languages) {
+            _ui.update { it.copy(activeCue = null, overlayText = "") }
+            if (_ui.value.enabled) activate()
+        }
+    }
+
+    fun setPreparingSubtitles(preparing: Boolean) {
+        if (released || !_ui.value.enabled || !isForeground) return
+        if (_ui.value.preparingSubtitles == preparing) return
+        stopPolling()
+        _ui.update { it.copy(preparingSubtitles = preparing, isProcessing = false) }
+        if (activationJob?.isActive != true) startPolling()
     }
 
     fun setModelsReady(ready: Boolean) {
@@ -166,6 +181,9 @@ class ListenTranslateSession(
         lastPositionMs = normalizedPosition
         lastDurationMs = durationMs.coerceAtLeast(0L)
         isPlaying = playing
+        if (playing && _ui.value.preparingSubtitles) {
+            _ui.update { it.copy(preparingSubtitles = false) }
+        }
         isBuffering = buffering
         this.playbackRate = ListenPrefetchPolicy.normalizedPlaybackRate(playbackRate)
         updateEffectiveRealtimeFactor()
@@ -183,6 +201,7 @@ class ListenTranslateSession(
     fun setForeground(foreground: Boolean) {
         if (released || isForeground == foreground) return
         isForeground = foreground
+        if (!foreground) _ui.update { it.copy(preparingSubtitles = false) }
         stopPolling()
         _ui.update { it.copy(isProcessing = false, prefetchLookAheadMs = 0L) }
         if (foreground && _ui.value.enabled && activationJob?.isActive != true) startPolling()
@@ -192,6 +211,7 @@ class ListenTranslateSession(
     fun onSeek(positionMs: Long) {
         if (released) return
         lastPositionMs = positionMs.coerceAtLeast(0L)
+        _ui.update { it.copy(preparingSubtitles = false) }
         stopPolling()
         _ui.update { it.copy(isProcessing = false) }
         refreshActiveCue()
@@ -212,6 +232,7 @@ class ListenTranslateSession(
         if (released) return
         activationJob?.cancel()
         stopPolling()
+        _ui.update { it.copy(preparingSubtitles = false, preparedAheadMs = 0L) }
         processingRealtimeFactor = null
         updateEffectiveRealtimeFactor()
         activationJob = scope.launch {
@@ -270,7 +291,7 @@ class ListenTranslateSession(
             languages = langs,
             contentKey = contentKey,
             asrModel = engine.asrModelId,
-            mtModel = engine.mtModelId,
+            mtModel = cacheMtModelId(),
             status = ListenTranslateJobStatus.Partial,
             lease = lease,
         )
@@ -292,8 +313,24 @@ class ListenTranslateSession(
         if (!_ui.value.enabled) return
         val cue = ListenTranslateWindows.cueAt(cachedCues, lastPositionMs)
         val overlay = ListenTranslateWindows.formatOverlay(cue, _ui.value.displayMode)
-        _ui.update { it.copy(activeCue = cue, overlayText = overlay) }
+        val ahead = ListenPrefetchPolicy.contiguousAheadMs(
+            cachedCues, lastPositionMs, lastDurationMs, windowMs,
+        )
+        val target = preparationTargetMs()
+        _ui.update {
+            it.copy(
+                activeCue = cue, overlayText = overlay, preparedAheadMs = ahead,
+                preparingSubtitles = it.preparingSubtitles && ahead < target,
+            )
+        }
     }
+
+    private fun preparationTargetMs(): Long = if (lastDurationMs > 0L) {
+        (lastDurationMs - lastPositionMs).coerceIn(0L, ListenPrefetchPolicy.BALANCED_LOOKAHEAD_MS)
+    } else ListenPrefetchPolicy.BALANCED_LOOKAHEAD_MS
+
+    private fun cacheMtModelId(): String =
+        if (_ui.value.displayMode == ListenDisplayMode.SourceOnly) "source-only-v1" else engine.mtModelId
 
     private suspend fun maybeFillAroundPosition(generation: Long): Boolean {
         if (!_ui.value.enabled || !isForeground || released) return false
@@ -303,7 +340,7 @@ class ListenTranslateSession(
         }
         val position = lastPositionMs
         val duration = lastDurationMs
-        val lookAheadMs = ListenPrefetchPolicy.lookAheadMs(
+        val lookAheadMs = if (_ui.value.preparingSubtitles) preparationTargetMs() else ListenPrefetchPolicy.lookAheadMs(
             playing = isPlaying,
             buffering = isBuffering,
             realtimeFactor = processingRealtimeFactor,
@@ -360,7 +397,7 @@ class ListenTranslateSession(
             val windowLease = cacheLease
             val windowEngine = engine
             val asrModel = windowEngine.asrModelId
-            val mtModel = windowEngine.mtModelId
+            val mtModel = cacheMtModelId()
             val windowStartedAtMs = monotonicTimeMs()
             var diagnostics = ListenPipelineDiagnostics(
                 queueWaitMs = elapsedListenTimeMs(queuedAtMs, windowStartedAtMs),

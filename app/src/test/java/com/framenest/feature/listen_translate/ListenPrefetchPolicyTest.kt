@@ -64,6 +64,16 @@ class ListenPrefetchPolicyTest {
         assertEquals("audio=0", ListenCacheVariant.contentKey("", null))
     }
 
+    @Test
+    fun preparedAheadStopsAtGapIncompleteTranslationAndMediaEnd() {
+        val future = listOf(cue(0L, 3_000L), cue(6_000L, 9_000L))
+        assertEquals(2_000L, ListenPrefetchPolicy.contiguousAheadMs(future, 1_000L, 9_000L, 3_000L))
+        val incomplete = listOf(cue(0L, 3_000L).copy(textTgt = ""))
+        assertEquals(0L, ListenPrefetchPolicy.contiguousAheadMs(incomplete, 0L, 9_000L, 3_000L))
+        assertEquals(1_000L, ListenPrefetchPolicy.contiguousAheadMs(listOf(cue(0L, 2_000L)), 1_000L, 2_000L, 3_000L))
+        assertEquals(0L, ListenPrefetchPolicy.contiguousAheadMs(future, 9_000L, 9_000L, 3_000L))
+    }
+
     private fun cue(startMs: Long, endMs: Long) = ListenTranslateCue(
         id = startMs,
         identity = identity,

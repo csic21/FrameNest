@@ -27,6 +27,8 @@ interface AsrEngine {
 data class AsrRecognition(
     val text: String,
     val words: List<AsrWord>,
+    /** Vosk returns words; SenseVoice pieces already carry their own word boundaries. */
+    val textSeparator: String = " ",
 ) {
     companion object {
         val EMPTY = AsrRecognition("", emptyList())

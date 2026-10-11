@@ -55,27 +55,28 @@ class SherpaAsrMappingTest {
     }
 
     @Test
-    fun englishSubwordSpacing_isTrimmedWithoutBreakingAlignment() {
+    fun englishSubwords_keepBoundariesAndStayWholeForWindowSelection() {
         val words = SherpaAsrEngine.mapTokensToWords(
-            tokens = arrayOf("the", " tri", "bal", "  ", "boy"),
+            tokens = arrayOf("▁the", "▁tri", "bal", "  ", "boy"),
             timestamps = floatArrayOf(0.90f, 1.26f, 1.56f, 1.80f, 2.16f),
         )
 
-        // The blank token and its timestamp drop together; "boy" keeps 2.16s.
-        assertEquals(listOf("the", "tri", "bal", "boy"), words.map { it.text })
-        assertEquals(2160L, words[3].startMs)
+        // A blank piece preserves the next word boundary; subwords stay together.
+        assertEquals(listOf(" the", " tribal", " boy"), words.map { it.text })
+        assertEquals(2160L, words[2].startMs)
         assertEquals(1260L, words[1].startMs)
-        assertEquals(1560L, words[1].endMs)
+        assertEquals(2160L, words[1].endMs)
+        assertEquals("the tribal boy", words.joinToString("") { it.text }.trim())
     }
 
     @Test
     fun invalidTimestamps_dropOnlyTheirOwnToken() {
         val words = SherpaAsrEngine.mapTokensToWords(
-            tokens = arrayOf("a", "b", "c"),
+            tokens = arrayOf("甲", "乙", "丙"),
             timestamps = floatArrayOf(0.5f, Float.NaN, 1.5f),
         )
 
-        assertEquals(listOf("a", "c"), words.map { it.text })
+        assertEquals(listOf("甲", "丙"), words.map { it.text })
         assertEquals(500L, words[0].startMs)
         assertEquals(1500L, words[0].endMs)
         assertEquals(1500L, words[1].startMs)

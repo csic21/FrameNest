@@ -65,7 +65,12 @@ data class ListenTranslateUiState(
     val experimentalSilenceGate: Boolean = false,
     /** Last/current window only. Cleared on generation changes; never logged or persisted. */
     val diagnostics: ListenPipelineDiagnostics? = null,
+    /** Explicit foreground-only preparation; never automatically starts playback. */
+    val preparingSubtitles: Boolean = false,
+    val preparedAheadMs: Long = 0L,
 ) {
     val languages: ListenLanguagePair
-        get() = ListenLanguagePair(sourceLang, targetLang).normalized()
+        get() = ListenLanguagePair(
+            sourceLang, if (displayMode == ListenDisplayMode.SourceOnly) sourceLang else targetLang,
+        ).normalized()
 }

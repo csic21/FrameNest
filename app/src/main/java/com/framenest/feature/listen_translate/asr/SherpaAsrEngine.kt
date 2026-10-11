@@ -41,7 +41,7 @@ class SherpaAsrEngine(
     override suspend fun ensureModel(modelDir: File, langTag: String) =
         withContext(Dispatchers.IO) {
             mutex.withLock {
-                val key = modelDir.absolutePath
+                val key = "${modelDir.absolutePath}|${mapLanguage(langTag)}"
                 if (loadedKey == key && recognizer != null) return@withLock
                 closeLocked()
                 val onnx = File(modelDir, SherpaModelInstaller.MODEL_FILE)
@@ -87,6 +87,7 @@ class SherpaAsrEngine(
                     AsrRecognition(
                         text = result.text?.trim().orEmpty(),
                         words = mapTokensToWords(result.tokens, result.timestamps),
+                        textSeparator = "",
                     )
                 } finally {
                     runCatching { stream.release() }
@@ -137,9 +138,9 @@ class SherpaAsrEngine(
 
         /**
          * Pair SenseVoice tokens with their start timestamps into cue words.
-         * Blank tokens are dropped together with their timestamp so alignment
-         * can never drift; a token end is the next token start (last token is
-         * point-length, which is all the window midpoint mapping needs).
+         * Keep SentencePiece/space boundaries and combine Latin subwords before
+         * window assignment. A token end is the next token start; the final token
+         * has only a start estimate and the display layer supplies a bounded duration.
          * Punctuation tokens from ITN are kept — subtitles want them.
          */
         internal fun mapTokensToWords(
@@ -147,12 +148,28 @@ class SherpaAsrEngine(
             timestamps: FloatArray?,
         ): List<AsrWord> {
             if (tokens == null || timestamps == null) return emptyList()
-            val starts = tokens.indices.mapNotNull { index ->
-                val text = tokens[index].trim()
-                if (text.isEmpty()) return@mapNotNull null
-                val startSec = timestamps.getOrNull(index) ?: return@mapNotNull null
-                if (!startSec.isFinite() || startSec < 0f) return@mapNotNull null
-                text to (startSec * 1000f).toLong().coerceAtLeast(0L)
+            val starts = mutableListOf<Pair<String, Long>>()
+            var pendingSpace = false
+            tokens.forEachIndexed { index, token ->
+                val piece = token.replace('▁', ' ')
+                if (piece.isBlank()) {
+                    pendingSpace = true
+                    return@forEachIndexed
+                }
+                val startSec = timestamps.getOrNull(index) ?: return@forEachIndexed
+                if (!startSec.isFinite() || startSec < 0f) return@forEachIndexed
+                val text = (if (pendingSpace && !piece.startsWith(' ')) " " else "") + piece
+                pendingSpace = false
+                val previous = starts.lastOrNull()
+                // Preserve whole Latin words when a window cuts through BPE pieces.
+                fun String.isLatinPiece() = isNotEmpty() && all {
+                    it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it == '\'' || it == '-'
+                }
+                if (previous != null && text.isLatinPiece() && previous.first.trim().isLatinPiece()) {
+                    starts[starts.lastIndex] = previous.first + text to previous.second
+                } else {
+                    starts += text to (startSec * 1000f).toLong().coerceAtLeast(0L)
+                }
             }
             return starts.mapIndexed { index, (text, startMs) ->
                 val endMs = starts.getOrNull(index + 1)?.second ?: startMs

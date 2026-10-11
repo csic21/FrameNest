@@ -15,6 +15,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +39,7 @@ fun ListenTranslateControls(
     onDisplayMode: (ListenDisplayMode) -> Unit,
     modifier: Modifier = Modifier,
     onExperimentalSilenceGate: (Boolean) -> Unit = {},
+    onPrepareSubtitles: () -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -83,6 +85,27 @@ fun ListenTranslateControls(
         }
 
         Spacer(Modifier.height(8.dp))
+        TextButton(
+            onClick = onPrepareSubtitles,
+            enabled = uiState.enabled && !uiState.isInstallingModels,
+            modifier = Modifier.testTag("listen_prepare_subtitles"),
+        ) {
+            Text(stringResource(if (uiState.preparingSubtitles) {
+                R.string.listen_translate_stop_prepare
+            } else R.string.listen_translate_prepare))
+        }
+        Text(
+            stringResource(R.string.listen_translate_prepare_hint),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        if (uiState.enabled) {
+            Text(
+                stringResource(R.string.listen_translate_ready_ahead, uiState.preparedAheadMs / 1000L),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.testTag("listen_ready_ahead"),
+            )
+        }
+
         val canChangeGate = !uiState.enabled && !uiState.isInstallingModels
         Row(
             modifier = Modifier.fillMaxWidth().toggleable(

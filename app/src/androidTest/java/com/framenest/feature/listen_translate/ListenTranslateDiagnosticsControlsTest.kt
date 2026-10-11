@@ -14,6 +14,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
+import androidx.test.platform.app.InstrumentationRegistry
+import android.graphics.Bitmap
+import java.io.File
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,6 +50,36 @@ class ListenTranslateDiagnosticsControlsTest(private val widthDp: Int) {
         compose.onNodeWithTag("listen_diagnostics").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("listen_diagnostics_toggle").performScrollTo().performClick()
         compose.onNodeWithTag("listen_diagnostics").assertDoesNotExist()
+    }
+
+    @Test
+    fun pausedPreparationShowsActualCoverageAndCanBeCancelled() {
+        val state = mutableStateOf(ListenTranslateUiState())
+        compose.setContent {
+            MaterialTheme {
+                ListenTranslateControls(
+                    uiState = state.value,
+                    onEnabledChange = {}, onSourceLang = {}, onTargetLang = {}, onDisplayMode = {},
+                    onPrepareSubtitles = { state.value = state.value.copy(preparingSubtitles = !state.value.preparingSubtitles) },
+                    modifier = Modifier.width(widthDp.dp).height(260.dp),
+                )
+            }
+        }
+        compose.onNodeWithTag("listen_prepare_subtitles").performScrollTo().assertIsNotEnabled()
+        compose.runOnIdle { state.value = state.value.copy(enabled = true, preparedAheadMs = 6_000L) }
+        compose.onNodeWithTag("listen_prepare_subtitles").performScrollTo().performClick()
+        compose.runOnIdle { check(state.value.preparingSubtitles) }
+        compose.onNodeWithTag("listen_ready_ahead").performScrollTo().assertIsDisplayed()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val screenshot = instrumentation.uiAutomation.takeScreenshot()
+        if (screenshot != null) {
+            File(instrumentation.targetContext.cacheDir, "fn67-listen-$widthDp.png").outputStream().use {
+                screenshot.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+            screenshot.recycle()
+        }
+        compose.onNodeWithTag("listen_prepare_subtitles").performScrollTo().performClick()
+        compose.runOnIdle { check(!state.value.preparingSubtitles) }
     }
 
     companion object {

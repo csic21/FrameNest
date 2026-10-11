@@ -143,8 +143,8 @@ class ListenPipelineDiagnosticsTest {
 
     @Test
     fun newBaselineInvalidatesLegacyRmsSilenceIdentity() {
-        assertEquals("sensevoice-v1|digital-zero-v2", listenAsrCacheModelId("sensevoice-v1", false))
-        assertEquals("sensevoice-v1|silence-gate-v1", listenAsrCacheModelId("sensevoice-v1", true))
+        assertEquals("sensevoice-v1|digital-zero-v2|text-v3", listenAsrCacheModelId("sensevoice-v1", false))
+        assertEquals("sensevoice-v1|silence-gate-v1|text-v3", listenAsrCacheModelId("sensevoice-v1", true))
     }
 
     @Test

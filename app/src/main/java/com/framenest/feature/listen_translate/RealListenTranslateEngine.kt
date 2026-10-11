@@ -9,6 +9,8 @@ import com.framenest.feature.listen_translate.audio.ListenAudioSource
 import com.framenest.feature.listen_translate.mt.MlKitMtEngine
 import java.io.File
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * Product listen-translate engine (FN-14, FN-51):
@@ -26,6 +28,9 @@ class RealListenTranslateEngine(
     private val experimentalSilenceGate: Boolean = false,
     private val monotonicTimeMs: () -> Long = { System.nanoTime() / 1_000_000L },
 ) : ListenTranslateEngine {
+
+    private data class SourceKey(val start: Long, val end: Long, val language: String, val track: Int?)
+    private var cachedSource: Pair<SourceKey, ListenWindowResult>? = null
 
     override val asrModelId: String
         get() = listenAsrCacheModelId(asrModelLabel(), experimentalSilenceGate)
@@ -70,15 +75,63 @@ class RealListenTranslateEngine(
         if (!asrModels.supportedSourceLanguages().contains(srcLang)) {
             throw IllegalStateException(asrModels.unsupportedLanguageMessage(srcLang))
         }
-        if (!MlKitMtEngine.isSupported(srcLang) || !MlKitMtEngine.isSupported(tgtLang)) {
+        if (srcLang != tgtLang && (!MlKitMtEngine.isSupported(srcLang) || !MlKitMtEngine.isSupported(tgtLang))) {
             throw IllegalStateException("语言对 $srcLang→$tgtLang 不被 ML Kit 支持")
         }
 
+        val key = SourceKey(startMs, endMs, srcLang, selectedAudioTrackOrdinal())
+        val source = cachedSource?.takeIf { it.first == key }?.second
+            ?.copy(stageTimings = timer.timings)
+            ?: recognizeWindow(startMs, endMs, srcLang, key.track, timer).also {
+                currentCoroutineContext().ensureActive()
+                if (it.textSrc.isNotBlank()) cachedSource = key to it
+            }
+        if (source.textSrc.isBlank()) return source
+        val textSrc = source.textSrc
+        val cueStartMs = source.cueStartMs
+        val cueEndMs = source.cueEndMs
+
+        // Keep source text visible and durable even if MT is slow or cancelled.
+        // This remains a single bounded window; no detached translation queue.
+        onSourceRecognized(
+            ListenWindowResult(textSrc, "", cueStartMs, cueEndMs, stageTimings = timer.timings),
+        )
+
+        val textTgt = try {
+            timer.measure(ListenPipelineStage.Translation) { mt.translate(textSrc, srcLang, tgtLang) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            // Still keep ASR text if MT fails.
+            return ListenWindowResult(
+                textSrc = textSrc,
+                textTgt = "",
+                cueStartMs = cueStartMs,
+                cueEndMs = cueEndMs,
+                retryableErrorMessage = "翻译失败：${t.message?.take(80) ?: "error"}",
+                stageTimings = timer.timings,
+            )
+        }
+        return ListenWindowResult(
+            textSrc = textSrc,
+            textTgt = textTgt,
+            cueStartMs = cueStartMs,
+            cueEndMs = cueEndMs,
+            stageTimings = timer.timings,
+        )
+    }
+
+    private suspend fun recognizeWindow(
+        startMs: Long,
+        endMs: Long,
+        srcLang: String,
+        track: Int?,
+        timer: ListenStageTimer,
+    ): ListenWindowResult {
         val modelDir: File = asrModels.modelDir(srcLang)
             ?: throw ModelsNotReadyException(asrModels.incompleteModelMessage(srcLang))
         timer.measure(ListenPipelineStage.ModelCheck) {
             asr.ensureModel(modelDir, srcLang)
-            mt.ensureModel(srcLang, tgtLang)
         }
 
         val decodeStartMs = (startMs - CONTEXT_PADDING_MS).coerceAtLeast(0L)
@@ -88,7 +141,7 @@ class RealListenTranslateEngine(
                 audio.pcmWindow(
                     startMs = decodeStartMs,
                     endMs = decodeEndMs,
-                    preferredAudioTrackOrdinal = selectedAudioTrackOrdinal(),
+                    preferredAudioTrackOrdinal = track,
                 )
             }
         } catch (cancelled: CancellationException) {
@@ -129,7 +182,7 @@ class RealListenTranslateEngine(
             windowEndMs = endMs,
         )
         val textSrc = if (wordsInWindow.isNotEmpty()) {
-            wordsInWindow.joinToString(" ") { it.text }.trim()
+            wordsInWindow.joinToString(recognition.textSeparator) { it.text }.trim()
         } else if (recognition.words.isEmpty()) {
             recognition.text
         } else {
@@ -148,42 +201,17 @@ class RealListenTranslateEngine(
             ?.let { decodeStartMs + it.startMs }
             ?.coerceIn(startMs, endMs)
             ?: startMs
-        val cueEndMs = wordsInWindow.lastOrNull()
+        val tokenEndMs = wordsInWindow.lastOrNull()
             ?.let { decodeStartMs + it.endMs }
             ?.coerceIn(cueStartMs, endMs)
             ?: endMs
 
-        // Keep source text visible and durable even if MT is slow or cancelled.
-        // This remains a single bounded window; no detached translation queue.
-        onSourceRecognized(
-            ListenWindowResult(textSrc, "", cueStartMs, cueEndMs, stageTimings = timer.timings),
-        )
-
-        val textTgt = try {
-            timer.measure(ListenPipelineStage.Translation) { mt.translate(textSrc, srcLang, tgtLang) }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (t: Throwable) {
-            // Still keep ASR text if MT fails.
-            return ListenWindowResult(
-                textSrc = textSrc,
-                textTgt = "",
-                cueStartMs = cueStartMs,
-                cueEndMs = cueEndMs,
-                retryableErrorMessage = "翻译失败：${t.message?.take(80) ?: "error"}",
-                stageTimings = timer.timings,
-            )
-        }
-        return ListenWindowResult(
-            textSrc = textSrc,
-            textTgt = textTgt,
-            cueStartMs = cueStartMs,
-            cueEndMs = cueEndMs,
-            stageTimings = timer.timings,
-        )
+        val cueEndMs = maxOf(tokenEndMs, cueStartMs + MIN_CUE_DURATION_MS).coerceAtMost(endMs)
+        return ListenWindowResult(textSrc, "", cueStartMs, cueEndMs, stageTimings = timer.timings)
     }
 
     fun close() {
+        cachedSource = null
         audio.close()
         asr.close()
         mt.close()
@@ -191,6 +219,7 @@ class RealListenTranslateEngine(
 
     private companion object {
         const val CONTEXT_PADDING_MS = 750L
+        const val MIN_CUE_DURATION_MS = 600L
     }
 }
 
@@ -210,7 +239,7 @@ internal fun listenPcmBlankReason(
 
 /** Do not reuse baseline silence coverage when the experimental gate is selected. */
 internal fun listenAsrCacheModelId(modelId: String, experimentalSilenceGate: Boolean): String =
-    if (experimentalSilenceGate) "$modelId|silence-gate-v1" else "$modelId|digital-zero-v2"
+    if (experimentalSilenceGate) "$modelId|silence-gate-v1|text-v3" else "$modelId|digital-zero-v2|text-v3"
 
 internal fun selectWordsForWindow(
     words: List<AsrWord>,

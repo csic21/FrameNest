@@ -50,7 +50,7 @@ class RealListenPipelineTest {
         assertArrayEquals(original, pcm)
         assertEquals(2_250L to 6_750L, bounds)
         assertEquals(3_250L, result.cueStartMs)
-        assertEquals(3_450L, result.cueEndMs)
+        assertEquals(3_850L, result.cueEndMs)
         assertEquals("quiet", result.textTgt)
         assertNull(source!!.stageTimings!!.translationMs)
         assertEquals(ListenStageTimings(10L, 20L, 0L, 30L, 0L), result.stageTimings)
@@ -64,6 +64,71 @@ class RealListenPipelineTest {
         assertNull(listenPcmBlankReason(quiet, experimentalSilenceGate = true))
         assertEquals(ListenBlankReason.NearSilence, listenPcmBlankReason(ShortArray(16_000), true))
         assertEquals(ListenBlankReason.EmptyPcm, listenPcmBlankReason(shortArrayOf(), true))
+    }
+
+    @Test
+    fun translationRetryReusesSourceButTrackChangeDoesNot() = runBlocking {
+        var reads = 0
+        var recognizes = 0
+        var track = 0
+        var translations = 0
+        val mt = MlKitMtEngine(false) { error("translation unavailable") }
+        val asr = object : AsrEngine {
+            override suspend fun ensureModel(modelDir: File, langTag: String) = Unit
+            override suspend fun recognize(pcm16kMono: ShortArray): AsrRecognition {
+                recognizes++
+                return AsrRecognition("hello", emptyList())
+            }
+            override fun close() = Unit
+        }
+        val audio = object : ListenAudioSource {
+            override suspend fun pcmWindow(startMs: Long, endMs: Long, preferredAudioTrackOrdinal: Int?): ShortArray {
+                reads++
+                return shortArrayOf(42)
+            }
+        }
+        val engine = RealListenTranslateEngine(audio, asr, mt, FakeModels,
+            selectedAudioTrackOrdinal = { track })
+        // Original-only uses the same source/target pair and never creates a Translator.
+        assertEquals("hello", engine.processWindow(0L, 3_000L, "en", "en").textTgt)
+        repeat(2) {
+            val result = engine.processWindowWithProgress(0L, 3_000L, "en", "zh") {
+                assertEquals("hello", it.textSrc)
+                translations++
+            }
+            assertNotNull(result.retryableErrorMessage)
+            assertNull(result.stageTimings!!.asrMs)
+        }
+        assertEquals(2, translations)
+        assertEquals(1, reads)
+        assertEquals(1, recognizes)
+        track = 1
+        engine.processWindow(0L, 3_000L, "en", "en")
+        assertEquals(2, recognizes)
+        engine.processWindow(3_000L, 6_000L, "en", "en")
+        assertEquals(3, recognizes)
+        engine.close()
+    }
+
+    @Test
+    fun senseVoicePiecesRenderWholeWordsAndShortCueRemainsVisible() = runBlocking {
+        val words = com.framenest.feature.listen_translate.asr.SherpaAsrEngine.mapTokensToWords(
+            arrayOf("▁tri", "bal", "▁boy"), floatArrayOf(0.3f, 0.4f, 0.6f),
+        )
+        val asr = object : AsrEngine {
+            override suspend fun ensureModel(modelDir: File, langTag: String) = Unit
+            override suspend fun recognize(pcm16kMono: ShortArray) = AsrRecognition("tribal boy", words, "")
+            override fun close() = Unit
+        }
+        val audio = object : ListenAudioSource {
+            override suspend fun pcmWindow(startMs: Long, endMs: Long, preferredAudioTrackOrdinal: Int?) = shortArrayOf(20)
+        }
+        val engine = RealListenTranslateEngine(audio, asr, MlKitMtEngine(), FakeModels)
+        val result = engine.processWindow(0L, 3_000L, "en", "en")
+        assertEquals("tribal boy", result.textSrc)
+        assertEquals(300L, result.cueStartMs)
+        assertEquals(900L, result.cueEndMs)
+        engine.close()
     }
 
     private object FakeModels : AsrModelSupport {

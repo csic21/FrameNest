@@ -399,6 +399,20 @@ class PlayerViewModel(
         listenSession.setExperimentalSilenceGate(enabled)
     }
 
+    fun prepareListenSubtitles() {
+        if (playbackLifecycle.closed) return
+        if (listenSession.uiState.value.preparingSubtitles) {
+            listenSession.setPreparingSubtitles(false)
+        } else {
+            pause()
+            // Controller's paused event may arrive later; seed the scheduler now.
+            val state = controller.state.value
+            listenSession.onPlaybackTick(state.positionMs, state.durationMs, playing = false,
+                buffering = state.isBuffering, playbackRate = state.playbackRate)
+            listenSession.setPreparingSubtitles(true)
+        }
+    }
+
     fun setListenDisplayMode(mode: ListenDisplayMode) {
         if (playbackLifecycle.closed) return
         listenSession.setDisplayMode(mode)
@@ -515,8 +529,6 @@ class PlayerViewModel(
                 val modelDir = asrSupport.modelDir(sourceLang)
                     ?: error(asrSupport.incompleteModelMessage(sourceLang))
                 asr.ensureModel(modelDir, sourceLang)
-                reportListenPreparation(generation, "正在准备本机翻译模型 $sourceLang→$targetLang…")
-                mt.ensureModel(sourceLang, targetLang)
                 currentCoroutineContext().ensureActive()
                 val engine = RealListenTranslateEngine(
                     audio = audio,
@@ -655,6 +667,7 @@ class PlayerViewModel(
 
     fun play() {
         if (playbackLifecycle.closed) return
+        listenSession.setPreparingSubtitles(false)
         if (controller.state.value.phase == PlayerState.Phase.Error) {
             retry()
             return
