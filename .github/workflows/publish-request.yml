@@ -98,7 +98,9 @@ jobs:
           python3 scripts/release.py prepare-signing --keystore "$ANDROID_KEYSTORE_PATH"
           # Do not pass key values as command-line arguments or Gradle properties.
           unset ANDROID_KEYSTORE_BASE64
-          ./gradlew assembleRelease --no-daemon --no-configuration-cache --stacktrace
+          # Package the large native ABI splits one at a time. Parallel zipflinger
+          # buffers exhausted the heap in FN-67 even after compilation succeeded.
+          ./gradlew assembleRelease --no-daemon --no-configuration-cache --max-workers=1 --no-parallel '-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8' --stacktrace
           python3 scripts/release.py package --build-tools "$ANDROID_HOME/build-tools/36.0.0"
       - name: Remove temporary signing material
         if: always()
