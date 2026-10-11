@@ -277,6 +277,9 @@ internal suspend fun extractVoskArchive(zipFile: File, destDir: File, maxExpande
             }
             if (entry.isDirectory) {
                 outFile.mkdirs()
+                // closeEntry() drains data too. Reject non-empty directory bodies before
+                // it can inflate an unbounded payload outside the expanded-byte budget.
+                check(zis.read() == -1) { "Vosk 模型目录条目包含数据" }
             } else {
                 outFile.parentFile?.mkdirs()
                 FileOutputStream(outFile).use { out ->

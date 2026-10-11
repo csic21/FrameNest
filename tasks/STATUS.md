@@ -71,6 +71,7 @@
 | FN-65 听译字幕位置对齐 CC 与分层显示 | 已完成 | Codex | `agent/FN-65-caption-stacking` → main | FN-64 | [FN-65](handoffs/FN-65.md) |
 | FN-66 听译性能与观看体验审计 | 已完成 | Codex | `agent/FN-66-asr-performance-audit` → main | FN-61、FN-62、FN-65 | [FN-66](handoffs/FN-66.md) |
 | FN-67 听译首句与字幕准备优化发布 | 已完成，0.6.6-internal 已发布 | Codex | `agent/FN-67-listen-performance` → main | FN-66 | [FN-67](handoffs/FN-67.md) |
+| FN-68 安全审计与修复发布 | 进行中 | agent | `agent/FN-68-security-hardening` | FN-67 | [FN-68](handoffs/FN-68.md) |
 
 > FN-14：产品路径为 **PCM → Vosk small 离线 ASR → ML Kit 本机 MT**。首次需下载
 > 源语言模型；质量受 small 模型与对白清晰度限制。详见 handoff。

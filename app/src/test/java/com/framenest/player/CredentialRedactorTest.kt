@@ -37,4 +37,38 @@ class CredentialRedactorTest {
         assertEquals("", CredentialRedactor.redact(null))
         assertEquals("", CredentialRedactor.redact(""))
     }
+
+    @Test
+    fun quotedEscapedMultilineAndTruncatedValuesDoNotLeak() {
+        for (raw in listOf(
+            "password=\"first \\\" hidden-tail\" host=nas",
+            "passwd='first \\' hidden-tail' host=nas",
+            "pwd=\"first\nhidden-tail\" host=nas",
+            "pass='first hidden-tail",
+            ":smb-pwd=first hidden-tail",
+            ":sout-smbj-password=\"first hidden-tail\"",
+        )) {
+            val safe = CredentialRedactor.redact(raw)
+            assertFalse(safe.contains("hidden-tail"))
+            assertFalse(safe.contains("first"))
+            assertTrue(safe.contains("***"))
+        }
+    }
+
+    @Test
+    fun usernamesAndAtSignsInUrlAreHidden() {
+        for (raw in listOf("smb://alice@nas/share", "smb://alice:p@ss@nas/share")) {
+            val safe = CredentialRedactor.redact(raw)
+            assertFalse(safe.contains("alice"))
+            assertFalse(safe.contains("p@ss"))
+            assertTrue(safe.endsWith("@nas/share"))
+        }
+    }
+
+    @Test
+    fun longQuotedValueIsProcessedWithoutRegexStackOverflow() {
+        val raw = "password=\"" + "x".repeat(100_000) + "\" host=nas"
+        assertEquals("password=*** host=nas", CredentialRedactor.redact(raw))
+        assertEquals("path=/movies/pwd-test.mkv", CredentialRedactor.redact("path=/movies/pwd-test.mkv"))
+    }
 }

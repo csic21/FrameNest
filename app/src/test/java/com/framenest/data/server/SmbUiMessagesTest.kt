@@ -42,4 +42,18 @@ class SmbUiMessagesTest {
         assertFalse(msg.contains("supersecret"))
         assertTrue(msg.contains("***") || msg.contains("操作失败"))
     }
+
+    @Test
+    fun validationStateAndSecurityFailuresAlwaysRedact() {
+        val raw = "password=\"first hidden-tail\" smb://alice@nas/share"
+        val messages = listOf(
+            SmbUiMessages.fromThrowable(IllegalArgumentException(raw)),
+            SmbUiMessages.fromThrowable(IllegalStateException(raw)),
+            SmbUiMessages.fromSmbError(SmbError.Security(raw)),
+        )
+        messages.forEach {
+            assertFalse(it.contains("hidden-tail"))
+            assertFalse(it.contains("alice"))
+        }
+    }
 }

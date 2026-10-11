@@ -19,4 +19,14 @@ class DiagnosticLogTest {
         assertFalse(snap.contains("supersecret"))
         assertTrue(snap.contains("Test") || snap.contains("login"))
     }
+
+    @Test
+    fun oversizedRemoteMessagesKeepTheBufferBoundedAndRedacted() {
+        repeat(250) {
+            DiagnosticLog.warn("tag".repeat(100), "password=\"first hidden-tail\" " + "x".repeat(10_000))
+        }
+        val lines = DiagnosticLog.snapshot()
+        assertTrue(lines.size <= 200)
+        assertTrue(lines.all { it.length < 4_300 && !it.contains("hidden-tail") })
+    }
 }

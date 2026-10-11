@@ -12,8 +12,8 @@ android {
         applicationId = "com.framenest"
         minSdk = 26
         targetSdk = 36
-        versionCode = 17
-        versionName = "0.6.6-internal"
+        versionCode = 18
+        versionName = "0.6.7-internal"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -134,6 +134,18 @@ kotlin {
 }
 
 dependencies {
+    // FN-68: override vulnerable transitives from ML Kit and SMBJ only.
+    constraints {
+        implementation("com.squareup.okhttp3:okhttp:4.12.0") {
+            because("Fix certificate validation advisories in ML Kit's OkHttp 3.0.0")
+        }
+        implementation("com.squareup.okio:okio:3.6.0") {
+            because("Fix malformed gzip denial of service; compatible with OkHttp 4.12")
+        }
+        implementation("org.bouncycastle:bcprov-jdk18on:1.85") {
+            because("Fix GOST, LDAP and ASN.1/name-constraint advisories in SMBJ's 1.79")
+        }
+    }
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

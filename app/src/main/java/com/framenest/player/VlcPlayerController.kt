@@ -833,7 +833,7 @@ class VlcPlayerController(
         if (!runCatching { player.isPlaying }.getOrDefault(true)) {
             runCatching { player.play() }
                 .onFailure { t ->
-                    Log.w(TAG, "seek preview play failed: ${t.message}")
+                    Log.w(TAG, "seek preview play failed: ${CredentialRedactor.redact(t.message)}")
                     cancelSeekPreview(pausePlayer = false)
                 }
         }
@@ -957,7 +957,7 @@ class VlcPlayerController(
         seekPreviewRestoreVolume = null
         if (player != null) {
             runCatching { player.setVolume(volume) }
-                .onFailure { t -> Log.w(TAG, "seek preview volume restore failed: ${t.message}") }
+                .onFailure { t -> Log.w(TAG, "seek preview volume restore failed: ${CredentialRedactor.redact(t.message)}") }
         }
     }
 
@@ -1159,7 +1159,7 @@ class VlcPlayerController(
         // Layout/orientation change only — do not reassign scale (that also
         // triggers a full surface rebuild and can freeze the current frame).
         runCatching { player.updateVideoSurfaces() }
-            .onFailure { t -> Log.w(TAG, "refreshVideoSurfaces failed: ${t.message}") }
+            .onFailure { t -> Log.w(TAG, "refreshVideoSurfaces failed: ${CredentialRedactor.redact(t.message)}") }
     }
 
     override fun release() {
@@ -1288,7 +1288,7 @@ class VlcPlayerController(
     private fun applyPlaybackRate(player: MediaPlayer?) {
         if (player == null) return
         runCatching { player.setRate(playbackRate) }
-            .onFailure { t -> Log.w(TAG, "setRate failed: ${t.message}") }
+            .onFailure { t -> Log.w(TAG, "setRate failed: ${CredentialRedactor.redact(t.message)}") }
     }
 
     private fun applyVideoScale(player: MediaPlayer) {
@@ -1310,7 +1310,7 @@ class VlcPlayerController(
             player.videoScale = videoScaleMode.toLibVlcScaleType()
             Log.i(TAG, "applyVideoScale ok mode=$videoScaleMode")
         }.onFailure { t ->
-            Log.w(TAG, "applyVideoScale failed: ${t.message}")
+            Log.w(TAG, "applyVideoScale failed: ${CredentialRedactor.redact(t.message)}")
         }
     }
 
@@ -1662,7 +1662,7 @@ class VlcPlayerController(
         val player = mediaPlayer ?: return
         if (runCatching { player.isPlaying }.getOrDefault(false)) {
             runCatching { player.pause() }
-                .onFailure { t -> Log.w(TAG, "pause failed ($reason): ${t.message}") }
+                .onFailure { t -> Log.w(TAG, "pause failed ($reason): ${CredentialRedactor.redact(t.message)}") }
         }
     }
 
@@ -1672,7 +1672,7 @@ class VlcPlayerController(
         // already-playing input is a harmless no-op.
         if (playRequested && !runCatching { player.isPlaying }.getOrDefault(false)) {
             runCatching { player.play() }
-                .onFailure { t -> Log.w(TAG, "play failed ($reason): ${t.message}") }
+                .onFailure { t -> Log.w(TAG, "play failed ($reason): ${CredentialRedactor.redact(t.message)}") }
         }
     }
 

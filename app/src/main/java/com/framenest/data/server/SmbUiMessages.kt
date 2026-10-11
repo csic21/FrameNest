@@ -12,9 +12,9 @@ object SmbUiMessages {
     fun fromThrowable(error: Throwable): String {
         return when (error) {
             is SmbException -> fromSmbError(error.error)
-            is IllegalArgumentException -> error.message?.takeIf { it.isNotBlank() }
+            is IllegalArgumentException -> error.message?.let(SmbErrorMapper::redactSecrets)?.takeIf { it.isNotBlank() }
                 ?: "无效的服务器或路径"
-            is IllegalStateException -> error.message?.takeIf { it.isNotBlank() }
+            is IllegalStateException -> error.message?.let(SmbErrorMapper::redactSecrets)?.takeIf { it.isNotBlank() }
                 ?: "服务器状态无效"
             else -> {
                 val mapped = SmbErrorMapper.map(error)
@@ -24,7 +24,7 @@ object SmbUiMessages {
     }
 
     fun fromSmbError(error: SmbError): String = when (error) {
-        is SmbError.Security -> error.message
+        is SmbError.Security -> SmbErrorMapper.redactSecrets(error.message)
         is SmbError.Auth -> "认证失败，请检查用户名和密码后重试"
         is SmbError.Network -> "网络错误，请检查主机地址、端口与局域网连接"
         is SmbError.NotFound -> "共享或路径不存在"

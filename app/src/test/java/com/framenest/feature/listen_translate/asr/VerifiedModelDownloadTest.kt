@@ -98,6 +98,10 @@ class VerifiedModelDownloadTest {
             assertTrue(runCatching { extractVoskArchive(archive("model/data", ByteArray(128)), destination, maxExpandedBytes = 64) }.isFailure)
             assertTrue(File(destination, "model/data").length() <= 64L)
             assertTrue(runCatching { extractVoskArchive(archive("model/small", byteArrayOf(1)), destination, maxEntries = 0) }.isFailure)
+            // Directory payloads used to bypass the byte budget through closeEntry().
+            assertTrue(runCatching { extractVoskArchive(archive("payload/", ByteArray(128)), destination, maxExpandedBytes = 64) }.isFailure)
+            extractVoskArchive(archive("empty/", byteArrayOf()), destination, maxExpandedBytes = 0)
+            assertTrue(File(destination, "empty").isDirectory)
         } finally { root.deleteRecursively() }
     }
 

@@ -23,8 +23,8 @@ object DiagnosticLog {
 
     @Synchronized
     private fun append(level: String, tag: String, message: String) {
-        val safe = CredentialRedactor.redact(message)
-        val safeTag = CredentialRedactor.redact(tag)
+        val safe = CredentialRedactor.redact(message).take(4_096)
+        val safeTag = CredentialRedactor.redact(tag).take(128)
         val line = "${timeFormat.format(Date())} $level/$safeTag: $safe"
         lines.addLast(line)
         while (lines.size > MAX_LINES) {

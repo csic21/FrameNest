@@ -67,7 +67,7 @@ object SmbSeekableMedia {
                     android.util.Log.w(
                         "FrameNestPlayer",
                         "proxy onRead failed label=$debugLabel offset=$offset size=$size " +
-                            "fileSize=$totalSize: ${e.javaClass.simpleName}: ${e.message}",
+                            "fileSize=$totalSize: ${e.javaClass.simpleName}: ${CredentialRedactor.redact(e.message)}",
                     )
                     throw ErrnoException("onRead", OsConstants.EIO)
                 }
