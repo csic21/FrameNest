@@ -168,6 +168,17 @@ class ListenPipelineDiagnosticsTest {
         assertFalse(text.contains("NaN"))
     }
 
+    @Test
+    fun formattedDiagnosticsShowRemoteReadCountAndBytes() {
+        val text = formatListenDiagnostics(
+            ListenPipelineDiagnostics(
+                stages = ListenStageTimings(pcmReadMs = 120L, remoteReads = 7, remoteReadBytes = 3_145_728L),
+            ),
+        )
+        assertTrue(text.contains("SMB 读取 7 次 / 3072 KiB"))
+        assertFalse(formatListenDiagnostics(ListenPipelineDiagnostics()).contains("SMB 读取"))
+    }
+
     private fun phasedEngine(): ListenTranslateEngine = object : DiagnosticEngine() {
         override suspend fun processWindowWithProgress(
             startMs: Long, endMs: Long, sourceLang: String, targetLang: String,

@@ -1155,3 +1155,17 @@ unit test、lint、debug/release assemble 与 AndroidTest 编译通过。真实 
 **目标**：审查凭证、网络下载、归档、字幕、更新安装、组件导出和运行依赖；修复可复现的问题，验证后推送 main 并发布。
 
 验收：每个修复有最小回归测试；执行 Gradle 单测、Lint、构建及发布脚本检查；记录手机/平板与原生库审计边界；按固定签名流水线发布并核验公开产物。用户已授权提交推送 main 和发布，不触碰真实 NAS 凭证或文件。
+
+## FN-69：听译 SMB 音频读取块缓存
+
+**依赖**：FN-61、FN-67、FN-68
+**拥有路径**：`feature/listen_translate/audio/**`、`feature/listen_translate/ListenPipelineDiagnostics.kt`、`feature/listen_translate/RealListenTranslateEngine.kt` 的读取统计接线、相关单测、决策 0029、性能文档与交接记录
+**目标**：SMB 听译的音频解码不再为 MediaExtractor 的每次小读取发起一次网络往返，使单窗口读取时间不再随容器索引和网络往返次数线性增长，从根源上解决每条字幕数十秒的延迟。
+
+工作内容：
+
+- 听译 SMB 随机读增加会话级 1 MiB 对齐块缓存（16 块，LRU），跨窗口与跨 `MediaExtractor` 复用；只作用于听译，不改播放、缩略图与 SMB 客户端。
+- 诊断面板的“音频读取/解码”显示本窗口的底层 SMB 读取次数和 KiB 数。
+- 真机探针与生产类回放验证读取次数下降且内容逐字节一致；NAS 与端到端延迟留给真机验收。
+
+验收：块缓存的读取语义、LRU、短读、文件末尾、早停、关闭与统计重置有纯 JVM 单测；`testDebugUnitTest`、`lintDebug`、`assembleDebug`、`assembleDebugAndroidTest` 通过；真机与 NAS 的往返、吞吐和首句延迟未测，交接中记录需要在面板上读取的数值。

@@ -1,5 +1,7 @@
 package com.framenest.feature.listen_translate
 
+import com.framenest.feature.listen_translate.audio.ListenRemoteReadStats
+
 /** One window only, memory-only: no audio, text, paths, identifiers, or telemetry. */
 data class ListenStageTimings(
     val modelCheckMs: Long? = null,
@@ -7,6 +9,9 @@ data class ListenStageTimings(
     val silenceGateMs: Long? = null,
     val asrMs: Long? = null,
     val translationMs: Long? = null,
+    /** Remote SMB reads issued while reading this window's PCM; null for local media. */
+    val remoteReads: Int? = null,
+    val remoteReadBytes: Long? = null,
 )
 
 /**
@@ -52,6 +57,11 @@ internal class ListenStageTimer(private val nowMs: () -> Long) {
             }
         }
     }
+
+    fun recordRemoteReads(stats: ListenRemoteReadStats?) {
+        if (stats == null) return
+        timings = timings.copy(remoteReads = stats.reads, remoteReadBytes = stats.bytes)
+    }
 }
 
 internal class ListenPipelineException(
@@ -65,6 +75,11 @@ internal fun elapsedListenTimeMs(startMs: Long, nowMs: Long): Long =
 internal fun listenCueLatenessMs(positionMs: Long, cueStartMs: Long): Long =
     (positionMs - cueStartMs).coerceAtLeast(0L)
 
+private fun ListenStageTimings.remoteReadSummary(): String {
+    val reads = remoteReads ?: return ""
+    return " · SMB 读取 $reads 次 / ${(remoteReadBytes ?: 0L) / 1024L} KiB"
+}
+
 /** Deliberately content-free text; never includes cue text or media/model identifiers. */
 internal fun formatListenDiagnostics(sample: ListenPipelineDiagnostics): String {
     fun Long?.ms(): String = this?.let { "${it}ms" } ?: "—"
@@ -76,7 +91,7 @@ internal fun formatListenDiagnostics(sample: ListenPipelineDiagnostics): String 
     }
     return listOf(
         "最近窗口$outcome · ${sample.playbackRate}x",
-        "模型检查 ${stages.modelCheckMs.ms()} · 音频读取/解码 ${stages.pcmReadMs.ms()}",
+        "模型检查 ${stages.modelCheckMs.ms()} · 音频读取/解码 ${stages.pcmReadMs.ms()}${stages.remoteReadSummary()}",
         "静音检查 ${stages.silenceGateMs.ms()} · ASR ${stages.asrMs.ms()} · 翻译 ${stages.translationMs.ms()}",
         "缓存/UI提交 ${sample.cacheCommitMs}ms · 处理总计 ${sample.totalMs}ms · 等待 ${sample.queueWaitMs}ms",
         "窗口起点落后播放 ${sample.windowBacklogMs}ms（媒体时间）",

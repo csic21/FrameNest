@@ -152,6 +152,7 @@ class RealListenTranslateEngine(
                 t,
             )
         }
+        timer.recordRemoteReads(audio.takeRemoteReadStats())
         val blank = timer.measure(ListenPipelineStage.SilenceGate) {
             listenPcmBlankReason(pcm, experimentalSilenceGate)
         }

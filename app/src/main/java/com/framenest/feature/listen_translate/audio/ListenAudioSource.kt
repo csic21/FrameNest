@@ -29,6 +29,9 @@ interface ListenAudioSource : Closeable {
         preferredAudioTrackOrdinal: Int? = null,
     ): ShortArray
 
+    /** Remote reads since the previous call, or null when the source is not remote. */
+    suspend fun takeRemoteReadStats(): ListenRemoteReadStats? = null
+
     override fun close() = Unit
 }
 
@@ -63,7 +66,8 @@ class RawListenAudioSource(
 
 /**
  * Keeps one read-only SMB random-access handle for the ASR session and replaces it when the
- * dedicated client reconnects. This avoids reopening the NAS file every few seconds.
+ * dedicated client reconnects. The handle sits behind a [BlockCachingRandomAccess], so the
+ * container index and media are fetched in blocks rather than per MediaExtractor read.
  * Credentials never logged.
  */
 class SmbListenAudioSource(
@@ -75,7 +79,7 @@ class SmbListenAudioSource(
 ) : ListenAudioSource {
     private val mutex = Mutex()
     private var openedClient: SmbClient? = null
-    private var opened: SmbRandomAccess? = null
+    private var opened: BlockCachingRandomAccess? = null
 
     override suspend fun pcmWindow(
         startMs: Long,
@@ -140,14 +144,18 @@ class SmbListenAudioSource(
         }
     }
 
+    override suspend fun takeRemoteReadStats(): ListenRemoteReadStats? = mutex.withLock {
+        opened?.takeRemoteReadStats()
+    }
+
     override fun close() {
         runBlocking {
             mutex.withLock { closeOpened() }
         }
     }
 
-    private fun open(client: SmbClient): SmbRandomAccess =
-        client.openRandomAccess(share, path)
+    private fun open(client: SmbClient): BlockCachingRandomAccess =
+        BlockCachingRandomAccess(client.openRandomAccess(share, path))
 
     private fun closeOpened() {
         val source = opened
@@ -202,6 +210,9 @@ internal class CachingListenAudioSource(
     private var cache = ShortArray(0)
     private var previousStartMs: Long? = null
     private var previousEndMs = 0L
+
+    override suspend fun takeRemoteReadStats(): ListenRemoteReadStats? =
+        mutex.withLock { delegate.takeRemoteReadStats() }
 
     override suspend fun pcmWindow(
         startMs: Long,
