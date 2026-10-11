@@ -1,6 +1,6 @@
 # FN-68 安全审计与修复
 
-审计日期：2026-10-11。起点：main `9122fad` / 0.6.6-internal。发布目标：0.6.7-internal / 18。
+审计日期：2026-10-11。起点：main `9122fad` / 0.6.6-internal。已发布：0.6.7-internal / 18；源码 `9d5e4ca`，公开验证见交接。
 
 ## 已修复
 
@@ -34,7 +34,7 @@
 
 - 严格模式 `./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest`：566 单测通过；Lint 0 error、62 warning、4 hint（存量告警），Debug 与 AndroidTest 编译通过。
 - `python3 -m unittest discover -s scripts/tests -v`：35 项通过。
-- Android API 35 arm64 平板及同模拟器 360dp 手机配置运行 SecurityCompatibilityTest，结果见任务交接。
+- Android API 35 arm64 平板及同模拟器 360dp 手机配置运行 SecurityCompatibilityTest，各 3/3 通过；已恢复并关闭模拟器。
 - 依赖扫描仅覆盖可解析 Maven 坐标，未覆盖 AAR 内嵌的 libVLC/ONNX Runtime/Vosk 等原生组件完整 SBOM、未知漏洞或恶意媒体模糊测试；未验证真实 NAS、真实设备翻译模型下载/翻译、完整覆盖升级。不能声称“所有漏洞已消除”。
 
 决策：[0028](decisions/0028-security-boundaries-and-dependencies.md)。发布及公开产物核验：[FN-68 交接](../tasks/handoffs/FN-68.md)。
