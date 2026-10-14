@@ -64,6 +64,13 @@ class ListenCompletedIntervalsTest {
         assertEquals(listOf(span(0L, 7_800L)), ListenCompletedIntervals.fromCues(cues, requireTranslation = false))
     }
 
+    @Test fun provisionalSourceNeverCertifiesEvenSourceOnlyOrAccidentallyTranslatedCoverage() {
+        val provisional = listOf(cue(0L, 4_200L, tgt = "", rev = ListenCoverageRev.PROVISIONAL_SOURCE),
+            cue(4_200L, 7_800L, rev = ListenCoverageRev.PROVISIONAL_SOURCE))
+        assertEquals(emptyList<ListenCompletedInterval>(), ListenCompletedIntervals.fromCues(provisional))
+        assertEquals(emptyList<ListenCompletedInterval>(), ListenCompletedIntervals.fromCues(provisional, requireTranslation = false))
+    }
+
     @Test fun sameLanguageDoesNotImplicitlyRelaxExplicitBilingualRequirement() {
         val source = cue(0L, 4L, tgt = "").copy(languages = ListenLanguagePair("ja", "ja"))
         assertEquals(emptyList<ListenCompletedInterval>(), ListenCompletedIntervals.fromCues(listOf(source)))

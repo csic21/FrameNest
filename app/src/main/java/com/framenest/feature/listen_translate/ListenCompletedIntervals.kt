@@ -10,7 +10,7 @@ internal data class ListenCompletedInterval(val startMs: Long, val endMs: Long) 
 }
 
 /**
- * Opt-in adaptive-span scheduling foundation; not connected to the production session.
+ * Exact coverage used by the opt-in adaptive-span session scheduler.
  * Callers must first partition cues by validated media/track/model/language cache identity.
  * Cue display bounds are not a substitute for explicit whole-span completion records.
  */
@@ -26,6 +26,7 @@ internal object ListenCompletedIntervals {
         requireTranslation: Boolean = true,
     ): List<ListenCompletedInterval> = union(cues.mapNotNull { cue ->
         val complete = when {
+            cue.rev == ListenCoverageRev.PROVISIONAL_SOURCE -> false
             cue.textSrc.isBlank() && cue.textTgt.isBlank() ->
                 cue.rev == ListenCoverageRev.CONFIRMED_SILENCE
             cue.textSrc.isBlank() -> false

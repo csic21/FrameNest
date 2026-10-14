@@ -51,6 +51,15 @@ class ListenTranslateWindowsTest {
     }
 
     @Test
+    fun cueAt_canRequireStrictHalfOpenSelectionWithoutChangingLegacyFallback() {
+        val past = cue(0L, 3_500L, "past", "过去")
+        assertEquals(past, ListenTranslateWindows.cueAt(listOf(past), 3_500L))
+        assertNull(ListenTranslateWindows.cueAt(listOf(past), 3_500L, includeEndFallback = false))
+        val current = cue(3_500L, 4_200L, "current", "当前")
+        assertEquals(current, ListenTranslateWindows.cueAt(listOf(past, current), 3_500L, includeEndFallback = false))
+    }
+
+    @Test
     fun cueAt_prefersLaterStartThenHigherRevision_withoutSortedInput() {
         val cues = listOf(
             cue(1_000, 4_000, "older", "旧", rev = 1),

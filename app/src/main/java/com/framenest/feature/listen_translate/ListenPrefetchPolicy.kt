@@ -8,6 +8,7 @@ import kotlin.math.max
 internal object ListenPrefetchPolicy {
     const val FAST_LOOKAHEAD_MS = 30_000L
     const val BALANCED_LOOKAHEAD_MS = 12_000L
+    const val MAX_ADAPTIVE_SPAN_MS = 12_000L
 
     private const val FAST_REALTIME_FACTOR = 0.65
     private const val MAX_PREFETCH_REALTIME_FACTOR = 1.0
@@ -84,6 +85,65 @@ internal object ListenPrefetchPolicy {
             start = end
         }
         return null
+    }
+
+    /**
+     * Adaptive units resume at actual completed boundaries, never at rounded 3-second
+     * slots. A current gap takes priority even when prefetch is off; future work is
+     * bounded by the same rolling horizon as fixed windows and by the next cached unit.
+     */
+    fun nextAdaptiveWindow(
+        intervals: List<ListenCompletedInterval>,
+        positionMs: Long,
+        durationMs: Long,
+        windowMs: Long,
+        maxSpanMs: Long,
+        lookAheadMs: Long,
+    ): Pair<Long, Long>? {
+        require(windowMs > 0L && maxSpanMs > 0L)
+        val position = positionMs.coerceAtLeast(0L)
+        if (durationMs > 0L && position >= durationMs) return null
+        val completed = ListenCompletedIntervals.union(intervals)
+        val budget = maxSpanMs.coerceAtMost(MAX_ADAPTIVE_SPAN_MS)
+        val currentComplete = completed.any { it.startMs <= position && position < it.endMs }
+        val gap = if (!currentComplete) {
+            // A playhead/3-second start can clip the first word before ASR. Keep
+            // 9–12 seconds of preceding context for the 12-second engine, quantized
+            // into stable 3-second retry keys instead of sliding on every player tick.
+            // Existing completed ends take precedence inside that bounded lookback.
+            // Consume short prefixes by their actual ends until the playhead is covered;
+            // past prefixes stay cached without becoming the active subtitle.
+            val anchorSlot = minOf(windowMs, budget)
+            val alignedPosition = (position / anchorSlot) * anchorSlot
+            val anchor = (alignedPosition - (budget - anchorSlot)).coerceAtLeast(0L)
+            val previousEnd = completed.lastOrNull { it.endMs <= position }?.endMs ?: 0L
+            val start = maxOf(anchor, previousEnd)
+            val end = boundedEnd(start, budget, durationMs)
+            ListenCompletedIntervals.firstGap(completed, start, end)
+        } else {
+            if (lookAheadMs <= 0L) return null
+            ListenCompletedIntervals.firstGap(
+                completed, position, boundedEnd(position, lookAheadMs, durationMs),
+            )
+        } ?: return null
+        return gap.startMs to minOf(gap.endMs, boundedEnd(gap.startMs, budget, durationMs))
+    }
+
+    fun adaptiveContiguousAheadMs(
+        intervals: List<ListenCompletedInterval>,
+        positionMs: Long,
+        durationMs: Long,
+    ): Long {
+        val position = positionMs.coerceAtLeast(0L)
+        if (durationMs > 0L && position >= durationMs) return 0L
+        return ListenCompletedIntervals.contiguousAheadMs(
+            intervals, position, boundedEnd(position, FAST_LOOKAHEAD_MS, durationMs),
+        )
+    }
+
+    private fun boundedEnd(startMs: Long, lengthMs: Long, durationMs: Long): Long {
+        val end = startMs + lengthMs.coerceIn(0L, Long.MAX_VALUE - startMs)
+        return if (durationMs > 0L) minOf(end, durationMs) else end
     }
 
     fun isFarSeek(previousMs: Long, currentMs: Long, windowMs: Long): Boolean =

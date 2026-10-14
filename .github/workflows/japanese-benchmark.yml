@@ -20,6 +20,9 @@ concurrency:
 
 jobs:
   emulator:
+    # Heavy runtime validation is explicit after the approved one-run experiment.
+    # A skipped PR job is not runtime acceptance evidence.
+    if: github.event_name == 'workflow_dispatch' || github.run_number == 7
     name: Real PCM · SenseVoice · ML Kit · Room · overlay selection
     runs-on: ubuntu-latest
     timeout-minutes: 60

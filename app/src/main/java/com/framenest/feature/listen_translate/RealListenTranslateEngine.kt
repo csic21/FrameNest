@@ -6,7 +6,7 @@ import com.framenest.feature.listen_translate.asr.AsrWord
 import com.framenest.feature.listen_translate.asr.ConservativeSpeechGate
 import com.framenest.feature.listen_translate.asr.isNearSilencePcm
 import com.framenest.feature.listen_translate.audio.ListenAudioSource
-import com.framenest.feature.listen_translate.mt.MlKitMtEngine
+import com.framenest.feature.listen_translate.mt.ListenMtEngine
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
 class RealListenTranslateEngine(
     private val audio: ListenAudioSource,
     private val asr: AsrEngine,
-    private val mt: MlKitMtEngine,
+    private val mt: ListenMtEngine,
     private val asrModels: AsrModelSupport,
     private val selectedAudioTrackOrdinal: () -> Int? = { null },
     private val asrModelLabel: () -> String = { "asr" },
@@ -31,13 +31,20 @@ class RealListenTranslateEngine(
     private val monotonicTimeMs: () -> Long = { System.nanoTime() / 1_000_000L },
     /** Content-free event time; includes silent PCM, but not an empty decode. */
     private val onPcmReady: (Long) -> Unit = {},
+    /** Unreleased experiment; preserve the fixed-window product default until validation. */
+    private val experimentalJapaneseSegments: Boolean = false,
+    private val knownMediaDurationMs: () -> Long = { 0L },
 ) : ListenTranslateEngine {
 
     private data class SourceKey(val start: Long, val end: Long, val language: String, val track: Int?)
     private var cachedSource: Pair<SourceKey, ListenWindowResult>? = null
 
     override val asrModelId: String
-        get() = listenAsrCacheModelId(asrModelLabel(), experimentalSilenceGate)
+        get() = listenAsrCacheModelId(asrModelLabel(), experimentalSilenceGate) +
+            if (experimentalJapaneseSegments) "|ja-owned-prefix-v1" else ""
+    override fun adaptiveMaxSpanMsFor(sourceLang: String): Long? =
+        if (experimentalJapaneseSegments && sourceLang.equals("ja", ignoreCase = true))
+            JapaneseOwnedPrefixPolicy.MAX_OWNED_MS else null
     override val mtModelId: String get() = mtModelLabel()
 
     override suspend fun processWindow(
@@ -79,7 +86,7 @@ class RealListenTranslateEngine(
         if (!asrModels.supportedSourceLanguages().contains(srcLang)) {
             throw IllegalStateException(asrModels.unsupportedLanguageMessage(srcLang))
         }
-        if (srcLang != tgtLang && (!MlKitMtEngine.isSupported(srcLang) || !MlKitMtEngine.isSupported(tgtLang))) {
+        if (srcLang != tgtLang && (!mt.supportsLanguage(srcLang) || !mt.supportsLanguage(tgtLang))) {
             throw IllegalStateException("语言对 $srcLang→$tgtLang 不被 ML Kit 支持")
         }
 
@@ -126,6 +133,10 @@ class RealListenTranslateEngine(
             ?: throw ModelsNotReadyException(asrModels.incompleteModelMessage(srcLang))
         timer.measure(ListenPipelineStage.ModelCheck) {
             asr.ensureModel(modelDir, srcLang)
+        }
+
+        if (experimentalJapaneseSegments && srcLang == "ja") {
+            return recognizeJapaneseSpan(startMs, endMs, track, timer, startTranslationPreparation)
         }
 
         val decodeStartMs = (startMs - CONTEXT_PADDING_MS).coerceAtLeast(0L)
@@ -208,6 +219,65 @@ class RealListenTranslateEngine(
 
         val cueEndMs = maxOf(tokenEndMs, cueStartMs + MIN_CUE_DURATION_MS).coerceAtMost(endMs)
         return ListenWindowResult(textSrc, "", cueStartMs, cueEndMs, stageTimings = timer.timings)
+    }
+
+    private suspend fun recognizeJapaneseSpan(
+        startMs: Long,
+        endMs: Long,
+        track: Int?,
+        timer: ListenStageTimer,
+        startTranslationPreparation: () -> Unit,
+    ): ListenWindowResult {
+        require(startMs >= 0L && endMs > startMs)
+        require(endMs - startMs <= JapaneseOwnedPrefixPolicy.MAX_OWNED_MS)
+        require(endMs <= Long.MAX_VALUE - 3_000L)
+        val duration = knownMediaDurationMs().coerceAtLeast(0L)
+        val readEnd = (endMs + 3_000L).let { if (duration > 0L) minOf(it, duration) else it }
+        require(readEnd > startMs)
+        // One bounded network/decode read; both ASR passes slice the same PCM locally.
+        val pcm = timer.measure(ListenPipelineStage.PcmRead) {
+            audio.pcmWindow(startMs, readEnd, preferredAudioTrackOrdinal = track)
+        }
+        currentCoroutineContext().ensureActive()
+        if (pcm.isNotEmpty()) onPcmReady(monotonicTimeMs())
+        timer.recordRemoteReads(audio.takeRemoteReadStats())
+        require(pcm.size <= JapaneseOwnedPrefixPolicy.MAX_READ_MS * 16L)
+        val actualEnd = startMs + pcm.size / 16L
+        if (actualEnd <= startMs) return ListenWindowResult("", "", blankReason = ListenBlankReason.EmptyPcm,
+            stageTimings = timer.timings)
+        val ownedLimit = minOf(endMs, actualEnd)
+        val coreSamples = ((ownedLimit - startMs) * 16L).toInt()
+        val core = if (coreSamples == pcm.size) pcm else pcm.copyOf(coreSamples)
+        val blank = timer.measure(ListenPipelineStage.SilenceGate) {
+            listenPcmBlankReason(core, experimentalSilenceGate)
+        }
+        if (blank != null) return ListenWindowResult("", "", blankReason = blank,
+            stageTimings = timer.timings, processedThroughMs = ownedLimit)
+        startTranslationPreparation()
+        val (shorter, contextual) = timer.measure(ListenPipelineStage.Asr) {
+            val first = asr.recognize(core)
+            currentCoroutineContext().ensureActive()
+            first to if (core === pcm) first else asr.recognize(pcm)
+        }
+        currentCoroutineContext().ensureActive()
+        val tokens = contextual.words.map { JapaneseTimedToken(it.text, startMs + it.startMs) }
+        val stableExclusive = listenStableTokenPrefix(shorter.text, tokens.map { it.text })
+        val selected = JapaneseOwnedPrefixPolicy.select(
+            tokens = tokens,
+            quietRuns = japanesePcmQuietRuns(pcm, startMs),
+            startMs = startMs,
+            decodedThroughMs = actualEnd,
+            endOfMedia = duration > 0L && actualEnd >= duration && ownedLimit >= duration,
+            ownedLimitMs = ownedLimit,
+            stableTokenEndExclusive = stableExclusive,
+        ) ?: throw IllegalStateException("日语句段尚无可靠进展，未提交后续音频覆盖")
+        require(selected.text.isNotBlank() && selected.processedThroughMs in (startMs + 1L)..ownedLimit)
+        // Phrase-level bounds only. Never map an entire translation to invented word times.
+        val cueStart = tokens.firstOrNull()?.startMs?.coerceIn(startMs, selected.processedThroughMs)
+            ?: startMs
+        return ListenWindowResult(selected.text, "", cueStart, selected.processedThroughMs,
+            stageTimings = timer.timings, processedThroughMs = selected.processedThroughMs,
+            segmentBoundaryReason = selected.reason.name)
     }
 
     fun close() {

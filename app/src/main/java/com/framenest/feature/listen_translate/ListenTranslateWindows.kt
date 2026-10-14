@@ -33,7 +33,12 @@ object ListenTranslateWindows {
         return start to end
     }
 
-    fun cueAt(cues: List<ListenTranslateCue>, positionMs: Long): ListenTranslateCue? {
+    /** Adaptive callers disable the legacy inclusive-end fallback for past lookback units. */
+    fun cueAt(
+        cues: List<ListenTranslateCue>,
+        positionMs: Long,
+        includeEndFallback: Boolean = true,
+    ): ListenTranslateCue? {
         val pos = positionMs.coerceAtLeast(0L)
         var bestExclusive: ListenTranslateCue? = null
         var bestInclusive: ListenTranslateCue? = null
@@ -46,7 +51,7 @@ object ListenTranslateWindows {
                 bestInclusive = cue
             }
         }
-        return bestExclusive ?: bestInclusive
+        return bestExclusive ?: bestInclusive.takeIf { includeEndFallback }
     }
 
     private fun hasHigherPriority(
@@ -149,4 +154,6 @@ internal object ListenCoverageRev {
     const val LEGACY_BLANK: Int = 0
     const val CONFIRMED_SILENCE: Int = 1
     const val UNRECOGNIZED_SPEECH: Int = 2
+    /** Stable source publication is displayable, but has not completed the unit. */
+    const val PROVISIONAL_SOURCE: Int = 3
 }

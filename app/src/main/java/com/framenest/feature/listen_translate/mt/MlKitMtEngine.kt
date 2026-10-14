@@ -20,11 +20,13 @@ import kotlinx.coroutines.withContext
 class MlKitMtEngine internal constructor(
     private val allowMeteredDownloads: Boolean,
     private val translatorFactory: (TranslatorOptions) -> Translator,
-) {
+) : ListenMtEngine {
     constructor(allowMeteredDownloads: Boolean = false) : this(
         allowMeteredDownloads = allowMeteredDownloads,
         translatorFactory = Translation::getClient,
     )
+
+    override fun supportsLanguage(langTag: String): Boolean = isSupported(langTag)
 
     private class TranslatorSlot {
         val preparation = Mutex()
@@ -35,12 +37,12 @@ class MlKitMtEngine internal constructor(
     private val translators = mutableMapOf<String, TranslatorSlot>()
     private var closed = false
 
-    suspend fun ensureModel(sourceLang: String, targetLang: String) {
+    override suspend fun ensureModel(sourceLang: String, targetLang: String) {
         if (sourceLang.equals(targetLang, ignoreCase = true)) return
         translatorFor(sourceLang, targetLang)
     }
 
-    suspend fun translate(
+    override suspend fun translate(
         text: String,
         sourceLang: String,
         targetLang: String,
@@ -55,7 +57,7 @@ class MlKitMtEngine internal constructor(
         translation.await()
     }
 
-    fun close() {
+    override fun close() {
         val owned = synchronized(lifecycleLock) {
             closed = true
             translators.values.mapNotNull { it.translator }.also { translators.clear() }
