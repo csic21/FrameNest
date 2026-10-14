@@ -65,6 +65,8 @@ data class ListenTranslateUiState(
     val experimentalSilenceGate: Boolean = false,
     /** Last/current window only. Cleared on generation changes; never logged or persisted. */
     val diagnostics: ListenPipelineDiagnostics? = null,
+    /** Enable/preparation to eligible overlay selection, not physical rendering. */
+    val startupTiming: ListenStartupTiming? = null,
     /** Explicit foreground-only preparation; never automatically starts playback. */
     val preparingSubtitles: Boolean = false,
     val preparedAheadMs: Long = 0L,

@@ -137,8 +137,12 @@ fun ListenTranslateControls(
         )
         if (showDiagnostics) {
             Text(
-                text = uiState.diagnostics?.let(::formatListenDiagnostics)
-                    ?: stringResource(R.string.listen_translate_diagnostics_waiting),
+                text = listOfNotNull(
+                    uiState.startupTiming?.let(::formatListenStartupTiming),
+                    uiState.diagnostics?.let(::formatListenDiagnostics),
+                ).joinToString("\n\n").ifEmpty {
+                    stringResource(R.string.listen_translate_diagnostics_waiting)
+                },
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.testTag("listen_diagnostics"),
             )

@@ -35,8 +35,34 @@ class ListenTranslateSession(
     private val pollIntervalMs: Long = 500L,
     private val monotonicTimeMs: () -> Long = { System.nanoTime() / 1_000_000L },
 ) {
+    private val startupTimer = ListenStartupTimer(monotonicTimeMs)
     private val _ui = MutableStateFlow(ListenTranslateUiState())
     val uiState: StateFlow<ListenTranslateUiState> = _ui.asStateFlow()
+
+    /** Called before model preparation is queued, so startup includes that wait. */
+    fun beginStartupTiming(): Long {
+        val token = startupTimer.begin()
+        _ui.update { it.copy(startupTiming = startupTimer.sample) }
+        return token
+    }
+
+    fun recordAsrPreparationTiming(token: Long, elapsedMs: Long) {
+        startupTimer.recordAsrPreparation(token, elapsedMs)
+        _ui.update { it.copy(startupTiming = startupTimer.sample) }
+    }
+
+    /** Capture at PCM event emission, before dispatching the event to the UI scope. */
+    val startupTimingToken: Long get() = startupTimer.token
+
+    fun recordFirstPcmTiming(token: Long, eventAtMs: Long) {
+        startupTimer.recordFirstPcm(token, eventAtMs)
+        _ui.update { it.copy(startupTiming = startupTimer.sample) }
+    }
+
+    private fun resetStartupTiming() {
+        startupTimer.reset()
+        _ui.update { it.copy(startupTiming = null) }
+    }
 
     fun setEngine(engine: ListenTranslateEngine) {
         this.engine = engine
@@ -63,6 +89,7 @@ class ListenTranslateSession(
     fun setContentKey(contentKey: String) {
         val normalized = contentKey.trim()
         if (normalized == this.contentKey) return
+        resetStartupTiming()
         this.contentKey = normalized
         // Codec/network failures from the old audio variant must not block the new one.
         retryPolicy.clear()
@@ -82,8 +109,10 @@ class ListenTranslateSession(
             )
         }
         if (enabled) {
+            if (startupTimer.sample == null) beginStartupTiming()
             activate()
         } else {
+            resetStartupTiming()
             cacheLease?.close()
             cacheLease = null
             activationJob?.cancel()
@@ -108,6 +137,7 @@ class ListenTranslateSession(
     fun setSourceLang(code: String) {
         val next = code.trim().lowercase()
         if (next == _ui.value.sourceLang) return
+        resetStartupTiming()
         _ui.update { it.copy(sourceLang = next, activeCue = null, overlayText = "") }
         if (_ui.value.enabled) {
             activate()
@@ -117,6 +147,7 @@ class ListenTranslateSession(
     fun setTargetLang(code: String) {
         val next = code.trim().lowercase()
         if (next == _ui.value.targetLang) return
+        resetStartupTiming()
         _ui.update { it.copy(targetLang = next, activeCue = null, overlayText = "") }
         if (_ui.value.enabled) {
             activate()
@@ -130,6 +161,7 @@ class ListenTranslateSession(
     }
 
     fun setDisplayMode(mode: ListenDisplayMode) {
+        if (mode != _ui.value.displayMode) resetStartupTiming()
         val previousLanguages = _ui.value.languages
         _ui.update {
             val overlay = ListenTranslateWindows.formatOverlay(it.activeCue, mode)
@@ -144,8 +176,12 @@ class ListenTranslateSession(
     fun setPreparingSubtitles(preparing: Boolean) {
         if (released || !_ui.value.enabled || !isForeground) return
         if (_ui.value.preparingSubtitles == preparing) return
+        if (preparing) {
+            beginStartupTiming()
+        }
         stopPolling()
         _ui.update { it.copy(preparingSubtitles = preparing, isProcessing = false) }
+        refreshActiveCue()
         if (activationJob?.isActive != true) startPolling()
     }
 
@@ -187,6 +223,7 @@ class ListenTranslateSession(
         isBuffering = buffering
         this.playbackRate = ListenPrefetchPolicy.normalizedPlaybackRate(playbackRate)
         updateEffectiveRealtimeFactor()
+        if (farSeek) resetStartupTiming()
         refreshActiveCue()
         if (_ui.value.enabled && (farSeek || enteredBuffering)) {
             // Cancel stale look-ahead immediately. The replacement poll either targets
@@ -200,6 +237,7 @@ class ListenTranslateSession(
     /** Background retains enable intent/cache, but cannot start or publish window work. */
     fun setForeground(foreground: Boolean) {
         if (released || isForeground == foreground) return
+        resetStartupTiming()
         isForeground = foreground
         if (!foreground) _ui.update { it.copy(preparingSubtitles = false) }
         stopPolling()
@@ -210,6 +248,7 @@ class ListenTranslateSession(
     /** Explicit user seeks also cancel small jumps, before the next player tick arrives. */
     fun onSeek(positionMs: Long) {
         if (released) return
+        resetStartupTiming()
         lastPositionMs = positionMs.coerceAtLeast(0L)
         _ui.update { it.copy(preparingSubtitles = false) }
         stopPolling()
@@ -219,6 +258,7 @@ class ListenTranslateSession(
     }
 
     fun release() {
+        resetStartupTiming()
         released = true
         cacheLease?.close()
         cacheLease = null
@@ -309,6 +349,17 @@ class ListenTranslateSession(
         refreshActiveCue()
     }
 
+    private fun recordCachedStartupReadiness() {
+        val langs = _ui.value.languages
+        // An unrelated cached subtitle elsewhere in the movie is not startup readiness.
+        val cue = ListenTranslateWindows.cueAt(cachedCues, lastPositionMs)
+        startupTimer.publish(
+            hasSource = cue?.textSrc?.isNotBlank() == true,
+            hasBilingual = langs.sourceLang != langs.targetLang &&
+                cue?.textSrc?.isNotBlank() == true && cue.textTgt.isNotBlank(),
+        )
+    }
+
     private fun refreshActiveCue() {
         if (!_ui.value.enabled) return
         val cue = ListenTranslateWindows.cueAt(cachedCues, lastPositionMs)
@@ -317,9 +368,21 @@ class ListenTranslateSession(
             cachedCues, lastPositionMs, lastDurationMs, windowMs,
         )
         val target = preparationTargetMs()
+        if (isForeground) {
+            recordCachedStartupReadiness()
+            val sourceVisible = cue?.textSrc?.isNotBlank() == true &&
+                _ui.value.displayMode != ListenDisplayMode.TargetOnly
+            startupTimer.select(
+                sourceVisible = sourceVisible,
+                bilingualVisible = sourceVisible && cue.textTgt.isNotBlank() &&
+                    _ui.value.displayMode == ListenDisplayMode.Bilingual &&
+                    _ui.value.languages.sourceLang != _ui.value.languages.targetLang,
+            )
+        }
         _ui.update {
             it.copy(
                 activeCue = cue, overlayText = overlay, preparedAheadMs = ahead,
+                startupTiming = startupTimer.sample,
                 preparingSubtitles = it.preparingSubtitles && ahead < target,
             )
         }
@@ -425,6 +488,19 @@ class ListenTranslateSession(
                 )
                 ensureCurrent(generation)
                 cachedCues = ListenCueCache.upsert(cachedCues, persistedSpeech)
+                startupTimer.publish(
+                    hasSource = result.textSrc.isNotBlank(),
+                    hasBilingual = result.textSrc.isNotBlank() && result.textTgt.isNotBlank() &&
+                        langs.sourceLang != langs.targetLang,
+                )
+                if (result.textSrc.isNotBlank() && result.textTgt.isNotBlank() &&
+                    langs.sourceLang != langs.targetLang
+                ) {
+                    startupTimer.recordGeneratedBilingual(
+                        result.stageTimings,
+                        diagnostics.cacheCommitMs + elapsedListenTimeMs(commitStartedAtMs, monotonicTimeMs()),
+                    )
+                }
                 updateCueSummary()
                 refreshActiveCue()
                 val now = monotonicTimeMs()

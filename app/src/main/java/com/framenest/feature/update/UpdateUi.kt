@@ -90,7 +90,7 @@ fun UpdateHost(controller: UpdateController, isPlaybackRoute: Boolean) {
                                 val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
                                 val intent = Intent(Intent.ACTION_VIEW).apply {
                                     setDataAndType(uri, "application/vnd.android.package-archive")
-                                    clipData = ClipData.newRawUri("FrameNest update", uri)
+                                    clipData = ClipData.newRawUri("映舟更新", uri)
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
                                 context.startActivity(intent)

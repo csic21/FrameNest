@@ -1,6 +1,6 @@
 # FrameNest
 
-FrameNest（栖影）是面向 Android 手机和平板的 NAS/SMB 视频播放器。
+映舟（FrameNest）是面向 Android 手机和平板的 NAS/SMB 视频播放器。
 
 当前仓库已完成 **MVP + 听译 Beta + 播放器产品控制**（FN-00 … FN-49）。
 版本见 `CHANGELOG.md`；验收记录见 `docs/RELEASE-ACCEPTANCE.md`。

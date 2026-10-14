@@ -9,6 +9,8 @@ data class ListenStageTimings(
     val silenceGateMs: Long? = null,
     val asrMs: Long? = null,
     val translationMs: Long? = null,
+    /** Overlaps ASR; do not add to other stages to infer total time. */
+    val translationPreparationMs: Long? = null,
     /** Remote SMB reads issued while reading this window's PCM; null for local media. */
     val remoteReads: Int? = null,
     val remoteReadBytes: Long? = null,
@@ -36,9 +38,10 @@ data class ListenPipelineDiagnostics(
     val failed: Boolean = false,
 )
 
-internal enum class ListenPipelineStage { ModelCheck, PcmRead, SilenceGate, Asr, Translation }
+internal enum class ListenPipelineStage { ModelCheck, PcmRead, SilenceGate, Asr, TranslationPreparation, Translation }
 
 internal class ListenStageTimer(private val nowMs: () -> Long) {
+    @Volatile
     var timings = ListenStageTimings()
         private set
 
@@ -48,16 +51,20 @@ internal class ListenStageTimer(private val nowMs: () -> Long) {
             block()
         } finally {
             val elapsed = elapsedListenTimeMs(start, nowMs())
-            timings = when (stage) {
-                ListenPipelineStage.ModelCheck -> timings.copy(modelCheckMs = elapsed)
-                ListenPipelineStage.PcmRead -> timings.copy(pcmReadMs = elapsed)
-                ListenPipelineStage.SilenceGate -> timings.copy(silenceGateMs = elapsed)
-                ListenPipelineStage.Asr -> timings.copy(asrMs = elapsed)
-                ListenPipelineStage.Translation -> timings.copy(translationMs = elapsed)
+            synchronized(this) {
+                timings = when (stage) {
+                    ListenPipelineStage.ModelCheck -> timings.copy(modelCheckMs = elapsed)
+                    ListenPipelineStage.PcmRead -> timings.copy(pcmReadMs = elapsed)
+                    ListenPipelineStage.SilenceGate -> timings.copy(silenceGateMs = elapsed)
+                    ListenPipelineStage.Asr -> timings.copy(asrMs = elapsed)
+                    ListenPipelineStage.TranslationPreparation -> timings.copy(translationPreparationMs = elapsed)
+                    ListenPipelineStage.Translation -> timings.copy(translationMs = elapsed)
+                }
             }
         }
     }
 
+    @Synchronized
     fun recordRemoteReads(stats: ListenRemoteReadStats?) {
         if (stats == null) return
         timings = timings.copy(remoteReads = stats.reads, remoteReadBytes = stats.bytes)
@@ -92,6 +99,7 @@ internal fun formatListenDiagnostics(sample: ListenPipelineDiagnostics): String 
     return listOf(
         "最近窗口$outcome · ${sample.playbackRate}x",
         "模型检查 ${stages.modelCheckMs.ms()} · 音频读取/解码 ${stages.pcmReadMs.ms()}${stages.remoteReadSummary()}",
+        "翻译模型准备 ${stages.translationPreparationMs.ms()}（与ASR重叠，不相加）",
         "静音检查 ${stages.silenceGateMs.ms()} · ASR ${stages.asrMs.ms()} · 翻译 ${stages.translationMs.ms()}",
         "缓存/UI提交 ${sample.cacheCommitMs}ms · 处理总计 ${sample.totalMs}ms · 等待 ${sample.queueWaitMs}ms",
         "窗口起点落后播放 ${sample.windowBacklogMs}ms（媒体时间）",

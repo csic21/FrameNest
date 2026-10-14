@@ -46,7 +46,7 @@ internal object UpdatePolicy {
             val prefix = "${REPOSITORY_PATH}download/$tag/"
             require(uri.host == "github.com" && uri.rawQuery == null &&
                 uri.rawPath.startsWith(prefix) && assetPattern.matches(uri.rawPath.removePrefix(prefix))) {
-                "安装包必须来自 FrameNest 对应版本的 GitHub Release"
+                "安装包必须来自映舟对应版本的 GitHub Release"
             }
         }
     }

@@ -705,7 +705,7 @@ fun SettingsScreen(
                                 val share = Intent(Intent.ACTION_SEND).apply {
                                     type = "text/plain"
                                     putExtra(Intent.EXTRA_STREAM, uri)
-                                    putExtra(Intent.EXTRA_SUBJECT, "FrameNest diagnostics")
+                                    putExtra(Intent.EXTRA_SUBJECT, "映舟诊断")
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
                                 context.startActivity(

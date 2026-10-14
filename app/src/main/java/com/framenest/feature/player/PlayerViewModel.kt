@@ -430,6 +430,7 @@ class PlayerViewModel(
         }
         val sourceLang = listenSession.uiState.value.sourceLang
         val targetLang = listenSession.uiState.value.targetLang
+        val startupToken = listenSession.beginStartupTiming()
         val generation = ++listenPrepareGeneration
         listenPrepareJob?.cancel()
         retireListenTransports()
@@ -440,7 +441,7 @@ class PlayerViewModel(
             error = null,
         )
         listenPrepareJob = sessionScope.launch {
-            enableRealListenTranslate(generation, sourceLang, targetLang, transports)
+            enableRealListenTranslate(generation, sourceLang, targetLang, transports, startupToken)
         }
     }
 
@@ -457,6 +458,7 @@ class PlayerViewModel(
         sourceLang: String,
         targetLang: String,
         transports: SmbTransportOwner,
+        startupToken: Long,
     ) = listenPrepareMutex.withLock {
         currentCoroutineContext().ensureActive()
         if (generation != listenPrepareGeneration) return@withLock
@@ -494,6 +496,7 @@ class PlayerViewModel(
             pendingAsr = null
             pendingMt = null
         }
+        var asrPreparationMs: Long? = null
         val prepared = try {
             val engine = withContext(Dispatchers.IO) {
                 ensureSmbConnectedForListen(transports)
@@ -506,39 +509,53 @@ class PlayerViewModel(
                     AsrEngineChoice.VOSK -> "Vosk($sourceLang)"
                     AsrEngineChoice.SHERPA -> "SenseVoice"
                 }
-                asrSupport.ensureInstalled(
-                    langTag = sourceLang,
-                    allowMeteredDownloads = allowMeteredDownloads,
-                ) { p ->
-                    if (generation != listenPrepareGeneration) return@ensureInstalled
-                    val percent = (p * 100f).toInt().coerceIn(0, 100)
-                    if (percent != lastProgressPercent) {
-                        lastProgressPercent = percent
-                        reportListenPreparation(generation, "正在准备 $installingEngineLabel：$percent%")
+                val asrPreparationStartedAt = System.nanoTime()
+                try {
+                    asrSupport.ensureInstalled(
+                        langTag = sourceLang,
+                        allowMeteredDownloads = allowMeteredDownloads,
+                    ) { p ->
+                        if (generation != listenPrepareGeneration) return@ensureInstalled
+                        val percent = (p * 100f).toInt().coerceIn(0, 100)
+                        if (percent != lastProgressPercent) {
+                            lastProgressPercent = percent
+                            reportListenPreparation(generation, "正在准备 $installingEngineLabel：$percent%")
+                        }
                     }
+                    currentCoroutineContext().ensureActive()
+                    val asr: AsrEngine = when (asrSupport.engineChoice()) {
+                        AsrEngineChoice.VOSK -> VoskAsrEngine()
+                        AsrEngineChoice.SHERPA -> SherpaAsrEngine()
+                    }
+                    val mt = MlKitMtEngine(allowMeteredDownloads = allowMeteredDownloads)
+                    pendingAsr = asr
+                    pendingMt = mt
+                    reportListenPreparation(generation, "正在载入本机 ASR 模型 $sourceLang…")
+                    val modelDir = asrSupport.modelDir(sourceLang)
+                        ?: error(asrSupport.incompleteModelMessage(sourceLang))
+                    asr.ensureModel(modelDir, sourceLang)
+                } finally {
+                    asrPreparationMs = ((System.nanoTime() - asrPreparationStartedAt) / 1_000_000L)
+                        .coerceAtLeast(0L)
                 }
-                currentCoroutineContext().ensureActive()
-                val asr: AsrEngine = when (asrSupport.engineChoice()) {
-                    AsrEngineChoice.VOSK -> VoskAsrEngine()
-                    AsrEngineChoice.SHERPA -> SherpaAsrEngine()
-                }
-                val mt = MlKitMtEngine(allowMeteredDownloads = allowMeteredDownloads)
-                pendingAsr = asr
-                pendingMt = mt
-                reportListenPreparation(generation, "正在载入本机 ASR 模型 $sourceLang…")
-                val modelDir = asrSupport.modelDir(sourceLang)
-                    ?: error(asrSupport.incompleteModelMessage(sourceLang))
-                asr.ensureModel(modelDir, sourceLang)
                 currentCoroutineContext().ensureActive()
                 val engine = RealListenTranslateEngine(
                     audio = audio,
-                    asr = asr,
-                    mt = mt,
+                    asr = checkNotNull(pendingAsr),
+                    mt = checkNotNull(pendingMt),
                     asrModels = asrSupport,
                     selectedAudioTrackOrdinal = { selectedAudioTrackOrdinal() },
                     asrModelLabel = { asrSupport.modelLabel(sourceLang) },
                     mtModelLabel = { "mlkit-v1-$sourceLang-$targetLang" },
                     experimentalSilenceGate = experimentalSilenceGate,
+                    onPcmReady = { eventAtMs ->
+                        val eventToken = listenSession.startupTimingToken
+                        sessionScope.launch {
+                            if (generation == listenPrepareGeneration && !playbackLifecycle.closed) {
+                                listenSession.recordFirstPcmTiming(eventToken, eventAtMs)
+                            }
+                        }
+                    },
                 )
                 if (generation != listenPrepareGeneration) {
                     throw CancellationException("stale listen-translate preparation")
@@ -549,6 +566,7 @@ class PlayerViewModel(
             if (generation != listenPrepareGeneration || playbackLifecycle.closed) {
                 throw CancellationException("stale listen-translate preparation")
             }
+            asrPreparationMs?.let { listenSession.recordAsrPreparationTiming(startupToken, it) }
             realListenEngine = engine
             listenSession.setEngine(engine)
             pendingAudio = null

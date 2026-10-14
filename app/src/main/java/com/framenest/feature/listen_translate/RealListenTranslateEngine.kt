@@ -9,8 +9,10 @@ import com.framenest.feature.listen_translate.audio.ListenAudioSource
 import com.framenest.feature.listen_translate.mt.MlKitMtEngine
 import java.io.File
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 
 /**
  * Product listen-translate engine (FN-14, FN-51):
@@ -27,6 +29,8 @@ class RealListenTranslateEngine(
     private val mtModelLabel: () -> String = { "mlkit-translate" },
     private val experimentalSilenceGate: Boolean = false,
     private val monotonicTimeMs: () -> Long = { System.nanoTime() / 1_000_000L },
+    /** Content-free event time; includes silent PCM, but not an empty decode. */
+    private val onPcmReady: (Long) -> Unit = {},
 ) : ListenTranslateEngine {
 
     private data class SourceKey(val start: Long, val end: Long, val language: String, val track: Int?)
@@ -79,45 +83,28 @@ class RealListenTranslateEngine(
             throw IllegalStateException("语言对 $srcLang→$tgtLang 不被 ML Kit 支持")
         }
 
-        val key = SourceKey(startMs, endMs, srcLang, selectedAudioTrackOrdinal())
-        val source = cachedSource?.takeIf { it.first == key }?.second
-            ?.copy(stageTimings = timer.timings)
-            ?: recognizeWindow(startMs, endMs, srcLang, key.track, timer).also {
-                currentCoroutineContext().ensureActive()
-                if (it.textSrc.isNotBlank()) cachedSource = key to it
-            }
-        if (source.textSrc.isBlank()) return source
-        val textSrc = source.textSrc
-        val cueStartMs = source.cueStartMs
-        val cueEndMs = source.cueEndMs
-
-        // Keep source text visible and durable even if MT is slow or cancelled.
-        // This remains a single bounded window; no detached translation queue.
-        onSourceRecognized(
-            ListenWindowResult(textSrc, "", cueStartMs, cueEndMs, stageTimings = timer.timings),
-        )
-
-        val textTgt = try {
-            timer.measure(ListenPipelineStage.Translation) { mt.translate(textSrc, srcLang, tgtLang) }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (t: Throwable) {
-            // Still keep ASR text if MT fails.
-            return ListenWindowResult(
-                textSrc = textSrc,
-                textTgt = "",
-                cueStartMs = cueStartMs,
-                cueEndMs = cueEndMs,
-                retryableErrorMessage = "翻译失败：${t.message?.take(80) ?: "error"}",
-                stageTimings = timer.timings,
-            )
-        }
-        return ListenWindowResult(
-            textSrc = textSrc,
-            textTgt = textTgt,
-            cueStartMs = cueStartMs,
-            cueEndMs = cueEndMs,
-            stageTimings = timer.timings,
+        return processListenWindowStages(
+            prepareTranslation = {
+                if (srcLang != tgtLang) {
+                    timer.measure(ListenPipelineStage.TranslationPreparation) {
+                        withContext(Dispatchers.IO) { mt.ensureModel(srcLang, tgtLang) }
+                    }
+                }
+            },
+            recognizeSource = { startTranslationPreparation ->
+                val key = SourceKey(startMs, endMs, srcLang, selectedAudioTrackOrdinal())
+                cachedSource?.takeIf { it.first == key }?.second
+                    ?.copy(stageTimings = timer.timings)?.also { startTranslationPreparation() }
+                    ?: recognizeWindow(startMs, endMs, srcLang, key.track, timer, startTranslationPreparation).also {
+                        currentCoroutineContext().ensureActive()
+                        if (it.textSrc.isNotBlank()) cachedSource = key to it
+                    }
+            },
+            publishSource = onSourceRecognized,
+            translateSource = { text ->
+                timer.measure(ListenPipelineStage.Translation) { mt.translate(text, srcLang, tgtLang) }
+            },
+            timings = { timer.timings },
         )
     }
 
@@ -127,6 +114,7 @@ class RealListenTranslateEngine(
         srcLang: String,
         track: Int?,
         timer: ListenStageTimer,
+        startTranslationPreparation: () -> Unit,
     ): ListenWindowResult {
         val modelDir: File = asrModels.modelDir(srcLang)
             ?: throw ModelsNotReadyException(asrModels.incompleteModelMessage(srcLang))
@@ -152,6 +140,8 @@ class RealListenTranslateEngine(
                 t,
             )
         }
+        currentCoroutineContext().ensureActive()
+        if (pcm.isNotEmpty()) onPcmReady(monotonicTimeMs())
         timer.recordRemoteReads(audio.takeRemoteReadStats())
         val blank = timer.measure(ListenPipelineStage.SilenceGate) {
             listenPcmBlankReason(pcm, experimentalSilenceGate)
@@ -166,6 +156,9 @@ class RealListenTranslateEngine(
             )
         }
 
+        // Do not start/cancel model downloads repeatedly for confirmed silence.
+        // Once PCM needs ASR, prepare MT concurrently with native recognition.
+        startTranslationPreparation()
         val recognition = try {
             timer.measure(ListenPipelineStage.Asr) { asr.recognize(pcm) }
         } catch (cancelled: CancellationException) {

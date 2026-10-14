@@ -19,6 +19,7 @@ class RealListenPipelineTest {
         pcm[16_000] = 30 // Very short/quiet onset, diluted by whole-window RMS.
         val original = pcm.copyOf()
         var now = 0L
+        var pcmReadyAt: Long? = null
         var recognized: ShortArray? = null
         var bounds: Pair<Long, Long>? = null
         val asr = object : AsrEngine {
@@ -40,12 +41,14 @@ class RealListenPipelineTest {
         val engine = RealListenTranslateEngine(
             audio, asr, MlKitMtEngine(), FakeModels,
             experimentalSilenceGate = false, monotonicTimeMs = { now },
+            onPcmReady = { pcmReadyAt = it },
         )
         var source: ListenWindowResult? = null
         val result = engine.processWindowWithProgress(3_000L, 6_000L, "en", "en") {
             source = it
             now += 40L // Source cache callback is excluded from ASR/MT stage times.
         }
+        assertEquals(30L, pcmReadyAt)
         assertSame(pcm, recognized)
         assertArrayEquals(original, pcm)
         assertEquals(2_250L to 6_750L, bounds)
@@ -129,6 +132,26 @@ class RealListenPipelineTest {
         assertEquals(300L, result.cueStartMs)
         assertEquals(900L, result.cueEndMs)
         engine.close()
+    }
+
+    @Test
+    fun blankPcmNeverConstructsTranslationClient() = runBlocking {
+        var clients = 0
+        val mt = MlKitMtEngine(false) { clients++; error("must not create MT for blank PCM") }
+        val asr = object : AsrEngine {
+            override suspend fun ensureModel(modelDir: File, langTag: String) = Unit
+            override suspend fun recognize(pcm16kMono: ShortArray): AsrRecognition = error("must not recognize blank")
+            override fun close() = Unit
+        }
+        for (pcm in listOf(shortArrayOf(), ShortArray(16_000))) {
+            val audio = object : ListenAudioSource {
+                override suspend fun pcmWindow(startMs: Long, endMs: Long, preferredAudioTrackOrdinal: Int?) = pcm
+            }
+            val engine = RealListenTranslateEngine(audio, asr, mt, FakeModels)
+            assertTrue(engine.processWindow(0L, 3_000L, "en", "zh").textSrc.isBlank())
+            engine.close()
+        }
+        assertEquals(0, clients)
     }
 
     private object FakeModels : AsrModelSupport {

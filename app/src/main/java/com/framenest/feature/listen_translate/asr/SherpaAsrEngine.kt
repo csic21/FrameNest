@@ -114,9 +114,9 @@ class SherpaAsrEngine(
         const val SAMPLE_RATE_HZ = 16_000
 
         /**
-         * Two threads balance RK3588-class throughput (~0.1 RTF at 1 thread on
-         * A76) against battery/thermal on sustained subtitle prefetch.
-         * Measured on-device before raising.
+         * Conservative CPU budget shared with video playback and on-device MT.
+         * This is a configuration choice, not a measured target-phone RTF.
+         * Benchmark cold/warm subtitle latency and sustained thermals before raising.
          */
         const val DEFAULT_NUM_THREADS = 2
 
