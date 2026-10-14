@@ -14,6 +14,7 @@ import com.framenest.data.settings.UserPreferences
 import com.framenest.data.thumbnail.ThumbnailRepository
 import com.framenest.feature.listen_translate.asr.SherpaModelInstaller
 import com.framenest.feature.listen_translate.asr.VoskModelInstaller
+import com.framenest.feature.listen_translate.mt.HyMtModelInstaller
 import com.framenest.feature.settings.CacheMaintenance
 import com.framenest.smb.SmbClient
 import com.framenest.smb.SmbjClient
@@ -62,6 +63,9 @@ class AppContainer(
     /** SenseVoice int8 ASR pack via sherpa-onnx (FN-51); filesDir/listen_models/sherpa. */
     val sherpaModelInstaller: SherpaModelInstaller = SherpaModelInstaller(appContext)
 
+    /** Optional verified direct MT pack; constructing its store never downloads it. */
+    val hyMtModelInstaller: HyMtModelInstaller = HyMtModelInstaller(appContext)
+
     /** List thumbnails (FN-07); concurrency from [userPreferences]. */
     val thumbnailRepository: ThumbnailRepository = ThumbnailRepository(
         context = appContext,
@@ -77,6 +81,7 @@ class AppContainer(
         listenModelManager = listenModelManager,
         voskModelInstaller = voskModelInstaller,
         sherpaModelInstaller = sherpaModelInstaller,
+        hyMtModelInstaller = hyMtModelInstaller,
     )
 
     val diagnosticLogExporter: DiagnosticLogExporter = DiagnosticLogExporter(appContext)

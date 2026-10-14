@@ -4,12 +4,14 @@ package com.framenest.feature.listen_translate.recorded
 internal data class JapaneseMorpheme(
     val rawStart: Int, val rawEnd: Int, val surface: String,
     val partOfSpeech: String, val detail: String, val conjugationForm: String, val known: Boolean,
+    val conjugationType: String = "*",
 )
 internal fun interface JapaneseMorphology { fun analyze(rawText: String): List<JapaneseMorpheme> }
 internal data class RecordedBoundary(val rawEnd: Int, val mediaEndMs: Long, val reason: RecordedSourceReason)
 
 /** A conservative linguistic/acoustic heuristic; never a guarantee of ASR/translation accuracy. */
 internal class JapaneseSourceBoundary(private val morphology: JapaneseMorphology) {
+    private val onsetToleranceMs = 250L // Estimated token onsets can fall slightly inside measured quiet.
     fun first(
         text: String, anchors: List<RecordedCharacterAnchor>, quiet: List<RecordedQuietSpan>,
         decodedThroughMs: Long, eof: Boolean = false,
@@ -22,34 +24,39 @@ internal class JapaneseSourceBoundary(private val morphology: JapaneseMorphology
         for (i in tokens.indices) {
             if (!terminal(tokens, i)) continue
             var endIndex = i
-            // Consume only sentence-closing punctuation, never comma/colon/list separators.
-            while (endIndex + 1 < tokens.size && tokens[endIndex + 1].surface.all { it in "。！？!?」』）)\"”’" }) endIndex++
+            // ASR commas are not a linguistic veto. Inspect the actual next morpheme
+            // after punctuation, while retaining every punctuation character in source.
+            while (endIndex + 1 < tokens.size && tokens[endIndex + 1].surface.all { it in "。！？!?」』）)\"”’、，," }) endIndex++
+            val hasSentencePunctuation = (i + 1..endIndex).any { tokens[it].surface.any { c -> c in "。！？!?" } }
             val right = tokens.getOrNull(endIndex + 1)
             if (right != null && dependent(right)) continue
+            if (right != null && !hasSentencePunctuation && attributiveContinuation(tokens, i, right)) continue
             val end = tokens[endIndex].rawEnd
             val terminalTime = anchorAt(tokens[i].rawEnd - 1)?.estimatedTokenStartMs ?: continue
             val rightTime = right?.let { anchorAt(it.rawStart)?.estimatedTokenStartMs }
             // Silence near a terminal is useful only when there is actual right context.
             if (rightTime != null && rightTime > terminalTime) {
                 val run = quiet.filter {
-                    it.endMs - it.startMs >= 160 && it.startMs >= terminalTime &&
+                    it.endMs - it.startMs >= 160 && it.startMs >= terminalTime - onsetToleranceMs &&
+                        it.endMs > terminalTime &&
                         it.endMs <= rightTime + 250 && it.startMs - terminalTime <= 1_500 &&
-                        rightTime - it.endMs <= 1_000 && decodedThroughMs - it.endMs >= 750
+                        rightTime - it.endMs <= 1_000 + onsetToleranceMs && decodedThroughMs - it.endMs >= 750
                 }.minByOrNull { kotlin.math.abs(rightTime - it.endMs) }
-                if (run != null) return RecordedBoundary(end, (run.startMs + run.endMs) / 2,
-                    if (endIndex > i) RecordedSourceReason.PUNCTUATION_AND_PCM_QUIET
+                if (run != null) return RecordedBoundary(end, maxOf((run.startMs + run.endMs) / 2, terminalTime),
+                    if (hasSentencePunctuation) RecordedSourceReason.PUNCTUATION_AND_PCM_QUIET
                     else RecordedSourceReason.MORPHOLOGY_AND_PCM_QUIET)
             }
             // A trailing measured quiet run is right-context PCM too. Do not wait forever
             // for another lexical token after an isolated complete utterance.
             if (right == null) {
                 val trailing = quiet.firstOrNull {
-                    it.startMs >= terminalTime && it.startMs - terminalTime <= 1_500 &&
+                    it.startMs >= terminalTime - onsetToleranceMs && it.endMs > terminalTime &&
+                        it.startMs - terminalTime <= 1_500 &&
                         it.endMs >= decodedThroughMs - 20 && it.endMs <= decodedThroughMs &&
                         it.endMs - it.startMs >= 750
                 }
-                if (trailing != null) return RecordedBoundary(text.length, trailing.startMs + 80,
-                    if (endIndex > i) RecordedSourceReason.PUNCTUATION_AND_PCM_QUIET
+                if (trailing != null) return RecordedBoundary(text.length, maxOf(trailing.startMs + 80, terminalTime),
+                    if (hasSentencePunctuation) RecordedSourceReason.PUNCTUATION_AND_PCM_QUIET
                     else RecordedSourceReason.MORPHOLOGY_AND_PCM_QUIET)
             }
             // Reliable physical EOF plus complete morphology. EOF alone never completes a fragment.
@@ -72,6 +79,17 @@ internal class JapaneseSourceBoundary(private val morphology: JapaneseMorphology
         val predicate = tokens[i]
         return predicate.known && predicate.partOfSpeech in setOf("動詞", "形容詞", "助動詞") &&
             (predicate.conjugationForm == "基本形" || predicate.conjugationForm.startsWith("命令"))
+    }
+
+    private fun attributiveContinuation(tokens: List<JapaneseMorpheme>, index: Int, next: JapaneseMorpheme): Boolean {
+        if (next.partOfSpeech !in setOf("名詞", "形容詞", "連体詞")) return false
+        if (tokens[index].partOfSpeech == "助詞" && tokens[index].detail.contains("終助詞")) return false
+        // Plain predicates before a noun/adjective can modify that nominal phrase.
+        // A polite auxiliary chain (including past ました) is independent-clause evidence.
+        val polite = (index downTo 0).asSequence()
+            .takeWhile { tokens[it].partOfSpeech == "助動詞" }
+            .any { tokens[it].conjugationType in setOf("特殊・マス", "特殊・デス") }
+        return !polite
     }
 
     private fun dependent(next: JapaneseMorpheme): Boolean =

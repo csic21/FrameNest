@@ -103,19 +103,28 @@ class RecordedSourceUnitCoordinatorTest {
         assertFalse(c.recoverUnion(union).accepted)
     }
 
-    @Test fun longNoBoundaryContextRotatesWithPersistableProvisionalWithoutDroppingOldText() {
+    @Test fun longNoBoundaryContextConsumesOnlyExactStitchedOwnershipWithoutRawZeroRestart() {
         val c = RecordedSourceUnitCoordinator(noBoundaries)
-        c.push(first()); val at24 = c.push(second())
-        c.translationSucceeded(at24.readyUnits.single(), "临时")
-        val next = RecordedWindowInput(RecordedHypothesis(0, 18000, 33000,
-            listOf(RecordedToken("継続する新しい録音内容", 19000))), emptyList())
-        val r = c.push(next)
-        assertEquals(27000L, r.nextWindowStartMs)
-        assertEquals(next.hypothesis.text, r.pendingText)
-        assertTrue(at24.records.any { it.unit.text == at24.pendingText })
-        assertTrue("rotation must not translate the same context twice", r.readyUnits.isEmpty())
-        assertTrue(r.records.none { it.unit.status == RecordedSourceStatus.FINAL })
-        assertTrue(r.pendingText.length <= 1024)
+        fun continuous(start: Long): RecordedWindowInput {
+            val tokens = (0 until 300).map { i -> RecordedToken((0x4e00 + start.toInt() / 50 + i).toChar().toString(), start + i*50L) }
+            return RecordedWindowInput(RecordedHypothesis(0,start,start+15000,tokens),emptyList())
+        }
+        c.push(continuous(0))
+        val at24 = c.push(continuous(9000))
+        c.deferUnconfirmed(at24.readyUnits.single())
+        val r = c.push(continuous(18000))
+        assertEquals(27000L,r.nextWindowStartMs)
+        assertEquals("",r.pendingText)
+        val revised = r.readyUnits.single().unit
+        assertEquals(RecordedSourceStatus.PROVISIONAL,revised.status)
+        assertEquals(at24.readyUnits.single().unit.id,revised.supersedes)
+        assertTrue(revised.text.startsWith(at24.readyUnits.single().unit.text))
+        assertEquals(660,revised.text.length)
+        c.deferUnconfirmed(r.readyUnits.single())
+        val next = c.push(continuous(27000))
+        assertTrue(next.readyUnits.isEmpty())
+        assertEquals(180,next.pendingText.length)
+        assertFalse("must not restart the new hypothesis at raw zero",next.pendingText.startsWith(continuous(27000).hypothesis.text.take(12)))
     }
 
     @Test fun isolatedCompleteSpeechWithMeasuredTrailingSilenceDoesNotWaitForAnotherToken() {
@@ -298,6 +307,21 @@ class RecordedSourceUnitCoordinatorTest {
         assertNull(c.translationSucceeded(r.readyUnits[0],"未确认").completedCoverage)
         val completed = c.translationSucceeded(r.readyUnits[1],"什么语言").completedCoverage!!
         assertTrue(completed.startMs>=9000)
+    }
+
+    @Test fun hardCharacterCapRetainsVerifiedNewRawCursorRatherThanReplayingPrefix() {
+        val c = RecordedSourceUnitCoordinator(noBoundaries,maxContextChars=128)
+        fun window(start: Long): RecordedWindowInput = RecordedWindowInput(RecordedHypothesis(0,start,start+15000,
+            (0 until 128).map { i -> RecordedToken((0x4e00+start.toInt()/100+i).toChar().toString(),start+i*100L) }),emptyList())
+        val first=window(0);val next=window(9000)
+        val cut=com.framenest.feature.listen_translate.RecordedOverlapAlignment.align(
+            com.framenest.feature.listen_translate.RecordedPending(first.hypothesis,0,0),next.hypothesis).cut!!
+        val initial=c.push(first)
+        initial.readyUnits.forEach { c.deferUnconfirmed(it) }
+        val r=c.push(next)
+        assertEquals(next.hypothesis.text.substring(cut.newOffset),r.pendingText)
+        assertTrue(r.pendingText.length<=128)
+        assertEquals(18000L,r.nextWindowStartMs)
     }
 
     @Test fun noBoundaryNeverYieldsNoneAndSourceInputIsBounded() {

@@ -303,4 +303,18 @@ class HyMtModelInstallerTest {
             assertTrue(unrelated.isDirectory)
         } finally { parent.deleteRecursively() }
     }
+
+    @Test fun explicitDeleteRefusesAnySharedModelLeaseUntilActuallyReleased() = runBlocking {
+        val root = root()
+        val lease = HyMtModelUseGuard.shared.acquire()
+        try {
+            val final = destination(root).apply { parentFile!!.mkdirs(); writeBytes(payload) }
+            val store = HyMtModelInstaller(root, spec, requireNetwork = {})
+            assertTrue(runCatching { store.deleteAll() }.isFailure)
+            assertArrayEquals(payload, final.readBytes())
+            lease.close()
+            store.deleteAll()
+            assertFalse(final.exists())
+        } finally { lease.close(); root.deleteRecursively() }
+    }
 }

@@ -83,6 +83,7 @@ jobs:
       - name: Check optional native ELF alignment
         run: |
           python3 scripts/check_hy_native_apk.py app/build/outputs/apk/debug/app-universal-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 app/build/outputs/apk/debug/app-universal-debug.apk
 
       - name: Upload debug APKs
         if: success()

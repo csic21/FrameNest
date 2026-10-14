@@ -22,6 +22,7 @@ class HyMtEngine internal constructor(
     private val native: HyMtNative,
     private val dispatcher: CoroutineDispatcher,
     private val threadCount: Int,
+    private val modelUseGuard: HyMtModelUseGuard = HyMtModelUseGuard.shared,
 ) : ListenMtEngine {
     constructor(verifiedModelPath: suspend () -> String, threadCount: Int = 2) : this(
         verifiedModelPath, HyMtJni, Dispatchers.IO, threadCount,
@@ -37,6 +38,7 @@ class HyMtEngine internal constructor(
     private val lifecycle = Any()
     private var closed = false
     private var handle = 0L
+    private var modelLease: HyMtModelUseGuard.Lease? = null
     private var active: HyMtCancellation? = null
 
     override fun supportsLanguage(langTag: String): Boolean = HyMtPrompt.language(langTag) != null
@@ -68,25 +70,32 @@ class HyMtEngine internal constructor(
             if (closed) return
             closed = true
             active?.cancel()
-            if (active == null) takeHandle() else 0L
+            if (active == null) takeHandle() else null
         }
-        if (release != 0L) native.close(release)
+        release?.let(::releaseModel)
     }
 
     private suspend fun ensureOpen(cancellation: HyMtCancellation) {
         if (handle != 0L) return
-        val path = verifiedModelPath()
-        checkCurrent(cancellation)
-        require(File(path).isAbsolute && '\u0000' !in path) { "A verified absolute model path is required" }
-        val opened = native.open(path.toByteArray(Charsets.UTF_8), threadCount, cancellation)
-        check(opened != 0L) { "Local model could not be opened" }
-        // Publish ownership before checking cancellation, so finally can always free it.
-        synchronized(lifecycle) { handle = opened }
+        // Acquire before verification, so deletion cannot race the gap between hashing and open.
+        val lease = modelUseGuard.acquire()
+        var published = false
         try {
+            val path = verifiedModelPath()
+            checkCurrent(cancellation)
+            require(File(path).isAbsolute && '\u0000' !in path) { "A verified absolute model path is required" }
+            val opened = native.open(path.toByteArray(Charsets.UTF_8), threadCount, cancellation)
+            check(opened != 0L) { "Local model could not be opened" }
+            // Publish both owners before checking cancellation; every close path releases together.
+            synchronized(lifecycle) {
+                handle = opened
+                modelLease = lease
+                published = true
+            }
             checkCurrent(cancellation)
         } catch (failure: Throwable) {
-            val release = synchronized(lifecycle) { takeHandle() }
-            if (release != 0L) native.close(release)
+            if (published) synchronized(lifecycle) { takeHandle() }?.let(::releaseModel)
+            else lease.close() // Path verification/native load failed without returning a handle.
             throw failure
         }
     }
@@ -106,9 +115,9 @@ class HyMtEngine internal constructor(
             } finally {
                 val release = synchronized(lifecycle) {
                     active = null
-                    if (closed) takeHandle() else 0L
+                    if (closed) takeHandle() else null
                 }
-                if (release != 0L) native.close(release)
+                release?.let(::releaseModel)
             }
         }
     }
@@ -121,5 +130,19 @@ class HyMtEngine internal constructor(
     }
 
     /** Caller holds lifecycle. */
-    private fun takeHandle(): Long = handle.also { handle = 0L }
+    private fun takeHandle(): LoadedModel? {
+        if (handle == 0L) return null
+        return LoadedModel(handle, checkNotNull(modelLease)).also {
+            handle = 0L
+            modelLease = null
+        }
+    }
+
+    private fun releaseModel(model: LoadedModel) {
+        native.close(model.handle)
+        // If close unexpectedly throws, keep deletion blocked: release was not established.
+        model.lease.close()
+    }
+
+    private data class LoadedModel(val handle: Long, val lease: HyMtModelUseGuard.Lease)
 }

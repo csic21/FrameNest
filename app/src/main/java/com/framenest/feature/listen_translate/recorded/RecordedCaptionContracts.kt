@@ -8,7 +8,7 @@ internal data class RecordedQuietSpan(val startMs: Long, val endMs: Long) {
     init { require(startMs >= 0 && endMs > startMs) }
 }
 
-internal object RecordedCaptionPolicy { const val VERSION = "recorded-source-units-kuromoji-v1" }
+internal object RecordedCaptionPolicy { const val VERSION = "recorded-source-units-kuromoji-v2" }
 
 internal enum class RecordedSourceStatus { FINAL, PROVISIONAL, UNCONFIRMED }
 internal enum class RecordedSourceReason {

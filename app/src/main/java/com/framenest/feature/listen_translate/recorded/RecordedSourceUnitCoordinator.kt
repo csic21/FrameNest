@@ -87,11 +87,6 @@ internal class RecordedSourceUnitCoordinator(
                 pending = null; stable.clear(); frozenAnchor = null; coverageStart = h.endMs; leftComplete = false
             }
             return result(true, ready, records)
-        } else if (h.endMs - coverageStart > maxContextMs) {
-            // Archive the complete old context; restart only on the fixed grid, retaining overlap.
-            emitContext(RecordedSourceStatus.PROVISIONAL, RecordedSourceReason.NO_BOUNDARY_CONTEXT_LIMIT,
-                old.window.endMs, ready, records, consume = true)
-            seed(input, completeLeft = false)
         } else {
             // If a complete utterance consumed the whole prior hypothesis, use its
             // immutable source anchor to skip only verified repeated overlap. Starting
@@ -119,7 +114,9 @@ internal class RecordedSourceUnitCoordinator(
                     check(oldContext.sumOf { it.end - it.begin } <= maxContextChars)
                     emitContext(RecordedSourceStatus.PROVISIONAL, RecordedSourceReason.NO_BOUNDARY_CONTEXT_LIMIT,
                         old.window.endMs, ready, records, consume = true)
-                    seed(input, completeLeft = false)
+                    // The verified overlap already supplies a new raw cursor. Even
+                    // under the hard character cap, do not replay the omitted prefix.
+                    seed(input, completeLeft = false, rawStart = cut.newOffset)
                 } else {
                     stable += added
                     frozenAnchor = RecordedFrozenAnchor(old.window, old.rawStart, cut.oldOffset)
@@ -128,10 +125,7 @@ internal class RecordedSourceUnitCoordinator(
             }
         }
         releaseBoundaries(ready, records)
-        if (text().isNotEmpty() && (readThrough - coverageStart >= maxContextMs || text().length >= maxContextChars)) {
-            emitContext(RecordedSourceStatus.PROVISIONAL, RecordedSourceReason.NO_BOUNDARY_CONTEXT_LIMIT,
-                readThrough, ready, records, consume = false)
-        }
+        capRemainingContext(ready, records)
         return result(true, ready, records)
     }
 
@@ -161,9 +155,7 @@ internal class RecordedSourceUnitCoordinator(
             return abandonRecovery(blocked, ready, records, "union_context_bound")
         }
         releaseBoundaries(ready, records)
-        if (text().isNotEmpty() && readThrough - coverageStart >= maxContextMs)
-            emitContext(RecordedSourceStatus.PROVISIONAL, RecordedSourceReason.NO_BOUNDARY_CONTEXT_LIMIT,
-                readThrough, ready, records, consume = false)
+        capRemainingContext(ready, records)
         return result(true, ready, records)
     }
 
@@ -260,6 +252,22 @@ internal class RecordedSourceUnitCoordinator(
         }
     }
 
+    /** Inspect one bounded next hypothesis before applying the retained-tail time limit.
+     * A credible boundary in that lookahead must not be discarded merely because the
+     * previous source start plus the full decode window exceeded the soft time budget.
+     * If no boundary resolves it, preserve the whole bounded text as provisional and
+     * consume its exact raw ownership; never restart the newer hypothesis at raw zero.
+     */
+    private fun capRemainingContext(ready: MutableList<RecordedTranslationTicket>, records: MutableList<RecordedCaptionRecord>) {
+        if (text().isEmpty()) return
+        val overflow = readThrough - coverageStart > maxContextMs
+        if (overflow || readThrough - coverageStart == maxContextMs || text().length >= maxContextChars) {
+            emitContext(RecordedSourceStatus.PROVISIONAL, RecordedSourceReason.NO_BOUNDARY_CONTEXT_LIMIT,
+                readThrough, ready, records, consume = overflow)
+            if (overflow) leftComplete = false
+        }
+    }
+
     private fun emitContext(status: RecordedSourceStatus, reason: RecordedSourceReason, endMs: Long,
         ready: MutableList<RecordedTranslationTicket>, records: MutableList<RecordedCaptionRecord>, consume: Boolean) {
         if (text().isBlank()) return
@@ -315,9 +323,12 @@ internal class RecordedSourceUnitCoordinator(
         }
     }
 
-    private fun seed(input: RecordedWindowInput, completeLeft: Boolean) {
-        stable.clear(); pending = RecordedPending(input.hypothesis, 0, input.hypothesis.startMs)
-        frozenAnchor = null; provisional = null; coverageStart = input.hypothesis.startMs; leftComplete = completeLeft
+    private fun seed(input: RecordedWindowInput, completeLeft: Boolean, rawStart: Int = 0) {
+        stable.clear(); pending = RecordedPending(input.hypothesis, rawStart, input.hypothesis.startMs)
+        frozenAnchor = null; provisional = null
+        coverageStart = if (rawStart == 0) input.hypothesis.startMs
+            else anchors(chunks()).firstOrNull()?.estimatedTokenStartMs ?: input.hypothesis.endMs
+        leftComplete = completeLeft
         quiet = input.quietSpans
     }
     private fun chunks(): List<Chunk> = stable + listOfNotNull(pending?.let { Chunk(it.window, it.rawStart, it.window.text.length) }).filter { it.end > it.begin }

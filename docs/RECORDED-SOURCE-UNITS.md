@@ -62,6 +62,10 @@ quiet detection, isolated speech followed by silence, stitch seams, one union re
 empty/late union results, provisional rollover, explicit EOF and 1 ms rounding,
 source retention over 200 weak windows, bounded queues/retries and stale generations.
 These are source-boundary/control-flow checks, not semantic acceptance of a model.
+`RecordedCapturedFixtureTest` also replays attributed real token/quiet captures under
+`app/src/test/resources/recorded/`: the four missed Kishida endings, 115.3-second cap
+regression, and the Emoji attributive phrase must remain correctly grouped. Missing
+new union hypotheses are explicitly failed, never fabricated. No ASR/MT is run here.
 
 ## Real-fixture CLI
 
@@ -107,9 +111,18 @@ entry point for independently regenerated real-audio evidence.
 
 ## Verified locally, 2026-10-14
 
-- 29 JUnit tests pass on the standalone Kotlin 2.1.20 / Java 21 runtime.
+- 36 JUnit tests pass on the standalone Kotlin 2.1.20 / Java 21 runtime.
 - CLI JSON/Unicode smoke passes: two final question units, retained list/false-period
   tail, then provisional incomplete EOF; no completed coverage without an MT success.
 - Pinned test-tool checksum verification passes for all 12 Maven artifacts.
-- No Android build, actual public PCM replay, MT generation, phone/tablet UI, or NAS
-  measurement was performed by this source-unit change. Those remain integration gates.
+- Captured real ASR/PCM-quiet replay now passes the focused v2 regressions. It verifies
+  source handling only and does not rerun recognition, audio analysis or translation.
+- No Android build, fresh ASR/MT generation, phone/tablet UI or NAS measurement was
+  performed by this source-unit change. Fresh full-video semantic acceptance remains an
+  integration gate; passing source tests cannot be reported as a quality pass.
+
+Policy v2 checks credible boundaries before applying the retained-tail time cap, keeps
+the hard 15/24-second ASR-window and 1,024-character bounds, and preserves verified raw
+splice ownership on fallback. It inspects morphology across commas with bounded 250 ms
+estimate tolerance, while blocking plain-predicate attributive splits. See decision 0033
+for the precise resource/continuity contract and remaining limitations.

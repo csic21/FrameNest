@@ -13,13 +13,19 @@ path; existing production defaults are not switched by these files.
 Use Kuromoji/IPADIC 0.9.0 NORMAL-mode morphology plus measured PCM quiet evidence.
 ASR-inserted spaces are omitted only in an analysis view with raw UTF-16 mapping.
 Predicate basic/imperative forms, optionally followed by a terminal particle, are
-candidates. A following particle, auxiliary, dependent/suffix component, or list comma
-blocks the candidate. Noun-only fragments and conjunctions do not become final from
-punctuation alone. This is a conservative, auditable heuristic, not a grammar proof.
+candidates. A following particle, auxiliary, or dependent/suffix component blocks the
+candidate. Commas are retained but looked past to the actual next lexical morpheme;
+they do not independently establish or veto completion. Plain predicates before a
+noun/adjective phrase remain joined unless a terminal particle, sentence punctuation,
+or polite auxiliary chain supports an independent clause. Noun-only fragments and
+conjunctions do not become final from punctuation alone. This is a conservative, auditable heuristic, not a grammar proof.
 No fixture vocabulary exceptions or expanding word-ending lists are used.
 
 A final candidate normally needs a real quiet run of at least 160 ms near its estimated
 terminal onset and the next lexical onset, with at least 750 ms of decoded right context.
+A bounded 250 ms tolerance covers estimated terminal onsets slightly inside real quiet
+and the maximum distance from quiet to the following estimated onset. The selected
+point remains inside measured quiet; token gaps alone are never used.
 A complete isolated utterance can instead use at least 750 ms of measured trailing
 quiet through the decoded edge. A reliable physical EOF plus complete morphology may
 finish a sentence; an incomplete EOF remains provisional. All display timestamps are
@@ -33,11 +39,16 @@ stand in for measured silence.
 - Alignment uses the existing bounded overlap matcher. There is at most one 24-second
   union request for a conflict. Failed recovery retains old source as UNCONFIRMED and
   continues at the newer fixed-grid window; it does not stop every later read.
-- The active context is bounded to 24 seconds / 1,024 UTF-16 code units. A whole-context
-  PROVISIONAL snapshot permits a caller to surface an incomplete source. Rollover keeps
-  the old persisted snapshot and overlaps the next fixed window. It never deletes a
-  text suffix to satisfy a cap. The restarted context's left edge is provisional until
-  a supported boundary; only subsequent complete units can become final.
+- Normal/union ASR windows remain at most 15/24 seconds and the assembled text has a
+  hard 1,024 UTF-16 code-unit cap. The 24-second retained-tail time budget is applied
+  after inspecting one incoming fixed-grid hypothesis and releasing credible boundaries.
+  This permits bounded text lookahead across the time budget (normally at most one
+  9-second grid step) without a longer PCM decode. A source unit may span that lookahead.
+  If the remaining tail still exceeds the time budget, its whole bounded text is saved
+  as PROVISIONAL and its exact raw ownership is consumed. The next window must recover
+  the immutable source anchor instead of starting again at raw zero. Character-cap
+  fallback also retains a verified new splice offset. A forced incomplete left edge
+  remains provisional until a supported boundary; it never earns completed coverage.
 - A provisional snapshot may be superseded. Persist `SUPERSEDED` events and source IDs;
   do not let an older provisional row mask a revised/final source.
 - Translation queue defaults to four units; one explicit retry is available, bounded
@@ -87,3 +98,18 @@ PCM quiet runs. This decision does not establish Japanese ASR accuracy, MT accur
 first-bilingual latency, NAS throughput, Android compatibility, or release readiness.
 Independent real public recordings and manual source/translation review are the next
 acceptance step; perfect universal accuracy is not the acceptance target.
+
+## v2 correction after the full-video failure
+
+`recorded-source-units-kuromoji-v2` invalidates cached decisions from v1. The failed
+full-video run exposed premature cap rotation, strict token/quiet comparisons, a blanket
+comma veto, and a false split in a plain-verb attributive phrase. The v2 tests replay
+captured real ASR/PCM quiet inputs for these cases; no source was changed to a fixture
+word list. The old capture lacks union hypotheses newly requested by the changed state
+sequence, so its source-only regression explicitly fails those missing requests and
+retains UNCONFIRMED text. Fresh union/MT execution and semantic review remain required.
+
+An ASR comma inside a conjugation (for example the captured `でしょ、うか`) can still
+change morphological analysis. No punctuation-elision parser or no-quiet stability
+heuristic was introduced in this scoped correction. Exact-zero PCM silence also needs
+an explicit future input contract; arbitrary blank ASR continues to mean unknown audio.

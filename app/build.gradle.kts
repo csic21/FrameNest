@@ -112,6 +112,9 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "META-INF/versions/9/previous-compilation-data.bin"
+            // Kuromoji core/IPADIC carry identical upstream notices. Merge notices
+            // instead of dropping legal attribution or applying a broad pickFirst.
+            merges += setOf("META-INF/CONTRIBUTORS.md", "META-INF/LICENSE.md")
         }
     }
 

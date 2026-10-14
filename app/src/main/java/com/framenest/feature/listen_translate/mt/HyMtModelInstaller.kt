@@ -37,6 +37,7 @@ class HyMtModelInstaller internal constructor(
             downloadVerifiedModel(model.url, destination, model.expectedBytes, model.sha256,
                 requireNetwork = network, onBytes = progress)
         },
+    private val modelUseGuard: HyMtModelUseGuard = HyMtModelUseGuard.shared,
 ) {
     constructor(context: Context) : this(
         root = File(context.applicationContext.filesDir, "listen_models/hymt"),
@@ -115,10 +116,12 @@ class HyMtModelInstaller internal constructor(
         }
     }
 
-    /** Caller must close the engine first; serialize against installs and startup verification. */
+    /** Refuse while any engine holds this model, including load/inference/close still unwinding. */
     suspend fun deleteAll() = INSTALL_MUTEX.withLock {
         withContext(Dispatchers.IO) {
-            check(!root.exists() || root.deleteRecursively()) { "无法清除 Hy-MT2 模型" }
+            modelUseGuard.whileUnused {
+                check(!root.exists() || root.deleteRecursively()) { "无法清除 Hy-MT2 模型" }
+            }
         }
     }
 

@@ -22,7 +22,7 @@ internal class KuromojiJapaneseMorphology : JapaneseMorphology {
             val end = begin + t.surface.length
             require(begin >= 0 && end <= rawOffsets.size && end > begin)
             JapaneseMorpheme(rawOffsets[begin], rawOffsets[end - 1] + 1, t.surface,
-                t.partOfSpeechLevel1, t.partOfSpeechLevel2, t.conjugationForm, t.isKnown)
+                t.partOfSpeechLevel1, t.partOfSpeechLevel2, t.conjugationForm, t.isKnown, t.conjugationType)
         }
     }
 }

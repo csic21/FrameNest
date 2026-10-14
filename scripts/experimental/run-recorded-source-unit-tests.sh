@@ -11,6 +11,7 @@ java -cp "$K/*" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -no-stdlib -no-reflec
   "$ROOT/app/src/main/java/com/framenest/feature/listen_translate/RecordedTranscriptStitcher.kt" \
   "$ROOT"/app/src/main/java/com/framenest/feature/listen_translate/recorded/*.kt \
   "$ROOT"/app/src/test/java/com/framenest/feature/listen_translate/recorded/*.kt
-java -Xmx512m -cp "$OUT/tests.jar:$CP" org.junit.runner.JUnitCore \
+java -Xmx512m -cp "$OUT/tests.jar:$CP:$ROOT/app/src/test/resources" org.junit.runner.JUnitCore \
   com.framenest.feature.listen_translate.recorded.RecordedSourceUnitCoordinatorTest \
-  com.framenest.feature.listen_translate.recorded.JapaneseSourceBoundaryTest
+  com.framenest.feature.listen_translate.recorded.JapaneseSourceBoundaryTest \
+  com.framenest.feature.listen_translate.recorded.RecordedCapturedFixtureTest
