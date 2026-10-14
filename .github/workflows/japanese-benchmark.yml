@@ -48,7 +48,21 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y libpulse0 libnss3 libxkbcommon0 libxcomposite1 libxcursor1 libxi6 libxrandr2 libxtst6
           ldd "$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64"
+      # Owner approval is limited to this one next run, first attempt only.
+      # Later runs never inherit this device-access grant.
+      - name: Grant approved one-run KVM access to current runner only
+        if: github.run_number == 7 && github.run_attempt == 1
+        run: |
+          test -c /dev/kvm
+          command -v setfacl || { sudo apt-get update && sudo apt-get install --no-install-recommends -y acl; }
+          getfacl -p /dev/kvm > "$RUNNER_TEMP/framenest-kvm-original.acl"
+          sudo setfacl -m "u:$(id -u):rw" /dev/kvm
+          touch "$RUNNER_TEMP/framenest-kvm-granted"
+          test -r /dev/kvm && test -w /dev/kvm
+          "$ANDROID_HOME/emulator/emulator" -accel-check
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+        with:
+          cache-read-only: false
       - name: Download pinned licensed media fixture
         timeout-minutes: 4
         run: python3 scripts/prepare-japanese-benchmark.py
@@ -65,7 +79,7 @@ jobs:
           echo no | avdmanager create avd --name japanese-benchmark --path "$ANDROID_AVD_HOME/japanese-benchmark.avd" --package 'system-images;android-35;google_apis;x86_64' --device pixel_2
           test -f "$ANDROID_AVD_HOME/japanese-benchmark.ini"
           "$ANDROID_HOME/emulator/emulator" -list-avds
-          # Reuse KVM only if already accessible; never chmod /dev/kvm or change groups.
+          # Reuse accessible KVM; the only permission grant is the guarded one-run step.
           ACCEL=off
           if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL=on; fi
           printf 'acceleration=%s\n' "$ACCEL" > benchmark-results/environment.txt
@@ -117,6 +131,12 @@ jobs:
           # Text is allowed only for the hash-pinned public licensed fixture review.
           # Do not collect general logcat, app databases, user/NAS subtitle text, or audio.
           adb emu kill || true
+      - name: Restore original KVM ACL after the approved run
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/framenest-kvm-granted" ]; then
+            sudo setfacl --restore="$RUNNER_TEMP/framenest-kvm-original.acl"
+          fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
