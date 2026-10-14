@@ -82,6 +82,12 @@ jobs:
           adb install -r app/build/outputs/apk/debug/app-x86_64-debug.apk
           adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           set -o pipefail
+          adb logcat -c
+          timeout 180 adb shell am instrument -w -r \
+            -e class com.framenest.AppDisplayNameTest \
+            com.framenest.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee benchmark-results/startup-smoke.txt
+          grep -Eq '^OK \(2 tests\)' benchmark-results/startup-smoke.txt
           timeout 1650 adb shell am instrument -w -r \
             -e class com.framenest.feature.listen_translate.JapanesePipelineAcceptanceTest \
             -e japaneseBenchmark true \
@@ -103,8 +109,13 @@ jobs:
           adb exec-out run-as com.framenest cat files/japanese-benchmark.json > benchmark-results/japanese-benchmark.partial.json 2>/dev/null || true
           cp app/src/androidTest/assets/japanese-benchmark/manifest.json benchmark-results/fixture-license.json
           adb exec-out run-as com.framenest cat files/japanese-fixture-review.json > benchmark-results/japanese-fixture-review.json 2>/dev/null || true
+          adb exec-out run-as com.framenest cat files/japanese-benchmark-phase.txt > benchmark-results/phase.txt 2>/dev/null || true
+          # Fresh disposable emulator contains only the public fixture and this app.
+          # Crash buffer is required to diagnose instrumentation startup/native crashes.
+          adb logcat -b crash -d -t 300 > benchmark-results/fixture-crash.txt 2>/dev/null || true
+          adb shell dumpsys activity exit-info com.framenest > benchmark-results/fixture-exit-info.txt 2>/dev/null || true
           # Text is allowed only for the hash-pinned public licensed fixture review.
-          # Do not collect device logcat, app databases, user/NAS subtitle text, or audio.
+          # Do not collect general logcat, app databases, user/NAS subtitle text, or audio.
           adb emu kill || true
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()

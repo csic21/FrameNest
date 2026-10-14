@@ -46,6 +46,8 @@ class JapanesePipelineAcceptanceTest {
         withTimeout(25 * 60_000L) {
             val instrumentation = InstrumentationRegistry.getInstrumentation()
             val context = instrumentation.targetContext
+            fun phase(value: String) { File(context.filesDir, "japanese-benchmark-phase.txt").writeText(value) }
+            phase("test_entered")
             val assets = instrumentation.context.assets
             val manifest = JSONObject(assets.open("japanese-benchmark/manifest.json").bufferedReader().use { it.readText() })
             val window = ListenTranslateWindows.windowContaining(
@@ -66,6 +68,7 @@ class JapanesePipelineAcceptanceTest {
                 }
             }
             assertEquals("Pinned fixture hash", manifest.getString("sha256"), digest.digest().joinToString("") { "%02x".format(it) })
+            phase("fixture_verified")
             val rows = JSONArray()
             val report = JSONObject()
                 .put("scope", "Android emulator functional integration; paused playhead; overlay selection not physical rendering")
@@ -132,9 +135,12 @@ class JapanesePipelineAcceptanceTest {
                             session.beginStartupTiming()
                         }
                         val preparationStart = SystemClock.elapsedRealtime()
+                        phase("pass_${pass}_installing_asr")
                         val model = installer.ensureInstalled("ja", allowMeteredDownloads = true)
                         assertTrue("Downloaded model bytes must verify", SherpaModelInstaller.verifyPack(model))
+                        phase("pass_${pass}_loading_asr")
                         asr.ensureModel(model, "ja")
+                        phase("pass_${pass}_running_pipeline")
                         withContext(Dispatchers.Main.immediate) {
                             session.recordAsrPreparationTiming(token, SystemClock.elapsedRealtime() - preparationStart)
                             session.onPlaybackTick(manifest.getLong("playhead_ms"), manifest.getLong("test_extent_ms"), playing = false)
@@ -192,6 +198,7 @@ class JapanesePipelineAcceptanceTest {
                             // the real warm native/MT clients for fixture-only review windows.
                             withContext(Dispatchers.Main.immediate) { session.release() }
                             job.cancelAndJoin()
+                            phase("fixture_review")
                             val reviewConfig = manifest.getJSONObject("fixture_review")
                             val starts = reviewConfig.getJSONArray("window_starts_ms")
                             assertEquals(ListenTranslateWindows.DEFAULT_WINDOW_MS, reviewConfig.getLong("window_duration_ms"))
