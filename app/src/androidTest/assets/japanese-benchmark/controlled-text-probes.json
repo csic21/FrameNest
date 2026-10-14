@@ -1,0 +1,42 @@
+{
+  "scope": "Authored complete-sentence linguistic controls. Not an independently verified audio transcript, listening audit, or golden transcription. Last sentence is synthetic and makes no real news claim.",
+  "evaluation": "Manual semantic review of question, entities, negation and scope; examples are not exact-match assertions.",
+  "probes": [
+    {
+      "id": "language_question",
+      "source_ja": "今、世界中で使われているのは何語でしょうか。",
+      "example_zh": "现在全世界都在使用的是哪种语言呢？",
+      "semantic_checks": "Preserve which-language question, present time, worldwide scope."
+    },
+    {
+      "id": "language_entities",
+      "source_ja": "英語、スペイン語、中国語の中で、あなたはどの言語を使いますか。",
+      "example_zh": "英语、西班牙语和中文，你使用其中哪种语言？",
+      "semantic_checks": "Preserve English, Spanish, Chinese and question; Chinese is 中文/汉语, not 术语."
+    },
+    {
+      "id": "negation_scope",
+      "source_ja": "この表現は日常会話では使われますが、ビジネス文書では使われません。",
+      "example_zh": "这种表达用于日常对话，但不用于商务文件。",
+      "semantic_checks": "Daily conversation positive, business documents negative; preserve contrast."
+    },
+    {
+      "id": "emoji_answer",
+      "source_ja": "正解は絵文字です。",
+      "example_zh": "正确答案是表情符号。",
+      "semantic_checks": "Preserve correct-answer and emoji concepts; 形符/颜文字/象形文字 alone fail."
+    },
+    {
+      "id": "popularity_scope",
+      "source_ja": "絵文字は若い人だけでなく幅広い年代の人に人気があり、世界中でメッセージのやり取りに使われています。",
+      "example_zh": "表情符号不仅受年轻人欢迎，也受到不同年龄段人群的喜爱，并在世界各地的信息交流中使用。",
+      "semantic_checks": "Not only young people, broad ages, popular, worldwide message use; not everyone uses it."
+    },
+    {
+      "id": "neutral_statement",
+      "source_ja": "総理大臣は官邸で記者会見を開き、今日の会議の内容を説明しました。",
+      "example_zh": "首相在官邸举行了记者会，并说明了今天的会议内容。",
+      "semantic_checks": "Preserve prime minister, official residence, press conference and explanation in past tense. No invented name/country/policy."
+    }
+  ]
+}

@@ -70,6 +70,7 @@ class JapanesePipelineAcceptanceTest {
             assertEquals("Pinned fixture hash", manifest.getString("sha256"), digest.digest().joinToString("") { "%02x".format(it) })
             phase("fixture_verified")
             val rows = JSONArray()
+            val preparationScheduleComparison = JSONArray()
             val report = JSONObject()
                 .put("scope", "Android emulator functional integration; paused playhead; overlay selection not physical rendering")
                 .put("accuracy_scored", false)
@@ -78,10 +79,13 @@ class JapanesePipelineAcceptanceTest {
                 .put("api", Build.VERSION.SDK_INT)
                 .put("abi", Build.SUPPORTED_ABIS.first())
                 .put("runs", rows)
+                .put("warm_preparation_schedule_comparison", preparationScheduleComparison)
+                .put("comparison_scope", "Same emulator and loaded ASR; fresh ML Kit clients with downloaded models. Serial schedule control versus production overlapping helper, not an old-APK or cold-download comparison.")
             // Fixture-only review artifact: deliberately separate from production diagnostics.
             // The media has already passed the manifest's exact size and SHA-256 checks.
             val reviewWindows = JSONArray()
             val wholeBlockReview = JSONArray()
+            val controlledTextReview = JSONArray()
             val fixtureReview = JSONObject()
                 .put("fixture_id", manifest.getString("id"))
                 .put("fixture_sha256", manifest.getString("sha256"))
@@ -98,6 +102,7 @@ class JapanesePipelineAcceptanceTest {
                 .put("review_instructions", "Listen to the pinned public fixture. Review complete utterances and adjacent 3-second window splits for omissions, hallucinations and Japanese-to-Chinese meaning. Script detection and non-echo checks are functional checks only.")
                 .put("windows", reviewWindows)
                 .put("whole_block_diagnostic", wholeBlockReview)
+                .put("controlled_text_diagnostic", controlledTextReview)
             val reviewFile = File(context.filesDir, "japanese-fixture-review.json")
             fun saveReview() { reviewFile.writeText(fixtureReview.toString(2)) }
             saveReview()
@@ -225,6 +230,69 @@ class JapanesePipelineAcceptanceTest {
                             // Independent context diagnostic, not a production-candidate acceptance.
                             // Whole ASR text is translated without the legacy three-second token crop.
                             // Overlapping blocks are NOT stitched or certified as completed coverage.
+                            phase("warm_preparation_schedule_comparison")
+                            // ABBA repeated once limits a simple order/warm-up confound. Each
+                            // run uses a fresh MT client; the downloaded models and ASR stay warm.
+                            var scheduleReferenceSource: String? = null
+                            var scheduleReferencePcm: ShortArray? = null
+                            for ((index, overlap) in listOf(false, true, true, false, false, true, true, false).withIndex()) {
+                                val comparisonAudio = FileListenAudioSource(media.absolutePath)
+                                val comparisonMt = MlKitMtEngine(allowMeteredDownloads = true)
+                                val comparisonTimer = ListenStageTimer(SystemClock::elapsedRealtime)
+                                val began = SystemClock.elapsedRealtime()
+                                var sourcePublishedMs: Long? = null
+                                var pcmSamples = 0
+                                var samePcm = true
+                                try {
+                                    val result = processListenWindowStages(
+                                        prepareTranslation = {
+                                            comparisonTimer.measure(ListenPipelineStage.TranslationPreparation) {
+                                                withContext(Dispatchers.IO) { comparisonMt.ensureModel("ja", "zh") }
+                                            }
+                                        },
+                                        recognizeSource = { startPreparation ->
+                                            val pcm = comparisonTimer.measure(ListenPipelineStage.PcmRead) {
+                                                comparisonAudio.pcmWindow(window.first - 750L, window.second + 750L)
+                                            }
+                                            check(pcm.isNotEmpty())
+                                            pcmSamples = pcm.size
+                                            samePcm = scheduleReferencePcm?.contentEquals(pcm) ?: true
+                                            if (scheduleReferencePcm == null) scheduleReferencePcm = pcm
+                                            if (overlap) startPreparation()
+                                            val recognized = comparisonTimer.measure(ListenPipelineStage.Asr) { asr.recognize(pcm) }
+                                            val words = selectWordsForWindow(recognized.words, window.first - 750L, window.first, window.second)
+                                            val text = if (words.isNotEmpty()) words.joinToString(recognized.textSeparator) { it.text }
+                                                else if (recognized.words.isEmpty()) recognized.text else ""
+                                            ListenWindowResult(text, "")
+                                        },
+                                        publishSource = { sourcePublishedMs = SystemClock.elapsedRealtime() - began },
+                                        translateSource = { text -> comparisonTimer.measure(ListenPipelineStage.Translation) {
+                                            comparisonMt.translate(text, "ja", "zh")
+                                        } },
+                                        timings = { comparisonTimer.timings },
+                                        awaitPreparation = { await -> comparisonTimer.measure(ListenPipelineStage.TranslationPreparationWait) { await() } },
+                                    )
+                                    check(result.textSrc.isNotBlank() && result.textTgt.isNotBlank() && result.retryableErrorMessage == null)
+                                    val sameSource = scheduleReferenceSource?.let { it == result.textSrc } ?: true
+                                    if (scheduleReferenceSource == null) scheduleReferenceSource = result.textSrc
+                                    val timing = comparisonTimer.timings
+                                    preparationScheduleComparison.put(JSONObject().put("index", index)
+                                        .put("schedule", if (overlap) "overlap" else "serial_control")
+                                        .put("same_source_as_first", sameSource)
+                                        .put("source_characters", result.textSrc.length)
+                                        .put("pcm_samples", pcmSamples).put("same_pcm_as_first", samePcm)
+                                        .put("total_ms", SystemClock.elapsedRealtime() - began)
+                                        .put("source_callback_ready_ms", sourcePublishedMs)
+                                        .put("pcm_ms", timing.pcmReadMs).put("asr_ms", timing.asrMs)
+                                        .put("mt_prepare_ms", timing.translationPreparationMs)
+                                        .put("mt_prepare_exposed_wait_ms", timing.translationPreparationWaitMs)
+                                        .put("mt_ms", timing.translationMs))
+                                    save()
+                                } finally {
+                                    comparisonAudio.close()
+                                    comparisonMt.close()
+                                }
+                            }
                             phase("whole_block_context_diagnostic")
                             val blockConfig = manifest.getJSONObject("whole_block_diagnostic")
                             val blockStarts = blockConfig.getJSONArray("window_starts_ms")
@@ -259,6 +327,27 @@ class JapanesePipelineAcceptanceTest {
                                 }
                             } finally {
                                 blockAudio.close()
+                            }
+                            phase("controlled_complete_sentence_mt")
+                            val controls = JSONObject(assets.open("japanese-benchmark/controlled-text-probes.json")
+                                .bufferedReader().use { it.readText() })
+                            fixtureReview.put("controlled_text_scope", controls.getString("scope"))
+                            val probes = controls.getJSONArray("probes")
+                            check(probes.length() in 1..8)
+                            for (index in 0 until probes.length()) {
+                                val probe = probes.getJSONObject(index)
+                                val source = probe.getString("source_ja")
+                                check(source.isNotBlank() && source.length <= 512)
+                                val began = SystemClock.elapsedRealtime()
+                                val translated = mt.translate(source, "ja", "zh")
+                                controlledTextReview.put(JSONObject().put("id", probe.getString("id"))
+                                    .put("textSrc", source).put("textTgt", translated)
+                                    .put("example_zh", probe.getString("example_zh"))
+                                    .put("semantic_checks", probe.getString("semantic_checks"))
+                                    .put("mt_ms", SystemClock.elapsedRealtime() - began)
+                                    .put("asr_used", false).put("semantic_acceptance_passed", JSONObject.NULL))
+                                saveReview()
+                                check(translated.isNotBlank()) { "Controlled complete-sentence translation was empty" }
                             }
                             fixtureReview.put("collection_completed", true)
                             saveReview()
