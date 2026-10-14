@@ -43,6 +43,15 @@ class ListenPrefetchPolicyTest {
     }
 
     @Test
+    fun adaptationSubtractsOnlyBoundedExposedPreparationWait() {
+        assertEquals(4_000L, ListenPrefetchPolicy.adaptationElapsedMs(4_000L, null))
+        assertEquals(4_000L, ListenPrefetchPolicy.adaptationElapsedMs(4_000L, -1L))
+        assertEquals(3_000L, ListenPrefetchPolicy.adaptationElapsedMs(4_000L, 1_000L))
+        assertEquals(0L, ListenPrefetchPolicy.adaptationElapsedMs(4_000L, Long.MAX_VALUE))
+        assertEquals(0L, ListenPrefetchPolicy.adaptationElapsedMs(-1L, 1_000L))
+    }
+
+    @Test
     fun nextWindow_prioritizesCurrentThenScansPastCachedFuture() {
         assertEquals(
             3_000L to 6_000L,

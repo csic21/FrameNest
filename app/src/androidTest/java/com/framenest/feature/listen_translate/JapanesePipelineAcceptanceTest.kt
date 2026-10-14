@@ -70,10 +70,32 @@ class JapanesePipelineAcceptanceTest {
             val report = JSONObject()
                 .put("scope", "Android emulator functional integration; paused playhead; overlay selection not physical rendering")
                 .put("accuracy_scored", false)
+                .put("semantic_review_status", "pending")
                 .put("hardware_performance_accepted", false)
                 .put("api", Build.VERSION.SDK_INT)
                 .put("abi", Build.SUPPORTED_ABIS.first())
                 .put("runs", rows)
+            // Fixture-only review artifact: deliberately separate from production diagnostics.
+            // The media has already passed the manifest's exact size and SHA-256 checks.
+            val reviewWindows = JSONArray()
+            val fixtureReview = JSONObject()
+                .put("fixture_id", manifest.getString("id"))
+                .put("fixture_sha256", manifest.getString("sha256"))
+                .put("source_url", manifest.getString("source"))
+                .put("media_url", manifest.getString("url"))
+                .put("author", manifest.getString("author"))
+                .put("license", manifest.getString("license"))
+                .put("license_url", manifest.getString("license_url"))
+                .put("manual_semantic_review", "pending")
+                .put("changes", "Machine-generated Japanese transcription and Chinese translation excerpts from the original video; may contain recognition or translation errors.")
+                .put("derived_text_license", "CC-BY-SA-4.0")
+                .put("semantic_acceptance_passed", JSONObject.NULL)
+                .put("independent_golden_transcript", false)
+                .put("review_instructions", "Listen to the pinned public fixture. Review complete utterances and adjacent 3-second window splits for omissions, hallucinations and Japanese-to-Chinese meaning. Script detection and non-echo checks are functional checks only.")
+                .put("windows", reviewWindows)
+            val reviewFile = File(context.filesDir, "japanese-fixture-review.json")
+            fun saveReview() { reviewFile.writeText(fixtureReview.toString(2)) }
+            saveReview()
             val reportFile = File(context.filesDir, "japanese-benchmark.json")
             fun save() { reportFile.writeText(report.toString(2)) }
             save()
@@ -160,8 +182,40 @@ class JapanesePipelineAcceptanceTest {
                             .put("bilingual_overlay_eligible_ms", startup.firstBilingualSelectedMs)
                             .put("pcm_ms", stages.pcmReadMs).put("asr_ms", stages.asrMs)
                             .put("mt_prepare_ms", stages.translationPreparationMs).put("mt_ms", stages.translationMs)
+                            .put("mt_prepare_exposed_wait_ms", stages.translationPreparationWaitMs)
+                            .put("full_effective_rtf", state.effectiveRealtimeFactor)
+                            .put("adaptation_effective_rtf", state.adaptationRealtimeFactor)
                             .put("cache_publish_ms", startup.firstGeneratedBilingualCachePublishMs)
                         save()
+                        if (pass == 1) {
+                            // The session subgate has finished. Stop its polling before reusing
+                            // the real warm native/MT clients for fixture-only review windows.
+                            withContext(Dispatchers.Main.immediate) { session.release() }
+                            job.cancelAndJoin()
+                            val reviewConfig = manifest.getJSONObject("fixture_review")
+                            val starts = reviewConfig.getJSONArray("window_starts_ms")
+                            assertEquals(ListenTranslateWindows.DEFAULT_WINDOW_MS, reviewConfig.getLong("window_duration_ms"))
+                            for (index in 0 until starts.length()) {
+                                val startMs = starts.getLong(index)
+                                val endMs = startMs + ListenTranslateWindows.DEFAULT_WINDOW_MS
+                                val result = engine.processWindow(startMs, endMs, "ja", "zh")
+                                reviewWindows.put(JSONObject()
+                                    .put("window_start_ms", startMs).put("window_end_ms", endMs)
+                                    .put("decode_context_start_ms", (startMs - 750L).coerceAtLeast(0L))
+                                    .put("decode_context_end_ms", endMs + 750L)
+                                    .put("cue_start_ms", result.cueStartMs ?: JSONObject.NULL)
+                                    .put("cue_end_ms", result.cueEndMs ?: JSONObject.NULL)
+                                    .put("textSrc", result.textSrc).put("textTgt", result.textTgt)
+                                    .put("blank_reason", result.blankReason?.name ?: JSONObject.NULL)
+                                    .put("translation_retryable_failure", result.retryableErrorMessage != null)
+                                    .put("asr_ms", result.stageTimings?.asrMs ?: JSONObject.NULL)
+                                    .put("mt_ms", result.stageTimings?.translationMs ?: JSONObject.NULL))
+                                saveReview()
+                                check(result.retryableErrorMessage == null) { "Fixture review translation stage failed" }
+                            }
+                            fixtureReview.put("collection_completed", true)
+                            saveReview()
+                        }
                     } finally {
                         withContext(NonCancellable) {
                             withContext(Dispatchers.Main.immediate) { session.release() }
@@ -172,6 +226,8 @@ class JapanesePipelineAcceptanceTest {
                     }
                 }
                 report.put("functional_acceptance_passed", true)
+                    .put("semantic_acceptance_passed", JSONObject.NULL)
+                    .put("fixture_review_collected", fixtureReview.optBoolean("collection_completed", false))
             } catch (failure: Throwable) {
                 report.put("functional_acceptance_passed", false).put("failure_type", failure.javaClass.simpleName)
                 throw failure

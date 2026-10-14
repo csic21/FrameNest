@@ -90,13 +90,15 @@ jobs:
           assert p.get('functional_acceptance_passed') is True
           assert len(p['runs']) == 2 and all(r.get('passed') is True for r in p['runs'])
           PY
-      - name: Collect bounded content-free measurements
+      - name: Collect bounded metrics and public-fixture review only
         if: always()
         run: |
           mkdir -p benchmark-results
           adb exec-out run-as com.framenest cat files/japanese-benchmark.json > benchmark-results/japanese-benchmark.partial.json 2>/dev/null || true
           cp app/src/androidTest/assets/japanese-benchmark/manifest.json benchmark-results/fixture-license.json
-          # Do not collect device logcat, app databases, subtitle text, or audio.
+          adb exec-out run-as com.framenest cat files/japanese-fixture-review.json > benchmark-results/japanese-fixture-review.json 2>/dev/null || true
+          # Text is allowed only for the hash-pinned public licensed fixture review.
+          # Do not collect device logcat, app databases, user/NAS subtitle text, or audio.
           adb emu kill || true
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()

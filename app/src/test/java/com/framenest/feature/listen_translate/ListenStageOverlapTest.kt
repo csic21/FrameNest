@@ -40,6 +40,36 @@ class ListenStageOverlapTest {
         assertEquals(0L, ListenPrefetchPolicy.lookAheadMs(true, false, factor))
     }
 
+    @Test fun exposedWaitExcludesAsrAndSourceCommitOverlap() = runTest {
+        val timer = ListenStageTimer { testScheduler.currentTime }
+        val result = processListenWindowStages(
+            { timer.measure(ListenPipelineStage.TranslationPreparation) { delay(4_000L) } },
+            { start -> start(); timer.measure(ListenPipelineStage.Asr) { delay(800L) }; ListenWindowResult("s", "") },
+            { delay(200L) }, { delay(100L); "t" }, { timer.timings },
+            { await -> timer.measure(ListenPipelineStage.TranslationPreparationWait) { await() } },
+        )
+        assertEquals(4_100L, testScheduler.currentTime)
+        assertEquals(4_000L, result.stageTimings!!.translationPreparationMs)
+        assertEquals(3_000L, result.stageTimings.translationPreparationWaitMs)
+        val full = ListenPrefetchPolicy.updateRealtimeFactor(null, 4_100L, 3_000L)
+        val adaptation = ListenPrefetchPolicy.updateRealtimeFactor(null,
+            ListenPrefetchPolicy.adaptationElapsedMs(4_100L, result.stageTimings.translationPreparationWaitMs), 3_000L)
+        assertEquals(0L, ListenPrefetchPolicy.lookAheadMs(true, false, full))
+        assertEquals(30_000L, ListenPrefetchPolicy.lookAheadMs(true, false, adaptation))
+    }
+
+    @Test fun fullyOverlappedPreparationDoesNotRemoveRealRecognitionWork() = runTest {
+        val timer = ListenStageTimer { testScheduler.currentTime }
+        processListenWindowStages(
+            { delay(100L) },
+            { start -> start(); delay(800L); ListenWindowResult("s", "") },
+            {}, { "t" }, { timer.timings },
+            { await -> timer.measure(ListenPipelineStage.TranslationPreparationWait) { await() } },
+        )
+        assertEquals(0L, timer.timings.translationPreparationWaitMs)
+        assertEquals(800L, ListenPrefetchPolicy.adaptationElapsedMs(800L, timer.timings.translationPreparationWaitMs))
+    }
+
     @Test fun concurrentStageAndRemoteReadUpdatesNeverEraseEachOther() = runBlocking {
         repeat(200) {
             val timer = ListenStageTimer { 10L }

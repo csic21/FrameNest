@@ -16,6 +16,7 @@ internal suspend fun processListenWindowStages(
     publishSource: suspend (ListenWindowResult) -> Unit,
     translateSource: suspend (String) -> String,
     timings: () -> ListenStageTimings,
+    awaitPreparation: suspend (suspend () -> Unit) -> Unit = { it() },
 ): ListenWindowResult = supervisorScope {
     val preparation = async(start = CoroutineStart.LAZY) { prepareTranslation() }
     try {
@@ -23,7 +24,7 @@ internal suspend fun processListenWindowStages(
         if (source.textSrc.isBlank()) return@supervisorScope source.copy(stageTimings = timings())
         publishSource(source.copy(textTgt = "", stageTimings = timings()))
         val target = try {
-            preparation.await()
+            awaitPreparation { preparation.await() }
             translateSource(source.textSrc)
         } catch (cancelled: CancellationException) {
             throw cancelled

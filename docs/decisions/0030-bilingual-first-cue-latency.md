@@ -20,8 +20,14 @@ ML Kit 准备在 IO dispatcher 上调用既有 `ensureModel`，包括创建 Tran
 ## 计时解释
 
 增加独立 `translationPreparationMs`，与 ASR 时间可能重叠；完整窗口预算继续使用
-真实 wall-clock 总时长，而不是阶段之和。冷下载仍进入总预算，可能让预取暂时停止，
-没有通过排除慢步骤制造好看的 RTF。现有最近窗口诊断不等于冷启动到真实屏幕显示。
+真实 wall-clock 总时长，而不是阶段之和。冷下载仍进入完整 RTF 和启动诊断。
+2026-10-14 后续细化：预取使用独立 adaptation EWMA，仅从完整窗口墙时扣除
+原文发布后 `preparation.await()` 的实测暴露等待 `translationPreparationWaitMs`。
+不扣与 ASR 重叠的完整准备时长，也不扣 PCM、ASR、翻译推理、Room/UI 等实际工作。
+完整 RTF 与调度 RTF 分别展示，不能拿调度值宣称端到端提速。首窗可能为静音，
+因此不采用跳过第一个窗口或猜测耗时阈值的方案。失败/取消不更新两种 EWMA，
+activate 重置两者；seek/前后台沿用既有 throughput 历史与取消边界。现有最近窗口
+诊断不等于冷启动到真实屏幕显示。
 
 首句跟踪记录初始 ASR 准备、首次非空 PCM 到达、首次原文/双语缓存就绪，以及
 首次原文/双语选入当前叠层；另保留首个新生成双语窗口的阶段/提交快照，区别于

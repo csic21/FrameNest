@@ -14,6 +14,8 @@ data class ListenStageTimings(
     /** Remote SMB reads issued while reading this window's PCM; null for local media. */
     val remoteReads: Int? = null,
     val remoteReadBytes: Long? = null,
+    /** Exposed preparation await after source publication; a subset of wall time. */
+    val translationPreparationWaitMs: Long? = null,
 )
 
 /**
@@ -36,9 +38,11 @@ data class ListenPipelineDiagnostics(
     val playbackRate: Float = 1f,
     val completed: Boolean = false,
     val failed: Boolean = false,
+    val effectiveRealtimeFactor: Double? = null,
+    val adaptationRealtimeFactor: Double? = null,
 )
 
-internal enum class ListenPipelineStage { ModelCheck, PcmRead, SilenceGate, Asr, TranslationPreparation, Translation }
+internal enum class ListenPipelineStage { ModelCheck, PcmRead, SilenceGate, Asr, TranslationPreparation, TranslationPreparationWait, Translation }
 
 internal class ListenStageTimer(private val nowMs: () -> Long) {
     @Volatile
@@ -58,6 +62,7 @@ internal class ListenStageTimer(private val nowMs: () -> Long) {
                     ListenPipelineStage.SilenceGate -> timings.copy(silenceGateMs = elapsed)
                     ListenPipelineStage.Asr -> timings.copy(asrMs = elapsed)
                     ListenPipelineStage.TranslationPreparation -> timings.copy(translationPreparationMs = elapsed)
+                    ListenPipelineStage.TranslationPreparationWait -> timings.copy(translationPreparationWaitMs = elapsed)
                     ListenPipelineStage.Translation -> timings.copy(translationMs = elapsed)
                 }
             }
@@ -100,6 +105,8 @@ internal fun formatListenDiagnostics(sample: ListenPipelineDiagnostics): String 
         "最近窗口$outcome · ${sample.playbackRate}x",
         "模型检查 ${stages.modelCheckMs.ms()} · 音频读取/解码 ${stages.pcmReadMs.ms()}${stages.remoteReadSummary()}",
         "翻译模型准备 ${stages.translationPreparationMs.ms()}（与ASR重叠，不相加）",
+        "翻译准备暴露等待 ${stages.translationPreparationWaitMs.ms()}（仅调度估计扣除；总耗时保留）",
+        "RTF 完整 ${sample.effectiveRealtimeFactor ?: "—"} · 调度 ${sample.adaptationRealtimeFactor ?: "—"}（含播放倍速）",
         "静音检查 ${stages.silenceGateMs.ms()} · ASR ${stages.asrMs.ms()} · 翻译 ${stages.translationMs.ms()}",
         "缓存/UI提交 ${sample.cacheCommitMs}ms · 处理总计 ${sample.totalMs}ms · 等待 ${sample.queueWaitMs}ms",
         "窗口起点落后播放 ${sample.windowBacklogMs}ms（媒体时间）",

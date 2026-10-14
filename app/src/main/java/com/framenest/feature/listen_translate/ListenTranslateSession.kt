@@ -85,6 +85,7 @@ class ListenTranslateSession(
     private var workGeneration: Long = 0L
     private var playbackRate: Float = 1f
     private var processingRealtimeFactor: Double? = null
+    private var adaptationRealtimeFactor: Double? = null
 
     fun setContentKey(contentKey: String) {
         val normalized = contentKey.trim()
@@ -274,6 +275,7 @@ class ListenTranslateSession(
         stopPolling()
         _ui.update { it.copy(preparingSubtitles = false, preparedAheadMs = 0L) }
         processingRealtimeFactor = null
+        adaptationRealtimeFactor = null
         updateEffectiveRealtimeFactor()
         activationJob = scope.launch {
             ensureJobAndRefresh()
@@ -406,7 +408,7 @@ class ListenTranslateSession(
         val lookAheadMs = if (_ui.value.preparingSubtitles) preparationTargetMs() else ListenPrefetchPolicy.lookAheadMs(
             playing = isPlaying,
             buffering = isBuffering,
-            realtimeFactor = processingRealtimeFactor,
+            realtimeFactor = adaptationRealtimeFactor,
             playbackRate = playbackRate,
         )
         _ui.update { it.copy(prefetchLookAheadMs = lookAheadMs) }
@@ -472,6 +474,8 @@ class ListenTranslateSession(
                     totalMs = elapsedListenTimeMs(windowStartedAtMs, monotonicTimeMs()),
                     completed = completed,
                     failed = failed,
+                    effectiveRealtimeFactor = processingRealtimeFactor?.times(playbackRate),
+                    adaptationRealtimeFactor = adaptationRealtimeFactor?.times(playbackRate),
                 )
                 _ui.update { it.copy(diagnostics = diagnostics) }
             }
@@ -640,9 +644,17 @@ class ListenTranslateSession(
                     )
                 }
                 refreshActiveCue()
+                val elapsedMs = elapsedListenTimeMs(windowStartedAtMs, monotonicTimeMs())
                 processingRealtimeFactor = ListenPrefetchPolicy.updateRealtimeFactor(
                     previous = processingRealtimeFactor,
-                    elapsedMs = monotonicTimeMs() - windowStartedAtMs,
+                    elapsedMs = elapsedMs,
+                    audioMs = endMs - startMs,
+                )
+                adaptationRealtimeFactor = ListenPrefetchPolicy.updateRealtimeFactor(
+                    previous = adaptationRealtimeFactor,
+                    elapsedMs = ListenPrefetchPolicy.adaptationElapsedMs(
+                        elapsedMs, result.stageTimings?.translationPreparationWaitMs,
+                    ),
                     audioMs = endMs - startMs,
                 )
                 updateEffectiveRealtimeFactor()
@@ -692,7 +704,12 @@ class ListenTranslateSession(
     }
 
     private fun updateEffectiveRealtimeFactor() {
-        _ui.update { it.copy(effectiveRealtimeFactor = processingRealtimeFactor?.times(playbackRate)) }
+        _ui.update {
+            it.copy(
+                effectiveRealtimeFactor = processingRealtimeFactor?.times(playbackRate),
+                adaptationRealtimeFactor = adaptationRealtimeFactor?.times(playbackRate),
+            )
+        }
     }
 
     private fun generatedCueCount(): Int =

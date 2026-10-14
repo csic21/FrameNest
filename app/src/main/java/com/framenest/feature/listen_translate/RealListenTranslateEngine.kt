@@ -105,6 +105,12 @@ class RealListenTranslateEngine(
                 timer.measure(ListenPipelineStage.Translation) { mt.translate(text, srcLang, tgtLang) }
             },
             timings = { timer.timings },
+            awaitPreparation = { await ->
+                if (srcLang == tgtLang) await() else {
+                    // Only the exposed tail is outside ASR/source publication overlap.
+                    timer.measure(ListenPipelineStage.TranslationPreparationWait) { await() }
+                }
+            },
         )
     }
 

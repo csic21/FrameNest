@@ -7,11 +7,13 @@ import com.framenest.data.listen_translate.ListenTranslateJobStatus
 import com.framenest.data.listen_translate.ListenTranslateRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -472,4 +474,129 @@ class ListenTranslateSessionTest {
         assertEquals(1, cancellationCount)
         session.release()
     }
+    @Test
+    fun coldPreparationDoesNotDisableAheadButFullRtfRemainsVisible() = runTest {
+        var now = 0L
+        val starts = mutableListOf<Long>()
+        val engine = object : ListenTranslateEngine {
+            override val asrModelId = "test"
+            override val mtModelId = "mt"
+            override suspend fun processWindow(startMs: Long, endMs: Long, sourceLang: String, targetLang: String): ListenWindowResult {
+                starts += startMs
+                if (starts.size > 1) awaitCancellation()
+                now += 30_600L
+                return ListenWindowResult("s", "t", stageTimings = ListenStageTimings(
+                    translationPreparationMs = 30_500L, translationPreparationWaitMs = 30_000L))
+            }
+        }
+        val session = ListenTranslateSession(ListenTranslateRepository(FakeListenTranslateDao()), engine,
+            this, PlaybackIdentity("s", "m", "cold.mkv"), monotonicTimeMs = { now })
+        session.onPlaybackTick(0L, 60_000L, playing = true)
+        session.setEnabled(true)
+        runCurrent()
+        assertEquals(listOf(0L, 3_000L), starts)
+        assertEquals(30_000L, session.uiState.value.prefetchLookAheadMs)
+        assertEquals(10.0, session.uiState.value.effectiveRealtimeFactor!!, 0.0001)
+        assertEquals(0.2, session.uiState.value.adaptationRealtimeFactor!!, 0.0001)
+        session.onPlaybackTick(100L, 60_000L, playing = true, playbackRate = 2f, buffering = true)
+        runCurrent()
+        assertEquals(0L, session.uiState.value.prefetchLookAheadMs)
+        assertEquals(20.0, session.uiState.value.effectiveRealtimeFactor!!, 0.0001)
+        assertEquals(0.4, session.uiState.value.adaptationRealtimeFactor!!, 0.0001)
+        // Seek cancels stale work but retains throughput history, as before this change.
+        session.onSeek(30_000L)
+        runCurrent()
+        assertEquals(0.4, session.uiState.value.adaptationRealtimeFactor!!, 0.0001)
+        session.setEnabled(false)
+        session.setEnabled(true)
+        runCurrent()
+        assertNull(session.uiState.value.effectiveRealtimeFactor)
+        assertNull(session.uiState.value.adaptationRealtimeFactor)
+        session.release()
+    }
+
+    @Test
+    fun slowRealWorkStillDisablesAheadAndPausedPreparationRemainsBounded() = runTest {
+        var now = 0L
+        val starts = mutableListOf<Long>()
+        val engine = object : ListenTranslateEngine {
+            override val asrModelId = "test"
+            override val mtModelId = "mt"
+            override suspend fun processWindow(startMs: Long, endMs: Long, sourceLang: String, targetLang: String): ListenWindowResult {
+                starts += startMs
+                now += 4_500L // Actual PCM/recognition/translation; no model-prepare wait.
+                return ListenWindowResult("s", "t")
+            }
+        }
+        val session = ListenTranslateSession(ListenTranslateRepository(FakeListenTranslateDao()), engine,
+            this, PlaybackIdentity("s", "m", "slow.mkv"), monotonicTimeMs = { now })
+        session.onPlaybackTick(0L, 60_000L, playing = true)
+        session.setEnabled(true)
+        runCurrent()
+        assertEquals(listOf(0L), starts)
+        assertEquals(0L, session.uiState.value.prefetchLookAheadMs)
+        assertEquals(1.5, session.uiState.value.adaptationRealtimeFactor!!, 0.0001)
+        session.onPlaybackTick(0L, 60_000L, playing = false)
+        session.setPreparingSubtitles(true)
+        runCurrent()
+        assertEquals(listOf(0L, 3_000L, 6_000L, 9_000L), starts)
+        assertFalse(session.uiState.value.preparingSubtitles)
+        assertEquals(12_000L, session.uiState.value.preparedAheadMs)
+        assertEquals(1.5, session.uiState.value.effectiveRealtimeFactor!!, 0.0001)
+        assertEquals(1.5, session.uiState.value.adaptationRealtimeFactor!!, 0.0001)
+        session.release()
+    }
+
+    @Test
+    fun failureNeverSeedsFullOrAdaptationRtf() = runTest {
+        var now = 0L
+        val engine = object : ListenTranslateEngine {
+            override val asrModelId = "test"
+            override val mtModelId = "mt"
+            override suspend fun processWindow(startMs: Long, endMs: Long, sourceLang: String, targetLang: String): ListenWindowResult {
+                now += 30_000L
+                return ListenWindowResult("s", "", retryableErrorMessage = "MT unavailable",
+                    stageTimings = ListenStageTimings(translationPreparationWaitMs = 29_000L))
+            }
+        }
+        val session = ListenTranslateSession(ListenTranslateRepository(FakeListenTranslateDao()), engine,
+            this, PlaybackIdentity("s", "m", "failure.mkv"), monotonicTimeMs = { now })
+        session.setEnabled(true)
+        runCurrent()
+        assertEquals(ListenTranslateJobStatus.Failed, session.uiState.value.status)
+        assertNull(session.uiState.value.effectiveRealtimeFactor)
+        assertNull(session.uiState.value.adaptationRealtimeFactor)
+        session.release()
+    }
+
+    @Test
+    fun firstTranslationAfterSilentWindowStillExcludesItsColdWait() = runTest {
+        var now = 0L
+        var calls = 0
+        val engine = object : ListenTranslateEngine {
+            override val asrModelId = "test"
+            override val mtModelId = "mt"
+            override suspend fun processWindow(startMs: Long, endMs: Long, sourceLang: String, targetLang: String): ListenWindowResult {
+                calls++
+                if (calls == 1) {
+                    now += 600L
+                    return ListenWindowResult("", "", blankReason = ListenBlankReason.NearSilence)
+                }
+                if (calls > 2) awaitCancellation()
+                now += 30_600L
+                return ListenWindowResult("s", "t", stageTimings = ListenStageTimings(translationPreparationWaitMs = 30_000L))
+            }
+        }
+        val session = ListenTranslateSession(ListenTranslateRepository(FakeListenTranslateDao()), engine,
+            this, PlaybackIdentity("s", "m", "silent-intro.mkv"), monotonicTimeMs = { now })
+        session.onPlaybackTick(0L, 60_000L, playing = true)
+        session.setEnabled(true)
+        runCurrent()
+        assertEquals(3, calls)
+        assertEquals(2.65, session.uiState.value.effectiveRealtimeFactor!!, 0.0001)
+        assertEquals(0.2, session.uiState.value.adaptationRealtimeFactor!!, 0.0001)
+        assertEquals(30_000L, session.uiState.value.prefetchLookAheadMs)
+        session.release()
+    }
+
 }

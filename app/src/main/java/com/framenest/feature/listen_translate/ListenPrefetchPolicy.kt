@@ -49,6 +49,12 @@ internal object ListenPrefetchPolicy {
         } ?: sample
     }
 
+    /** Preserve real PCM/ASR/MT/cache work, removing only measured model-prepare await. */
+    fun adaptationElapsedMs(elapsedMs: Long, preparationWaitMs: Long?): Long {
+        val elapsed = elapsedMs.coerceAtLeast(0L)
+        return elapsed - (preparationWaitMs ?: 0L).coerceIn(0L, elapsed)
+    }
+
     /** Current gap first, then the first future gap inside the adaptive horizon. */
     fun nextWindow(
         cues: List<ListenTranslateCue>,
