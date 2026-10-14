@@ -43,6 +43,11 @@ jobs:
           test -x "$ANDROID_HOME/build-tools/36.0.0/aapt2"
           test -x "$ANDROID_HOME/emulator/emulator"
           test -f "$ANDROID_HOME/system-images/android-35/google_apis/x86_64/system.img"
+      - name: Install official Ubuntu emulator runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libpulse0 libnss3 libxkbcommon0 libxcomposite1 libxcursor1 libxi6 libxrandr2 libxtst6
+          ldd "$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64"
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
       - name: Download pinned licensed media fixture
         timeout-minutes: 4
