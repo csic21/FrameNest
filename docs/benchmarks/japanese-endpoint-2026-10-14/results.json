@@ -1,0 +1,783 @@
+{
+  "status": "experimental_cloud_ASR_only_not_release_acceptance",
+  "date": "2026-10-14",
+  "clip": "kishida-114s.wav",
+  "audio_sha256": "ce2ddb47957ff9d515e2b9226e02f5ecab5fb311f0af1dbc487b6b7651db919f",
+  "hardware": "cloud AMD EPYC9V74; process affinity CPUs0,1; runtime2threads",
+  "endpoint_policy": {
+    "frame_seconds": 0.02,
+    "primary_threshold_dbfs": -38,
+    "pause_confirmation_seconds": 0.32,
+    "min_segment_seconds": 2,
+    "minimum_active_seconds": 0.2,
+    "max_segment_seconds": 9,
+    "cut": "At end of confirmed quiet interval; all PCM retained in consecutive nonoverlap segments. No SRT/text input to segmentation.",
+    "sensitivity_thresholds_dbfs": [
+      -35,
+      -41
+    ]
+  },
+  "reference_caveat": "Edited community reference,436 normalizedchars; omits fillers. Not adjudicated verbatim gold.",
+  "model_load_seconds": 1.056687108000915,
+  "baseline": {
+    "window_seconds": 3,
+    "context_each_side_seconds": 0.75,
+    "runs": [
+      {
+        "run": 0,
+        "compute_seconds": 4.4611644340002385,
+        "rtf": 0.03913302135087929,
+        "CER": 0.14678899082568808
+      },
+      {
+        "run": 1,
+        "compute_seconds": 4.449989389000621,
+        "rtf": 0.03903499464035632,
+        "CER": 0.14678899082568808
+      },
+      {
+        "run": 2,
+        "compute_seconds": 5.229787297999792,
+        "rtf": 0.04587532717543677,
+        "CER": 0.14678899082568808
+      }
+    ],
+    "first_cue_text": "まず 昨",
+    "first_input_ready_seconds": 3.75,
+    "first_decode_seconds": [
+      0.09182081900144112,
+      0.09117932700064557,
+      0.08669635299884249
+    ]
+  },
+  "profiles": {
+    "-38": {
+      "segment_count": 22,
+      "forced_count": 3,
+      "pause_count": 18,
+      "duration_median_seconds": 4.670000000000002,
+      "duration_max_seconds": 9.0,
+      "runs": [
+        {
+          "run": 0,
+          "compute_seconds": 3.0432423729998845,
+          "rtf": 0.026695108535086706,
+          "CER": 0.13990825688073394
+        },
+        {
+          "run": 1,
+          "compute_seconds": 2.7183388539997395,
+          "rtf": 0.023845077666664383,
+          "CER": 0.13990825688073394
+        },
+        {
+          "run": 2,
+          "compute_seconds": 2.830418326000654,
+          "rtf": 0.024828230929830296,
+          "CER": 0.13990825688073394
+        }
+      ],
+      "nas_first_nonempty_cue_compute_seconds": [
+        0.19833715499953541,
+        0.18671933299992816,
+        0.14961761199992907
+      ],
+      "nas_first_two_cues_compute_seconds": [
+        0.3231114689988317,
+        0.3429368170000089,
+        0.2722322450008505
+      ],
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 6.84,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 4.76,
+          "text": "はい、まず 昨日の事件 につい ては。",
+          "decode_seconds": 0.19824583099943993
+        },
+        {
+          "start": 6.84,
+          "end": 12.36,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 4.5600000000000005,
+          "text": "容疑書やが介捕を使れ、そして警察庁において捜査中です。",
+          "decode_seconds": 0.12463333699997747
+        },
+        {
+          "start": 12.36,
+          "end": 16.18,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 3.1,
+          "text": "また、私の方からあの。",
+          "decode_seconds": 0.11644166599944583
+        },
+        {
+          "start": 16.18,
+          "end": 25.18,
+          "kind": "forced_9s",
+          "quiet_tail_seconds": 0.0,
+          "active_seconds": 8.48,
+          "text": "際のご心配をおかけし、そしてご迷惑をおかけした地元の皆さんをやあの中で漁業組合。",
+          "decode_seconds": 0.24870835600086139
+        },
+        {
+          "start": 25.18,
+          "end": 27.48,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 1.8,
+          "text": "の方々でしょうか。",
+          "decode_seconds": 0.08029519299998356
+        },
+        {
+          "start": 27.48,
+          "end": 35.56,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 7.42,
+          "text": "、あるいは容疑者確保にご協力いただいた方に対し、直接お礼の電話を入れさせていただきました。",
+          "decode_seconds": 0.22142288199938776
+        },
+        {
+          "start": 35.56,
+          "end": 38.96,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 2.56,
+          "text": "あの、まその他にも。",
+          "decode_seconds": 0.08855875599874707
+        },
+        {
+          "start": 38.96,
+          "end": 46.46,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 6.74,
+          "text": "国国内また国外からもさま々まなああご心配やお迎いの声をいただいたこと。",
+          "decode_seconds": 0.1722328359992389
+        },
+        {
+          "start": 46.46,
+          "end": 50.28,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 3.04,
+          "text": "をまの感謝申し上げております。",
+          "decode_seconds": 0.10605503199985833
+        },
+        {
+          "start": 50.28,
+          "end": 59.28,
+          "kind": "forced_9s",
+          "quiet_tail_seconds": 0.0,
+          "active_seconds": 7.7,
+          "text": "えそしてまあ、民主主義の根幹をなくま選挙においてえこうした暴力的な行為が行われた。",
+          "decode_seconds": 0.2750553950008907
+        },
+        {
+          "start": 59.28,
+          "end": 64.18,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 3.84,
+          "text": "このことは絶対許すことはできないと考えています。",
+          "decode_seconds": 0.15911876499922073
+        },
+        {
+          "start": 64.18,
+          "end": 73.18,
+          "kind": "forced_9s",
+          "quiet_tail_seconds": 0.0,
+          "active_seconds": 6.96,
+          "text": "そして、大 切な こと は、この 大 切な 選挙 を 最後 まで やり 通す こと。",
+          "decode_seconds": 0.2528152159993624
+        },
+        {
+          "start": 73.18,
+          "end": 75.62,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 1.82,
+          "text": "であると思っています。",
+          "decode_seconds": 0.061613601001226925
+        },
+        {
+          "start": 75.62,
+          "end": 83.78,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 6.78,
+          "text": "有権者 の 皆さんの 声を しっかり 選挙を 通じて 示してもらうこと。",
+          "decode_seconds": 0.1822259729997313
+        },
+        {
+          "start": 83.78,
+          "end": 86.04,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 1.8,
+          "text": "これは我が国にとっても。",
+          "decode_seconds": 0.05635869300022023
+        },
+        {
+          "start": 86.04,
+          "end": 90.48,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 3.7600000000000002,
+          "text": "また、我が国の民主主義にとってもこれは大切なことであります。",
+          "decode_seconds": 0.0986321489999682
+        },
+        {
+          "start": 90.48,
+          "end": 98.24000000000001,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 6.6000000000000005,
+          "text": "そういった思いで、国民の皆さんと共もにこど大切な選挙を最後までやり通していきたいと考えています。",
+          "decode_seconds": 0.1879853610007558
+        },
+        {
+          "start": 98.24000000000001,
+          "end": 100.48,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 1.54,
+          "text": "そして。",
+          "decode_seconds": 0.05804246600018814
+        },
+        {
+          "start": 100.48,
+          "end": 102.72,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 1.8800000000000001,
+          "text": "うん、その各党の。",
+          "decode_seconds": 0.06182680900019477
+        },
+        {
+          "start": 102.72,
+          "end": 106.98,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 3.7600000000000002,
+          "text": "こうした選挙運動が妨げるられることがないよう。",
+          "decode_seconds": 0.10468813400075305
+        },
+        {
+          "start": 106.98,
+          "end": 113.04,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 4.88,
+          "text": "ま、警察においては警備安全について万全を期してもらいたいと。",
+          "decode_seconds": 0.13962094000089564
+        },
+        {
+          "start": 113.04,
+          "end": 114.0,
+          "kind": "eof",
+          "quiet_tail_seconds": 0.34,
+          "active_seconds": 0.6,
+          "text": "考えています。",
+          "decode_seconds": 0.045528066000770195
+        }
+      ]
+    },
+    "-35": {
+      "segment_count": 22,
+      "forced_count": 2,
+      "pause_count": 19,
+      "duration_median_seconds": 4.970000000000006,
+      "duration_max_seconds": 9.0,
+      "runs": [
+        {
+          "run": 0,
+          "compute_seconds": 2.857437452999875,
+          "rtf": 0.025065240815788377,
+          "CER": 0.12844036697247707
+        },
+        {
+          "run": 1,
+          "compute_seconds": 2.833849242000724,
+          "rtf": 0.024858326684216878,
+          "CER": 0.12844036697247707
+        },
+        {
+          "run": 2,
+          "compute_seconds": 2.748769268000615,
+          "rtf": 0.024112011122812412,
+          "CER": 0.12844036697247707
+        }
+      ],
+      "nas_first_nonempty_cue_compute_seconds": [
+        0.1942598719997477,
+        0.19281401400075993,
+        0.1718389900015609
+      ],
+      "nas_first_two_cues_compute_seconds": [
+        0.31478970399984973,
+        0.34884306200001447,
+        0.29174072700152465
+      ],
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 6.82,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 4.48,
+          "text": "はい、まず 昨日の事件 につい ては。",
+          "decode_seconds": 0.19421492599940393
+        },
+        {
+          "start": 6.82,
+          "end": 12.32,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 4.1,
+          "text": "容疑者が介度を使れ、そして警察庁において捜査中です。",
+          "decode_seconds": 0.12039114700019127
+        },
+        {
+          "start": 12.32,
+          "end": 16.12,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 2.86,
+          "text": "また、私の方からあの。",
+          "decode_seconds": 0.09552509199966153
+        },
+        {
+          "start": 16.12,
+          "end": 25.12,
+          "kind": "forced_9s",
+          "quiet_tail_seconds": 0.0,
+          "active_seconds": 7.9,
+          "text": "災のご心配をおかけし、そしてご迷惑をおかけした地元の皆さんをやあの中で漁業組合。",
+          "decode_seconds": 0.21203016700019361
+        },
+        {
+          "start": 25.12,
+          "end": 27.46,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 1.56,
+          "text": "の方々でしょうか。",
+          "decode_seconds": 0.06378634199973021
+        },
+        {
+          "start": 27.46,
+          "end": 35.52,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 6.82,
+          "text": "、あるいは容疑者確保にご協力いただいた方に対し、直接お礼の電話を入れさせていただきました。",
+          "decode_seconds": 0.17527645699919958
+        },
+        {
+          "start": 35.52,
+          "end": 38.92,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 2.24,
+          "text": "あのまその他にも。",
+          "decode_seconds": 0.09949467700062087
+        },
+        {
+          "start": 38.92,
+          "end": 46.38,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 6.22,
+          "text": "国国内また国外からもさま々まなああご心配やお迎いの声をいただいたこと。",
+          "decode_seconds": 0.19052939900029742
+        },
+        {
+          "start": 46.38,
+          "end": 50.120000000000005,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 2.66,
+          "text": "を感謝申し上げております。",
+          "decode_seconds": 0.0868015350006317
+        },
+        {
+          "start": 50.120000000000005,
+          "end": 59.120000000000005,
+          "kind": "forced_9s",
+          "quiet_tail_seconds": 0.0,
+          "active_seconds": 6.92,
+          "text": "そして、民主 主義 の 根幹 を なく、選挙 においてこう した 暴力 的 な 行為 が行 われ。",
+          "decode_seconds": 0.22140506600044318
+        },
+        {
+          "start": 59.120000000000005,
+          "end": 62.74,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 2.64,
+          "text": "たこのことは絶対許すことはできないと。",
+          "decode_seconds": 0.10474193399932119
+        },
+        {
+          "start": 62.74,
+          "end": 68.66,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 3.54,
+          "text": "考えています、あのう、そしてま大切なことはこの。",
+          "decode_seconds": 0.14196149700001115
+        },
+        {
+          "start": 68.66,
+          "end": 75.60000000000001,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 4.8,
+          "text": "大切な選挙を最後までやり通すことであると思っています。",
+          "decode_seconds": 0.1748557040009473
+        },
+        {
+          "start": 75.60000000000001,
+          "end": 83.72,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 5.98,
+          "text": "有権者の 皆さんの声 を しっかり 選挙 を通じ て 示してもらうこと。",
+          "decode_seconds": 0.19328130999929272
+        },
+        {
+          "start": 83.72,
+          "end": 86.02,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 1.6600000000000001,
+          "text": "？これは我が国にとっても。",
+          "decode_seconds": 0.0702814420001232
+        },
+        {
+          "start": 86.02,
+          "end": 90.46000000000001,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 3.44,
+          "text": "また、我が国の民主主義にとってもこれは大切なことであります。",
+          "decode_seconds": 0.11474001700116787
+        },
+        {
+          "start": 90.46000000000001,
+          "end": 98.14,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 5.78,
+          "text": "そういった思いで、国民の皆さんと共もにこの大切な選挙を最後までやり通していきたいと考えています。",
+          "decode_seconds": 0.18069583699980285
+        },
+        {
+          "start": 98.14,
+          "end": 100.38,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 1.4000000000000001,
+          "text": "そして。",
+          "decode_seconds": 0.06075811499977135
+        },
+        {
+          "start": 100.38,
+          "end": 102.62,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 1.68,
+          "text": "うん、その各党の。",
+          "decode_seconds": 0.06032778699955088
+        },
+        {
+          "start": 102.62,
+          "end": 106.9,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 3.4,
+          "text": "こうした選挙運動が妨げるられることがないよう。",
+          "decode_seconds": 0.10034717899907264
+        },
+        {
+          "start": 106.9,
+          "end": 112.98,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 4.48,
+          "text": "ま、警察においては、警備安全について万全を期してもらいたいと。",
+          "decode_seconds": 0.1466649560006772
+        },
+        {
+          "start": 112.98,
+          "end": 114.0,
+          "kind": "eof",
+          "quiet_tail_seconds": 0.38,
+          "active_seconds": 0.42,
+          "text": "考えています。",
+          "decode_seconds": 0.046684794999237056
+        }
+      ]
+    },
+    "-41": {
+      "segment_count": 15,
+      "forced_count": 8,
+      "pause_count": 6,
+      "duration_median_seconds": 8.999999999999998,
+      "duration_max_seconds": 9.000000000000004,
+      "runs": [
+        {
+          "run": 0,
+          "compute_seconds": 2.739382781999666,
+          "rtf": 0.02402967352631286,
+          "CER": 0.1444954128440367
+        },
+        {
+          "run": 1,
+          "compute_seconds": 2.7219408019991533,
+          "rtf": 0.02387667370174696,
+          "CER": 0.1444954128440367
+        },
+        {
+          "run": 2,
+          "compute_seconds": 3.2934436020004796,
+          "rtf": 0.028889856157898942,
+          "CER": 0.1444954128440367
+        }
+      ],
+      "nas_first_nonempty_cue_compute_seconds": [
+        0.15463854699919466,
+        0.14990496399877884,
+        0.14647040300042136
+      ],
+      "nas_first_two_cues_compute_seconds": [
+        0.2776067079994391,
+        0.2953849869991245,
+        0.29917289900004107
+      ],
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 6.98,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 5.14,
+          "text": "はまず 昨日の事件 につい ては。",
+          "decode_seconds": 0.15459409200047958
+        },
+        {
+          "start": 6.98,
+          "end": 12.38,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 4.72,
+          "text": "容疑者が介度をされ、そして警察庁において捜査中です。",
+          "decode_seconds": 0.12275683100051538
+        },
+        {
+          "start": 12.38,
+          "end": 21.38,
+          "kind": "forced_9s",
+          "quiet_tail_seconds": 0.0,
+          "active_seconds": 8.42,
+          "text": "また、私の方からあの再のご心配をおかけし、そしてご迷惑をおかけした地元の。",
+          "decode_seconds": 0.21560964899981627
+        },
+        {
+          "start": 21.38,
+          "end": 30.38,
+          "kind": "forced_9s",
+          "quiet_tail_seconds": 0.0,
+          "active_seconds": 8.56,
+          "text": "皆さんやたあの中で漁業組合の方々ですとかああ、あるいは容疑者確保にご協力いただいた。",
+          "decode_seconds": 0.24479435000102967
+        },
+        {
+          "start": 30.38,
+          "end": 39.38,
+          "kind": "forced_9s",
+          "quiet_tail_seconds": 0.0,
+          "active_seconds": 8.06,
+          "text": "方に対し、直接ご礼の電話を入れさせていただきましたあのまあその他にも。",
+          "decode_seconds": 0.23776952700063703
+        },
+        {
+          "start": 39.38,
+          "end": 46.56,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 6.74,
+          "text": "ふに国内また国外からもさま々なああご心配やお迎いの声をいただいたこと。",
+          "decode_seconds": 0.1680488840011094
+        },
+        {
+          "start": 46.56,
+          "end": 50.34,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 3.2600000000000002,
+          "text": "感謝申し上げております。",
+          "decode_seconds": 0.0917201650008792
+        },
+        {
+          "start": 50.34,
+          "end": 59.34,
+          "kind": "forced_9s",
+          "quiet_tail_seconds": 0.0,
+          "active_seconds": 8.36,
+          "text": "えそしてまあ、民主主義の根幹をなくま選挙においてえこうした暴力的なあ行為がああ行われた。",
+          "decode_seconds": 0.20662430199990922
+        },
+        {
+          "start": 59.34,
+          "end": 64.32000000000001,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 4.22,
+          "text": "このことは絶対許すことはできないと考えています。",
+          "decode_seconds": 0.11579426400021475
+        },
+        {
+          "start": 64.32000000000001,
+          "end": 73.32000000000001,
+          "kind": "forced_9s",
+          "quiet_tail_seconds": 0.0,
+          "active_seconds": 8.040000000000001,
+          "text": "そして、大切な こと は、この 大 切な 選挙 を 最後 まで やり 通す こと で。",
+          "decode_seconds": 0.20685564200175577
+        },
+        {
+          "start": 73.32000000000001,
+          "end": 82.32000000000001,
+          "kind": "forced_9s",
+          "quiet_tail_seconds": 0.0,
+          "active_seconds": 8.28,
+          "text": "あると思っています、、有権者の皆さんの声をしっかり選挙を通じて示して。",
+          "decode_seconds": 0.21802240899887693
+        },
+        {
+          "start": 82.32000000000001,
+          "end": 91.32000000000001,
+          "kind": "forced_9s",
+          "quiet_tail_seconds": 0.0,
+          "active_seconds": 7.94,
+          "text": "もらう こと、これ は 我が国 に とって も、また 我が国 の 民主 主義 に とっても これ は 大切な こと で あり ますそう いった。",
+          "decode_seconds": 0.23648614100056875
+        },
+        {
+          "start": 91.32000000000001,
+          "end": 98.38,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 6.22,
+          "text": "国民の皆さんと共もにど大切な選挙を最後までやり通していきたいと考えています。",
+          "decode_seconds": 0.17234020300020347
+        },
+        {
+          "start": 98.38,
+          "end": 107.38,
+          "kind": "forced_9s",
+          "quiet_tail_seconds": 0.0,
+          "active_seconds": 7.94,
+          "text": "そして、各党 のこう した 選挙運動 が 妨げられる ことがな いよう。",
+          "decode_seconds": 0.19675725500019325
+        },
+        {
+          "start": 107.38,
+          "end": 114.0,
+          "kind": "eof",
+          "quiet_tail_seconds": 0.02,
+          "active_seconds": 5.84,
+          "text": "ま、警察においては、こ警備安全について万全を期してもらいたいと考えております。",
+          "decode_seconds": 0.14804016500056605
+        }
+      ]
+    }
+  },
+  "actual_live_probe": [
+    {
+      "run": 0,
+      "events": [
+        {
+          "start": 0.0,
+          "end": 6.84,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 4.76,
+          "text": "はい、まず 昨日の事件 につい ては。",
+          "decode_seconds": 0.1742846820015984,
+          "actual_wall_output_seconds": 7.014537881999786
+        },
+        {
+          "start": 6.84,
+          "end": 12.36,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 4.5600000000000005,
+          "text": "容疑書やが介捕を使れ、そして警察庁において捜査中です。",
+          "decode_seconds": 0.18161001599946758,
+          "actual_wall_output_seconds": 12.542029776999698
+        },
+        {
+          "start": 12.36,
+          "end": 16.18,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 3.1,
+          "text": "また、私の方からあの。",
+          "decode_seconds": 0.09726738300014404,
+          "actual_wall_output_seconds": 16.277483821000715
+        }
+      ]
+    },
+    {
+      "run": 1,
+      "events": [
+        {
+          "start": 0.0,
+          "end": 6.84,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 4.76,
+          "text": "はい、まず 昨日の事件 につい ては。",
+          "decode_seconds": 0.18416439399879891,
+          "actual_wall_output_seconds": 7.024376423998547
+        },
+        {
+          "start": 6.84,
+          "end": 12.36,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 4.5600000000000005,
+          "text": "容疑書やが介捕を使れ、そして警察庁において捜査中です。",
+          "decode_seconds": 0.12482319799892139,
+          "actual_wall_output_seconds": 12.485050870998748
+        },
+        {
+          "start": 12.36,
+          "end": 16.18,
+          "kind": "energy_pause",
+          "quiet_tail_seconds": 0.32,
+          "active_seconds": 3.1,
+          "text": "また、私の方からあの。",
+          "decode_seconds": 0.10017351300120936,
+          "actual_wall_output_seconds": 16.280424157999732
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Energy-only acoustic evidence; no human listening audit performed.",
+    "No MLKit translation, Android player timing or OPPO inference.",
+    "NAS measurements start from already decoded complete local PCM; exclude read/decode/MT/render/load.",
+    "simulated_live_output_seconds is a schedule calculation; actual live probe separately labelled.",
+    "Whole-segment PTS is coarser than3s baseline; no word-level alignment claims.",
+    "No strings deduplicated. Thresholds not selected using reference text; -38primary predeclared, -35/-41 sensitivity only."
+  ]
+}
