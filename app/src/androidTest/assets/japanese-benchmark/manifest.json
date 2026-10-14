@@ -1,0 +1,17 @@
+{
+  "id": "emoji-simpleshow-japan",
+  "url": "https://upload.wikimedia.org/wikipedia/commons/a/a4/Emoji.webm",
+  "source": "https://commons.wikimedia.org/wiki/File:Emoji.webm",
+  "author": "Simpleshow Japan",
+  "license": "CC-BY-SA-4.0",
+  "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "bytes": 9487128,
+  "sha256": "ad3af093836cad823ef1793ff4d505139eed92dd7e7402de4c015a2ed50d5956",
+  "asset": "japanese-benchmark/emoji.webm",
+  "window_start_ms": 3000,
+  "window_end_ms": 6000,
+  "playhead_ms": 3500,
+  "reference_status": "No independent golden transcription. Functional Japanese-to-Chinese pipeline smoke only, not translation accuracy acceptance.",
+  "integrity_policy": "Public source URL may change; exact size and SHA-256 pin the accepted bytes. Refuse changed content. Download unchanged original; decode only the production three-second window around paused playhead, with production context padding.",
+  "test_extent_ms": 9000
+}

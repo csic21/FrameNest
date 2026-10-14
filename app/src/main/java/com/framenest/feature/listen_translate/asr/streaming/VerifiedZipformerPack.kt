@@ -12,6 +12,7 @@ internal data class ZipformerPackDescriptor(
     val immutableRevision: String,
     val licenseEvidenceUrl: String,
     val files: Map<ZipformerFile, ZipformerFileDigest>,
+    val sourceLanguages: Set<String>,
 )
 
 /**
@@ -24,18 +25,25 @@ class VerifiedZipformerPack private constructor(
     private val packDirectory: File,
     private val descriptor: ZipformerPackDescriptor,
 ) {
+    internal fun requireSourceLanguage(language: String) {
+        require(language.trim().lowercase() in descriptor.sourceLanguages) {
+            "This streaming checkpoint does not support the selected source language"
+        }
+    }
+
     internal fun verifiedPaths(): Map<ZipformerFile, File> = verifyPaths(privateRoot, packDirectory, descriptor)
 
     internal companion object {
         fun verify(privateFilesDir: File, packDirectory: File, descriptor: ZipformerPackDescriptor): VerifiedZipformerPack {
             verifyPaths(privateFilesDir, packDirectory, descriptor)
-            return VerifiedZipformerPack(privateFilesDir, packDirectory, descriptor.copy(files = descriptor.files.toMap()))
+            return VerifiedZipformerPack(privateFilesDir, packDirectory, descriptor.copy(files = descriptor.files.toMap(), sourceLanguages = descriptor.sourceLanguages.toSet()))
         }
 
         private fun verifyPaths(root: File, directory: File, descriptor: ZipformerPackDescriptor): Map<ZipformerFile, File> {
             require(descriptor.id.isNotBlank() && descriptor.immutableRevision.isNotBlank())
             require(descriptor.licenseEvidenceUrl.startsWith("https://"))
             require(descriptor.files.keys == ZipformerFile.entries.toSet())
+            require(descriptor.sourceLanguages.isNotEmpty() && descriptor.sourceLanguages.all { it.matches(Regex("[a-z]{2,3}")) && it != "auto" })
             val rootPath = root.canonicalFile.toPath()
             val packPath = directory.canonicalFile.toPath()
             require(packPath != rootPath && packPath.startsWith(rootPath)) { "Pack must be in private storage" }

@@ -10,7 +10,8 @@ import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig
  * and OnlineStream.kt. No AssetManager: private filesystem packs require newFromFile.
  * Default endpoint rules are the pinned upstream defaults, not tuned latency claims.
  */
-fun createExperimentalZipformerEngine(pack: VerifiedZipformerPack, numThreads: Int = 2): StreamingAsrEngine {
+fun createExperimentalZipformerEngine(pack: VerifiedZipformerPack, sourceLanguage: String, numThreads: Int = 2): StreamingAsrEngine {
+    pack.requireSourceLanguage(sourceLanguage)
     require(numThreads in 1..4)
     return ZipformerStreamingAsrEngine {
         // Re-hash at load time, not just when installation was first checked. Caller must keep the

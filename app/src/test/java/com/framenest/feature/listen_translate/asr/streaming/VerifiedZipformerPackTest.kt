@@ -16,7 +16,7 @@ class VerifiedZipformerPackTest {
             File(directory, name).writeBytes(bytes)
             ZipformerFileDigest(name, bytes.size.toLong(), digest(bytes))
         }
-        return directory to ZipformerPackDescriptor("test-only", "immutable-test-revision", "https://example.test/license", files)
+        return directory to ZipformerPackDescriptor("test-only", "immutable-test-revision", "https://example.test/license", files, setOf("en", "zh"))
     }
     @Test fun hashAndSizeAreCheckedAgainBeforeNativeLoading() {
         val root = Files.createTempDirectory("zipformer-private").toFile()
@@ -30,6 +30,19 @@ class VerifiedZipformerPackTest {
             assertTrue(runCatching { VerifiedZipformerPack.verify(root, dir, descriptor) }.isFailure)
         } finally { root.deleteRecursively() }
     }
+    @Test fun unsupportedJapaneseAndAutoCannotActivateBilingualCheckpoint() {
+        val root = Files.createTempDirectory("zipformer-language").toFile()
+        try {
+            val (dir, descriptor) = fixture(root)
+            val verified = VerifiedZipformerPack.verify(root, dir, descriptor)
+            verified.requireSourceLanguage("en")
+            verified.requireSourceLanguage("zh")
+            for (unsupported in listOf("ja", "ko", "yue", "auto", "")) {
+                assertTrue(runCatching { verified.requireSourceLanguage(unsupported) }.isFailure)
+            }
+        } finally { root.deleteRecursively() }
+    }
+
     @Test fun rejectsTraversalOutsidePrivateRootMissingManifestAndSymlinksEscapingPack() {
         val root = Files.createTempDirectory("zipformer-private").toFile()
         val external = Files.createTempDirectory("zipformer-outside").toFile()
