@@ -441,6 +441,117 @@ class ListenAdaptiveSessionTest {
         session.release()
     }
 
+    @Test fun retryFinalRemovesChangedStartAndEndProvisionalWithoutRevivingOldTail() = runTest {
+        for (finalStart in listOf(500L, 1_000L)) for (oldEnd in listOf(4_200L, 6_500L)) {
+            val repository = ListenTranslateRepository(FakeListenTranslateDao())
+            val engine = object : AdaptiveEngine() {
+                override suspend fun processWindow(startMs: Long, endMs: Long, sourceLang: String, targetLang: String): ListenWindowResult {
+                    if (startMs > 0L) awaitCancellation()
+                    return ListenWindowResult("new source", "新的译文", cueStartMs = finalStart,
+                        cueEndMs = 5_500L, processedThroughMs = 5_500L)
+                }
+            }
+            repository.ensureJob(identity, languages, asrModel = engine.asrModelId, mtModel = engine.mtModelId)
+            repository.upsertCueForExistingJob(identity, languages, 1_000L, oldEnd, "old source", "",
+                rev = ListenCoverageRev.PROVISIONAL_SOURCE)
+            val future = repository.upsertCueForExistingJob(identity, languages, 7_000L, 9_000L, "valid future", "有效后句")
+            val outside = repository.upsertCueForExistingJob(identity, languages, 9_000L, 10_000L, "pending future", "",
+                rev = ListenCoverageRev.PROVISIONAL_SOURCE)
+            val session = ListenTranslateSession(repository, engine, this, identity)
+            session.setSourceLang("ja")
+            session.onPlaybackTick(2_000L, 12_000L, playing = false)
+            session.setEnabled(true)
+            runCurrent()
+            assertEquals("new source\n新的译文", session.uiState.value.overlayText)
+            assertEquals("新的译文", repository.cueAt(identity, languages, 2_000L)?.textTgt)
+            val cues = repository.listCues(identity, languages)
+            assertFalse(cues.any { it.textSrc == "old source" })
+            assertTrue(cues.any { it.id == future.id })
+            assertTrue(cues.any { it.id == outside.id })
+            session.onSeek(6_000L)
+            runCurrent()
+            assertEquals("", session.uiState.value.overlayText)
+            assertNull(session.uiState.value.activeCue)
+            session.release()
+        }
+    }
+
+    @Test fun failedTranslationThenRetryWithDifferentBoundsReplacesDurableSourceProgress() = runTest {
+        val repository = ListenTranslateRepository(FakeListenTranslateDao())
+        var attempts = 0
+        val engine = object : AdaptiveEngine() {
+            override suspend fun processWindow(startMs: Long, endMs: Long, sourceLang: String, targetLang: String): ListenWindowResult {
+                attempts++
+                return if (attempts == 1) {
+                    ListenWindowResult("old failed source", "", cueStartMs = 1_000L, cueEndMs = 4_200L,
+                        processedThroughMs = 4_200L, retryableErrorMessage = "MT failed")
+                } else ListenWindowResult("new retry source", "重试译文", cueStartMs = 500L, cueEndMs = 5_500L,
+                    processedThroughMs = 5_500L)
+            }
+        }
+        val session = ListenTranslateSession(repository, engine, this, identity)
+        session.setSourceLang("ja")
+        session.onPlaybackTick(2_000L, 12_000L, playing = false)
+        session.setEnabled(true)
+        runCurrent()
+        assertEquals(ListenTranslateJobStatus.Failed, session.uiState.value.status)
+        assertEquals(ListenCoverageRev.PROVISIONAL_SOURCE, repository.listCues(identity, languages).single().rev)
+        session.setEnabled(false)
+        session.setEnabled(true)
+        runCurrent()
+        assertEquals(2, attempts)
+        assertEquals("new retry source\n重试译文", session.uiState.value.overlayText)
+        assertTrue(repository.listCues(identity, languages).none { it.textSrc == "old failed source" })
+        session.release()
+    }
+
+    @Test fun confirmedSilenceAlsoRemovesSupersededProvisionalSpeech() = runTest {
+        val repository = ListenTranslateRepository(FakeListenTranslateDao())
+        val engine = object : AdaptiveEngine() {
+            override suspend fun processWindow(startMs: Long, endMs: Long, sourceLang: String, targetLang: String) =
+                ListenWindowResult("", "", blankReason = ListenBlankReason.NearSilence, processedThroughMs = 5_500L)
+        }
+        repository.ensureJob(identity, languages, asrModel = engine.asrModelId, mtModel = engine.mtModelId)
+        repository.upsertCueForExistingJob(identity, languages, 1_000L, 6_500L, "old source", "",
+            rev = ListenCoverageRev.PROVISIONAL_SOURCE)
+        val session = ListenTranslateSession(repository, engine, this, identity)
+        session.setSourceLang("ja")
+        session.onPlaybackTick(2_000L, 12_000L, playing = false)
+        session.setEnabled(true)
+        runCurrent()
+        assertEquals("", session.uiState.value.overlayText)
+        assertEquals(0, session.uiState.value.generatedCueCount)
+        assertTrue(repository.listCues(identity, languages).all { it.textSrc.isBlank() })
+        session.release()
+    }
+
+    @Test fun staleGenerationCannotCleanUpPreviousProvisionalOrPublishFinal() = runTest {
+        val repository = ListenTranslateRepository(FakeListenTranslateDao())
+        val engine = object : AdaptiveEngine() {
+            override suspend fun processWindow(startMs: Long, endMs: Long, sourceLang: String, targetLang: String): ListenWindowResult {
+                try { awaitCancellation() } catch (_: CancellationException) {
+                    return withContext(NonCancellable) {
+                        ListenWindowResult("stale new source", "stale translation", cueStartMs = 500L,
+                            cueEndMs = 5_500L, processedThroughMs = 5_500L)
+                    }
+                }
+            }
+        }
+        repository.ensureJob(identity, languages, asrModel = engine.asrModelId, mtModel = engine.mtModelId)
+        val old = repository.upsertCueForExistingJob(identity, languages, 1_000L, 4_200L, "old source", "",
+            rev = ListenCoverageRev.PROVISIONAL_SOURCE)
+        val session = ListenTranslateSession(repository, engine, this, identity)
+        session.setSourceLang("ja")
+        session.onPlaybackTick(2_000L, 12_000L, playing = false)
+        session.setEnabled(true)
+        runCurrent()
+        session.setForeground(false)
+        runCurrent()
+        assertEquals(old, repository.listCues(identity, languages).single())
+        assertEquals(0L, repository.getJob(identity, languages)!!.coveredUntilMs)
+        session.release()
+    }
+
     @Test fun languageGateKeepsOtherLanguagesOnLegacyThreeSecondWindows() = runTest {
         val requested = mutableListOf<Pair<Long, Long>>()
         val engine = object : AdaptiveEngine() {

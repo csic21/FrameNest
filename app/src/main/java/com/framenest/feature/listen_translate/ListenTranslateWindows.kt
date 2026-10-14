@@ -1,6 +1,8 @@
 package com.framenest.feature.listen_translate
 
 import com.framenest.data.listen_translate.ListenTranslateCue
+import com.framenest.data.listen_translate.LISTEN_PROVISIONAL_SOURCE_REV
+import com.framenest.data.listen_translate.ListenProvisionalCleanup
 
 /**
  * Pure helpers for windowed listen-translate scheduling (FN-12).
@@ -63,6 +65,11 @@ object ListenTranslateWindows {
         val candidateHasText = candidate.textSrc.isNotBlank() || candidate.textTgt.isNotBlank()
         val currentHasText = current.textSrc.isNotBlank() || current.textTgt.isNotBlank()
         if (candidateHasText != currentHasText) return candidateHasText
+        // Final speech wins even if an older provisional retry has a later start or
+        // larger numeric revision. Revision 3 is a progress kind, not a newer final.
+        val candidateFinal = candidate.rev != ListenCoverageRev.PROVISIONAL_SOURCE
+        val currentFinal = current.rev != ListenCoverageRev.PROVISIONAL_SOURCE
+        if (candidateFinal != currentFinal) return candidateFinal
         return compareValuesBy(candidate, current,
             { it.startMs }, { it.rev }, { it.endMs }, { it.id }) > 0
     }
@@ -127,10 +134,14 @@ internal object ListenCueCache {
     fun upsert(
         existing: List<ListenTranslateCue>,
         incoming: ListenTranslateCue,
+        provisionalCleanup: ListenProvisionalCleanup? = null,
     ): List<ListenTranslateCue> {
         val result = ArrayList<ListenTranslateCue>(existing.size + 1)
         var inserted = false
         for (cue in existing) {
+            if (provisionalCleanup != null && cue.rev == ListenCoverageRev.PROVISIONAL_SOURCE &&
+                cue.startMs >= provisionalCleanup.ownedStartMs && cue.startMs < provisionalCleanup.processedThroughMs
+            ) continue
             if (cue.startMs == incoming.startMs && cue.endMs == incoming.endMs) {
                 continue
             }
@@ -155,5 +166,5 @@ internal object ListenCoverageRev {
     const val CONFIRMED_SILENCE: Int = 1
     const val UNRECOGNIZED_SPEECH: Int = 2
     /** Stable source publication is displayable, but has not completed the unit. */
-    const val PROVISIONAL_SOURCE: Int = 3
+    const val PROVISIONAL_SOURCE: Int = LISTEN_PROVISIONAL_SOURCE_REV
 }

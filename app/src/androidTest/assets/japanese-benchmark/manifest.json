@@ -12,7 +12,7 @@
   "window_end_ms": 6000,
   "playhead_ms": 3500,
   "reference_status": "No independent golden transcription. Functional Japanese-to-Chinese pipeline smoke only, not translation accuracy acceptance.",
-  "integrity_policy": "Public source URL may change; exact size and SHA-256 pin the accepted bytes. Refuse changed content. Download unchanged original; decode only the production three-second window around paused playhead, with production context padding.",
+  "integrity_policy": "Public source URL may change; exact size and SHA-256 pin the accepted bytes. Refuse changed content. Decode only the bounded windows explicitly listed in this manifest.",
   "test_extent_ms": 9000,
   "fixture_review": {
     "window_starts_ms": [
@@ -28,5 +28,16 @@
     "window_duration_ms": 3000,
     "purpose": "Manual semantic review of complete utterances and adjacent production-window sentence splits. No independently verified golden transcript; no automatic semantic acceptance.",
     "content_export_scope": "Only decoded text from this exact SHA-256-verified, publicly licensed Emoji fixture. Never app/user media or production diagnostics."
+  },
+  "whole_block_diagnostic": {
+    "window_starts_ms": [
+      0,
+      9000,
+      18000,
+      27000
+    ],
+    "window_duration_ms": 15000,
+    "purpose": "Compare real whole-context ASR-to-ML-Kit translation against clipped production windows. Diagnostic only: overlapping blocks are not stitched, cached, displayed, or automatically accepted.",
+    "content_export_scope": "Only this exact SHA-256-verified publicly licensed fixture; no user media."
   }
 }

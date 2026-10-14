@@ -2,6 +2,7 @@ package com.framenest.feature.listen_translate
 
 import com.framenest.core.model.PlaybackIdentity
 import com.framenest.data.listen_translate.ListenLanguagePair
+import com.framenest.data.listen_translate.ListenProvisionalCleanup
 import com.framenest.data.listen_translate.ListenTranslateCue
 import com.framenest.data.listen_translate.ListenTranslateJobStatus
 import com.framenest.data.listen_translate.ListenTranslateRepository
@@ -552,6 +553,7 @@ class ListenTranslateSession(
                 val (cueStart, cueEnd) = speechBounds(result)
                 val commitStartedAtMs = monotonicTimeMs()
                 val revision = if (adaptive && provisional) ListenCoverageRev.PROVISIONAL_SOURCE else 1
+                val cleanup = if (adaptive && !provisional) ListenProvisionalCleanup(startMs, processedEnd(result)) else null
                 val persistedSpeech = if (commitProgress) {
                     repository.completeWindowCueForExistingJob(
                         identity, langs, cueStart, cueEnd, result.textSrc, result.textTgt,
@@ -559,14 +561,18 @@ class ListenTranslateSession(
                         durationMs = lastDurationMs.takeIf { it > 0L },
                         contentKey = windowContentKey, asrModel = asrModel, mtModel = mtModel,
                         lease = windowLease,
+                        provisionalCleanup = cleanup,
+                        isCurrentGeneration = { isCurrent(generation) },
                     )
                 } else repository.upsertCueForExistingJob(
                     identity, langs, cueStart, cueEnd, result.textSrc, result.textTgt,
                     rev = revision, contentKey = windowContentKey, asrModel = asrModel, mtModel = mtModel,
                     lease = windowLease,
+                    provisionalCleanup = cleanup,
+                    isCurrentGeneration = { isCurrent(generation) },
                 )
                 ensureCurrent(generation)
-                cachedCues = ListenCueCache.upsert(cachedCues, persistedSpeech)
+                cachedCues = ListenCueCache.upsert(cachedCues, persistedSpeech, cleanup)
                 startupTimer.publish(
                     hasSource = result.textSrc.isNotBlank(),
                     hasBilingual = result.textSrc.isNotBlank() && result.textTgt.isNotBlank() &&
@@ -666,6 +672,9 @@ class ListenTranslateSession(
                     // Persist only the consumed span, excluding decoded read-ahead. Writing this
                     // after the speech cue means cancellation cannot hide completed text;
                     // coverage and progress themselves commit in one Room transaction.
+                    val cleanup = if (adaptive && result.blankReason != ListenBlankReason.UnrecognizedSpeech) {
+                        ListenProvisionalCleanup(startMs, actualEndMs)
+                    } else null
                     val persistedCoverage = repository.completeWindowCueForExistingJob(
                         identity = identity,
                         languages = langs,
@@ -687,9 +696,11 @@ class ListenTranslateSession(
                         asrModel = asrModel,
                         mtModel = mtModel,
                         lease = windowLease,
+                        provisionalCleanup = cleanup,
+                        isCurrentGeneration = { isCurrent(generation) },
                     )
                     ensureCurrent(generation)
-                    cachedCues = ListenCueCache.upsert(cachedCues, persistedCoverage)
+                    cachedCues = ListenCueCache.upsert(cachedCues, persistedCoverage, cleanup)
                     progressCommittedWithCoverage = true
                 }
                 if (!progressCommittedWithCoverage) {
@@ -781,10 +792,13 @@ class ListenTranslateSession(
 
     private suspend fun ensureCurrent(generation: Long) {
         currentCoroutineContext().ensureActive()
-        if (released || !isForeground || !_ui.value.enabled || generation != workGeneration || cacheLease?.active != true) {
+        if (!isCurrent(generation)) {
             throw CancellationException("stale listen-translate window")
         }
     }
+
+    private fun isCurrent(generation: Long): Boolean =
+        !released && isForeground && _ui.value.enabled && generation == workGeneration && cacheLease?.active == true
 
     private fun updateEffectiveRealtimeFactor() {
         _ui.update {

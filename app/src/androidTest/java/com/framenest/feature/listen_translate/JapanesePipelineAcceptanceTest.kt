@@ -81,6 +81,7 @@ class JapanesePipelineAcceptanceTest {
             // Fixture-only review artifact: deliberately separate from production diagnostics.
             // The media has already passed the manifest's exact size and SHA-256 checks.
             val reviewWindows = JSONArray()
+            val wholeBlockReview = JSONArray()
             val fixtureReview = JSONObject()
                 .put("fixture_id", manifest.getString("id"))
                 .put("fixture_sha256", manifest.getString("sha256"))
@@ -96,6 +97,7 @@ class JapanesePipelineAcceptanceTest {
                 .put("independent_golden_transcript", false)
                 .put("review_instructions", "Listen to the pinned public fixture. Review complete utterances and adjacent 3-second window splits for omissions, hallucinations and Japanese-to-Chinese meaning. Script detection and non-echo checks are functional checks only.")
                 .put("windows", reviewWindows)
+                .put("whole_block_diagnostic", wholeBlockReview)
             val reviewFile = File(context.filesDir, "japanese-fixture-review.json")
             fun saveReview() { reviewFile.writeText(fixtureReview.toString(2)) }
             saveReview()
@@ -219,6 +221,44 @@ class JapanesePipelineAcceptanceTest {
                                     .put("mt_ms", result.stageTimings?.translationMs ?: JSONObject.NULL))
                                 saveReview()
                                 check(result.retryableErrorMessage == null) { "Fixture review translation stage failed" }
+                            }
+                            // Independent context diagnostic, not a production-candidate acceptance.
+                            // Whole ASR text is translated without the legacy three-second token crop.
+                            // Overlapping blocks are NOT stitched or certified as completed coverage.
+                            phase("whole_block_context_diagnostic")
+                            val blockConfig = manifest.getJSONObject("whole_block_diagnostic")
+                            val blockStarts = blockConfig.getJSONArray("window_starts_ms")
+                            val blockLength = blockConfig.getLong("window_duration_ms")
+                            check(blockLength in 1L..15_000L && blockStarts.length() in 1..8)
+                            val blockAudio = FileListenAudioSource(media.absolutePath)
+                            try {
+                                for (index in 0 until blockStarts.length()) {
+                                    val blockStart = blockStarts.getLong(index)
+                                    check(blockStart in 0L..(Long.MAX_VALUE - blockLength))
+                                    val blockEnd = blockStart + blockLength
+                                    val began = SystemClock.elapsedRealtime()
+                                    val pcm = blockAudio.pcmWindow(blockStart, blockEnd)
+                                    val decoded = SystemClock.elapsedRealtime()
+                                    check(pcm.isNotEmpty() && pcm.size <= 240_000)
+                                    val recognition = asr.recognize(pcm)
+                                    val recognized = SystemClock.elapsedRealtime()
+                                    val translated = mt.translate(recognition.text, "ja", "zh")
+                                    val finished = SystemClock.elapsedRealtime()
+                                    wholeBlockReview.put(JSONObject()
+                                        .put("window_start_ms", blockStart).put("window_end_ms", blockEnd)
+                                        .put("actual_pcm_samples", pcm.size)
+                                        .put("textSrc", recognition.text).put("textTgt", translated)
+                                        .put("pcm_ms", decoded - began).put("asr_ms", recognized - decoded)
+                                        .put("mt_ms", finished - recognized).put("total_ms", finished - began)
+                                        .put("warm_models", true).put("overlay_or_cache_committed", false)
+                                        .put("semantic_acceptance_passed", JSONObject.NULL))
+                                    saveReview()
+                                    check(recognition.text.isNotBlank() && translated.isNotBlank()) {
+                                        "Whole-block context diagnostic produced empty text"
+                                    }
+                                }
+                            } finally {
+                                blockAudio.close()
                             }
                             fixtureReview.put("collection_completed", true)
                             saveReview()

@@ -329,6 +329,48 @@ class ListenTranslateRepositoryTest {
     }
 
     @Test
+    fun finalCleanupRemovesOnlyOwnedProvisionalAndKeepsOtherJobsAndCompletedCues() = runBlocking {
+        val repo = ListenTranslateRepository(FakeListenTranslateDao())
+        repo.ensureJob(identity, langs)
+        val lease = repo.acquireLease(identity, langs)
+        repo.upsertCueForExistingJob(identity, langs, 1_000L, 6_500L, "old source", "", rev = LISTEN_PROVISIONAL_SOURCE_REV)
+        val valid = repo.upsertCueForExistingJob(identity, langs, 2_000L, 2_500L, "valid", "有效")
+        val boundary = repo.upsertCueForExistingJob(identity, langs, 5_500L, 7_000L, "outside", "", rev = LISTEN_PROVISIONAL_SOURCE_REV)
+        val otherLanguages = ListenLanguagePair("ja", "en")
+        repo.ensureJob(identity, otherLanguages)
+        val other = repo.upsertCueForExistingJob(identity, otherLanguages, 1_000L, 6_500L, "other pair", "", rev = LISTEN_PROVISIONAL_SOURCE_REV)
+        repo.completeWindowCueForExistingJob(identity, langs, 500L, 5_500L, "new", "新", 1,
+            coveredUntilMs = 5_500L, durationMs = 12_000L, lease = lease,
+            provisionalCleanup = ListenProvisionalCleanup(0L, 5_500L))
+        val cues = repo.listCues(identity, langs)
+        assertTrue(cues.none { it.textSrc == "old source" })
+        assertTrue(cues.any { it.id == valid.id })
+        assertTrue(cues.any { it.id == boundary.id })
+        assertEquals(other, repo.listCues(identity, otherLanguages).single())
+        assertEquals(5_500L, repo.getJob(identity, langs)!!.coveredUntilMs)
+    }
+
+    @Test
+    fun staleGenerationOrLeaseCannotDeleteProvisionalDuringFinalCommit() = runBlocking {
+        for (closeLease in listOf(false, true)) {
+            val repo = ListenTranslateRepository(FakeListenTranslateDao())
+            repo.ensureJob(identity, langs)
+            val lease = repo.acquireLease(identity, langs)
+            val old = repo.upsertCueForExistingJob(identity, langs, 1_000L, 6_500L, "old", "", rev = LISTEN_PROVISIONAL_SOURCE_REV)
+            if (closeLease) lease.close()
+            val failure = runCatching {
+                repo.completeWindowCueForExistingJob(identity, langs, 500L, 5_500L, "stale", "stale", 1,
+                    coveredUntilMs = 5_500L, durationMs = 12_000L, lease = lease,
+                    provisionalCleanup = ListenProvisionalCleanup(0L, 5_500L),
+                    isCurrentGeneration = { closeLease })
+            }.exceptionOrNull()
+            assertTrue(failure is kotlinx.coroutines.CancellationException)
+            assertEquals(old, repo.listCues(identity, langs).single())
+            assertEquals(0L, repo.getJob(identity, langs)!!.coveredUntilMs)
+        }
+    }
+
+    @Test
     fun listenContentKey_stable() {
         assertEquals("s10_m20", ListenContentKey.of(10L, 20L))
         assertEquals("", ListenContentKey.of(null, null))
@@ -545,7 +587,11 @@ internal class FakeListenTranslateDao : ListenTranslateDao {
         timeMs: Long,
     ): ListenTranslateCueEntity? =
         listCues(serverId, share, path, sourceLang, targetLang)
-            .lastOrNull { it.startMs <= timeMs && it.endMs > timeMs }
+            .filter { it.startMs <= timeMs && it.endMs > timeMs }
+            .maxWithOrNull(compareBy<ListenTranslateCueEntity>(
+                { it.textSrc.isNotBlank() || it.textTgt.isNotBlank() },
+                { it.rev != LISTEN_PROVISIONAL_SOURCE_REV }, { it.startMs }, { it.rev }, { it.endMs }, { it.id },
+            ))
 
     override suspend fun deleteCuesAtRange(
         serverId: String,
@@ -560,6 +606,19 @@ internal class FakeListenTranslateDao : ListenTranslateDao {
             it.serverId == serverId && it.share == share && it.path == path &&
                 it.sourceLang == sourceLang && it.targetLang == targetLang &&
                 it.startMs == startMs && it.endMs == endMs
+        }
+        refreshFlow(serverId, share, path, sourceLang, targetLang)
+    }
+
+    override suspend fun deleteSupersededProvisionalCues(
+        serverId: String, share: String, path: String, sourceLang: String, targetLang: String,
+        ownedStartMs: Long, processedThroughMs: Long,
+    ) {
+        cueRows.removeAll {
+            it.serverId == serverId && it.share == share && it.path == path &&
+                it.sourceLang == sourceLang && it.targetLang == targetLang &&
+                it.rev == LISTEN_PROVISIONAL_SOURCE_REV &&
+                it.startMs >= ownedStartMs && it.startMs < processedThroughMs
         }
         refreshFlow(serverId, share, path, sourceLang, targetLang)
     }

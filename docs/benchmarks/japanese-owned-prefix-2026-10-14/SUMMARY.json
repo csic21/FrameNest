@@ -1,0 +1,62 @@
+{
+  "status": "failed_semantic_and_progress_acceptance",
+  "cli_sha256": "c936a28b718c47bd9bbd92eb7b68c4990782bdaa106beb1e322335774de4d029",
+  "method": "Actual 12s core +15s context SenseVoice per step, exact supplied Kotlin CLI, next start=actualEnd, no Python selector or fallback. Policy subprocess time separate.",
+  "emoji": {
+    "duration_ms": 113960,
+    "covered_ms": 113960,
+    "segments": 16,
+    "reasons": {
+      "TerminalWithAcousticPause": 7,
+      "TerminalWithEstimatedTokenGap": 2,
+      "ForcedAcousticPause": 3,
+      "ForcedTokenBoundary": 3,
+      "EndOfMedia": 1
+    },
+    "asr_seconds_two_passes": 11.165903553996031,
+    "asr_rtf": 0.09798090166721685,
+    "cli_subprocess_seconds": 2.537750598998173,
+    "early_improvement": "First three committed cues preserve この and 中国語 as complete source text; no MT in this experiment.",
+    "failures": [
+      {
+        "type": "lost_suffix_after_forced_restart",
+        "block_start_ms": 52260,
+        "actual_end_ms": 64019,
+        "both_asr_contain": "伝えられるから",
+        "selected_ends": "伝えられるか",
+        "unselected_suffix_token": "ら",
+        "unselected_suffix_start_seconds": 64.01999927520751,
+        "next_asr_starts": "絵文字は昔から",
+        "explanation": "Re-decoding exactly at approximate token start drops leftover syllable; text/audio carry is absent."
+      },
+      {
+        "type": "lexical_word_split",
+        "block_start_ms": 95639,
+        "actual_end_ms": 97499,
+        "selected_text": "絵文",
+        "next_selected_starts": "ちの影響",
+        "explanation": "Forced boundary splits 絵文字 and the fresh decode changes the remaining syllable."
+      }
+    ]
+  },
+  "kishida": {
+    "known_media_duration_ms": 175787,
+    "covered_ms": 7980,
+    "status": "blocked_no_result",
+    "first_selected_text": "まず 昨日 の 事件 につ い ては、容疑 者 や",
+    "blocked_start_ms": 7980,
+    "core_text": "逮護さされ、そして警察庁において捜査中です。また私の方からあの代のご心配をおかけし、そしてご迷惑をおかけし。",
+    "context_text": "介護さされ、そして警察庁において捜査中です また私の方から再人のご心配をおかけし、そしてご迷惑をおかけした地元の皆さんが方。",
+    "cli_stdout": "NONE\t0\n",
+    "reason": "First normalized characters differ (逮 vs介), so exact stable prefix=0 despite shared later sentence; NONE returned. Stopped immediately, no fabricated advance.",
+    "asr_seconds_including_blocked_attempt": 1.2596650410014263,
+    "cli_subprocess_seconds": 0.2874965719984175
+  },
+  "limits": [
+    "Cloud CPU only, no new MT/Android/OPPO result.",
+    "Emoji has no independent reference; concrete failures use both raw ASR runs plus contiguous selected/restarted evidence.",
+    "Kishida did not reach36s, no full114s successful run claimed.",
+    "Emoji reachedEOF while its local first36 checkpoint had passed; cross-fixture validation still failed.",
+    "Subprocess JVM startup is included in CLI timing and is not a production policy microbenchmark."
+  ]
+}

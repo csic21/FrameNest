@@ -2,9 +2,10 @@
 
 ## Scope and status
 
-`JapaneseOwnedPrefixPolicy` is an independent, pure Kotlin experiment. It is not a
-Japanese parser, a semantic acceptance gate, a model VAD, or a change to production
-Session behavior. No model, default or existing engine file is changed by this work.
+`JapaneseOwnedPrefixPolicy` is a pure Kotlin experiment with gated engine and Session
+integration. It is not a Japanese parser, a semantic acceptance gate, or a model VAD.
+The production default remains disabled. Continuous real-audio validation failed;
+this strategy must not be enabled or described as accepted.
 There are no fixture vocabulary exceptions. Generic terminal forms and particles
 are deliberately incomplete heuristic evidence, not guarantees.
 
@@ -80,16 +81,6 @@ Excerpts are machine transcripts adapted into synthetic tests, not an independen
 human-reviewed reference. No new ASR, MT or device execution was performed by this
 selector test. Independent Japanese footage and manual semantic review remain required.
 
-## Handoff
-
-- Status: independent policy and JVM logic tests complete; product integration pending.
-- Paths: `JapaneseOwnedPrefixPolicy.kt`, `JapaneseOwnedPrefixPolicyTest.kt`, this document.
-- No commit created. No existing engine, Session, defaults or dependency files edited.
-- Shared integration owner must map ASR timestamps to the absolute timebase, extract
-  real quiet runs, supply two-ASR stability bounds, preserve generation/cache leases,
-  and advance only to validated actual ownership after successful completion.
-- Android build/lint, real NAS/phone timing and semantic acceptance not established.
-
 ## Integrated experiment, 2026-10-14
 
 `RealListenTranslateEngine(experimentalJapaneseSegments = true)` now opts into the
@@ -124,3 +115,27 @@ and 69 pure pipeline/window tests passed. Standalone RealEngine checks extract t
 unchanged audio/model support interfaces and exception declaration to avoid Android
 installer dependencies; Session harness uses annotation-only Room stand-ins. Real
 Android compilation and repeated semantic/latency acceptance are still required.
+
+## Continuous validation: FAILED
+
+On 2026-10-14 the exact production Kotlin selector, PCM pause extraction, token
+mapping and two-pass stability comparison were replayed continuously against the
+public Emoji and Kishida recordings. Every next read began at the actual returned
+completion boundary; NONE stopped the run instead of skipping audio.
+
+- Emoji initially retained the first two questions and the complete 中国語 example.
+  Later forced cuts split から and 絵文字. Restarted recognition omitted the withheld
+  character. Whole-token ownership in a selector does not preserve acoustic context.
+- Kishida stopped at 7,980 ms: the shorter and contextual recognitions disagreed on
+  their first character, so exact prefix agreement was zero despite later agreement.
+- Emoji's two ASR passes took 11.166 s total (RTF 0.098). This desktop throughput
+  measurement excludes PCM decoding, model preparation, translation and display.
+- Independent control-flow review reproduced stale provisional rows masking final
+  translations, a 1 ms owned gap becoming a 16-sample ASR input, exact-EOF sensitivity
+  to one millisecond of decoded sample loss, and isolated speech followed by silence
+  never finding a following lexical token.
+
+These are release blockers, not tuning details. Further investigation will retain
+continuous overlapping acoustic context and a separate text commit cursor; estimated
+token starts must not determine future PCM read origins. No default switch or
+semantic acceptance follows from the passing unit tests above.

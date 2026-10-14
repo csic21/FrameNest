@@ -59,6 +59,14 @@ data class ListenTranslateCue(
     val rev: Int,
 )
 
+/** Reserved displayable progress revision; never certifies completed coverage. */
+internal const val LISTEN_PROVISIONAL_SOURCE_REV = 3
+
+/** Successful owned audio supersedes provisional cues that started inside this span. */
+data class ListenProvisionalCleanup(val ownedStartMs: Long, val processedThroughMs: Long) {
+    init { require(ownedStartMs >= 0L && processedThroughMs > ownedStartMs) }
+}
+
 /**
  * Stable content fingerprint: size + modified time (when known).
  * Empty when metadata is unavailable — does not force cache invalidation alone.
