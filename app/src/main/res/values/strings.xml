@@ -196,7 +196,7 @@
 
     <!-- Listen-translate (FN-12) -->
     <string name="listen_translate_title">听译字幕</string>
-    <string name="listen_translate_hint">本机听译 Beta：Vosk small 离线识别 + ML Kit 翻译。适合清晰对白的辅助理解，噪声、多人重叠或专有名词可能明显出错。结果不写 NAS。</string>
+    <string name="listen_translate_hint">本机听译 Beta：按设置使用 SenseVoice 或 Vosk 离线识别，默认使用 ML Kit 翻译。适合清晰对白的辅助理解，噪声、多人重叠或专有名词可能明显出错。结果不写 NAS。</string>
     <string name="listen_translate_enable">开启听译</string>
     <string name="listen_translate_source_lang">源语言</string>
     <string name="listen_translate_target_lang">目标语言</string>
@@ -204,6 +204,17 @@
     <string name="listen_translate_mode_src">原文</string>
     <string name="listen_translate_mode_tgt">译文</string>
     <string name="listen_translate_mode_both">双语</string>
+    <string name="listen_translate_high_quality_japanese">日语→中文高质量字幕（可选）</string>
+    <string name="listen_translate_high_quality_cost">Hy-MT2 Q4：约 1.06 GiB 模型下载，运行建议另预留约 2 GiB 内存；手机实际占用待验证。</string>
+    <string name="listen_translate_high_quality_download_hint">选择仅保存偏好；开启听译时才按模型下载设置安装。默认仅 Wi-Fi/有线网络，允许流量下载需在设置中选择。</string>
+    <string name="listen_translate_high_quality_default">当前使用 ML Kit。高质量模式仅支持 SenseVoice 日语→中文。</string>
+    <string name="listen_translate_high_quality_selected">已选择 Hy-MT2 Q4；再次开启听译后使用。</string>
+    <string name="listen_translate_high_quality_stop_first">先关闭听译，再切换翻译方案。</string>
+    <string name="listen_translate_high_quality_unavailable">当前构建或识别引擎不支持，继续使用 ML Kit。此选项需要包含 Hy-MT 的构建，并在设置中选择 SenseVoice。</string>
+    <string name="listen_translate_high_quality_unsupported_pair">仅支持 SenseVoice 日语→中文；当前语言对继续使用 ML Kit，不下载 Hy-MT 模型。</string>
+    <string name="listen_translate_high_quality_source_only">原文模式不使用翻译，也不会下载 Hy-MT 模型。</string>
+    <string name="listen_translate_caption_unconfirmed">当前句段待确认</string>
+    <string name="listen_translate_audio_read_through">音频已读到 %1$d 秒（不代表字幕已确认）</string>
     <string name="listen_translate_status">状态：%1$s</string>
     <string name="listen_translate_status_idle">未开始</string>
     <string name="listen_translate_status_running">识别中</string>

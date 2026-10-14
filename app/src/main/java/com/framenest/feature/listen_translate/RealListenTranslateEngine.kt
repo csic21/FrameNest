@@ -34,7 +34,7 @@ class RealListenTranslateEngine(
     /** Unreleased experiment; preserve the fixed-window product default until validation. */
     private val experimentalJapaneseSegments: Boolean = false,
     private val knownMediaDurationMs: () -> Long = { 0L },
-) : ListenTranslateEngine {
+) : OwnedListenTranslateEngine {
 
     private data class SourceKey(val start: Long, val end: Long, val language: String, val track: Int?)
     private var cachedSource: Pair<SourceKey, ListenWindowResult>? = null
@@ -280,7 +280,7 @@ class RealListenTranslateEngine(
             segmentBoundaryReason = selected.reason.name)
     }
 
-    fun close() {
+    override fun close() {
         cachedSource = null
         audio.close()
         asr.close()

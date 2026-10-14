@@ -87,6 +87,11 @@ class ListenTranslateSession(
     private var playbackRate: Float = 1f
     private var processingRealtimeFactor: Double? = null
     private var adaptationRealtimeFactor: Double? = null
+    private var recordedRetryAtMs = 0L
+    private var recordedFailures = 0
+    private var recordedWorkMs = 0L
+    private var recordedAdaptationWorkMs = 0L
+    private var recordedAudioMs = 0L
 
     fun setContentKey(contentKey: String) {
         val normalized = contentKey.trim()
@@ -185,6 +190,10 @@ class ListenTranslateSession(
         _ui.update { it.copy(preparingSubtitles = preparing, isProcessing = false) }
         refreshActiveCue()
         if (activationJob?.isActive != true) startPolling()
+    }
+
+    fun setHighQualityJapaneseChoice(enabled: Boolean, available: Boolean) {
+        _ui.update { it.copy(highQualityJapanese = enabled, highQualityAvailable = available) }
     }
 
     fun setModelsReady(ready: Boolean) {
@@ -318,7 +327,12 @@ class ListenTranslateSession(
 
     private fun stopPolling() {
         workGeneration++
-        _ui.update { it.copy(diagnostics = null) }
+        recordedRetryAtMs = 0L
+        recordedFailures = 0
+        recordedWorkMs = 0L
+        recordedAdaptationWorkMs = 0L
+        recordedAudioMs = 0L
+        _ui.update { it.copy(diagnostics = null, recordedReadThroughMs = 0L, currentCaptionUnconfirmed = false) }
         pollJob?.cancel()
         pollJob = null
     }
@@ -356,22 +370,22 @@ class ListenTranslateSession(
         val langs = _ui.value.languages
         // An unrelated cached subtitle elsewhere in the movie is not startup readiness.
         val cue = ListenTranslateWindows.cueAt(
-            cachedCues, lastPositionMs, includeEndFallback = adaptiveMaxSpanMs() == null,
+            cachedCues, lastPositionMs, includeEndFallback = !intervalCoverage(),
         )
         startupTimer.publish(
             hasSource = cue?.textSrc?.isNotBlank() == true,
-            hasBilingual = langs.sourceLang != langs.targetLang &&
-                cue?.textSrc?.isNotBlank() == true && cue.textTgt.isNotBlank(),
+            hasBilingual = cue?.rev != ListenCoverageRev.PROVISIONAL_SOURCE &&
+                langs.sourceLang != langs.targetLang && cue?.textSrc?.isNotBlank() == true && cue.textTgt.isNotBlank(),
         )
     }
 
     private fun refreshActiveCue() {
         if (!_ui.value.enabled) return
         val cue = ListenTranslateWindows.cueAt(
-            cachedCues, lastPositionMs, includeEndFallback = adaptiveMaxSpanMs() == null,
+            cachedCues, lastPositionMs, includeEndFallback = !intervalCoverage(),
         )
         val overlay = ListenTranslateWindows.formatOverlay(cue, _ui.value.displayMode)
-        val ahead = if (adaptiveMaxSpanMs() != null) {
+        val ahead = if (intervalCoverage()) {
             ListenPrefetchPolicy.adaptiveContiguousAheadMs(
                 completedIntervals(), lastPositionMs, lastDurationMs,
             )
@@ -387,7 +401,8 @@ class ListenTranslateSession(
                 _ui.value.displayMode != ListenDisplayMode.TargetOnly
             startupTimer.select(
                 sourceVisible = sourceVisible,
-                bilingualVisible = sourceVisible && cue.textTgt.isNotBlank() &&
+                bilingualVisible = sourceVisible && cue.rev != ListenCoverageRev.PROVISIONAL_SOURCE &&
+                    cue.textTgt.isNotBlank() &&
                     _ui.value.displayMode == ListenDisplayMode.Bilingual &&
                     _ui.value.languages.sourceLang != _ui.value.languages.targetLang,
             )
@@ -395,6 +410,7 @@ class ListenTranslateSession(
         _ui.update {
             it.copy(
                 activeCue = cue, overlayText = overlay, preparedAheadMs = ahead,
+                currentCaptionUnconfirmed = cue?.rev == ListenCoverageRev.PROVISIONAL_SOURCE,
                 startupTiming = startupTimer.sample,
                 preparingSubtitles = it.preparingSubtitles && ahead < target,
             )
@@ -418,6 +434,166 @@ class ListenTranslateSession(
         ),
     )
 
+    private fun recordedEngine(): RecordedListenTranslateEngine? =
+        (engine as? RecordedListenTranslateEngine)?.takeIf {
+            it.supportsRecordedPair(_ui.value.languages.sourceLang, _ui.value.languages.targetLang)
+        }
+
+    private fun intervalCoverage(): Boolean = adaptiveMaxSpanMs() != null || recordedEngine() != null
+
+    /** Producer advancement never certifies the pending/uncertain audio as translated. */
+    private suspend fun processRecordedAhead(
+        producer: RecordedListenTranslateEngine,
+        lookAheadMs: Long,
+        generation: Long,
+    ): Boolean {
+        if (monotonicTimeMs() < recordedRetryAtMs) return false
+        val remainingMs = if (lastDurationMs > 0L) {
+            (lastDurationMs - lastPositionMs).coerceAtLeast(0L)
+        } else Long.MAX_VALUE
+        if (remainingMs == 0L) return false
+        val needed = (if (lookAheadMs > 0L) lookAheadMs else 1L).coerceAtMost(remainingMs)
+        if (ListenPrefetchPolicy.adaptiveContiguousAheadMs(completedIntervals(), lastPositionMs, lastDurationMs) >= needed) return false
+        return processMutex.withLock {
+            ensureCurrent(generation)
+            val langs = _ui.value.languages
+            val lease = cacheLease
+            val key = contentKey
+            val asrId = producer.asrModelId
+            val mtId = cacheMtModelId()
+            val began = monotonicTimeMs()
+            var cacheMs = 0L
+            var completedAny = false
+            var changedAny = false
+            val previousReadThroughMs = _ui.value.recordedReadThroughMs
+            fun cueChanged(startMs: Long, endMs: Long, source: String, target: String, revision: Int): Boolean =
+                cachedCues.none { it.startMs == startMs && it.endMs == endMs &&
+                    it.textSrc == source && it.textTgt == target && it.rev == revision }
+            _ui.update { it.copy(isProcessing = true, errorMessage = null, status = ListenTranslateJobStatus.Running) }
+            try {
+                val progress = producer.processAhead(
+                    RecordedListenRequest(generation, lastPositionMs, lastDurationMs,
+                        lookAheadMs.coerceIn(0L, 30_000L), langs.sourceLang, langs.targetLang),
+                ) { cue ->
+                    ensureCurrent(generation)
+                    require(cue.displayStartMs >= 0L && cue.displayEndMs > cue.displayStartMs)
+                    require(cue.decodedThroughMs >= cue.displayEndMs)
+                    require(cue.textSrc.length <= 4096 && cue.textTgt.length <= 4096)
+                    if (lastDurationMs > 0L) require(cue.decodedThroughMs <= lastDurationMs)
+                    val coverageStart = cue.coverageStartMs
+                    val coverageEnd = cue.coverageEndMs
+                    if (cue.isFinal) {
+                        require(coverageStart != null && coverageEnd != null && coverageStart >= 0L && coverageEnd > coverageStart)
+                        require(cue.displayStartMs >= coverageStart && cue.displayEndMs <= coverageEnd && coverageEnd <= cue.decodedThroughMs)
+                        if (cue.confirmedSilence) {
+                            require(cue.textSrc.isBlank() && cue.textTgt.isBlank()) {
+                                "confirmed silence cannot contain speech"
+                            }
+                        } else require(cue.textSrc.isNotBlank() &&
+                            (langs.sourceLang == langs.targetLang || cue.textTgt.isNotBlank()))
+                    } else {
+                        require(!cue.confirmedSilence) { "uncertain text cannot confirm silence" }
+                        // A replayed source candidate must never replace an accepted final
+                        // (including an exact-range blank coverage row in Room).
+                        if (ListenCompletedIntervals.firstGap(completedIntervals(),
+                                cue.displayStartMs, cue.displayEndMs) == null) return@processAhead
+                    }
+                    val supersededStart = cue.supersededStartMs
+                    val supersededEnd = cue.supersededEndMs
+                    require((supersededStart == null) == (supersededEnd == null))
+                    if (supersededStart != null && supersededEnd != null) {
+                        require(supersededStart >= 0L && supersededEnd > supersededStart &&
+                            supersededEnd <= cue.decodedThroughMs)
+                    }
+                    val commitStarted = monotonicTimeMs()
+                    val cleanup = when {
+                        cue.isFinal -> ListenProvisionalCleanup(coverageStart!!, coverageEnd!!)
+                        supersededStart != null -> ListenProvisionalCleanup(supersededStart, supersededEnd!!)
+                        else -> null
+                    }
+                    changedAny = changedAny || (cleanup != null && cachedCues.any {
+                        it.rev == ListenCoverageRev.PROVISIONAL_SOURCE &&
+                            it.startMs >= cleanup.ownedStartMs && it.startMs < cleanup.processedThroughMs &&
+                            (it.startMs != cue.displayStartMs || it.endMs != cue.displayEndMs)
+                    })
+                    if (cue.textSrc.isNotBlank() || cue.textTgt.isNotBlank()) {
+                        changedAny = changedAny || cueChanged(cue.displayStartMs, cue.displayEndMs,
+                            cue.textSrc, cue.textTgt, if (cue.isFinal) 1 else ListenCoverageRev.PROVISIONAL_SOURCE)
+                        val speech = repository.upsertCueForExistingJob(identity, langs,
+                            cue.displayStartMs, cue.displayEndMs, cue.textSrc, cue.textTgt,
+                            rev = if (cue.isFinal) 1 else ListenCoverageRev.PROVISIONAL_SOURCE,
+                            contentKey = key, asrModel = asrId, mtModel = mtId, lease = lease,
+                            provisionalCleanup = cleanup, isCurrentGeneration = { isCurrent(generation) })
+                        ensureCurrent(generation)
+                        cachedCues = ListenCueCache.upsert(cachedCues, speech, cleanup)
+                    }
+                    if (cue.isFinal) {
+                        val sameBounds = cue.displayStartMs == coverageStart && cue.displayEndMs == coverageEnd
+                        changedAny = changedAny || cueChanged(coverageStart!!, coverageEnd!!,
+                            if (sameBounds) cue.textSrc else "", if (sameBounds) cue.textTgt else "", 1)
+                        val completed = repository.completeWindowCueForExistingJob(identity, langs,
+                            coverageStart!!, coverageEnd!!,
+                            if (sameBounds) cue.textSrc else "", if (sameBounds) cue.textTgt else "", rev = 1,
+                            coveredUntilMs = coverageEnd, durationMs = lastDurationMs.takeIf { it > 0L },
+                            contentKey = key, asrModel = asrId, mtModel = mtId, lease = lease,
+                            provisionalCleanup = cleanup, isCurrentGeneration = { isCurrent(generation) })
+                        ensureCurrent(generation)
+                        cachedCues = ListenCueCache.upsert(cachedCues, completed, cleanup)
+                        completedAny = true
+                        _ui.update { it.copy(coveredUntilMs = maxOf(it.coveredUntilMs, coverageEnd)) }
+                    }
+                    cacheMs += elapsedListenTimeMs(commitStarted, monotonicTimeMs())
+                    startupTimer.publish(cue.textSrc.isNotBlank(), cue.isFinal &&
+                        langs.sourceLang != langs.targetLang && cue.textSrc.isNotBlank() && cue.textTgt.isNotBlank())
+                    if (cue.isFinal && cue.textTgt.isNotBlank()) startupTimer.recordGeneratedBilingual(cue.timings, cacheMs)
+                    updateCueSummary()
+                    refreshActiveCue()
+                }
+                ensureCurrent(generation)
+                require(progress.readThroughMs >= previousReadThroughMs && progress.newAudioMs >= 0L)
+                require(progress.newAudioMs <= progress.readThroughMs - previousReadThroughMs) {
+                    "new audio must advance the producer read cursor"
+                }
+                if (lastDurationMs > 0L) require(progress.readThroughMs <= lastDurationMs)
+                val elapsedMs = elapsedListenTimeMs(began, monotonicTimeMs())
+                recordedWorkMs += elapsedMs
+                recordedAdaptationWorkMs += ListenPrefetchPolicy.adaptationElapsedMs(
+                    elapsedMs, progress.timings?.translationPreparationWaitMs,
+                )
+                recordedAudioMs += progress.newAudioMs
+                if (recordedAudioMs > 0L) {
+                    processingRealtimeFactor = recordedWorkMs.toDouble() / recordedAudioMs
+                    adaptationRealtimeFactor = recordedAdaptationWorkMs.toDouble() / recordedAudioMs
+                    updateEffectiveRealtimeFactor()
+                }
+                recordedFailures = 0
+                recordedRetryAtMs = 0L
+                _ui.update { it.copy(isProcessing = false, status = ListenTranslateJobStatus.Partial,
+                    recordedReadThroughMs = progress.readThroughMs,
+                    message = progress.message ?: it.message,
+                    diagnostics = ListenPipelineDiagnostics(stages = progress.timings ?: ListenStageTimings(),
+                        totalMs = elapsedListenTimeMs(began, monotonicTimeMs()), cacheCommitMs = cacheMs,
+                        completed = completedAny, playbackRate = playbackRate,
+                        effectiveRealtimeFactor = processingRealtimeFactor?.times(playbackRate),
+                        adaptationRealtimeFactor = adaptationRealtimeFactor?.times(playbackRate))) }
+                refreshActiveCue()
+                // An unchanged callback or a producer's optimistic flag cannot create
+                // an immediate retry loop. Zero-audio MT work still drains after a new cue.
+                progress.madeProgress && (progress.readThroughMs > previousReadThroughMs || changedAny)
+            } catch (cancelled: CancellationException) {
+                if (generation == workGeneration) _ui.update { it.copy(isProcessing = false) }
+                throw cancelled
+            } catch (failure: Throwable) {
+                ensureCurrent(generation)
+                recordedFailures = (recordedFailures + 1).coerceAtMost(5)
+                recordedRetryAtMs = monotonicTimeMs() + minOf(5_000L, 500L * (1L shl recordedFailures))
+                _ui.update { it.copy(isProcessing = false, status = ListenTranslateJobStatus.Failed,
+                    errorMessage = failure.message?.take(160) ?: failure.javaClass.simpleName) }
+                false
+            }
+        }
+    }
+
     private suspend fun maybeFillAroundPosition(generation: Long): Boolean {
         if (!_ui.value.enabled || !isForeground || released) return false
         if (isBuffering) {
@@ -433,6 +609,7 @@ class ListenTranslateSession(
             playbackRate = playbackRate,
         )
         _ui.update { it.copy(prefetchLookAheadMs = lookAheadMs) }
+        recordedEngine()?.let { return processRecordedAhead(it, lookAheadMs, generation) }
         val adaptiveSpan = adaptiveMaxSpanMs()
         if (adaptiveSpan != null) {
             val next = ListenPrefetchPolicy.nextAdaptiveWindow(

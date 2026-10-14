@@ -1,0 +1,33 @@
+{
+  "id": "hymt2-1.8b-q4_k_m",
+  "modelVersion": "hymt2-1.8b-q4_k_m-a0c709d9fac510f2c807aa3af52872340dc37a4a",
+  "kind": "mt",
+  "displayName": "Tencent Hy-MT2-1.8B (Q4_K_M)",
+  "optInRequired": true,
+  "automaticDownload": false,
+  "repository": "tencent/Hy-MT2-1.8B-GGUF",
+  "revision": "a0c709d9fac510f2c807aa3af52872340dc37a4a",
+  "sourceUrl": "https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/tree/a0c709d9fac510f2c807aa3af52872340dc37a4a",
+  "file": {
+    "name": "Hy-MT2-1.8B-Q4_K_M.gguf",
+    "url": "https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/a0c709d9fac510f2c807aa3af52872340dc37a4a/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "bytes": 1133080448,
+    "sha256": "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699"
+  },
+  "downloadSizeLabel": "1.06 GiB",
+  "minimumAdditionalFreeBytes": 67108864,
+  "license": {
+    "spdx": "Apache-2.0",
+    "copyright": "Copyright (C) 2026 Tencent. All rights reserved.",
+    "url": "https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/blob/a0c709d9fac510f2c807aa3af52872340dc37a4a/LICENSE.txt",
+    "asset": "listen_models/hymt2-1.8b-LICENSE.txt",
+    "sha256": "a1d52d448f81c584a47c583e19dfab2d3851c7c84431b07baee093c1113ed114"
+  },
+  "evidence": {
+    "apiUrl": "https://huggingface.co/api/models/tencent/Hy-MT2-1.8B-GGUF/revision/a0c709d9fac510f2c807aa3af52872340dc37a4a?blobs=true",
+    "verifiedOn": "2026-10-14",
+    "weightBytesAndSha256": "Official Hugging Face LFS metadata, also verified against downloaded file.",
+    "license": "Unmodified official LICENSE.txt at the pinned revision."
+  },
+  "notes": "Model download size excludes native runtime and inference working memory. Experimental direct translation is optional; no quality or physical-device latency guarantee."
+}

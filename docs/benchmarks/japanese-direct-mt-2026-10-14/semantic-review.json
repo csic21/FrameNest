@@ -1,0 +1,139 @@
+{
+  "review_type": "Analyst text-to-text semantic review; not independent audio gold, not a scored general MT benchmark.",
+  "official_clean_controls_core_pass": 6,
+  "clean_controls_total": 6,
+  "guard_clean_controls_core_pass": 6,
+  "asr_release_gate": "FAIL: at least three of four blocks still contain unsupported completion or relationships. Fourth preserves core facts but is not audio/boundary validated.",
+  "cases": [
+    {
+      "case_id": "language_question",
+      "group": "authored_control",
+      "source": "今、世界中で使われているのは何語でしょうか。",
+      "mlkit_baseline": "现在全球使用什么语言？",
+      "hy_official_prompt": "现在世界上使用的语言是什么语呢？",
+      "hy_fragment_guard": "现在世界上使用的语言是什么语言？",
+      "review": {
+        "official": "pass_core_semantics",
+        "guard": "pass_core_semantics",
+        "note": "现在、全球、何种语言疑问均保留；默认“什么语”略生硬。"
+      }
+    },
+    {
+      "case_id": "language_entities",
+      "group": "authored_control",
+      "source": "英語、スペイン語、中国語の中で、あなたはどの言語を使いますか。",
+      "mlkit_baseline": "你用英语，西班牙语，中国人使用哪种语言？",
+      "hy_official_prompt": "在英语、西班牙语和中文中，你使用哪种语言？",
+      "hy_fragment_guard": "你使用哪种语言呢？英语、西班牙语还是中文？",
+      "review": {
+        "official": "pass_core_semantics",
+        "guard": "pass_core_semantics",
+        "note": "英语、西班牙语、中文三个语言实体及你选择使用哪种语言保留。"
+      }
+    },
+    {
+      "case_id": "negation_scope",
+      "group": "authored_control",
+      "source": "この表現は日常会話では使われますが、ビジネス文書では使われません。",
+      "mlkit_baseline": "此表示在日常对话中使用，但不在商业文档中使用。",
+      "hy_official_prompt": "这种表达在日常对话中会使用，但在商务文书中则不会使用。",
+      "hy_fragment_guard": "这种表达常用于日常对话中，但在商务文书中不会使用。",
+      "review": {
+        "official": "pass_core_semantics",
+        "guard": "pass_core_semantics",
+        "note": "日常会话肯定、商务文件否定及对比保留。guard“常用于”有轻微频率色彩，不构成关系倒置。"
+      }
+    },
+    {
+      "case_id": "emoji_answer",
+      "group": "authored_control",
+      "source": "正解は絵文字です。",
+      "mlkit_baseline": "正确的答案是象形图。",
+      "hy_official_prompt": "正确答案是表情符号。",
+      "hy_fragment_guard": "正确答案是表情符号。",
+      "review": {
+        "official": "pass_task_terminology",
+        "guard": "pass_task_terminology",
+        "note": "本任务的正确答案／表情符号概念保留。孤立絵文字有更宽泛词义，不外推通用词义结论。"
+      }
+    },
+    {
+      "case_id": "popularity_scope",
+      "group": "authored_control",
+      "source": "絵文字は若い人だけでなく幅広い年代の人に人気があり、世界中でメッセージのやり取りに使われています。",
+      "mlkit_baseline": "表情符号不仅适用于年轻人，也很受欢迎，也很受欢迎，而且是各种年龄的人，并且用于在世界各地互动。",
+      "hy_official_prompt": "表情符号不仅受到年轻人喜爱，也受到各年龄层的人欢迎，被全球用于信息交流。",
+      "hy_fragment_guard": "表情符号不仅受到年轻人的喜爱，也受到各年龄层的人欢迎，在全世界被用于信息交流。",
+      "review": {
+        "official": "pass_core_semantics",
+        "guard": "pass_core_semantics",
+        "note": "不仅年轻人、广泛年龄层的欢迎、全球信息交流均保留；没有把它改成人人使用。"
+      }
+    },
+    {
+      "case_id": "neutral_statement",
+      "group": "authored_control",
+      "source": "総理大臣は官邸で記者会見を開き、今日の会議の内容を説明しました。",
+      "mlkit_baseline": "总理在公共居住地开设新闻发布会，并解释了今天会议的内容。",
+      "hy_official_prompt": "首相在官邸召开记者会，说明了今天的会议内容。",
+      "hy_fragment_guard": "首相在官邸召开记者会，解释了今天的会议内容。",
+      "review": {
+        "official": "pass_core_semantics",
+        "guard": "pass_core_semantics",
+        "note": "首相、官邸、记者会、说明今天会议内容保留，没有新增人名或政策。"
+      }
+    },
+    {
+      "case_id": "asr_0_15000",
+      "group": "real_asr_text",
+      "source": "この イラスト の 意味 わかり ま すか 今、世界 中 で 使 われ て いる の は 何語 でしょ うか 英語、スペイン語、中国語、それ は ビジネス 文章 で は。",
+      "mlkit_baseline": "此图的含义我想知道是否是全球使用的常用事物，英文，西班牙语，中文，这是一个商业句子。",
+      "hy_official_prompt": "你能理解这个插图的含义吗？现在全世界使用的是哪种语言呢？是英语、西班牙语还是中文？在商务文书中则常用英语。",
+      "hy_fragment_guard": "您明白这幅插图的含义吗？现在全世界使用的语言是什么？是英语、西班牙语、中文，还是用于商务文件。",
+      "review": {
+        "official": "fail_unsupported_completion",
+        "guard": "fail_relation_attachment",
+        "note": "默认凭空补成商务文件常用英语。guard虽删除此补写，却将原本分开的商务残片接入“是英语、西班牙语、中文，还是用于商务文件”选择项，语义类别错接。"
+      }
+    },
+    {
+      "case_id": "asr_9000_24000",
+      "group": "real_asr_text",
+      "source": "うか 英語、スペイン語、中国語、それ はビジネス 文章では使われない言葉です 正解は絵文字 絵文字はインターネット上の。",
+      "mlkit_baseline": "UMM英语，西班牙语，中文，它是一个不用于商业判决的词，正确答案是互联网上的表情符号象形图。",
+      "hy_official_prompt": "英语、西班牙语、汉语——这些在商务文本中都不会被使用。正确的表达方式就是使用表情符号，而表情符号则来自互联网。",
+      "hy_fragment_guard": "英语、西班牙语、中文在商务文本中都不会使用这种词，正确答案是表情符号，表情符号是网络上的。",
+      "review": {
+        "official": "fail_unsupported_relation_and_completion",
+        "guard": "fail_unsupported_relation",
+        "note": "默认把模糊それ明确为三种语言均不用于商务文本，并新增表情符号来自互联网；将正确答案改为正确表达方式。guard删除互联网起源补写，但仍把英语、西语、中文作“不使用这种词”的参与者，不能据现有截断输入确认这种关系。"
+      }
+    },
+    {
+      "case_id": "asr_18000_33000",
+      "group": "real_asr_text",
+      "source": "絵文字 絵文字はインターネット上のコミュニケーションで使われ、特に若い世代に人気です 絵文字の映画がハリウッドで作られるほど。",
+      "mlkit_baseline": "表情字符用于互联网上的通信，尤其是对于年轻世代。",
+      "hy_official_prompt": "表情符号在互联网交流中被广泛使用，尤其受到年轻人的喜爱——甚至还有以表情符号为题材的电影在好莱坞被制作出来。",
+      "hy_fragment_guard": "表情符号在互联网交流中被广泛使用，尤其受到年轻一代的喜爱。甚至还有以表情符号为主题的电影在好莱坞制作。",
+      "review": {
+        "official": "core_facts_preserved_boundary_unresolved",
+        "guard": "core_facts_preserved_boundary_unresolved",
+        "note": "互联网交流、特别受年轻人欢迎、表情符号电影在好莱坞制作均保留，较MLKit明显改善。两种输出都补充“广泛”，且将末尾程度从句ほど自然化成独立完整陈述；核心内容可读不等于连续字幕或音频语义验收通过。"
+      }
+    },
+    {
+      "case_id": "asr_27000_42000",
+      "group": "real_asr_text",
+      "source": "第人気 絵文字の映画が ハリウッドで作られるほど、絵文字は 日本発祥 絵を文字 のよ うに使う 新しい表現スタイルです。",
+      "mlkit_baseline": "更流行的象形图电影是在好莱坞制造的，象形图是使用日本的出生件作为字符的新表达式。",
+      "hy_official_prompt": "由于有如此受欢迎的表情符号电影在好莱坞被制作出来，表情符号其实是一种源自日本的、将图像当作文字来使用的新型表达方式。",
+      "hy_fragment_guard": "如此受欢迎的表情符号电影在好莱坞被制作出来，说明表情符号是一种源自日本的、将图像作为文字使用的新型表达方式。",
+      "review": {
+        "official": "fail_invented_causal_link",
+        "guard": "fail_invented_inferential_link",
+        "note": "日本起源和图画作文字恢复，但默认“由于”把好莱坞电影与日本起源连成因果；guard“说明”改为推论，均不是源文给出的关系。第人気本身疑似ASR错误，不能凭此报告判定音频原文。"
+      }
+    }
+  ]
+}

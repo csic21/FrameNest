@@ -1,0 +1,389 @@
+[
+  {
+    "case_id": "language_question",
+    "group": "authored_control",
+    "source": "今、世界中で使われているのは何語でしょうか。",
+    "translation": "现在世界上使用的语言是什么语呢？",
+    "mlkit_baseline": "现在全球使用什么语言？",
+    "source_chars": 22,
+    "time_to_first_content_ms": 648.801487000128,
+    "wall_ms": 1035.2124219998586,
+    "usage": {
+      "completion_tokens": 9,
+      "prompt_tokens": 34,
+      "total_tokens": 43,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    "timings": {
+      "cache_n": 0,
+      "prompt_n": 34,
+      "prompt_ms": 644.764,
+      "prompt_per_token_ms": 18.96364705882353,
+      "prompt_per_second": 52.732472656661976,
+      "predicted_n": 9,
+      "predicted_ms": 386.436,
+      "predicted_per_token_ms": 48.3045,
+      "predicted_per_second": 20.702004989183205
+    },
+    "finish_reason": "stop",
+    "state_before": {
+      "VmRSS": "1950004 kB",
+      "VmHWM": "1950004 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "state_after": {
+      "VmRSS": "1956788 kB",
+      "VmHWM": "1956788 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "semantic_review": null
+  },
+  {
+    "case_id": "language_entities",
+    "group": "authored_control",
+    "source": "英語、スペイン語、中国語の中で、あなたはどの言語を使いますか。",
+    "translation": "在英语、西班牙语和中文中，你使用哪种语言？",
+    "mlkit_baseline": "你用英语，西班牙语，中国人使用哪种语言？",
+    "source_chars": 31,
+    "time_to_first_content_ms": 697.9225230006705,
+    "wall_ms": 1256.1658490003538,
+    "usage": {
+      "completion_tokens": 14,
+      "prompt_tokens": 44,
+      "total_tokens": 58,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    "timings": {
+      "cache_n": 0,
+      "prompt_n": 44,
+      "prompt_ms": 694.854,
+      "prompt_per_token_ms": 15.792136363636365,
+      "prompt_per_second": 63.322654831086815,
+      "predicted_n": 14,
+      "predicted_ms": 558.116,
+      "predicted_per_token_ms": 42.932,
+      "predicted_per_second": 23.29264884002609
+    },
+    "finish_reason": "stop",
+    "state_before": {
+      "VmRSS": "1956788 kB",
+      "VmHWM": "1956788 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "state_after": {
+      "VmRSS": "1957808 kB",
+      "VmHWM": "1957808 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "semantic_review": null
+  },
+  {
+    "case_id": "negation_scope",
+    "group": "authored_control",
+    "source": "この表現は日常会話では使われますが、ビジネス文書では使われません。",
+    "translation": "这种表达在日常对话中会使用，但在商务文书中则不会使用。",
+    "mlkit_baseline": "此表示在日常对话中使用，但不在商业文档中使用。",
+    "source_chars": 33,
+    "time_to_first_content_ms": 702.2711620002156,
+    "wall_ms": 1551.2056859997756,
+    "usage": {
+      "completion_tokens": 17,
+      "prompt_tokens": 43,
+      "total_tokens": 60,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    "timings": {
+      "cache_n": 0,
+      "prompt_n": 43,
+      "prompt_ms": 699.042,
+      "prompt_per_token_ms": 16.25679069767442,
+      "prompt_per_second": 61.51275602896535,
+      "predicted_n": 17,
+      "predicted_ms": 848.938,
+      "predicted_per_token_ms": 53.058625,
+      "predicted_per_second": 18.847077171713366
+    },
+    "finish_reason": "stop",
+    "state_before": {
+      "VmRSS": "1957808 kB",
+      "VmHWM": "1957808 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "state_after": {
+      "VmRSS": "1957900 kB",
+      "VmHWM": "1957900 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "semantic_review": null
+  },
+  {
+    "case_id": "emoji_answer",
+    "group": "authored_control",
+    "source": "正解は絵文字です。",
+    "translation": "正确答案是表情符号。",
+    "mlkit_baseline": "正确的答案是象形图。",
+    "source_chars": 9,
+    "time_to_first_content_ms": 639.6161980001125,
+    "wall_ms": 898.9943259994106,
+    "usage": {
+      "completion_tokens": 6,
+      "prompt_tokens": 27,
+      "total_tokens": 33,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    "timings": {
+      "cache_n": 0,
+      "prompt_n": 27,
+      "prompt_ms": 636.412,
+      "prompt_per_token_ms": 23.570814814814817,
+      "prompt_per_second": 42.42534710219166,
+      "predicted_n": 6,
+      "predicted_ms": 259.405,
+      "predicted_per_token_ms": 51.88099999999999,
+      "predicted_per_second": 19.27487905013396
+    },
+    "finish_reason": "stop",
+    "state_before": {
+      "VmRSS": "1957900 kB",
+      "VmHWM": "1957900 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "state_after": {
+      "VmRSS": "1957992 kB",
+      "VmHWM": "1957992 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "semantic_review": null
+  },
+  {
+    "case_id": "popularity_scope",
+    "group": "authored_control",
+    "source": "絵文字は若い人だけでなく幅広い年代の人に人気があり、世界中でメッセージのやり取りに使われています。",
+    "translation": "表情符号不仅受到年轻人喜爱，也受到各年龄层的人欢迎，被全球用于信息交流。",
+    "mlkit_baseline": "表情符号不仅适用于年轻人，也很受欢迎，也很受欢迎，而且是各种年龄的人，并且用于在世界各地互动。",
+    "source_chars": 49,
+    "time_to_first_content_ms": 1107.9588329994294,
+    "wall_ms": 2112.3184129992296,
+    "usage": {
+      "completion_tokens": 22,
+      "prompt_tokens": 56,
+      "total_tokens": 78,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    "timings": {
+      "cache_n": 0,
+      "prompt_n": 56,
+      "prompt_ms": 1103.147,
+      "prompt_per_token_ms": 19.69905357142857,
+      "prompt_per_second": 50.763860120183445,
+      "predicted_n": 22,
+      "predicted_ms": 1005.951,
+      "predicted_per_token_ms": 47.90242857142857,
+      "predicted_per_second": 20.875768302829858
+    },
+    "finish_reason": "stop",
+    "state_before": {
+      "VmRSS": "1957992 kB",
+      "VmHWM": "1957992 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "state_after": {
+      "VmRSS": "1959192 kB",
+      "VmHWM": "1959192 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "semantic_review": null
+  },
+  {
+    "case_id": "neutral_statement",
+    "group": "authored_control",
+    "source": "総理大臣は官邸で記者会見を開き、今日の会議の内容を説明しました。",
+    "translation": "首相在官邸召开记者会，说明了今天的会议内容。",
+    "mlkit_baseline": "总理在公共居住地开设新闻发布会，并解释了今天会议的内容。",
+    "source_chars": 32,
+    "time_to_first_content_ms": 790.0428879993342,
+    "wall_ms": 1358.1590209996648,
+    "usage": {
+      "completion_tokens": 14,
+      "prompt_tokens": 46,
+      "total_tokens": 60,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    "timings": {
+      "cache_n": 0,
+      "prompt_n": 46,
+      "prompt_ms": 785.136,
+      "prompt_per_token_ms": 17.068173913043477,
+      "prompt_per_second": 58.588575737197125,
+      "predicted_n": 14,
+      "predicted_ms": 568.032,
+      "predicted_per_token_ms": 43.69476923076923,
+      "predicted_per_second": 22.886034589600584
+    },
+    "finish_reason": "stop",
+    "state_before": {
+      "VmRSS": "1959192 kB",
+      "VmHWM": "1959192 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "state_after": {
+      "VmRSS": "1959284 kB",
+      "VmHWM": "1959284 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "semantic_review": null
+  },
+  {
+    "case_id": "asr_0_15000",
+    "group": "real_asr_text",
+    "source": "この イラスト の 意味 わかり ま すか 今、世界 中 で 使 われ て いる の は 何語 でしょ うか 英語、スペイン語、中国語、それ は ビジネス 文章 で は。",
+    "translation": "你能理解这个插图的含义吗？现在全世界使用的是哪种语言呢？是英语、西班牙语还是中文？在商务文书中则常用英语。",
+    "mlkit_baseline": "此图的含义我想知道是否是全球使用的常用事物，英文，西班牙语，中文，这是一个商业句子。",
+    "source_chars": 85,
+    "time_to_first_content_ms": 1324.77598999958,
+    "wall_ms": 2647.510312000122,
+    "usage": {
+      "completion_tokens": 31,
+      "prompt_tokens": 92,
+      "total_tokens": 123,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    "timings": {
+      "cache_n": 0,
+      "prompt_n": 92,
+      "prompt_ms": 1319.372,
+      "prompt_per_token_ms": 14.341000000000001,
+      "prompt_per_second": 69.73014434139878,
+      "predicted_n": 31,
+      "predicted_ms": 1322.502,
+      "predicted_per_token_ms": 44.0834,
+      "predicted_per_second": 22.684275713760734
+    },
+    "finish_reason": "stop",
+    "state_before": {
+      "VmRSS": "1959284 kB",
+      "VmHWM": "1959284 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "state_after": {
+      "VmRSS": "1962968 kB",
+      "VmHWM": "1962968 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "semantic_review": null
+  },
+  {
+    "case_id": "asr_9000_24000",
+    "group": "real_asr_text",
+    "source": "うか 英語、スペイン語、中国語、それ はビジネス 文章では使われない言葉です 正解は絵文字 絵文字はインターネット上の。",
+    "translation": "英语、西班牙语、汉语——这些在商务文本中都不会被使用。正确的表达方式就是使用表情符号，而表情符号则来自互联网。",
+    "mlkit_baseline": "UMM英语，西班牙语，中文，它是一个不用于商业判决的词，正确答案是互联网上的表情符号象形图。",
+    "source_chars": 60,
+    "time_to_first_content_ms": 909.666923000259,
+    "wall_ms": 2209.5519730000888,
+    "usage": {
+      "completion_tokens": 31,
+      "prompt_tokens": 68,
+      "total_tokens": 99,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    "timings": {
+      "cache_n": 0,
+      "prompt_n": 68,
+      "prompt_ms": 904.949,
+      "prompt_per_token_ms": 13.308073529411764,
+      "prompt_per_second": 75.14235608857517,
+      "predicted_n": 31,
+      "predicted_ms": 1299.756,
+      "predicted_per_token_ms": 43.3252,
+      "predicted_per_second": 23.081255250985567
+    },
+    "finish_reason": "stop",
+    "state_before": {
+      "VmRSS": "1962968 kB",
+      "VmHWM": "1962968 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "state_after": {
+      "VmRSS": "1963032 kB",
+      "VmHWM": "1963032 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "semantic_review": null
+  },
+  {
+    "case_id": "asr_18000_33000",
+    "group": "real_asr_text",
+    "source": "絵文字 絵文字はインターネット上のコミュニケーションで使われ、特に若い世代に人気です 絵文字の映画がハリウッドで作られるほど。",
+    "translation": "表情符号在互联网交流中被广泛使用，尤其受到年轻人的喜爱——甚至还有以表情符号为题材的电影在好莱坞被制作出来。",
+    "mlkit_baseline": "表情字符用于互联网上的通信，尤其是对于年轻世代。",
+    "source_chars": 63,
+    "time_to_first_content_ms": 1139.6064909995403,
+    "wall_ms": 2706.999766000081,
+    "usage": {
+      "completion_tokens": 31,
+      "prompt_tokens": 71,
+      "total_tokens": 102,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    "timings": {
+      "cache_n": 0,
+      "prompt_n": 71,
+      "prompt_ms": 1133.719,
+      "prompt_per_token_ms": 15.96787323943662,
+      "prompt_per_second": 62.62574764999086,
+      "predicted_n": 31,
+      "predicted_ms": 1569.188,
+      "predicted_per_token_ms": 52.30626666666667,
+      "predicted_per_second": 19.11816812262138
+    },
+    "finish_reason": "stop",
+    "state_before": {
+      "VmRSS": "1963032 kB",
+      "VmHWM": "1963032 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "state_after": {
+      "VmRSS": "1963060 kB",
+      "VmHWM": "1963060 kB",
+      "Threads": "14",
+      "Cpus_allowed_list": "0-1"
+    },
+    "semantic_review": null
+  }
+]

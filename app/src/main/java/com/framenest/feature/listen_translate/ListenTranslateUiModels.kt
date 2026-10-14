@@ -72,9 +72,27 @@ data class ListenTranslateUiState(
     /** Explicit foreground-only preparation; never automatically starts playback. */
     val preparingSubtitles: Boolean = false,
     val preparedAheadMs: Long = 0L,
+    /** Explicit, persisted opt-in. Selecting this alone must never download a model. */
+    val highQualityJapanese: Boolean = false,
+    /** The runtime has a usable Hy-MT native backend and the selected ASR is SenseVoice. */
+    val highQualityAvailable: Boolean = false,
+    /** A provisional display candidate, never evidence of accepted subtitle coverage. */
+    val currentCaptionUnconfirmed: Boolean = false,
+    /** Audio read progress, separate from confirmed subtitle coverage. */
+    val recordedReadThroughMs: Long = 0L,
 ) {
     val languages: ListenLanguagePair
         get() = ListenLanguagePair(
             sourceLang, if (displayMode == ListenDisplayMode.SourceOnly) sourceLang else targetLang,
         ).normalized()
+
+    /** UI gating only; the runtime must independently enforce the same requirements. */
+    val canSelectHighQualityJapanese: Boolean
+        get() = highQualityAvailable &&
+            languages == ListenLanguagePair("ja", "zh")
+
+    /** Keep an unsupported saved choice reversible, but never switch during preparation. */
+    val canChangeHighQualityJapanese: Boolean
+        get() = !enabled && !isInstallingModels &&
+            (highQualityJapanese || canSelectHighQualityJapanese)
 }

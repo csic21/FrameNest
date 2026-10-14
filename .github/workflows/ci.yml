@@ -21,7 +21,7 @@ jobs:
   build:
     name: Assemble · Unit tests · Lint
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g
 
@@ -68,6 +68,21 @@ jobs:
 
       - name: Lint
         run: ./gradlew lintDebug --stacktrace
+
+      # Compile the explicitly opt-in engine without enabling downloads in the app.
+      # This job uses no emulator/KVM device and creates no signing credentials.
+      - name: Install pinned native build tools
+        run: |
+          sdkmanager --install "ndk;28.2.13676358" "cmake;3.22.1" < /dev/null
+          test -f "$ANDROID_HOME/ndk/28.2.13676358/source.properties"
+          test -x "$ANDROID_HOME/cmake/3.22.1/bin/cmake"
+
+      - name: Compile optional quality engine and instrumented tests
+        run: ./gradlew -PhyMtNative=true assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug --stacktrace
+
+      - name: Check optional native ELF alignment
+        run: |
+          python3 scripts/check_hy_native_apk.py app/build/outputs/apk/debug/app-universal-debug.apk
 
       - name: Upload debug APKs
         if: success()

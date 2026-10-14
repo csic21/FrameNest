@@ -5,6 +5,8 @@ import android.media.MediaDataSource
 import androidx.annotation.RawRes
 import com.framenest.player.audio.PcmAudioMath
 import com.framenest.player.audio.PcmWindowDecoder
+import com.framenest.player.audio.PcmWindowResult
+import com.framenest.player.audio.requirePcmSamples
 import com.framenest.smb.SmbClient
 import com.framenest.smb.SmbError
 import com.framenest.smb.SmbException
@@ -29,6 +31,16 @@ interface ListenAudioSource : Closeable {
         preferredAudioTrackOrdinal: Int? = null,
     ): ShortArray
 
+    /**
+     * Optional media-clock/EOF contract. Legacy providers remain compatible, but must not invent
+     * timeline coverage or EOF from resampled sample count.
+     */
+    suspend fun pcmWindowDetailed(
+        startMs: Long,
+        endMs: Long,
+        preferredAudioTrackOrdinal: Int? = null,
+    ): PcmWindowResult = PcmWindowResult(pcmWindow(startMs, endMs, preferredAudioTrackOrdinal))
+
     /** Remote reads since the previous call, or null when the source is not remote. */
     suspend fun takeRemoteReadStats(): ListenRemoteReadStats? = null
 
@@ -44,6 +56,12 @@ class FileListenAudioSource(
         endMs: Long,
         preferredAudioTrackOrdinal: Int?,
     ): ShortArray = decoder.decodeFile(path, startMs, endMs, preferredAudioTrackOrdinal)
+
+    override suspend fun pcmWindowDetailed(
+        startMs: Long,
+        endMs: Long,
+        preferredAudioTrackOrdinal: Int?,
+    ): PcmWindowResult = decoder.decodeFileDetailed(path, startMs, endMs, preferredAudioTrackOrdinal)
 }
 
 class RawListenAudioSource(
@@ -56,6 +74,18 @@ class RawListenAudioSource(
         endMs: Long,
         preferredAudioTrackOrdinal: Int?,
     ): ShortArray = decoder.decodeRaw(
+        context,
+        resId,
+        startMs,
+        endMs,
+        preferredAudioTrackOrdinal,
+    )
+
+    override suspend fun pcmWindowDetailed(
+        startMs: Long,
+        endMs: Long,
+        preferredAudioTrackOrdinal: Int?,
+    ): PcmWindowResult = decoder.decodeRawDetailed(
         context,
         resId,
         startMs,
@@ -85,7 +115,13 @@ class SmbListenAudioSource(
         startMs: Long,
         endMs: Long,
         preferredAudioTrackOrdinal: Int?,
-    ): ShortArray =
+    ): ShortArray = pcmWindowDetailed(startMs, endMs, preferredAudioTrackOrdinal).requirePcmSamples()
+
+    override suspend fun pcmWindowDetailed(
+        startMs: Long,
+        endMs: Long,
+        preferredAudioTrackOrdinal: Int?,
+    ): PcmWindowResult =
         mutex.withLock {
             withContext(Dispatchers.IO) {
                 val client = clientProvider() ?: reconnectClient()
@@ -120,7 +156,7 @@ class SmbListenAudioSource(
         startMs: Long,
         endMs: Long,
         preferredAudioTrackOrdinal: Int?,
-    ): ShortArray {
+    ): PcmWindowResult {
         if (openedClient !== client) closeOpened()
         val randomAccess = opened ?: open(client).also {
             opened = it
@@ -133,7 +169,7 @@ class SmbListenAudioSource(
             closeRandomAccessOnClose = false,
         )
         return try {
-            decoder.decodeMediaDataSource(
+            decoder.decodeMediaDataSourceDetailed(
                 source = mediaSource,
                 startMs = startMs,
                 endMs = endMs,
@@ -208,6 +244,8 @@ internal class CachingListenAudioSource(
     private var cacheEndMs = 0L
     private var cacheTrackOrdinal: Int? = null
     private var cache = ShortArray(0)
+    private var cacheDecodedThroughMs: Long? = null
+    private var cacheReachedEndOfStream = false
     private var previousStartMs: Long? = null
     private var previousEndMs = 0L
 
@@ -218,27 +256,48 @@ internal class CachingListenAudioSource(
         startMs: Long,
         endMs: Long,
         preferredAudioTrackOrdinal: Int?,
-    ): ShortArray = mutex.withLock {
+    ): ShortArray = pcmWindowDetailed(startMs, endMs, preferredAudioTrackOrdinal).samples
+
+    override suspend fun pcmWindowDetailed(
+        startMs: Long,
+        endMs: Long,
+        preferredAudioTrackOrdinal: Int?,
+    ): PcmWindowResult = mutex.withLock {
         if (!contains(startMs, endMs, preferredAudioTrackOrdinal)) {
             // First request / distant seek: do not put speculative decode ahead of ASR.
             // Adjacent windows regain read-ahead to amortize extractor/codec startup.
             val sequential = cacheTrackOrdinal == preferredAudioTrackOrdinal &&
                 previousStartMs?.let { startMs > it && startMs <= previousEndMs } == true
             val decodeEndMs = endMs + if (sequential) readAheadMs else 0L
-            cache = delegate.pcmWindow(startMs, decodeEndMs, preferredAudioTrackOrdinal)
+            val result = delegate.pcmWindowDetailed(
+                startMs,
+                decodeEndMs,
+                preferredAudioTrackOrdinal,
+            )
+            cache = result.samples
             cacheStartMs = startMs
-            cacheEndMs = startMs + samplesToMs(cache.size)
+            cacheDecodedThroughMs = result.decodedThroughMs
+            cacheReachedEndOfStream = result.reachedEndOfStream && result.decodedThroughMs != null
+            // Legacy sample-only providers retain their existing cache indexing. This fallback
+            // is never exposed as media coverage, nor used to infer source EOF.
+            cacheEndMs = result.decodedThroughMs ?: (startMs + samplesToMs(cache.size))
             cacheTrackOrdinal = preferredAudioTrackOrdinal
         }
         previousStartMs = startMs
         previousEndMs = endMs
-        slice(startMs, endMs)
+        PcmWindowResult(
+            samples = slice(startMs, endMs),
+            decodedThroughMs = cacheDecodedThroughMs?.coerceAtMost(endMs),
+            reachedEndOfStream = cacheReachedEndOfStream && endMs >= cacheEndMs,
+        )
     }
 
     override fun close() {
         runBlocking {
             mutex.withLock {
                 cache = ShortArray(0)
+                cacheDecodedThroughMs = null
+                cacheReachedEndOfStream = false
                 previousStartMs = null
                 delegate.close()
             }
@@ -246,18 +305,27 @@ internal class CachingListenAudioSource(
     }
 
     private fun contains(startMs: Long, endMs: Long, trackOrdinal: Int?): Boolean =
-        cache.isNotEmpty() &&
+        (cache.isNotEmpty() || cacheReachedEndOfStream) &&
             cacheTrackOrdinal == trackOrdinal &&
             startMs >= cacheStartMs &&
-            endMs <= cacheEndMs
+            (endMs <= cacheEndMs || cacheReachedEndOfStream)
 
     private fun slice(startMs: Long, endMs: Long): ShortArray {
         if (cache.isEmpty() || endMs <= startMs || startMs >= cacheEndMs) return ShortArray(0)
-        val startSample = msToSamples((startMs - cacheStartMs).coerceAtLeast(0L))
-            .coerceIn(0, cache.size)
-        val endSample = msToSamples((endMs - cacheStartMs).coerceAtLeast(0L))
-            .coerceIn(startSample, cache.size)
+        val startSample = sampleIndex(startMs).coerceIn(0, cache.size)
+        val endSample = sampleIndex(endMs).coerceIn(startSample, cache.size)
         return cache.copyOfRange(startSample, endSample)
+    }
+
+    private fun sampleIndex(timeMs: Long): Int {
+        val offsetMs = (timeMs - cacheStartMs).coerceAtLeast(0L)
+        if (cacheDecodedThroughMs != null) {
+            // Spread per-buffer resampling rounding across the known media span instead of
+            // mistaking missing fractional samples for an undecoded tail.
+            val durationMs = (cacheEndMs - cacheStartMs).coerceAtLeast(1L)
+            return (offsetMs.coerceAtMost(durationMs) * cache.size / durationMs).toInt()
+        }
+        return msToSamples(offsetMs)
     }
 
     private fun msToSamples(ms: Long): Int =

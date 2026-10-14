@@ -569,6 +569,7 @@ fun PlayerScreen(
                     onDisplayMode = { vm.setListenDisplayMode(it) },
                     onExperimentalSilenceGate = { vm.setListenExperimentalSilenceGate(it) },
                     onPrepareSubtitles = { vm.prepareListenSubtitles() },
+                    onHighQualityJapaneseChange = { vm.setHighQualityJapanese(it) },
                     onSelectOff = { vm.selectSubtitleOff() },
                     onSelectEmbedded = { vm.selectEmbeddedSubtitle(it) },
                     onSelectExternal = { vm.selectExternalSubtitle(it) },
@@ -1143,6 +1144,7 @@ private fun PlayerBottomPanels(
     onDisplayMode: (ListenDisplayMode) -> Unit,
     onExperimentalSilenceGate: (Boolean) -> Unit,
     onPrepareSubtitles: () -> Unit,
+    onHighQualityJapaneseChange: (Boolean) -> Unit,
     onSelectOff: () -> Unit,
     onSelectEmbedded: (Int) -> Unit,
     onSelectExternal: (ExternalSubtitleOption) -> Unit,
@@ -1165,6 +1167,7 @@ private fun PlayerBottomPanels(
             onDisplayMode = onDisplayMode,
             onExperimentalSilenceGate = onExperimentalSilenceGate,
             onPrepareSubtitles = onPrepareSubtitles,
+            onHighQualityJapaneseChange = onHighQualityJapaneseChange,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(260.dp)

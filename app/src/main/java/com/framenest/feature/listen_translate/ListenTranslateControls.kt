@@ -40,6 +40,7 @@ fun ListenTranslateControls(
     modifier: Modifier = Modifier,
     onExperimentalSilenceGate: (Boolean) -> Unit = {},
     onPrepareSubtitles: () -> Unit = {},
+    onHighQualityJapaneseChange: (Boolean) -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -103,6 +104,14 @@ fun ListenTranslateControls(
                 stringResource(R.string.listen_translate_ready_ahead, uiState.preparedAheadMs / 1000L),
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.testTag("listen_ready_ahead"),
+            )
+        }
+        if (uiState.currentCaptionUnconfirmed) {
+            Text(
+                stringResource(R.string.listen_translate_caption_unconfirmed),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.testTag("listen_caption_unconfirmed"),
             )
         }
 
@@ -203,6 +212,9 @@ fun ListenTranslateControls(
             )
         }
 
+        Spacer(Modifier.height(8.dp))
+        HighQualityJapaneseChoice(uiState, onHighQualityJapaneseChange)
+
         if (uiState.isInstallingModels) {
             Spacer(Modifier.height(8.dp))
             Text(
@@ -263,6 +275,17 @@ fun ListenTranslateControls(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag("listen_translate_status"),
             )
+            if (uiState.recordedReadThroughMs > 0L) {
+                Text(
+                    text = stringResource(
+                        R.string.listen_translate_audio_read_through,
+                        uiState.recordedReadThroughMs / 1_000L,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("listen_audio_read_through"),
+                )
+            }
             uiState.message?.takeUnless { uiState.isInstallingModels }?.let { msg ->
                 Text(
                     text = msg,
@@ -299,6 +322,63 @@ fun ListenTranslateControls(
             }
         }
     }
+}
+
+@Composable
+private fun HighQualityJapaneseChoice(
+    uiState: ListenTranslateUiState,
+    onHighQualityJapaneseChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().toggleable(
+            value = uiState.highQualityJapanese,
+            enabled = uiState.canChangeHighQualityJapanese,
+            role = Role.Switch,
+            onValueChange = onHighQualityJapaneseChange,
+        ).testTag("listen_high_quality_japanese"),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            stringResource(R.string.listen_translate_high_quality_japanese),
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Switch(
+            checked = uiState.highQualityJapanese,
+            onCheckedChange = null,
+            enabled = uiState.canChangeHighQualityJapanese,
+        )
+    }
+    Text(
+        stringResource(R.string.listen_translate_high_quality_cost),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.testTag("listen_high_quality_cost"),
+    )
+    Text(
+        stringResource(R.string.listen_translate_high_quality_download_hint),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    val availabilityMessage = when {
+        uiState.displayMode == ListenDisplayMode.SourceOnly ->
+            R.string.listen_translate_high_quality_source_only
+        !uiState.highQualityAvailable ->
+            R.string.listen_translate_high_quality_unavailable
+        !uiState.canSelectHighQualityJapanese ->
+            R.string.listen_translate_high_quality_unsupported_pair
+        uiState.enabled || uiState.isInstallingModels ->
+            R.string.listen_translate_high_quality_stop_first
+        uiState.highQualityJapanese ->
+            R.string.listen_translate_high_quality_selected
+        else -> R.string.listen_translate_high_quality_default
+    }
+    Text(
+        stringResource(availabilityMessage),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.testTag("listen_high_quality_availability"),
+    )
 }
 
 @Composable
