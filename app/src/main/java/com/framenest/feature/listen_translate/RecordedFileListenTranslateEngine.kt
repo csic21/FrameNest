@@ -161,7 +161,11 @@ class RecordedFileListenTranslateEngine(
         val advanced = (state.readThroughMs - before.readThroughMs).coerceAtLeast(0L)
         RecordedListenProgress(state.readThroughMs, advanced, changed || advanced > 0L,
             pending = state.nextAction !is RecordedNextAction.Finished || state.pendingText.isNotBlank(),
-            message = if (state.records.any { it.unit.status != RecordedSourceStatus.FINAL }) "部分原文句段待确认" else null,
+            message = when {
+                state.records.any { it.state == RecordedResultState.TRANSLATION_FAILED } -> "翻译未完成，已保留原文；可关闭后重新启用听译重试"
+                state.records.any { it.unit.status != RecordedSourceStatus.FINAL } -> "部分原文句段待确认"
+                else -> null
+            },
             timings = timer.timings)
     }
 
