@@ -21,7 +21,9 @@ coordinate and exposes the selected version in BuildConfig. Both complete APKs
 must be rebuilt against their respective classes and native libraries. Replacing
 only native binaries under old compiled Kotlin classes is not a valid comparison.
 Runtime version participates in subtitle cache identity; installed model paths,
-weight checksums and model version remain unchanged. No migration/deletion is needed.
+weight checksums and model version remain unchanged. Installed models need no migration
+or deletion. Existing derived caption jobs are invalidated by the repository when
+the runtime-specific label changes; user media and manual subtitle files are untouched.
 
 The cloud Python control reproduced old text byte-for-byte and observed CER
 44/436 (10.09%) vs 36/436 (8.26%) with the new package stack. This is not Android
@@ -40,3 +42,13 @@ compilation; same real PCM/model native A/B; full outputs, timestamps, model-loa
 and decode time; no VAD gap credited as completed coverage. The separate emulator
 job stays disabled until a new single-run device-permission approval. Public
 fixture content may appear only in opt-in test artifacts, never production logs.
+
+
+Interpretation of the paired replay: 33 case rows comprise Emoji (13), full Kishida
+(12), and the independent-reference Kishida114 excerpt (8). Seven excerpt windows
+repeat full-video windows, so report each sample separately and do not pool them
+as independent audio. Model hash verification/asset copies warm filesystem caches;
+these are fresh native-session preparations, not cold-storage measurements. Raw
+and production load/decode timing boundaries differ, so compare the same backend
+across versions only. Cancellation probes test caller publication/reuse, not native
+interruption. All exclusion gaps remain outside accepted coverage.
