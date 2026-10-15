@@ -218,8 +218,14 @@ dependencies {
     // FN-51: SenseVoice-Small int8 ASR via sherpa-onnx (default engine).
     // AAR bundles the JNI bridge + onnxruntime natives for all ABIs; the
     // arm64-v8a/x86_64 abiFilters above keep only the two shipped ABIs.
-    implementation(if (sherpaRuntimeBaseline) "com.github.k2-fsa:sherpa-onnx:1.12.32" else libs.sherpa.onnx.get()) {
-        exclude(group = "net.java.dev.jna", module = "jna")
+    if (sherpaRuntimeBaseline) {
+        implementation("com.github.k2-fsa:sherpa-onnx:1.12.32") {
+            exclude(group = "net.java.dev.jna", module = "jna")
+        }
+    } else {
+        implementation(libs.sherpa.onnx) {
+            exclude(group = "net.java.dev.jna", module = "jna")
+        }
     }
     implementation(libs.mlkit.translate)
     implementation(libs.kotlinx.coroutines.play.services)
