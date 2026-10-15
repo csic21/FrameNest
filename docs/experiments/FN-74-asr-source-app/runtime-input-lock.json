@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "status": "pinned-reviewed",
+  "repository": "csic21/FrameNest",
+  "run_id": 38728412567,
+  "run_attempt": 1,
+  "commit": "6216ecc3ad6cfe7a0cbb2100140ff4a7f9c788d0",
+  "artifact_id": 11969082716,
+  "artifact_name": "source-asr-apks-6216ecc3ad6cfe7a0cbb2100140ff4a7f9c788d0-1",
+  "zip_size_bytes": 482671323,
+  "zip_sha256": "052799959778364fc98d44a1acd966648400cf6f1270e0a44189acb4577470c2",
+  "pair_manifest_sha256": "9de1545a5760a9f4f44e61812b2450cc028b5736ffba080009a568818b1cfe53",
+  "app_apk_sha256": "d1966647e9cf6bfe7bede04fadb4f74f11a7f40143a288211f37f9cf37160d64",
+  "test_apk_sha256": "05e5e76f6f2b602942b6f97aa911b588ca4d826d279f9d2c752c4b1371788775",
+  "input_lock_is_execution_authorization": false
+}

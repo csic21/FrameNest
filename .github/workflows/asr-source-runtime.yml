@@ -1,0 +1,122 @@
+name: Disabled retained source ASR runtime validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/asr-source-runtime.yml
+      - scripts/prepare_source_runtime_pair.py
+      - scripts/run_source_runtime_sessions.sh
+      - scripts/check_source_runtime_results.py
+      - scripts/check_source_runtime_ui_result.py
+      - docs/experiments/FN-74-asr-source-app/runtime-input-lock.json
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: source-asr-runtime-${{ github.ref }}
+  cancel-in-progress: false # Never cancel an active ACL cleanup for a newer run.
+
+jobs:
+  retained-source-runtime:
+    # CLOSED. Filling immutable input pins is not execution authorization.
+    # Owner must separately approve and narrowly gate a specific future run.
+    if: ${{ false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      FN74_RESULTS: ${{ github.workspace }}/source-runtime-results
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout only validation code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Record validator identity and exercise fail-closed checks
+        run: |
+          set -euo pipefail
+          mkdir -p "$FN74_RESULTS"
+          git rev-parse HEAD > "$FN74_RESULTS/validator-commit.txt"
+          cp docs/experiments/FN-74-asr-source-app/runtime-input-lock.json "$FN74_RESULTS/"
+          python3 -m unittest discover -s scripts/tests -p 'test_*source_runtime*.py' -v 2>&1 | tee "$FN74_RESULTS/validator-tests.log"
+          bash -n scripts/run_source_runtime_sessions.sh
+          python3 - <<'PY'
+          import json, os, platform
+          from pathlib import Path
+          record = {'github': {k: os.environ.get(k) for k in ['GITHUB_REPOSITORY','GITHUB_SHA','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT']},
+                    'image': {k: os.environ.get(k) for k in ['ImageOS','ImageVersion']}, 'platform': platform.platform(),
+                    'scope': 'One API35 x86_64 AVD, two fresh source app sessions; OS caches may stay warm; no historical-stock timing comparison',
+                    'emulator_memory_mib': 4096, 'emulator_cores': 2, 'session_limit_seconds': 900,
+                    'instrumentation_limit_seconds': 420, 'ui_instrumentation_limit_seconds': 300,
+                    'ui_session_limit_seconds': 600, 'ui_tests_expected': 7, 'release_approved': False}
+          (Path(os.environ['FN74_RESULTS'])/'host.json').write_text(json.dumps(record,indent=2)+'\n')
+          PY
+
+      - name: Verify successful ordinary CI artifact and exact retained app/test pair
+        timeout-minutes: 12
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/prepare_source_runtime_pair.py --download \
+            --archive "$RUNNER_TEMP/source-runtime-input.zip" \
+            --destination "$FN74_RESULTS/input" \
+            --report "$FN74_RESULTS/input-verification.json"
+          # No Gradle, AAR recompilation, fixture regeneration, or replacement APKs.
+
+      - name: Set up existing Android SDK without accepting licenses
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+          accept-android-sdk-licenses: false
+
+      - name: Install the previously used API35 x86_64 image only
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          test -s "$ANDROID_HOME/licenses/android-sdk-license"
+          sdkmanager --install emulator 'system-images;android-35;google_apis;x86_64' < /dev/null
+          test -f "$ANDROID_HOME/system-images/android-35/google_apis/x86_64/system.img"
+          cp "$ANDROID_HOME/system-images/android-35/google_apis/x86_64/source.properties" "$FN74_RESULTS/system-image.properties"
+          "$ANDROID_HOME/emulator/emulator" -version > "$FN74_RESULTS/emulator-version.txt" 2>&1
+
+      - name: Install official emulator runtime libraries
+        timeout-minutes: 5
+        run: |
+          sudo -n apt-get update
+          sudo -n apt-get install --no-install-recommends -y acl libpulse0 libnss3 libxkbcommon0 libxcomposite1 libxcursor1 libxi6 libxrandr2 libxtst6
+          ldd "$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64" > "$FN74_RESULTS/emulator-libraries.txt"
+
+      - name: Closed current-UID one-run KVM access step
+        # CLOSED independently; no standing grant or run-number approval exists.
+        if: ${{ false }}
+        run: |
+          set -euo pipefail
+          test -c /dev/kvm
+          test ! -e "$FN74_RESULTS/kvm-original.acl"
+          getfacl -p /dev/kvm > "$FN74_RESULTS/kvm-original.acl"
+          sudo -n setfacl -m "u:$(id -u):rw" /dev/kvm
+          getfacl -p /dev/kvm > "$FN74_RESULTS/kvm-granted.acl"
+          test -r /dev/kvm && test -w /dev/kvm
+          "$ANDROID_HOME/emulator/emulator" -accel-check > "$FN74_RESULTS/acceleration-check.txt" 2>&1
+
+      - name: Replay two source sessions and the separate notice UI suite on one AVD
+        timeout-minutes: 45
+        run: bash scripts/run_source_runtime_sessions.sh run
+
+      - name: Stop any remaining emulator and restore original KVM ACL
+        if: always()
+        timeout-minutes: 3
+        run: bash scripts/run_source_runtime_sessions.sh cleanup
+
+      - name: Retain complete input identity, selected APK pair and all results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: source-asr-runtime-${{ github.sha }}-${{ github.run_attempt }}
+          path: source-runtime-results/
+          retention-days: 14
+          if-no-files-found: warn
