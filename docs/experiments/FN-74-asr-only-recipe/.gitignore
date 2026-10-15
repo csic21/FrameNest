@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 inputs/
+dependency-audit/archives/
+dependency-audit/sources/
+ci-work/

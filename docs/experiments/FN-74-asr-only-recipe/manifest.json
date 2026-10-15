@@ -132,7 +132,7 @@
     "build_tools": "34.0.0",
     "min_sdk": 21,
     "jvm_target": "1.8",
-    "host_image_digest": "REQUIRED_AT_CI_BUILD",
+    "host_image_digest": "REQUIRED_FOR_REPRODUCIBILITY; native-only hosted CI may explicitly record exploratory VM provenance with release gate closed",
     "gradle_dependency_verification": "REQUIRED_REVIEWED_LOCK_BEFORE_RELEASE_BUILD"
   },
   "cmake_options": {
@@ -232,5 +232,12 @@
     }
   ],
   "license_file_manifest_sha256": "4b6aa92aea6c0a952126743f1b028453740815e6f9901431672e1f2f3c86deb8",
-  "notice_template_sha256": "e56277e18ea4ae772b85ae121f019b30448940e01e42e09e8c6b2e844a22b539"
+  "notice_template_sha256": "e56277e18ea4ae772b85ae121f019b30448940e01e42e09e8c6b2e844a22b539",
+  "native_ci": {
+    "workflow": ".github/workflows/asr-native-source.yml",
+    "scope": "native-only exploratory compile and static audit",
+    "host_provenance": "actual GitHub hosted image metadata; never a fabricated OCI digest",
+    "release_gate": "closed",
+    "toolchain_lock": "toolchain-lock.json"
+  }
 }

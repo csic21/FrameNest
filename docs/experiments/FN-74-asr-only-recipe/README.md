@@ -1,6 +1,8 @@
 # sherpa-onnx 1.13.8 ASR-facing / no-TTS Android recipe
 
-Prepared 2026-10-15. **Candidate recipe only: no native build, AAR build, Android execution, 16 KB device test, benchmark, or legal clearance has been completed.** Nothing in this directory changes FrameNest's stock runtime A/B, production dependency, CI, or PR. This is a separate future variant and must receive separate acceptance; stock-AAR results do not transfer to it.
+Prepared 2026-10-15. **Candidate recipe only: no native build, AAR build, Android execution, 16 KB device test, benchmark, or legal clearance has been completed.** The original recipe did not change FrameNest's stock runtime A/B, production dependency, CI, or PR. The later CI-NATIVE extension adds only a dedicated experimental workflow; production dependency and existing app CI remain unchanged. This is a separate future variant and must receive separate acceptance; stock-AAR results do not transfer to it.
+
+An optional ordinary native-only CI extension is documented in [CI-NATIVE.md](CI-NATIVE.md). It permits explicitly exploratory hosted-VM provenance, with the release/reproducibility gate closed; it does not change the stock app dependency or execute Gradle/KVM.
 
 ## Fixed inputs and scope
 
@@ -24,7 +26,7 @@ This recipe checks the resulting CMake cache, compile database, link map and JNI
 
 ## Native preparation and build
 
-No command installs a toolchain, accepts SDK licenses, runs KVM/emulators, publishes a package or changes an app repository. Supply already authorized, preinstalled official tools. The CI image digest must pin the actual JDK, SDK and tool binaries; exact component versions alone do not establish bit-for-bit reproducibility.
+The original native/packaging commands below do not install a toolchain, accept SDK licenses, run KVM/emulators or publish a package. Supply already authorized, preinstalled official tools for them. The separate CI-NATIVE extension can download and extract checksum-verified official tools into an isolated temporary directory; it does not modify system installations or accept agreements. The CI image digest must pin the actual JDK, SDK and tool binaries; exact component versions alone do not establish bit-for-bit reproducibility.
 
 From this directory:
 
@@ -90,7 +92,7 @@ Sources: [Android page-size guidance](https://developer.android.com/guide/practi
 
 ## Release gates for this separate variant
 
-1. Complete the reviewed Gradle checksum lock, pin the CI image digest, verify official NDK provenance, retain NDK static-runtime notices and record SDK tool hashes. No toolchain was downloaded by this preparation.
+1. Complete the reviewed Gradle checksum lock, pin the CI image digest, verify official NDK provenance, retain NDK static-runtime notices and record SDK tool hashes. The original preparation downloaded no toolchain. The CI extension subsequently downloaded and verified the exact official NDK/CMake/Ninja archives and actual notices; it has not yet configured or compiled native code.
 2. Run clean arm64 and x86_64 native/AAR builds. Inspect compile commands, link maps, static dependency inventory, ELF LOAD/RELRO, JNI bindings and the absence of TTS/Piper/espeak code. Compare two clean candidate output hashes. Do not infer success from this recipe's syntax/fixture tests.
 3. Complete notice/license review: Eigen MPL source availability, exact ORT vendor-binary notice/SBOM coverage, embedded JSON attribution discrepancies, NDK runtime notices, Kotlin/host graph and model licenses. The vendor ORT ZIP contains no license files; the bundled Microsoft notices are verified source notices at commit 33ca9628233dc8f002435e868d4c2e9f82766ca1, not proof of the vendor's complete build contents. No GPL-free/legal-compatibility claim is made.
 4. Add this candidate only on its independent development branch, with a new exact artifact hash. Compile FrameNest against the narrowed Kotlin API and test JNI load and all retained calls.

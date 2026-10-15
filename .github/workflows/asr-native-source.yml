@@ -1,0 +1,99 @@
+name: ASR source native audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['experiment/FN-74-asr-only-recipe']
+    paths:
+      - '.github/workflows/asr-native-source.yml'
+      - 'docs/experiments/FN-74-asr-only-recipe/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/asr-native-source.yml'
+      - 'docs/experiments/FN-74-asr-only-recipe/**'
+
+# No publishing, signing, secrets, OIDC, emulator or KVM permissions.
+permissions:
+  contents: read
+
+concurrency:
+  group: asr-native-source-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  native-audit:
+    name: Exploratory arm64 + x86_64 JNI build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      RECIPE: docs/experiments/FN-74-asr-only-recipe
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout recipe only branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, same pin as ci.yml
+        with:
+          persist-credentials: false
+
+      - name: Record actual hosted image and validate recipe
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/asr-evidence"
+          python3 "$RECIPE/scripts/ci_toolchain.py" record-host \
+            --report "$RUNNER_TEMP/asr-evidence/host-provenance.json"
+          python3 -m py_compile "$RECIPE"/scripts/*.py
+          python3 "$RECIPE/scripts/test_recipe.py" -v 2>&1 | tee "$RUNNER_TEMP/asr-evidence/preparation-tests.log"
+          python3 "$RECIPE/scripts/test_ci_native.py" -v 2>&1 | tee -a "$RUNNER_TEMP/asr-evidence/preparation-tests.log"
+
+      - name: Prepare checksum-verified official native tools
+        id: tools
+        run: |
+          set -euo pipefail
+          # Only inspect the image's existing record. Never run sdkmanager --licenses,
+          # accept a new agreement, sudo, or change device/security permissions.
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -n "$SDK_ROOT"
+          python3 "$RECIPE/scripts/ci_toolchain.py" prepare \
+            --root "$RUNNER_TEMP/asr-tools" \
+            --sdk-license "$SDK_ROOT/licenses/android-sdk-license" \
+            --report "$RUNNER_TEMP/asr-evidence/toolchain-download-provenance.json" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Fetch and verify fixed native source inputs
+        run: |
+          set -euo pipefail
+          python3 "$RECIPE/scripts/inputs.py" fetch 2>&1 | tee "$RUNNER_TEMP/asr-evidence/fetch.log"
+
+      - name: Build only no-TTS JNI and run static audit
+        env:
+          NDK: ${{ steps.tools.outputs.ndk }}
+          CMAKE: ${{ steps.tools.outputs.cmake }}
+          NINJA: ${{ steps.tools.outputs.ninja }}
+          NDK_NOTICES: ${{ steps.tools.outputs.ndk_notices }}
+        run: |
+          set -euo pipefail
+          python3 "$RECIPE/scripts/build_native.py" \
+            --work "$RUNNER_TEMP/asr-native-work" \
+            --ndk "$NDK" --cmake "$CMAKE" --ninja "$NINJA" --jobs 2 \
+            --ndk-runtime-notices "$NDK_NOTICES" \
+            --exploratory-host-provenance "$RUNNER_TEMP/asr-evidence/host-provenance.json" \
+            --toolchain-provenance "$RUNNER_TEMP/asr-evidence/toolchain-download-provenance.json" \
+            2>&1 | tee "$RUNNER_TEMP/asr-evidence/native-driver.log"
+
+      - name: Collect candidates and failure evidence
+        if: always()
+        run: |
+          python3 "$RECIPE/scripts/collect_ci_artifacts.py" \
+            --work "$RUNNER_TEMP/asr-native-work" \
+            --evidence "$RUNNER_TEMP/asr-evidence" \
+            --tools "$RUNNER_TEMP/asr-tools" \
+            --out "$RUNNER_TEMP/asr-native-artifacts"
+
+      - name: Upload exploratory native evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4, same pin as ci.yml
+        with:
+          name: asr-native-source-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/asr-native-artifacts/
+          retention-days: 14
+          if-no-files-found: error
