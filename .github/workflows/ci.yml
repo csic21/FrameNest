@@ -77,6 +77,9 @@ jobs:
       - name: Lint
         run: ./gradlew lintDebug --stacktrace
 
+      - name: Compile and test fixed old-runtime baseline
+        run: ./gradlew -PsherpaRuntimeBaseline=true -PhyMtNative=false assembleDebug assembleDebugAndroidTest testDebugUnitTest --stacktrace
+
       # Compile the explicitly opt-in engine without enabling downloads in the app.
       # This job uses no emulator/KVM device and creates no signing credentials.
       - name: Install pinned native build tools

@@ -1,0 +1,66 @@
+[
+  {
+    "abi": "arm64-v8a",
+    "old_count": 125,
+    "new_count": 133,
+    "removed": [],
+    "added": [
+      "Java_com_k2fsa_sherpa_onnx_OfflineDiacritization_addDiacritics",
+      "Java_com_k2fsa_sherpa_onnx_OfflineDiacritization_delete",
+      "Java_com_k2fsa_sherpa_onnx_OfflineDiacritization_newFromAsset",
+      "Java_com_k2fsa_sherpa_onnx_OfflineDiacritization_newFromFile",
+      "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_createStreamWithHotwords",
+      "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_prependAdspLibraryPath",
+      "Java_com_k2fsa_sherpa_onnx_VersionInfo_00024Companion_getOnnxruntimeVersionStr2",
+      "Java_com_k2fsa_sherpa_onnx_VersionInfo_getOnnxruntimeVersionStr2"
+    ]
+  },
+  {
+    "abi": "armeabi-v7a",
+    "old_count": 125,
+    "new_count": 133,
+    "removed": [],
+    "added": [
+      "Java_com_k2fsa_sherpa_onnx_OfflineDiacritization_addDiacritics",
+      "Java_com_k2fsa_sherpa_onnx_OfflineDiacritization_delete",
+      "Java_com_k2fsa_sherpa_onnx_OfflineDiacritization_newFromAsset",
+      "Java_com_k2fsa_sherpa_onnx_OfflineDiacritization_newFromFile",
+      "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_createStreamWithHotwords",
+      "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_prependAdspLibraryPath",
+      "Java_com_k2fsa_sherpa_onnx_VersionInfo_00024Companion_getOnnxruntimeVersionStr2",
+      "Java_com_k2fsa_sherpa_onnx_VersionInfo_getOnnxruntimeVersionStr2"
+    ]
+  },
+  {
+    "abi": "x86",
+    "old_count": 125,
+    "new_count": 133,
+    "removed": [],
+    "added": [
+      "Java_com_k2fsa_sherpa_onnx_OfflineDiacritization_addDiacritics",
+      "Java_com_k2fsa_sherpa_onnx_OfflineDiacritization_delete",
+      "Java_com_k2fsa_sherpa_onnx_OfflineDiacritization_newFromAsset",
+      "Java_com_k2fsa_sherpa_onnx_OfflineDiacritization_newFromFile",
+      "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_createStreamWithHotwords",
+      "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_prependAdspLibraryPath",
+      "Java_com_k2fsa_sherpa_onnx_VersionInfo_00024Companion_getOnnxruntimeVersionStr2",
+      "Java_com_k2fsa_sherpa_onnx_VersionInfo_getOnnxruntimeVersionStr2"
+    ]
+  },
+  {
+    "abi": "x86_64",
+    "old_count": 125,
+    "new_count": 133,
+    "removed": [],
+    "added": [
+      "Java_com_k2fsa_sherpa_onnx_OfflineDiacritization_addDiacritics",
+      "Java_com_k2fsa_sherpa_onnx_OfflineDiacritization_delete",
+      "Java_com_k2fsa_sherpa_onnx_OfflineDiacritization_newFromAsset",
+      "Java_com_k2fsa_sherpa_onnx_OfflineDiacritization_newFromFile",
+      "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_createStreamWithHotwords",
+      "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_prependAdspLibraryPath",
+      "Java_com_k2fsa_sherpa_onnx_VersionInfo_00024Companion_getOnnxruntimeVersionStr2",
+      "Java_com_k2fsa_sherpa_onnx_VersionInfo_getOnnxruntimeVersionStr2"
+    ]
+  }
+]
