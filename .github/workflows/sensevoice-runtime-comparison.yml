@@ -15,12 +15,12 @@ permissions:
 
 concurrency:
   group: sensevoice-runtime-comparison-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   comparison:
-    # Approved 2026-10-15 for this one temporary runner only.
-    if: github.run_number == 4 && github.run_attempt == 1
+    # Recovery-only event: cancel the failed predecessor; no KVM or test job.
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 75
     env:
@@ -119,12 +119,12 @@ jobs:
         if: always()
         run: |
           mkdir -p runtime-results
-          adb -s emulator-5554 logcat -d > runtime-results/final-logcat.txt 2>&1 || true
-          adb -s emulator-5554 exec-out run-as com.framenest cat files/sensevoice-runtime-comparison.json > runtime-results/last-partial-result.json 2>/dev/null || true
+          timeout 15 adb -s emulator-5554 logcat -d > runtime-results/final-logcat.txt 2>&1 || true
+          timeout 15 adb -s emulator-5554 exec-out run-as com.framenest cat files/sensevoice-runtime-comparison.json > runtime-results/last-partial-result.json 2>/dev/null || true
       - name: Stop emulator and restore original KVM ACL
         if: always()
         run: |
-          adb -s emulator-5554 emu kill || true
+          timeout 15 adb -s emulator-5554 emu kill || true
           if test -f "$RUNNER_TEMP/fn74-kvm-original.acl"; then
             sudo setfacl --restore="$RUNNER_TEMP/fn74-kvm-original.acl"
             getfacl -p /dev/kvm > "$RUNNER_TEMP/fn74-kvm-restored.acl"
