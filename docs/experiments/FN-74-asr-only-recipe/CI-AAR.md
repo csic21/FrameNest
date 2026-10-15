@@ -38,9 +38,12 @@ an emulator/KVM. Existing Android device and legal gates remain open.
    new hashes/sizes, identical dynamic exports, identical program headers and
    identical PT_LOAD bytes except ELF section-table bookkeeping fields changed
    by stripping. A second strip from the original must produce the same bytes.
+   Outputs must also match the separately recorded local strip hashes.
    This proves that stripping step's repeatability, not whole-build reproducibility.
 6. The strict build uses a fresh Gradle home, `--dependency-verification strict`,
-   the exact reviewed XML and independently pinned review evidence. AGP is told
+   the exact reviewed XML and independently pinned review evidence. Existing
+   Gradle state/output is rejected, build caching is disabled and tasks rerun;
+   every staged input plus direct official Kotlin/wrapper pins is rechecked. AGP is told
    to retain the explicitly stripped native bytes. After ZIP normalization the
    audit checks ABI/SO/class/native-call/notice whitelists and hashes, and matches
    the final AAR's four SOs against the new native manifest.
@@ -97,3 +100,33 @@ or legal clearance. The unchanged arm64 ORT RELRO end warning stays visible and
 is not a proven runtime crash. Exact ORT vendor build/transitive SBOM, Eigen
 source availability, embedded attribution, static C++ runtime and model/app
 license review remain separate requirements.
+
+## Completed graph review, 2026-10-15
+
+Quarantine run [38710270425](https://github.com/csic21/FrameNest/actions/runs/38710270425)
+completed all 26 release-build tasks at recipe commit
+`65ffdaf32a7e6c1a5b06d12d02a1d7c55484746f`. Its original XML has 428 artifacts.
+The cache also contained 32 downloaded POMs omitted from generated verification
+metadata because corresponding `.module` metadata was preferred. The approved
+XML explicitly adds these 32; `graph-reconciliation.json` preserves the original
+capture digest and exact 460/460 cache-file coverage. The strict workflow also
+hash-checks every actual downloaded cache file after Gradle, so unused downloaded
+POMs cannot silently evade this package's audit.
+
+All 460 files across 242 components were freshly retrieved from canonical
+Google Maven (164 files) or Maven Central (296 files), totaling 326,450,244 bytes:
+184 JARs, 242 POMs and 34 module files. All locked SHA-256 values matched.
+Published sidecars matched for 215 SHA-256 and 449 SHA-1 entries; the remaining
+245/11 sidecar endpoints explicitly returned 404. A transient Google 502 was
+retried rather than treated as an absent checksum. Two historical routing/format
+cases are covered by narrow tests: `com.google.android:annotations:4.1.1.4` is on
+Central, and several old Central sidecars include a fixed publisher staging path.
+No arbitrary repository fallback or trust exclusion is allowed.
+
+The captured graph includes the actual AGP AAPT2 Linux classifier
+`aapt2-8.4.0-11315950-linux.jar`, SHA-256
+`5638a5b151f9c50ba2a9e5291edfc9227aec3fedc3ee8f8a8583fa54cd1dd9ca`.
+Its checksum is distinct from the SDK-installed AAPT2. The reviewed XML and
+independent evidence are separately digest-pinned in `gradle-lock/approved-lock.json`.
+This closes the recorded graph's checksum-review gate; Android/runtime, complete
+build reproducibility, app integration and legal gates remain open.

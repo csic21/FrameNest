@@ -15,6 +15,23 @@ def unique_zip_entries(z):
     if any(stat.S_ISLNK(info.external_attr>>16) for info in z.infolist()):raise SystemExit('ZIP symlink is forbidden')
     return {n:z.read(n) for n in names if not n.endswith('/')}
 
+def staged_inventory(project):
+    excluded={'recipe-project.json','gradle/verification-metadata.xml'}
+    rows=[]
+    for path in sorted(project.rglob('*')):
+        if path.is_symlink():raise SystemExit('Symlink in staged Gradle project')
+        if path.is_file() and str(path.relative_to(project)) not in excluded:
+            rows.append({'path':str(path.relative_to(project)),'sha256':digest(path),'size_bytes':path.stat().st_size})
+    return rows
+
+def verify_staged_inventory(project,meta):
+    if meta.get('staged_inputs')!=staged_inventory(project):raise SystemExit('Staged project inputs changed; restage from pinned recipe')
+    for item in LOCK['kotlin_sources']:
+        path=project/'asr/src/main/java/com/k2fsa/sherpa/onnx'/Path(item['path']).name
+        if digest(path)!=item['sha256']:raise SystemExit('Staged Kotlin source pin mismatch')
+    for item in LOCK['packaging_wrapper_files']:
+        if digest(project/item['path'].removeprefix('android/SherpaOnnxAar/'))!=item['sha256']:raise SystemExit('Staged wrapper pin mismatch')
+
 def stage(work, project):
     verify()
     info=json.loads((work/'stage.json').read_text());source=Path(info['abis']['arm64-v8a']['source'])
@@ -105,11 +122,35 @@ tasks.withType<org.gradle.api.tasks.bundling.AbstractArchiveTask>().configureEac
     for name in ['toolchain.json','native-output-manifest.json','native-audit.json','strip-evidence.json','imported-native-artifact.json']:
         if (work/name).is_file():shutil.copy2(work/name,assets/name)
     metadata={'status':'staged-not-built','native_work':str(work),'wrapper_jar_sha256':digest(project/'gradle/wrapper/gradle-wrapper.jar'),'kotlin_source_count':len(LOCK['kotlin_sources']),'native_present':native.exists(),'manifest_sha256':digest(ROOT/'manifest.json')}
+    metadata['staged_inputs']=staged_inventory(project)
     (project/'recipe-project.json').write_text(json.dumps(metadata,indent=2)+'\n')
     print('STAGED',project)
 
+def gradle_cache_inventory(project):
+    cache=project/'.gradle-home/caches/modules-2/files-2.1'
+    return [{'cache_path':str(p.relative_to(cache)),'sha256':digest(p),'size_bytes':p.stat().st_size} for p in sorted(cache.rglob('*')) if p.is_file()]
+
+def audit_gradle_cache(rows,graph):
+    approved={(r['group'],r['name'],r['version'],r['artifact']):r['sha256'] for r in graph}
+    seen=set()
+    for row in rows:
+        parts=PurePosixPath(row['cache_path']).parts
+        if len(parts)!=5:raise SystemExit('Unexpected Gradle cache artifact path')
+        identity=tuple(parts[:3])+(parts[4],)
+        if identity in seen:raise SystemExit('Duplicate resolved Gradle cache artifact')
+        seen.add(identity)
+        if approved.get(identity)!=row['sha256']:raise SystemExit('Strict cache artifact is missing or differs from independently reviewed lock: '+':'.join(identity))
+    if not seen:raise SystemExit('Empty strict Gradle artifact cache')
+    return {'status':'all-actual-cache-files-match-reviewed-lock','actual_files':len(seen),'reviewed_files':len(approved),'unused_reviewed_artifacts':[list(x) for x in sorted(set(approved)-seen)]}
+
+def require_fresh_gradle_state(project):
+    for relative in ['.gradle-home','.gradle','build','asr/build','LOCK-CAPTURE-QUARANTINE.txt']:
+        if (project/relative).exists():raise SystemExit('Fresh staged project required; refusing prior Gradle state: '+relative)
+
 def build(a,capture=False):
     project=a.project.resolve(); sdk=a.sdk.resolve();meta=json.loads((project/'recipe-project.json').read_text())
+    require_fresh_gradle_state(project)
+    verify_staged_inventory(project,meta)
     provenance=host_provenance(a.host_image_digest,a.exploratory_host_provenance)
     sdk_license=sdk/'licenses/android-sdk-license'
     if not sdk_license.is_file() or not sdk_license.read_text().strip():raise SystemExit('Pre-existing SDK license record required; no agreement will be accepted')
@@ -121,17 +162,18 @@ def build(a,capture=False):
     if not re.search(r'version "21\.',java):raise SystemExit('JDK 21 required')
     (project/'packaging-environment.json').write_text(json.dumps({'host_provenance':provenance,'java_version':java,'java_binary_sha256':digest(Path(shutil.which('java')).resolve()),'android_jar_sha256':digest(sdk/'platforms/android-34/android.jar'),'sdk_aapt2_sha256':digest(sdk/'build-tools/34.0.0/aapt2'),'existing_sdk_license_sha256':digest(sdk_license),'license_acceptance_performed':False},indent=2)+'\n')
     env=os.environ.copy();env.update(ANDROID_HOME=str(sdk),ANDROID_SDK_ROOT=str(sdk),GRADLE_USER_HOME=str(project/'.gradle-home'),SOURCE_DATE_EPOCH=str(LOCK['source_date_epoch']),TZ='UTC',LC_ALL='C.UTF-8')
-    args=[str(project/'gradlew'),'--no-daemon',':asr:assembleRelease']
+    args=[str(project/'gradlew'),'--no-daemon','--no-build-cache','--rerun-tasks',':asr:assembleRelease']
     lockfile=project/'gradle/verification-metadata.xml'
     if capture:
         if lockfile.exists():raise SystemExit('A metadata file already exists; review it rather than silently overwriting')
         args+=['--write-verification-metadata','sha256']
+        (project/'LOCK-CAPTURE-QUARANTINE.txt').write_text('NOT A RELEASE ARTIFACT. This capture, including any partial graph after failure, requires independent official-byte review and a fresh strict build. No native/runtime acceptance claimed.\n')
     else:
         if not a.verification_file or not a.verification_sha256:raise SystemExit('Reviewed Gradle lock file and independently recorded SHA-256 required')
         original=a.verification_file.resolve()
         if digest(original)!=a.verification_sha256:raise SystemExit('Reviewed Gradle lock digest mismatch')
         from gradle_lock import validate_gradle_lock,verify_review,read_review
-        validate_gradle_lock(original.read_bytes())
+        graph=validate_gradle_lock(original.read_bytes())
         if digest(a.review_file)!=a.review_sha256:raise SystemExit('Gradle independent review digest mismatch')
         verify_review(original.read_bytes(),read_review(a.review_file))
         if not (Path(meta['native_work'])/'strip-evidence.json').is_file():raise SystemExit('Explicit strip evidence required before packaging')
@@ -141,14 +183,15 @@ def build(a,capture=False):
     with (project/('gradle-lock-capture.log' if capture else 'aar-build.log')).open('w') as log:
         subprocess.run(args,cwd=project,env=env,stdout=log,stderr=subprocess.STDOUT,check=True)
     src=project/'asr/build/outputs/aar/asr-release.aar'
+    rows=gradle_cache_inventory(project)
+    (project/'gradle-cache-inventory.json').write_text(json.dumps(rows,indent=2)+'\n')
     if capture:
-        (project/'LOCK-CAPTURE-QUARANTINE.txt').write_text('NOT A RELEASE ARTIFACT. Review every captured Gradle dependency hash/provenance, commit the approved lock and repeat a strict build. No native/runtime acceptance claimed.\n')
         # Artifact inventory is retained separately from the graph for review; no cache is trusted as authority.
-        cache=project/'.gradle-home/caches/modules-2/files-2.1'
-        rows=[{'cache_path':str(p.relative_to(cache)),'sha256':digest(p),'size_bytes':p.stat().st_size} for p in sorted(cache.rglob('*')) if p.is_file()]
-        (project/'gradle-cache-inventory.json').write_text(json.dumps(rows,indent=2)+'\n')
         print('QUARANTINED lock bootstrap:',lockfile,'sha256',digest(lockfile));return
-    out=project/'verified-candidate';out.mkdir(exist_ok=False)
+    cache_audit=audit_gradle_cache(rows,graph)
+    (project/'gradle-cache-audit.json').write_text(json.dumps(cache_audit,indent=2)+'\n')
+    # A failed final audit must never leave a file under the verified-candidate path.
+    out=project/'candidate-quarantine';out.mkdir(exist_ok=False)
     target=out/'sherpa-onnx-1.13.8-asr-no-tts.aar'
     # Normalize nested classes.jar and AAR entry order/timestamps using deterministic stored ZIP entries.
     # Android packaging alignment is checked on the eventual app APK, not this AAR.
@@ -167,8 +210,11 @@ def build(a,capture=False):
         for item in native_manifest['outputs']:
             name='jni/'+item['path'].removeprefix('jniLibs/')
             if hashlib.sha256(z.read(name)).hexdigest()!=item['sha256']:raise SystemExit('AAR changed native bytes: '+name)
-    output={'status':'candidate-not-android-accepted','sha256':digest(target),'size_bytes':target.stat().st_size,'gradle_verification_sha256':digest(lockfile),'host_image_digest':a.host_image_digest,'host_provenance':provenance,'reproducibility_proven':False,'release_gate':'closed','gradle_review_sha256':a.review_sha256,'java_version':java,'android_jar_sha256':digest(sdk/'platforms/android-34/android.jar'),'aapt2_sha256':digest(sdk/'build-tools/34.0.0/aapt2'),'source_manifest_sha256':digest(ROOT/'manifest.json')}
-    (out/'output-manifest.json').write_text(json.dumps(output,indent=2)+'\n');print('CANDIDATE ONLY',target)
+    output={'status':'candidate-not-android-accepted','gradle_cache_audit':cache_audit,'sha256':digest(target),'size_bytes':target.stat().st_size,'gradle_verification_sha256':digest(lockfile),'host_image_digest':a.host_image_digest,'host_provenance':provenance,'reproducibility_proven':False,'release_gate':'closed','gradle_review_sha256':a.review_sha256,'java_version':java,'android_jar_sha256':digest(sdk/'platforms/android-34/android.jar'),'sdk_aapt2_sha256':digest(sdk/'build-tools/34.0.0/aapt2'),'reviewed_maven_aapt2_artifacts':[row for row in graph if row['group']=='com.android.tools.build' and row['name']=='aapt2'],'aapt2_execution_verified':False,'source_manifest_sha256':digest(ROOT/'manifest.json')}
+    (out/'output-manifest.json').write_text(json.dumps(output,indent=2)+'\n')
+    verified=project/'verified-candidate'
+    if verified.exists():raise SystemExit('Refusing existing verified candidate directory')
+    out.rename(verified);print('CANDIDATE ONLY',verified/target.name)
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);s=p.add_subparsers(dest='action',required=True)

@@ -6,5 +6,17 @@
   "commit": "8fb54b09e405a9cb9d2a0211d83176ced0328af8",
   "zip_sha256": "5dc4019557ce6ac0f9a203fb6e00bd4e52f58153e2cf17347805cf108744e48e",
   "source": "https://github.com/csic21/FrameNest/actions/runs/38706441953",
-  "policy": "Exact reviewed native artifact only. Expiry or mismatch fails closed; rebuild native separately and review a new lock."
+  "policy": "Exact reviewed native artifact only. Expiry or mismatch fails closed; rebuild native separately and review a new lock.",
+  "expected_stripped_jni": [
+    {
+      "abi": "arm64-v8a",
+      "stripped_sha256": "7c2add157be1d7ad3208f99ff4e5ebed6e50cccac6ef75b33b7b08d77cd7ddc7",
+      "stripped_size_bytes": 3433440
+    },
+    {
+      "abi": "x86_64",
+      "stripped_sha256": "d5a02856e9e0a05b035628dbff5c6cdd6a3e8ef06e7a661ba1b364df746816e9",
+      "stripped_size_bytes": 3728696
+    }
+  ]
 }

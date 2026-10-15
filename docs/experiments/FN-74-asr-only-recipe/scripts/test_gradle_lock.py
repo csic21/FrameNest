@@ -135,6 +135,14 @@ class GradleLockTests(unittest.TestCase):
         self.assertEqual(lock.repository_for('com.google.testing.platform'), lock.GOOGLE)
         self.assertEqual(lock.repository_for('com.androidish'), lock.CENTRAL)
 
+    def test_historical_android_annotations_use_central_exact_group(self):
+        for extension in ['jar', 'pom']:
+            row = lock.validate_gradle_lock(xml(group='com.google.android', name='annotations',
+                                                version='4.1.1.4', artifact='annotations-4.1.1.4.' + extension))[0]
+            self.assertEqual(lock.artifact_url(row), lock.CENTRAL +
+                             'com/google/android/annotations/4.1.1.4/annotations-4.1.1.4.' + extension)
+        self.assertEqual(lock.repository_for('com.google.android.gms'), lock.GOOGLE)
+
     def test_all_captured_entries_are_fetched_not_just_jars(self):
         original = xml()
         artifact = '<artifact name="kotlin-stdlib-1.7.20.pom"><sha256 value="' + HASH + '"/></artifact>'
@@ -186,6 +194,21 @@ class GradleLockTests(unittest.TestCase):
     def test_published_checksum_format(self):
         for suffix in ['', '  file.jar', ' *file.jar', '\n']:
             self.assertEqual(lock.parse_checksum((HASH.upper() + suffix).encode(), 'sha256', 'file.jar'), HASH)
+
+    def test_historical_central_staging_checksum_requires_exact_repository_path(self):
+        relative = 'javax/inject/javax.inject/1/javax.inject-1.jar'
+        prefix = '/home/maven/repository-staging/to-ibiblio/maven2/'
+        sidecar = (SHA1 + '  ' + prefix + relative + '\n').encode()
+        self.assertEqual(lock.parse_checksum(sidecar, 'sha1', 'javax.inject-1.jar', relative), SHA1)
+        labels = [prefix + 'wrong/group/javax.inject-1.jar',
+                  '/unrecognized/staging/' + relative,
+                  prefix + '../' + relative, prefix + relative + '\nextra',
+                  prefix + relative.replace('.jar', '.pom')]
+        for label in labels:
+            with self.subTest(label=label), self.assertRaises(lock.LockError):
+                lock.parse_checksum((SHA1 + '  ' + label).encode(), 'sha1', 'javax.inject-1.jar', relative)
+        with self.assertRaises(lock.LockError):
+            lock.parse_checksum(sidecar, 'sha1', 'javax.inject-1.jar')
 
     def test_evidence_rejects_wrong_xml_even_if_same_graph(self):
         report = lock.review_lock(xml(), fetcher=FakeRepository())

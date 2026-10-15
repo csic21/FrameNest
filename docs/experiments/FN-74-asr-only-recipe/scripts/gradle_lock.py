@@ -169,6 +169,10 @@ def repository_for(group):
     artifacts. Kotlin's Android plugin marker and implementation are on Central.
     No Plugin Portal redirect is required for either of this recipe's plugins.
     """
+    # The historical com.google.android:annotations:4.1.1.4 is on Central;
+    # its exact group is distinct from Google Maven's com.google.android.* groups.
+    if group == 'com.google.android':
+        return CENTRAL
     prefixes = ('com.android', 'androidx', 'com.google.android', 'com.google.testing.platform')
     return GOOGLE if any(group == p or group.startswith(p + '.') for p in prefixes) else CENTRAL
 
@@ -209,14 +213,22 @@ def fetch(url, max_bytes):
         fail('Repository read failed: ' + url + ': ' + str(exc))
 
 
-def parse_checksum(data, algorithm, filename):
-    """Accept plain hex or the conventional hex + exact filename sidecar."""
+def parse_checksum(data, algorithm, filename, repository_path=None):
+    """Accept hex, exact basename, or Central's exact historical staging path."""
     try:
         value = data.decode('ascii').strip()
     except UnicodeDecodeError:
         fail('Non-ASCII published checksum: ' + filename)
     length = {'sha256': 64, 'sha1': 40}[algorithm]
-    match = re.fullmatch(r'([0-9a-fA-F]{' + str(length) + r'})(?:[ \t]+\*?' + re.escape(filename) + r')?', value)
+    labels = [re.escape(filename)]
+    if repository_path is not None:
+        if (not re.fullmatch(r'[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*', repository_path)
+                or '..' in repository_path or repository_path.rsplit('/', 1)[-1] != filename):
+            fail('Unsafe checksum repository path: ' + str(repository_path))
+        # Observed on Central's javax.inject:1 and kxml2:2.3.0 sidecars.
+        # This label is compared only; it is never read as a local path.
+        labels.append(re.escape('/home/maven/repository-staging/to-ibiblio/maven2/' + repository_path))
+    match = re.fullmatch(r'([0-9a-fA-F]{' + str(length) + r'})(?:[ \t]+\*?(?:' + '|'.join(labels) + r'))?', value)
     if not match:
         fail('Malformed published ' + algorithm + ' checksum: ' + filename)
     return match.group(1).lower()
@@ -242,7 +254,7 @@ def review_artifact(record, fetcher=fetch):
         else:
             if len(sidecar) > MAX_CHECKSUM_BYTES:
                 fail('Oversized published checksum: ' + sidecar_url)
-            expected = parse_checksum(sidecar, algorithm, record['artifact'])
+            expected = parse_checksum(sidecar, algorithm, record['artifact'], url.removeprefix(repository_for(record['group'])))
             if expected != actual[algorithm]:
                 fail('Published checksum mismatch: ' + sidecar_url)
             item.update(status='matched', value=expected, sidecar_sha256=sha256(sidecar))

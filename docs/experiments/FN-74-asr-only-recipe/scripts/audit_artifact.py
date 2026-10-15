@@ -84,7 +84,7 @@ def main():
                         if n.endswith('.class') and parse(jar.read(n))['name']+'.class'!=n:raise ValueError('Class path/name mismatch')
                 allowed={Path(x['path']).name for x in LOCK['kotlin_sources']}
                 for c in classes:
-                    if c['name']=='com/k2fsa/sherpa/onnx/BuildConfig':continue
+                    if not c['name'].startswith('com/k2fsa/sherpa/onnx/'):raise ValueError('Unexpected class namespace: '+c['name'])
                     if c['source_file'] not in allowed:raise ValueError('Non-whitelisted Kotlin/Java class: '+repr(c['name']))
                     if c['major']!=52:raise ValueError('Unexpected JVM target: '+c['name'])
                 required={'com/k2fsa/sherpa/onnx/'+n for n in ['OfflineRecognizer','OfflineStream','OnlineRecognizer','OnlineStream','VersionInfo']}

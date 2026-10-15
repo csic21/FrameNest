@@ -79,10 +79,12 @@ python3 scripts/package_aar.py build \
   --project /absolute/new/strict-aar-project --sdk /opt/android-sdk \
   --host-image-digest sha256:YOUR_REAL_64_HEX_IMAGE_DIGEST \
   --verification-file /absolute/reviewed/verification-metadata.xml \
-  --verification-sha256 YOUR_REVIEWED_LOCK_SHA256
+  --verification-sha256 YOUR_REVIEWED_LOCK_SHA256 \
+  --review-file /absolute/reviewed/independent-review.json \
+  --review-sha256 YOUR_REVIEWED_EVIDENCE_SHA256
 ```
 
-Lock-capture output is explicitly quarantined and cannot establish release readiness. Strict packaging preserves native bytes, checks them against native-output-manifest.json, enforces the source/API/native whitelists and includes notice assets. ZIP order/timestamps are normalized, but a second clean build comparison remains required. It never publishes to Maven or modifies the application's dependency coordinate.
+Lock-capture output is explicitly quarantined and cannot establish release readiness. Strict packaging preserves the explicitly stripped native bytes, checks them against native-output-manifest.json, enforces the source/API/native whitelists and includes the full original NDK notice set. It requires a fresh staged project and independent graph review evidence; see CI-AAR.md. ZIP order/timestamps are normalized, but a second clean build comparison remains required. It never publishes to Maven or modifies the application's dependency coordinate.
 
 ## 16 KB: preserve the ORT warning
 

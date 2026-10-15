@@ -54,6 +54,10 @@ def strip(work,ndk,provenance):
             repeat=Path(tmp)/target.name;shutil.copy2(original,repeat);subprocess.run([*command,str(repeat)],check=True)
             if digest(repeat)!=digest(target):raise ValueError('Repeated stripping produced different bytes')
         evidence.append({'abi':abi,'library':target.name,'command':['llvm-strip','--strip-unneeded'],'original_sha256':digest(original),'original_size_bytes':original.stat().st_size,'stripped_sha256':digest(target),'stripped_size_bytes':target.stat().st_size,'repeat_from_original_identical':True,'load_fingerprint':fingerprint})
+    expected_stripped={x['abi']:x for x in json.loads((ROOT/'native-artifact-lock.json').read_text())['expected_stripped_jni']}
+    for row in evidence:
+        expected=expected_stripped[row['abi']]
+        if row['stripped_sha256']!=expected['stripped_sha256'] or row['stripped_size_bytes']!=expected['stripped_size_bytes']:raise ValueError('Strip output differs from independently recorded local result')
     after_audit,exports_after=inspect_native(work/'jniLibs',str(readelf))
     if exports_before!=exports_after:raise ValueError('Strip changed dynamic JNI symbols')
     output=original_manifest.copy();output.update(status='stripped-static-audit-only',strip_tool_sha256=digest(stripbin),release_gate='closed',reproducibility_proven=False)

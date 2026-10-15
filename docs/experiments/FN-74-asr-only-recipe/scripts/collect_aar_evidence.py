@@ -11,7 +11,7 @@ def collect(project,work,evidence,out):
         if not src.is_file():return
         dst=out/name;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(src,dst)
         rows.append({'path':str(name),'size_bytes':dst.stat().st_size,'sha256':digest(dst)})
-    for name in ['gradle-lock-capture.log','aar-build.log','LOCK-CAPTURE-QUARANTINE.txt','gradle/verification-metadata.xml','gradle-cache-inventory.json','recipe-project.json','packaging-environment.json','settings.gradle.kts','build.gradle.kts','asr/build.gradle.kts','gradle.properties','prepackage-native-audit.json']:
+    for name in ['gradle-lock-capture.log','aar-build.log','LOCK-CAPTURE-QUARANTINE.txt','gradle/verification-metadata.xml','gradle-cache-inventory.json','gradle-cache-audit.json','recipe-project.json','packaging-environment.json','settings.gradle.kts','build.gradle.kts','asr/build.gradle.kts','gradle.properties','prepackage-native-audit.json']:
         copy(project/name,Path('packaging')/name)
     for name in ['native-output-manifest.json','native-output-manifest.prestrip.json','native-audit.json','strip-evidence.json','imported-native-artifact.json']:copy(work/name,Path('native')/name)
     for name in ['host-provenance.json','toolchain-provenance.json','native-download.json','tests.log']:copy(evidence/name,Path('evidence')/name)
