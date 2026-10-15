@@ -23,7 +23,10 @@ data class RecordedListenRequest(
     val targetLang: String,
 )
 
-/** Provisional text never certifies coverage, even when it has a translation. */
+/**
+ * Provisional text never certifies coverage, even when it has a translation.
+ * A nonfinal textTgt is temporary presentation only: never persist it as a cache hit.
+ */
 data class RecordedListenCue(
     val displayStartMs: Long,
     val displayEndMs: Long,

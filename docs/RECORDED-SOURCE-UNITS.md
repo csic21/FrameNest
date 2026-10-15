@@ -111,10 +111,10 @@ entry point for independently regenerated real-audio evidence.
 
 ## Verified locally, 2026-10-14
 
-- 36 JUnit tests pass on the standalone Kotlin 2.1.20 / Java 21 runtime.
+- 39 JUnit tests pass on the standalone Kotlin 2.1.20 / Java 21 runtime.
 - CLI JSON/Unicode smoke passes: two final question units, retained list/false-period
   tail, then provisional incomplete EOF; no completed coverage without an MT success.
-- Pinned test-tool checksum verification passes for all 12 Maven artifacts.
+- Pinned test-tool checksum verification passes for all 13 Maven artifacts.
 - Captured real ASR/PCM-quiet replay now passes the focused v2 regressions. It verifies
   source handling only and does not rerun recognition, audio analysis or translation.
 - No Android build, fresh ASR/MT generation, phone/tablet UI or NAS measurement was
@@ -126,3 +126,40 @@ the hard 15/24-second ASR-window and 1,024-character bounds, and preserves verif
 splice ownership on fallback. It inspects morphology across commas with bounded 250 ms
 estimate tolerance, while blocking plain-predicate attributive splits. See decision 0033
 for the precise resource/continuity contract and remaining limitations.
+
+## Temporary bilingual candidate (v3 integration)
+
+The adapter sends the current bounded **whole** FINAL or PROVISIONAL source unit to the
+same MT model and prompt. UNCONFIRMED alignment failures still use DEFER and retain source
+only. A PROVISIONAL MT success stays nonfinal, returns no completed coverage, and can be
+superseded. Uncertainty is not a claim that the translation's meaning is correct.
+
+Session writes only the original source for nonfinal Room rows. Their translated targets
+live separately in at most eight memory entries (each already limited to 4,096 characters),
+are matched against the exact current source and span, and expire when playback passes,
+work generation changes, the engine changes, seeking occurs, or the session stops/exits.
+Supersession and accepted final spans remove overlapping temporary targets. Older persisted
+provisional targets are ignored for recorded presentation. The existing uncertain-caption
+UI flag remains set; these targets never count as a durable bilingual cache hit.
+
+For a real CLI runner, process TRANSLATE as follows:
+1. UNCONFIRMED: send `DEFER sequence`.
+2. FINAL or PROVISIONAL: run actual MT on exactly `readyUnits[].text`. Send `MT_OK` only
+   for a real nonempty successful result, otherwise `MT_FAIL`. No synthetic success.
+3. Count final coverage only from `completedCoverage`. Separately report the union of
+   active translated PROVISIONAL display spans as temporary translation availability.
+   Exclude superseded rows and keep semantic review independent of both measures.
+4. After RESET, discard old tickets and translations; never persist provisional targets
+   for reuse in a later session. Keep the original H/X/T/Q evidence and actual MT outputs.
+
+Reproduce pure integration tests with `python3 scripts/experimental/fetch-source-unit-test-tools.py`,
+`bash scripts/experimental/run-recorded-adapter-tests.sh` and
+`bash scripts/experimental/run-recorded-session-tests.sh`. These use mocked devices/DAO;
+Room annotations are stubbed in the standalone runner, so Android/Room SQL still require CI.
+
+Earlier actual Kishida provisional MT review found a factual error in the unit containing
+ASR `要人が救わる`, translated as dignitaries being rescued rather than gathering, and an
+expanded conclusion. Display availability does not fix or excuse this semantic failure.
+The last 2.727 seconds had measured low-energy PCM and no pending lexical source; it stays
+uncovered rather than acquiring invented completion. No fresh model run is claimed by
+this restored implementation after the execution workspace rollback.

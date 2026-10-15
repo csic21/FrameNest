@@ -57,8 +57,16 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
 
+      - name: Check official Maven availability before resolving dependencies
+        run: |
+          for path in org/jetbrains/annotations/13.0/annotations-13.0.pom com/google/code/gson/gson/2.11.0/gson-2.11.0.pom; do
+            curl --fail --silent --show-error --location --retry 2 --retry-all-errors --max-time 30 \
+              --output /dev/null --write-out 'Maven HTTP %{http_code}\n' "https://repo.maven.apache.org/maven2/$path"
+          done
       - name: Assemble debug
-        run: ./gradlew assembleDebug --stacktrace
+        # Do not preserve transient repository not-found responses across runner caches.
+        # Pinned dependency verification remains mandatory.
+        run: ./gradlew assembleDebug --refresh-dependencies --stacktrace
 
       - name: Unit tests
         run: ./gradlew testDebugUnitTest --stacktrace

@@ -24,7 +24,8 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * Coordinates Room cache + [ListenTranslateEngine] while the player runs.
- * Does not touch NAS; all cues stay in app-private SQLite (decision 0005).
+ * Does not touch NAS; durable cues stay in app-private SQLite (decision 0005).
+ * Uncertain recorded translations are bounded, generation-local presentation only.
  */
 class ListenTranslateSession(
     private val repository: ListenTranslateRepository,
@@ -66,7 +67,11 @@ class ListenTranslateSession(
     }
 
     fun setEngine(engine: ListenTranslateEngine) {
+        if (released || this.engine === engine) return
+        // Invalidate the old producer before changing model/cache identity.
+        stopPolling()
         this.engine = engine
+        if (_ui.value.enabled) activate()
     }
 
     private var cacheLease: ListenTranslateRepository.CacheLease? = null
@@ -77,13 +82,16 @@ class ListenTranslateSession(
     private var pollJob: Job? = null
     private var observeJob: Job? = null
     private var cachedCues: List<ListenTranslateCue> = emptyList()
+    private data class TemporaryRecordedTranslation(val source: String, val target: String)
+    // At most eight validated 4,096-character targets, never merged into cachedCues/Room.
+    private val temporaryRecordedTranslations = linkedMapOf<Pair<Long, Long>, TemporaryRecordedTranslation>()
     private var lastPositionMs: Long = 0L
     private var lastDurationMs: Long = 0L
     private var isPlaying: Boolean = false
     private var isBuffering: Boolean = false
     private var isForeground: Boolean = true
     private var released: Boolean = false
-    private var workGeneration: Long = 0L
+    @Volatile private var workGeneration: Long = 0L
     private var playbackRate: Float = 1f
     private var processingRealtimeFactor: Double? = null
     private var adaptationRealtimeFactor: Double? = null
@@ -133,6 +141,7 @@ class ListenTranslateSession(
                     preparedAheadMs = 0L,
                     activeCue = null,
                     overlayText = "",
+                    currentCaptionUnconfirmed = false,
                     isProcessing = false,
                     status = ListenTranslateJobStatus.Idle,
                     prefetchLookAheadMs = 0L,
@@ -327,12 +336,14 @@ class ListenTranslateSession(
 
     private fun stopPolling() {
         workGeneration++
+        clearTemporaryRecordedTranslations()
         recordedRetryAtMs = 0L
         recordedFailures = 0
         recordedWorkMs = 0L
         recordedAdaptationWorkMs = 0L
         recordedAudioMs = 0L
-        _ui.update { it.copy(diagnostics = null, recordedReadThroughMs = 0L, currentCaptionUnconfirmed = false) }
+        _ui.update { it.copy(diagnostics = null, recordedReadThroughMs = 0L,
+            currentCaptionUnconfirmed = it.activeCue?.rev == ListenCoverageRev.PROVISIONAL_SOURCE) }
         pollJob?.cancel()
         pollJob = null
     }
@@ -379,11 +390,35 @@ class ListenTranslateSession(
         )
     }
 
-    private fun refreshActiveCue() {
-        if (!_ui.value.enabled) return
-        val cue = ListenTranslateWindows.cueAt(
+    private fun clearTemporaryRecordedTranslations() = synchronized(temporaryRecordedTranslations) {
+        temporaryRecordedTranslations.clear()
+        _ui.update { state ->
+            val cue = state.activeCue
+            if (cue?.rev == ListenCoverageRev.PROVISIONAL_SOURCE) {
+                val sourceOnly = cue.copy(textTgt = "")
+                state.copy(activeCue = sourceOnly,
+                    overlayText = ListenTranslateWindows.formatOverlay(sourceOnly, state.displayMode))
+            } else state
+        }
+    }
+
+    private fun recordedPresentationCue(cue: ListenTranslateCue?): ListenTranslateCue? {
+        if (recordedEngine() == null || cue?.rev != ListenCoverageRev.PROVISIONAL_SOURCE) return cue
+        val temporary = synchronized(temporaryRecordedTranslations) {
+            temporaryRecordedTranslations[cue.startMs to cue.endMs]
+        }
+        // Older persisted provisional targets must not reappear as trusted cache hits.
+        return cue.copy(textTgt = temporary?.takeIf { it.source == cue.textSrc }?.target.orEmpty())
+    }
+
+    // Selection and UI publication share clear()'s lock: a seek cannot be followed by
+    // publication of a temporary target captured just before that seek cleared memory.
+    private fun refreshActiveCue() = synchronized(temporaryRecordedTranslations) {
+        if (!_ui.value.enabled) return@synchronized
+        temporaryRecordedTranslations.entries.removeAll { it.key.second <= lastPositionMs }
+        val cue = recordedPresentationCue(ListenTranslateWindows.cueAt(
             cachedCues, lastPositionMs, includeEndFallback = !intervalCoverage(),
-        )
+        ))
         val overlay = ListenTranslateWindows.formatOverlay(cue, _ui.value.displayMode)
         val ahead = if (intervalCoverage()) {
             ListenPrefetchPolicy.adaptiveContiguousAheadMs(
@@ -517,17 +552,40 @@ class ListenTranslateSession(
                             (it.startMs != cue.displayStartMs || it.endMs != cue.displayEndMs)
                     })
                     if (cue.textSrc.isNotBlank() || cue.textTgt.isNotBlank()) {
+                        val durableTarget = if (cue.isFinal) cue.textTgt else ""
+                        val span = cue.displayStartMs to cue.displayEndMs
                         changedAny = changedAny || cueChanged(cue.displayStartMs, cue.displayEndMs,
-                            cue.textSrc, cue.textTgt, if (cue.isFinal) 1 else ListenCoverageRev.PROVISIONAL_SOURCE)
+                            cue.textSrc, durableTarget, if (cue.isFinal) 1 else ListenCoverageRev.PROVISIONAL_SOURCE) ||
+                            (!cue.isFinal && synchronized(temporaryRecordedTranslations) {
+                                temporaryRecordedTranslations[span]?.target.orEmpty() != cue.textTgt
+                            })
                         val speech = repository.upsertCueForExistingJob(identity, langs,
-                            cue.displayStartMs, cue.displayEndMs, cue.textSrc, cue.textTgt,
+                            cue.displayStartMs, cue.displayEndMs, cue.textSrc, durableTarget,
                             rev = if (cue.isFinal) 1 else ListenCoverageRev.PROVISIONAL_SOURCE,
                             contentKey = key, asrModel = asrId, mtModel = mtId, lease = lease,
                             provisionalCleanup = cleanup, isCurrentGeneration = { isCurrent(generation) })
                         ensureCurrent(generation)
                         cachedCues = ListenCueCache.upsert(cachedCues, speech, cleanup)
+                        synchronized(temporaryRecordedTranslations) {
+                            // Native work can return on a worker dispatcher while seek clears memory.
+                            if (!isCurrent(generation)) throw CancellationException("stale temporary translation")
+                            if (cleanup != null) temporaryRecordedTranslations.entries.removeAll {
+                                it.key.first < cleanup.processedThroughMs && it.key.second > cleanup.ownedStartMs
+                            }
+                            temporaryRecordedTranslations.remove(span)
+                            if (!cue.isFinal && cue.textTgt.isNotBlank() && cue.displayEndMs > lastPositionMs) {
+                                temporaryRecordedTranslations[span] = TemporaryRecordedTranslation(cue.textSrc, cue.textTgt)
+                                while (temporaryRecordedTranslations.size > 8)
+                                    temporaryRecordedTranslations.remove(temporaryRecordedTranslations.keys.first())
+                            }
+                        }
                     }
                     if (cue.isFinal) {
+                        synchronized(temporaryRecordedTranslations) {
+                            temporaryRecordedTranslations.entries.removeAll {
+                                it.key.first < coverageEnd!! && it.key.second > coverageStart!!
+                            }
+                        }
                         val sameBounds = cue.displayStartMs == coverageStart && cue.displayEndMs == coverageEnd
                         changedAny = changedAny || cueChanged(coverageStart!!, coverageEnd!!,
                             if (sameBounds) cue.textSrc else "", if (sameBounds) cue.textTgt else "", 1)

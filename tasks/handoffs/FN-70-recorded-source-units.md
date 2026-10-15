@@ -42,3 +42,22 @@
   Original local commit was lost; this restoration has no model/morphology changes.
 - Revalidated after restoration: `bash scripts/experimental/run-recorded-source-unit-tests.sh`
   passes 39 tests; `git diff --check` passes. Android/real model quality not rerun.
+
+- Temporary bilingual restoration: adapter translates bounded whole PROVISIONAL units;
+  UNCONFIRMED still DEFER. Session persists nonfinal source only and keeps target text in
+  eight bounded memory entries, with generation/seek/exit/expiry/supersession cleanup.
+  Final-only completed coverage is unchanged. No model, prompt or morphology edits.
+- Restored standalone Session runner is now committed rather than relying on /tmp files;
+  bootstrap pins the matching coroutines-test JAR. Added seven Session regressions for
+  no durable target/coverage, next-session isolation, eviction/seek, replacement/final
+  completion, late callbacks and rejection of legacy persisted provisional targets.
+- Remaining quality risk: earlier real provisional MT had a factual error; this candidate
+  is not a semantic PASS. Actual full-video/phone/NAS quality was not rerun after rollback.
+
+- Final restored checks: 39 source-unit tests, 16 adapter tests and 141 Session/Repository/
+  scheduling tests pass. New engine-replacement late-callback and real two-thread
+  select-before-seek regressions pass. UI selection/publication and temporary-memory
+  clearing share an atomic lock; writes recheck the volatile work generation.
+- Commands: `bash scripts/experimental/run-recorded-source-unit-tests.sh`,
+  `bash scripts/experimental/run-recorded-adapter-tests.sh`,
+  `bash scripts/experimental/run-recorded-session-tests.sh`, and `git diff --check`.

@@ -96,8 +96,9 @@ class RecordedFileListenTranslateEngine(
         } else when (action) {
             is RecordedNextAction.Translate -> {
                 val ticket = action.ticket
-                if (ticket.unit.status != RecordedSourceStatus.FINAL) {
-                    // Whole-context tests show that MT can invent a conclusion for incomplete text.
+                if (ticket.unit.status == RecordedSourceStatus.UNCONFIRMED) {
+                    // Weak alignment retains source only. Bounded PROVISIONAL units may
+                    // get a replaceable, explicitly uncertain translation for this session.
                     publish(c.deferUnconfirmed(ticket))
                 } else {
                     try {

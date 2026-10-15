@@ -122,3 +122,13 @@ An earlier whole-context snapshot is superseded. Tentative intervals share one e
 seam PTS, without certifying semantic or word alignment. The archived-prefix anchor
 remains available for the next bounded union. Exact reconstruction tests cover repeated
 caps, stable prefixes, supersession, EOF and later recovery. Morphology is unchanged.
+
+## Temporary PROVISIONAL translation
+
+For the opt-in recorded adapter, bounded whole PROVISIONAL units may receive actual MT
+while remaining explicitly uncertain. UNCONFIRMED weak-alignment text remains source-only.
+Only FINAL MT success completes coverage. Nonfinal targets are presentation-only in a
+bounded generation-local Session memory map; Room retains source only. Reset, seek, exit,
+playback expiry, supersession and accepted final spans discard temporary targets. This
+improves translation availability without claiming semantic correctness or changing the
+ASR, MT prompt, morphology, PCM grid, source status or EOF coverage rules.

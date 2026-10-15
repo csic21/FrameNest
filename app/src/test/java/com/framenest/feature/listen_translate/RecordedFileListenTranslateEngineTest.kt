@@ -125,15 +125,16 @@ class RecordedFileListenTranslateEngineTest {
         f.engine.close()
     }
 
-    @Test fun `incomplete EOF is source only and never invokes MT`() = runBlocking {
+    @Test fun `incomplete EOF translates the bounded whole source without final coverage`() = runBlocking {
         val f = Fixture()
         f.audio.read = { _, _, _ -> PcmWindowResult(ShortArray(16_000) { 4_000 }, 1_000, true) }
         f.asr.recognize = { recognition("中国語") }
         repeat(4) { f.step(duration = 1_000) }
         assertTrue(f.cues.any { it.textSrc == "中国語" })
-        assertTrue(f.cues.all { !it.isFinal && it.coverageStartMs == null && it.textTgt.isEmpty() })
-        assertEquals(0, f.mt.preparations)
-        assertTrue(f.mt.texts.isEmpty())
+        assertTrue(f.cues.all { !it.isFinal && it.coverageStartMs == null && it.coverageEndMs == null })
+        assertEquals("译文:中国語", f.cues.last().textTgt)
+        assertEquals(1, f.mt.preparations)
+        assertEquals(listOf("中国語"), f.mt.texts)
         f.engine.close()
     }
 
@@ -242,6 +243,28 @@ class RecordedFileListenTranslateEngineTest {
         f.step(generation = 2, position = 36_000)
         assertEquals(27_000L to 42_000L, f.audio.reads.last())
         assertTrue(f.cues.isEmpty())
+        assertEquals(1, f.mt.texts.size)
+        f.engine.close()
+    }
+
+    @Test fun `cancelled provisional MT cannot publish after seek`() = runBlocking {
+        val f = Fixture()
+        f.audio.read = { _, _, _ -> PcmWindowResult(ShortArray(16000) { 4000 }, 1000, true) }
+        f.asr.recognize = { recognition("中国語") }
+        f.step(duration = 1000); f.step(duration = 1000)
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        f.mt.translate = {
+            withContext(NonCancellable) { entered.complete(Unit); release.await() }
+            "late provisional"
+        }
+        val job = launch { f.step(duration = 1000) }
+        entered.await(); job.cancel(); release.complete(Unit); job.join()
+        assertTrue(f.cues.all { it.textTgt.isEmpty() && !it.isFinal })
+        f.audio.read = { _, end, _ -> PcmWindowResult(ShortArray(16000) { 4000 }, end, false) }
+        f.asr.recognize = { AsrRecognition.EMPTY }
+        f.step(generation = 2, position = 36000)
+        assertTrue(f.cues.all { it.textTgt.isEmpty() && it.coverageStartMs == null })
         assertEquals(1, f.mt.texts.size)
         f.engine.close()
     }
