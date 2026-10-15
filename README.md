@@ -106,7 +106,7 @@ adb shell am start -n com.framenest/.MainActivity
 4. 将 [任务卡](tasks/TASKS.md) 中对应的 `FN-XX` 段落直接交给 Agent。
 5. 要求每个 Agent 按 [交接模板](tasks/HANDOFF.md) 回报。
 
-内部测试版：`0.6.8-internal`。安装：
+已发布内部测试版：`0.6.9-internal`；`0.6.10-internal` 是已完成源码运行验收、待最终签名构建的发布候选。安装：
 
 ```bash
 ./gradlew assembleDebug
@@ -126,3 +126,31 @@ SMBJ 策略视为其加密保证。升级保留服务器与凭证引用，已有
 
 本机听译诊断不上传音频/字幕。ML Kit 自身的 SDK 统计遵循 Google 的
 [数据披露](https://developers.google.com/ml-kit/android-data-disclosure)；不能宣称零遥测。
+
+
+## 0.6.10 源码 ASR 发布候选
+
+候选发布使用已验证的 sherpa-onnx 1.13.8 ASR-facing/no-TTS AAR（SHA-256
+`6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503`），
+模型与 ML Kit 翻译不变，Hy-MT 仍关闭和隐藏。升级有机会改善某些识别结果，
+不保证准确率提高，也没有这份源码构建的同条件实测提速结论。
+
+发布构建从既有、锁定的同仓库 Actions artifact 取 AAR，不依赖尚未发布的 URL。
+公开发布后可显式执行 `python3 scripts/prepare_source_asr_from_release.py`，
+从固定版本地址读取同一 AAR 并再次核验长度和哈希；不存在或不匹配即失败，无自动替换。
+然后用 `./gradlew -PsherpaAsrSource=true -PhyMtNative=false assembleDebug` 重现源码运行库集成。
+开发默认仍是旧版 Maven 依赖，也可明确指定 `-PsherpaAsrSource=false`；旧版 profile 禁止发布。
+两种运行库使用不同缓存身份，下载的 SenseVoice 模型不变。
+
+设置中的“开源许可与源码（ASR 实验）”可完整离线阅读 29 份原始许可和补充说明，
+包括 Eigen 源码链接及 Android simple-sentencepiece 变更说明。计划发布附件包含精确 AAR、
+完整 NOTICE 和来源记录。它们没有单独下载模型或上传语音。
+
+PT_LOAD/ZIP 的 16KB 静态对齐通过，arm64 16KB 真机仍未验收。ORT 未取整 RELRO
+末端警告尚存，但未发现已知 LOAD 保护重叠或已证实的运行失败。测试范围、候选审批和
+同签名发布流程见 [发布说明](docs/RELEASING.md)。
+
+源码运行库已在固定公开语料上完成两次 Android 会话：396 行文本/时间戳与 stock 1.13.8
+逐行一致（不比较跨环境耗时），Kishida114 的 CER 为 38/436（约 8.72%）。仍有
+「広島サミット→広島さと」「握り拳→握りこ」等误识别；没有普遍准确率或提速保证。
+手机宽度模拟器上的 7 项许可界面测试通过，不能替代平板或 arm64 真机验收。

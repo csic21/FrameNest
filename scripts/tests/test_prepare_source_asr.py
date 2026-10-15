@@ -92,7 +92,9 @@ class SourceArtifactTests(unittest.TestCase):
         self.assertIn('val sherpaSourceSha256 = "' + target.LOCK['aar_sha256'] + '"', build)
         self.assertIn('providers.gradleProperty("sherpaAsrSource").map(String::toBooleanStrict).getOrElse(false)', build)
         self.assertIn('implementation(libs.sherpa.onnx)', build)
-        self.assertIn('check(!sherpaAsrSource)', build)
+        self.assertIn('check(sherpaAsrSource)', build)
+        self.assertIn('check(!hyMtNative)', build)
+        self.assertIn('acceptance["approved"] == true', build)
 
 
 if __name__ == '__main__':

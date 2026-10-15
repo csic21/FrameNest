@@ -1,4 +1,5 @@
 import java.security.MessageDigest
+import groovy.json.JsonSlurper
 
 plugins {
     alias(libs.plugins.android.application)
@@ -81,8 +82,8 @@ android {
         applicationId = "com.framenest"
         minSdk = 26
         targetSdk = 36
-        versionCode = 20
-        versionName = "0.6.9-internal"
+        versionCode = 21
+        versionName = "0.6.10-internal"
         buildConfigField("boolean", "HY_MT_NATIVE", hyMtNative.toString())
         buildConfigField("boolean", "SHERPA_ASR_SOURCE", sherpaAsrSource.toString())
         // Upstream VersionInfo returns the plain version. Keep the artifact identity separate.
@@ -197,7 +198,15 @@ val requireReleaseSigning = tasks.register("requireReleaseSigning") {
     group = "verification"
     description = "Require maintainer-supplied signing material before release builds."
     doLast {
-        check(!sherpaAsrSource) { "The source-ASR profile is experimental debug-only; release is not approved." }
+        check(sherpaAsrSource) { "Release requires the exact source-ASR profile; legacy is debug-only." }
+        check(!hyMtNative) { "Hy-MT native remains disabled for this release." }
+        val acceptance = JsonSlurper().parse(rootProject.file(".github/source-asr-release-approval.json")) as Map<*, *>
+        check(acceptance["approved"] == true && acceptance["aar_sha256"] == sherpaSourceSha256 &&
+            acceptance["source_app_commit"] == "6216ecc3ad6cfe7a0cbb2100140ff4a7f9c788d0" &&
+            acceptance["runtime_report_sha256"] is String &&
+            Regex("[0-9a-f]{64}").matches(acceptance["runtime_report_sha256"] as String)) {
+            "Source-ASR release awaits explicit runtime acceptance; refusing signing."
+        }
         val required = listOf(
             "ANDROID_KEYSTORE_PATH", "ANDROID_STORE_PASSWORD", "ANDROID_KEY_ALIAS", "ANDROID_KEY_PASSWORD",
         )

@@ -3,7 +3,7 @@ name: Experimental source ASR app
 on:
   workflow_dispatch:
   push:
-    branches: ['experiment/FN-74-asr-source-app']
+    branches: ['experiment/FN-74-asr-source-app', 'agent/FN-74-source-release-0610']
     paths:
       - '.github/workflows/asr-source-app.yml'
       - 'app/**'

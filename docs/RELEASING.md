@@ -159,3 +159,60 @@ python3 -m py_compile scripts/release.py
 参考：[Android app signing](https://developer.android.com/studio/publish/app-signing)、
 [GitHub release API](https://docs.github.com/en/rest/releases/releases)、
 [GitHub release assets API](https://docs.github.com/en/rest/releases/assets)。
+
+
+## FN-74 / 0.6.10 source-ASR candidate
+
+The exact retained source-AAR app passed runtime run 38739397163 and independent
+comparison; `.github/source-asr-release-approval.json` now records approval and the
+SHA of the committed scoped acceptance report. That report pins runtime artifact
+11976112287 / SHA c582c3564ffafbae9051b5fad29081fbd744a0c370e9a06d94415971f74b690b,
+installed APK/native identities and the remaining limits. Do not infer broader
+acceptance from these frozen inputs or historical timings. Final candidate CI,
+signed/R8 APK audits, public asset hashes and update-feed verification still apply.
+The separate `.github/release-request.json` publication trigger is not changed here.
+
+The signed build explicitly requires `-PsherpaAsrSource=true -PhyMtNative=false`.
+Legacy Maven remains the default developer/debug profile and can be chosen explicitly
+with `-PsherpaAsrSource=false`; it cannot produce the new release. The AAR SHA and cache
+identity remain distinct, while native VersionInfo must remain plain `1.13.8`.
+
+The Android build job has only `contents: read` and `actions: read`, using the existing
+short-lived Actions token to read the exact same-repository artifact fixed in
+`docs/experiments/FN-74-asr-source-app/artifact-lock.json`. Authorization is sent only
+to the official API; storage downloads carry no token. No new credential or persistent
+access is created. This build must not read the future 0.6.10 release URL: doing so
+would create a circular dependency. A missing/expired artifact fails closed.
+
+Before packaging, all three signed release APKs must pass the source-AAR native/class/
+notice audit and official 16KB ZIP alignment. R8's existing sherpa keep rules remain.
+The signer certificate, source commit, ABI/version, no-Hy/GGUF, immutable-tag, no-overwrite,
+interrupted-draft and public update-feed guards remain mandatory. No signing key is
+created or changed. The existing release publisher verifies uploaded bytes again.
+
+The exact release bundle now contains 12 files: three APKs, three signature reports,
+update.json, release-manifest.json, SHA256SUMS, and exactly these three source assets:
+
+- sherpa-onnx-1.13.8-asr-no-tts.aar (59,632,871 bytes, immutable reviewed SHA)
+- sherpa-onnx-1.13.8-asr-no-tts-NOTICE.txt (all 29 original texts plus supplement in full)
+- source-asr-provenance.json (source/recipe URLs, AAR hash and accepted-run provenance)
+
+Only the three APKs appear in update.json; the three extra assets are separately listed
+in release-manifest.json and included in all bundle/upload checksum checks. Their
+fullset, regular-file status, exact AAR bytes, reconstructed full notices, fixed source
+URLs and provenance are checked again immediately before publication. The AAR is neither
+rebuilt nor repackaged by the app release job.
+
+After public publication, `python3 scripts/prepare_source_asr_from_release.py` is a
+separate explicit reproducibility entry point. It accepts no URL override, follows only
+the official HTTPS asset origin, streams within the immutable size limit and checks the
+same SHA before exclusive staging. It never falls back to Actions, Maven or another tag.
+Source archive URLs/hashes and the complete native recipe remain available with this
+release's exact source commit. App source reproducibility is not a claim that rebuilding
+the native toolchain yields a byte-identical AAR.
+
+Accuracy improvement is possible, not guaranteed; no measured speedup is claimed for
+this source artifact. arm64 16KB runtime remains untested: static PT_LOAD and ZIP alignment
+pass, with the ORT unrounded RELRO-end warning retained and no known LOAD protection
+overlap or demonstrated runtime crash. Do not turn this caveat into either a pass or a
+known failure. Release acceptance does not assert complete transitive SBOM/legal clearance.

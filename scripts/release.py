@@ -18,6 +18,8 @@ import time
 import urllib.request
 import zipfile
 
+import source_asr_release_assets as source_assets
+
 REPOSITORY = "csic21/FrameNest"
 APPLICATION_ID = "com.framenest"
 # Historical reference only. The trusted TARGET certificate is set separately
@@ -198,10 +200,11 @@ def package_release(source, tag, apk_dir, output, build_tools):
         (output / (filename + ".signature.txt")).write_text(report + "\n", encoding="utf-8")
         assets.append({"abi": abi, "size": target.stat().st_size, "sha256": digest(target),
                        "url": f"https://github.com/{REPOSITORY}/releases/download/{tag}/{filename}"})
+    source_asset_records = source_assets.package_assets(output, source, tag)
     update = make_update(version, tag, release_notes(version["versionName"]), assets)
     write_json(output / "update.json", update)
     provenance = {"schemaVersion": 1, "repository": REPOSITORY, "source_sha": source, "tag": tag,
-                  **version, "signer_sha256": pin, "assets": assets,
+                  **version, "signer_sha256": pin, "assets": assets, "source_asr_assets": source_asset_records,
                   "workflow_url": f"https://github.com/{REPOSITORY}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
                   "workflow_attempt": os.environ["GITHUB_RUN_ATTEMPT"]}
     write_json(output / "release-manifest.json", provenance)
@@ -229,6 +232,7 @@ def bundle_manifest(folder, source, tag):
         require(type(asset["size"]) is int and asset["size"] > 0 and path.stat().st_size == asset["size"] and digest(path) == asset["sha256"], "APK no longer matches the verified build.")
         require(parse_signers((folder / (filename + ".signature.txt")).read_text()) == {certificate_pin()}, "Signature report differs from the verified certificate.")
         names.update((filename, filename + ".signature.txt"))
+    names.update(source_assets.verify_assets(folder, source, tag, provenance["source_asr_assets"]))
     require({path.name for path in folder.iterdir()} == names and all(path.is_file() and not path.is_symlink() for path in folder.iterdir()), "Unexpected release bundle contents.")
     expected_sums = "".join(f"{digest(folder / name)}  {name}\n" for name in sorted(names - {"SHA256SUMS"}))
     require((folder / "SHA256SUMS").read_text() == expected_sums, "SHA256SUMS differs from the verified bundle.")

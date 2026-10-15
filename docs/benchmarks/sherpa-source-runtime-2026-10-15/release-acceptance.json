@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "status": "accepted-for-release-candidate-with-stated-limits",
+  "run_id": 38739397163,
+  "job_id": 116436847992,
+  "artifact_id": 11976112287,
+  "artifact_size_bytes": 266698432,
+  "artifact_sha256": "c582c3564ffafbae9051b5fad29081fbd744a0c370e9a06d94415971f74b690b",
+  "validator_source_commit": "95a08e2f6ba8cd1c630fe926743b4c61b3e50ba1",
+  "source_app_commit": "6216ecc3ad6cfe7a0cbb2100140ff4a7f9c788d0",
+  "source_aar_sha256": "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+  "app_apk_sha256": "d1966647e9cf6bfe7bede04fadb4f74f11a7f40143a288211f37f9cf37160d64",
+  "test_apk_sha256": "05e5e76f6f2b602942b6f97aa911b588ca4d826d279f9d2c752c4b1371788775",
+  "native_version_observed": "1.13.8",
+  "native_git_sha1": "8c8e275d",
+  "runtime_identity": "1.13.8-asr-no-tts-sha256-6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+  "fixture_manifest_sha256": "9231712ec85ec7a16b31000f3cb960f2a15b7e3ccc28758515452a2351f66f77",
+  "native_members": [
+    {
+      "abi": "arm64-v8a",
+      "path": "lib/arm64-v8a/libsherpa-onnx-jni.so",
+      "bytes": 3433440,
+      "sha256": "7c2add157be1d7ad3208f99ff4e5ebed6e50cccac6ef75b33b7b08d77cd7ddc7"
+    },
+    {
+      "abi": "arm64-v8a",
+      "path": "lib/arm64-v8a/libonnxruntime.so",
+      "bytes": 22249560,
+      "sha256": "33847ad43bffe204699fd4a27f7f3603452a8cdaf2f9a44983a0bc31ffcf2da1"
+    },
+    {
+      "abi": "x86_64",
+      "path": "lib/x86_64/libsherpa-onnx-jni.so",
+      "bytes": 3728696,
+      "sha256": "d5a02856e9e0a05b035628dbff5c6cdd6a3e8ef06e7a661ba1b364df746816e9"
+    },
+    {
+      "abi": "x86_64",
+      "path": "lib/x86_64/libonnxruntime.so",
+      "bytes": 25581120,
+      "sha256": "087e84297cad64acb823c3d901d6e0cc934e91add7cdb20da802cd1c0bea5c3e"
+    }
+  ],
+  "native_execution_abi": "x86_64",
+  "api": 35,
+  "sessions": 2,
+  "rows_per_session": 198,
+  "all_396_rows_equal_stock_1_13_8_except_decode_ms": true,
+  "kishida114_cer": {
+    "edits": 38,
+    "reference_characters": 436,
+    "ratio": 0.0871559633027523
+  },
+  "known_word_regressions": [
+    "広島サミット → 広島さと",
+    "握り拳 → 握りこ"
+  ],
+  "raw_recognizer_and_99_streams_balanced_each_session": true,
+  "production_close_reload_equal": true,
+  "cancelled_result_publication_suppressed": true,
+  "native_interrupt_proven": false,
+  "cancel_join_ms": [
+    1858.567094,
+    1822.260858
+  ],
+  "notice_ui_tests_passed": 7,
+  "notice_ui_configuration": "phone-sized x86_64 AVD only",
+  "kvm_original_and_restored_acl_records_equal": true,
+  "independent_comparison_sha256": "8530935ba8422e68cf355b46fbd3f3d1aa1affb6ab41f40450a2b654111baf63",
+  "session_report_sha256": [
+    "d5add35cba0b31d9901d514997eaedf07759ddbcbacddd71f17af4a5b6760e52",
+    "d91cf1c3d218091219c7186e216068f4b3a0fa30273caac043134d78c67176bc"
+  ],
+  "measured_source_speedup_accepted": false,
+  "arm64_runtime_tested": false,
+  "arm64_16kb_runtime_accepted": false,
+  "final_signed_r8_apk_tested": false,
+  "limits": "Same frozen inputs only, 33 windows include repeated windows; no universal accuracy, OPPO/NAS timing, tablet UI or bounded native cancellation claim. Final signed APK source/native/notice/signature/ABI/zipalign/feed checks remain required."
+}

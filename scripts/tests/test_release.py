@@ -7,10 +7,12 @@ from pathlib import Path
 import tempfile
 import os
 import subprocess
+import sys
 import zipfile
 import unittest
 from unittest.mock import patch
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 SPEC = importlib.util.spec_from_file_location("release", Path(__file__).resolve().parents[1] / "release.py")
 r = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(r)
@@ -19,6 +21,9 @@ OTHER = "b" * 40
 PIN = "1" * 64
 TAG = "v0.6.0-internal"
 FILES = {"first.apk": b"signed APK fixture", "update.json": b'{"versionCode":11}'}
+SOURCE_FILES = {"sherpa-onnx-1.13.8-asr-no-tts.aar": b"source AAR fixture",
+                "sherpa-onnx-1.13.8-asr-no-tts-NOTICE.txt": b"complete notice fixture",
+                "source-asr-provenance.json": b'{"fixture":true}'}
 MANIFEST = {"source_sha": SOURCE, "tag": TAG, "versionCode": 11, "signer_sha256": PIN,
             "files": {name: {"size": len(data), "sha256": hashlib.sha256(data).hexdigest()} for name, data in FILES.items()}}
 
@@ -335,6 +340,33 @@ class BundleTests(unittest.TestCase):
         environment = patch.dict(os.environ, {"GITHUB_RUN_ID": "123", "GITHUB_RUN_ATTEMPT": "1"})
         environment.start()
         self.addCleanup(environment.stop)
+        # These legacy fake APKs exercise publication guards, not the real AAR
+        # reader. The helper's independent tests own exact AAR/notice validation.
+        self.source_records = [{"name": name, "size": len(data), "sha256": hashlib.sha256(data).hexdigest(),
+                                "url": f"https://github.com/{r.REPOSITORY}/releases/download/{TAG}/{name}"}
+                               for name, data in SOURCE_FILES.items()]
+        source_package = patch.object(r.source_assets, "package_assets", side_effect=self.package_source_assets)
+        self.source_package = source_package.start()
+        self.addCleanup(source_package.stop)
+        source_verify = patch.object(r.source_assets, "verify_assets", side_effect=self.verify_source_assets)
+        self.source_verify = source_verify.start()
+        self.addCleanup(source_verify.stop)
+
+    def package_source_assets(self, output, source, tag):
+        self.assertEqual((SOURCE, TAG), (source, tag))
+        for name, data in SOURCE_FILES.items():
+            (output / name).write_bytes(data)
+        return copy.deepcopy(self.source_records)
+
+    def verify_source_assets(self, folder, source, tag, records):
+        self.assertEqual((SOURCE, TAG), (source, tag))
+        r.require(records == self.source_records, "Source asset records differ from fixture.")
+        for record in records:
+            path = folder / record["name"]
+            r.require(path.is_file() and not path.is_symlink(), "Source asset is missing or not a regular file.")
+            r.require(path.stat().st_size == record["size"] and r.digest(path) == record["sha256"],
+                      "Source asset bytes differ from fixture.")
+        return set(SOURCE_FILES)
 
     def tools(self, *args):
         if args[0].endswith("apksigner"):
@@ -350,11 +382,91 @@ class BundleTests(unittest.TestCase):
     def test_complete_bundle_round_trips_and_all_digests_match(self):
         self.package()
         manifest = r.bundle_manifest("artifacts", SOURCE, TAG)
-        self.assertEqual(9, len(manifest["files"]))
+        self.assertEqual(12, len(manifest["files"]))
         self.assertEqual(PIN, manifest["signer_sha256"])
         update = r.read_json("artifacts/update.json")
         self.assertEqual(list(r.ABIS), [item["abi"] for item in update["assets"]])
         self.assertEqual("- 更新说明", update["notes"])
+        self.assertNotIn("source_asr_assets", update)
+        self.assertEqual(set(SOURCE_FILES), set(manifest["files"]) & set(SOURCE_FILES))
+        for name, data in SOURCE_FILES.items():
+            self.assertEqual({"size": len(data), "sha256": hashlib.sha256(data).hexdigest()}, manifest["files"][name])
+        sums = Path("artifacts/SHA256SUMS").read_text()
+        self.assertEqual(11, len(sums.splitlines()))
+        for name in SOURCE_FILES:
+            self.assertIn(f"{r.digest(Path('artifacts') / name)}  {name}\n", sums)
+
+    def test_source_asset_hooks_are_mandatory_and_records_are_forwarded(self):
+        self.package()
+        self.source_package.assert_called_once_with(Path("artifacts"), SOURCE, TAG)
+        provenance = r.read_json("artifacts/release-manifest.json")
+        self.assertEqual(self.source_records, provenance["source_asr_assets"])
+        r.bundle_manifest("artifacts", SOURCE, TAG)
+        self.source_verify.assert_called_once_with(Path("artifacts"), SOURCE, TAG, self.source_records)
+
+    def test_source_packaging_failure_stops_bundle_creation(self):
+        self.source_package.side_effect = ValueError("Source release is not accepted.")
+        with self.assertRaisesRegex(ValueError, "not accepted"):
+            self.package()
+        self.assertFalse(Path("artifacts/release-manifest.json").exists())
+        self.assertFalse(Path("artifacts/SHA256SUMS").exists())
+
+    def test_missing_source_records_are_rejected(self):
+        self.package()
+        provenance = r.read_json("artifacts/release-manifest.json")
+        del provenance["source_asr_assets"]
+        r.write_json("artifacts/release-manifest.json", provenance)
+        with self.assertRaises(KeyError):
+            r.bundle_manifest("artifacts", SOURCE, TAG)
+        self.source_verify.assert_not_called()
+
+    def test_changed_source_records_are_not_ignored(self):
+        self.package()
+        corrupt = copy.deepcopy(self.source_records)
+        corrupt[0]["sha256"] = "0" * 64
+        for records in ([], self.source_records[:-1], self.source_records + self.source_records[:1], corrupt):
+            provenance = r.read_json("artifacts/release-manifest.json")
+            provenance["source_asr_assets"] = records
+            r.write_json("artifacts/release-manifest.json", provenance)
+            with self.subTest(records=records), self.assertRaisesRegex(ValueError, "records differ"):
+                r.bundle_manifest("artifacts", SOURCE, TAG)
+            self.assertEqual(records, self.source_verify.call_args.args[3])
+
+    def test_source_verification_failure_stops_publication_bundle(self):
+        self.package()
+        self.source_verify.side_effect = ValueError("Source provenance is invalid.")
+        with self.assertRaisesRegex(ValueError, "provenance is invalid"):
+            r.bundle_manifest("artifacts", SOURCE, TAG)
+
+    def test_changed_or_missing_source_assets_are_rejected(self):
+        self.package()
+        for name, original in SOURCE_FILES.items():
+            path = Path("artifacts") / name
+            for missing in (False, True):
+                if missing:
+                    path.unlink()
+                else:
+                    path.write_bytes(b"altered")
+                with self.subTest(name=name, missing=missing), self.assertRaises(ValueError):
+                    r.bundle_manifest("artifacts", SOURCE, TAG)
+                path.write_bytes(original)
+
+    def test_source_asset_set_remains_exact(self):
+        self.package()
+        # Even if a helper omitted a filename, the final allowlist must reject
+        # the unverified file rather than including arbitrary directory output.
+        self.source_verify.side_effect = None
+        self.source_verify.return_value = set(SOURCE_FILES) - {"sherpa-onnx-1.13.8-asr-no-tts-NOTICE.txt"}
+        with self.assertRaisesRegex(ValueError, "Unexpected release bundle contents"):
+            r.bundle_manifest("artifacts", SOURCE, TAG)
+
+    def test_checksums_cannot_omit_source_assets(self):
+        self.package()
+        sums = Path("artifacts/SHA256SUMS")
+        sums.write_text("".join(line for line in sums.read_text().splitlines(keepends=True)
+                                if not any(line.endswith("  " + name + "\n") for name in SOURCE_FILES)))
+        with self.assertRaisesRegex(ValueError, "SHA256SUMS differs"):
+            r.bundle_manifest("artifacts", SOURCE, TAG)
 
     def test_altered_apk_is_rejected_before_publication(self):
         self.package()

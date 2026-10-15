@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "sessions": [
+    {
+      "session": 1,
+      "completed": true,
+      "rows": 198,
+      "lifecycle": {
+        "raw_recognizer_created": 1,
+        "raw_recognizer_released": 1,
+        "raw_stream_created": 99,
+        "raw_stream_released": 99,
+        "production_ensure_calls": 3,
+        "production_recognize_calls": 102,
+        "production_close_calls": 3,
+        "production_native_allocations_observable": false
+      },
+      "cancellation_probe": {
+        "pre_dispatch_cancel_skipped_body": true,
+        "requested_after_call_entry": true,
+        "completed_before_cancel": false,
+        "cancellation_took_effect": true,
+        "cancellation_observed_by_caller": true,
+        "result_publication_suppressed": true,
+        "cancel_join_ms": 1858.567094,
+        "native_decode_interrupted_proven": false,
+        "scope": "Coroutine publication and reuse only. Entry precedes Dispatchers.IO; no native-start hook. JNI decode may finish before cancellation is observed; no seek/player lifecycle or bounded native cancellation claim."
+      }
+    },
+    {
+      "session": 2,
+      "completed": true,
+      "rows": 198,
+      "lifecycle": {
+        "raw_recognizer_created": 1,
+        "raw_recognizer_released": 1,
+        "raw_stream_created": 99,
+        "raw_stream_released": 99,
+        "production_ensure_calls": 3,
+        "production_recognize_calls": 102,
+        "production_close_calls": 3,
+        "production_native_allocations_observable": false
+      },
+      "cancellation_probe": {
+        "pre_dispatch_cancel_skipped_body": true,
+        "requested_after_call_entry": true,
+        "completed_before_cancel": false,
+        "cancellation_took_effect": true,
+        "cancellation_observed_by_caller": true,
+        "result_publication_suppressed": true,
+        "cancel_join_ms": 1822.260858,
+        "native_decode_interrupted_proven": false,
+        "scope": "Coroutine publication and reuse only. Entry precedes Dispatchers.IO; no native-start hook. JNI decode may finish before cancellation is observed; no seek/player lifecycle or bounded native cancellation claim."
+      }
+    }
+  ],
+  "session_scope": "One AVD; two fresh app installs/processes; OS caches may remain warm",
+  "historical_stock_timing_comparison_accepted": false,
+  "accuracy_accepted": false,
+  "hardware_performance_accepted": false,
+  "arm64_tested": false,
+  "device_16k_accepted": false,
+  "different_output_row_indices": [],
+  "two_fresh_sessions_output_equal": true
+}
