@@ -81,7 +81,6 @@ jobs:
           sdkmanager --install emulator 'system-images;android-35;google_apis;x86_64' < /dev/null
           test -f "$ANDROID_HOME/system-images/android-35/google_apis/x86_64/system.img"
           cp "$ANDROID_HOME/system-images/android-35/google_apis/x86_64/source.properties" "$FN74_RESULTS/system-image.properties"
-          "$ANDROID_HOME/emulator/emulator" -version > "$FN74_RESULTS/emulator-version.txt" 2>&1
 
       - name: Install official emulator runtime libraries
         timeout-minutes: 5
@@ -89,6 +88,7 @@ jobs:
           sudo -n apt-get update
           sudo -n apt-get install --no-install-recommends -y acl libpulse0 libnss3 libxkbcommon0 libxcomposite1 libxcursor1 libxi6 libxrandr2 libxtst6
           ldd "$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64" > "$FN74_RESULTS/emulator-libraries.txt"
+          "$ANDROID_HOME/emulator/emulator" -version > "$FN74_RESULTS/emulator-version.txt" 2>&1
 
       - name: Closed current-UID one-run KVM access step
         # CLOSED independently; no standing grant or run-number approval exists.

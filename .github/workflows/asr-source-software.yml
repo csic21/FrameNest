@@ -20,8 +20,8 @@ concurrency:
 
 jobs:
   source-software-probe:
-    # One new workflow run only; retries and subsequent pushes cannot execute it.
-    if: github.run_number == 1 && github.run_attempt == 1
+    # One setup retry only; run 1 failed before boot while loading emulator libraries.
+    if: github.run_number == 2 && github.run_attempt == 1
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -84,7 +84,6 @@ jobs:
           sdkmanager --install emulator 'system-images;android-35;google_apis;x86_64' < /dev/null
           test -f "$ANDROID_HOME/system-images/android-35/google_apis/x86_64/system.img"
           cp "$ANDROID_HOME/system-images/android-35/google_apis/x86_64/source.properties" "$FN74_RESULTS/system-image.properties"
-          "$ANDROID_HOME/emulator/emulator" -version > "$FN74_RESULTS/emulator-version.txt" 2>&1
 
       - name: Install official emulator runtime libraries
         timeout-minutes: 3
@@ -92,6 +91,7 @@ jobs:
           sudo -n apt-get update
           sudo -n apt-get install --no-install-recommends -y libpulse0 libnss3 libxkbcommon0 libxcomposite1 libxcursor1 libxi6 libxrandr2 libxtst6
           ldd "$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64" > "$FN74_RESULTS/emulator-libraries.txt"
+          "$ANDROID_HOME/emulator/emulator" -version > "$FN74_RESULTS/emulator-version.txt" 2>&1
 
       - name: Run one fail-fast software probe using the exact retained pair
         timeout-minutes: 63

@@ -133,10 +133,10 @@ if phase not in ('boot', 'session-1', 'session-2'):
 
 
 class SoftwareRouteStaticTest(unittest.TestCase):
-    def test_only_exact_new_branch_push_and_first_attempt_can_run(self):
+    def test_only_exact_branch_setup_retry_and_first_attempt_can_run(self):
         workflow = (ROOT / '.github/workflows/asr-source-software.yml').read_text()
         self.assertIn("branches: ['experiment/FN-74-asr-source-acceptance']", workflow)
-        self.assertIn('if: github.run_number == 1 && github.run_attempt == 1', workflow)
+        self.assertIn('if: github.run_number == 2 && github.run_attempt == 1', workflow)
         self.assertNotIn('workflow_dispatch', workflow)
         self.assertNotIn('pull_request', workflow)
         trigger = workflow.split('permissions:')[0]
@@ -170,6 +170,18 @@ class SoftwareRouteStaticTest(unittest.TestCase):
         self.assertIn('-e sourceRuntimeComparison true -e expectedRuntime 1.13.8', runner)
         self.assertIn('sha256sum -c APK-SHA256SUMS', runner)
         subprocess.run(['bash', '-n', str(SCRIPTS / 'run_source_software_sessions.sh')], check=True)
+
+    def test_emulator_version_runs_only_after_runtime_libraries_are_installed(self):
+        for route in ('software', 'runtime'):
+            with self.subTest(route=route):
+                workflow = (ROOT / f'.github/workflows/asr-source-{route}.yml').read_text()
+                command = '"$ANDROID_HOME/emulator/emulator" -version'
+                self.assertEqual(workflow.count(command), 1)
+                libraries = workflow.split('      - name: Install official emulator runtime libraries\n', 1)[1].split('      - name:', 1)[0]
+                install = next(line for line in libraries.splitlines() if 'apt-get install' in line)
+                self.assertIn('libpulse0', install)
+                self.assertIn(command, libraries)
+                self.assertLess(libraries.index(install), libraries.index(command))
 
     def test_accelerated_route_stays_closed(self):
         workflow = (ROOT / '.github/workflows/asr-source-runtime.yml').read_text()

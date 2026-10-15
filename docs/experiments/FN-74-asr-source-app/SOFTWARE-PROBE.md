@@ -2,8 +2,9 @@
 
 This separate ordinary-CI probe consumes the already retained app/test pair from
 `runtime-input-lock.json`. It never builds APKs, native libraries, models or PCM.
-Only the first run and first attempt of `asr-source-software.yml`, on its exact
-source-acceptance branch and listed path changes, can execute. A failure ends this
+Only run 2, attempt 1 of `asr-source-software.yml`, on its exact source-acceptance
+branch and listed path changes, can execute. This is the bounded setup retry for
+run 1, which failed before boot while loading the emulator version command. A failure ends this
 probe; changing time limits, retrying, or enabling acceleration needs a new decision.
 The accelerated workflow remains disabled.
 
@@ -37,3 +38,14 @@ JSON, per-session status and checks, separate UI result, and final probe status.
 Only the emulator PID recorded by this run is stopped. Offline tests replace all
 launches with mocks and verify failure short-circuiting, exact-identity rejection,
 explicit software timing labels and absence of acceleration/permission commands.
+
+## Run 1 setup failure
+
+Run [38731905439](https://github.com/csic21/FrameNest/actions/runs/38731905439)
+failed before boot: `emulator -version` ran before the runtime-library installation
+step and the loader could not find `libpulse.so.0` (exit 127). The retained input
+pair was already verified, but no AVD/ASR/UI session ran. Evidence is in
+`software-run1/failure.json` and the preserved `emulator-version.txt`; the original
+artifact archive SHA-256 is recorded there. The narrow retry moves the version
+command after the existing library installation in both workflows. APK pins,
+launch flags, time limits and the disabled accelerated gates are unchanged.
