@@ -19,8 +19,8 @@ concurrency:
 
 jobs:
   comparison:
-    # Recovery-only event: cancel the failed predecessor; no KVM or test job.
-    if: false
+    # Retry of the approved test; run4 failed before granting any KVM ACL.
+    if: github.run_number == 6 && github.run_attempt == 1
     runs-on: ubuntu-latest
     timeout-minutes: 75
     env:
@@ -38,14 +38,16 @@ jobs:
           accept-android-sdk-licenses: false
       - name: Install supported SDK without accepting new licenses
         run: |
+          set -euxo pipefail
           sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' emulator 'system-images;android-35;google_apis;x86_64' < /dev/null
           test -f "$ANDROID_HOME/platforms/android-36/android.jar"
           test -f "$ANDROID_HOME/system-images/android-35/google_apis/x86_64/system.img"
-          command -v ffmpeg
-      - name: Install official emulator runtime libraries
+      - name: Install official fixture and emulator runtime libraries
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y libpulse0 libnss3 libxkbcommon0 libxcomposite1 libxcursor1 libxi6 libxrandr2 libxtst6
+          sudo apt-get install --no-install-recommends -y ffmpeg libpulse0 libnss3 libxkbcommon0 libxcomposite1 libxcursor1 libxi6 libxrandr2 libxtst6
+          command -v ffmpeg
+          ffmpeg -version
           ldd "$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64"
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
       - name: Prepare byte-identical public inputs once for both complete APKs
@@ -68,7 +70,7 @@ jobs:
           test "$(sha256sum runtime-results/apks/baseline/app.apk | cut -d' ' -f1)" != "$(sha256sum runtime-results/apks/candidate/app.apk | cut -d' ' -f1)"
           ./gradlew --stop
       - name: Grant approved one-run current-user KVM access
-        if: github.run_number == 4 && github.run_attempt == 1
+        if: github.run_number == 6 && github.run_attempt == 1
         run: |
           set -euo pipefail
           test -c /dev/kvm
