@@ -1201,3 +1201,10 @@ unit test、lint、debug/release assemble 与 AndroidTest 编译通过。真实 
 **目标**：通过真实File PCM、SenseVoice、ML Kit ja→zh、Room及会话叠层选择跑通固定样本；严禁用假译文替代。
 
 验收：默认3秒窗口，分开记录媒体PTS与源/双语就绪；冷下载和暖下载缓存/重新加载native分组。视频URL/字节长度/SHA固定，许可归属随fixture；原视频不提交仓库。独立PR路径/手动触发限定重型下载，失败关闭，无新密钥或系统权限修改。结果只证明模拟器本地文件功能子门槛，不等于OPPO/NAS/物理渲染或翻译准确率验收。用户已授权测试与验收成功后的发布；未满足相关验收前不得发布。
+
+
+## FN-74：已核验 source-ASR AAR 的独立 app 构建 profile
+
+**拥有路径**：独立实验分支的 opt-in Gradle profile、source-only 缓存身份、固定 artifact 导入脚本、APK 静态审计、普通 CI 和对应测试/文档。
+**目标**：在 recipe 分支基础上，以固定 AAR SHA 完成 app assemble/unit/lint/仪器编译；默认稳定 1.12.32、模型和 MT 不变，不修改 stock PR #6。
+**验收边界**：保留实际 APK 与摘要，核嵌入 JNI/ORT、DEX 类、notices、ELF/ZIP；不运行设备、不修改 KVM、不发布。source identity 与 upstream VersionInfo 1.13.8 分开；性能、真实 4KB/16KB、法律和重现性另行验收。

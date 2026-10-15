@@ -8,6 +8,17 @@ import org.junit.Test
 class SherpaModelSpecTest {
 
     @Test
+    fun sourceRuntimeIdentity_doesNotReuseStockCues_orChangeTheModelPack() {
+        val sourceIdentity = "1.13.8-asr-no-tts-sha256-6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503"
+        val source = SherpaAsrModelSupport.cacheModelLabel(true, sourceIdentity)
+        assertEquals(SherpaModelInstaller.MODEL_VERSION, SherpaAsrModelSupport.cacheModelLabel(false, "1.12.32"))
+        assertEquals("${SherpaModelInstaller.MODEL_VERSION}|sherpa-$sourceIdentity", source)
+        assertNotEquals(SherpaModelInstaller.MODEL_VERSION, source)
+        assertNotEquals("${SherpaModelInstaller.MODEL_VERSION}|sherpa-1.13.8", source)
+        assertNotEquals(source, SherpaAsrModelSupport.cacheModelLabel(true, "$sourceIdentity-other-bytes"))
+    }
+
+    @Test
     fun packFiles_arePinnedToAnImmutableRevision() {
         assertEquals(2, SherpaModelInstaller.FILES.size)
         val byName = SherpaModelInstaller.FILES.associateBy { it.name }

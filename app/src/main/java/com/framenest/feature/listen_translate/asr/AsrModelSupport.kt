@@ -1,5 +1,6 @@
 package com.framenest.feature.listen_translate.asr
 
+import com.framenest.BuildConfig
 import com.framenest.data.settings.AsrEngineChoice
 import java.io.File
 
@@ -112,5 +113,14 @@ class SherpaAsrModelSupport(
     override fun readyMessage(sourceLang: String): String =
         "本机听译已就绪：SenseVoice($sourceLang，含标点） + ML Kit Translate"
 
-    override fun modelLabel(sourceLang: String): String = SherpaModelInstaller.MODEL_VERSION
+    override fun modelLabel(sourceLang: String): String = cacheModelLabel(
+        BuildConfig.SHERPA_ASR_SOURCE, BuildConfig.SHERPA_RUNTIME_IDENTITY,
+    )
+
+    companion object {
+        /** Preserve stable caches; the source profile cannot consume stock runtime cues. */
+        internal fun cacheModelLabel(sourceProfile: Boolean, runtimeIdentity: String): String =
+            if (sourceProfile) "${SherpaModelInstaller.MODEL_VERSION}|sherpa-$runtimeIdentity"
+            else SherpaModelInstaller.MODEL_VERSION
+    }
 }

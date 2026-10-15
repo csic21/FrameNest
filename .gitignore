@@ -12,6 +12,7 @@ captures/
 *.apk
 *.ap_
 *.aab
+app/libs/sherpa-onnx-1.13.8-asr-no-tts.aar
 *.log
 
 
