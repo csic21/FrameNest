@@ -1,0 +1,17 @@
+{
+  "source_commit": "5c7d605ae25063a72bf2343d6298099f3e69428b",
+  "run_id": 38733262176,
+  "job_id": 116416034166,
+  "artifact_id": 11972016933,
+  "artifact_size_bytes": 265998587,
+  "artifact_sha256": "6d78113b2a7afb8ad7daa5a2c6231934d40ee885127315402b782631bc94e5c7",
+  "boot_deadline_seconds": 900,
+  "failed_phase": "boot",
+  "exit_code": 124,
+  "native_tests_executed": false,
+  "ui_tests_executed": false,
+  "kvm_acl_changed": false,
+  "source_apk_changed": false,
+  "cleanup": "emulator kill acknowledged; workflow cleanup passed",
+  "conclusion": "No completed boot within bounded software probe; no source-runtime acceptance or performance result. Stop software retries."
+}

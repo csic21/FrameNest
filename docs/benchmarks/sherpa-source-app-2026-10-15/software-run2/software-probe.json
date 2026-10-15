@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "status": "failed",
+  "execution_backend": "android-emulator-software-tcg",
+  "acceleration": "off",
+  "timing_interpretation": "All wall times are software-emulation cost only, never product speed or historical-stock speedup",
+  "hardware_performance_accepted": false,
+  "accuracy_accepted": false,
+  "historical_stock_timing_comparison_accepted": false,
+  "failed_phase": "boot",
+  "exit_code": 124,
+  "phases_after_failure_attempted": false
+}
