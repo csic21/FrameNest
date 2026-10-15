@@ -1,0 +1,19 @@
+# Qwen3-ASR isolated benchmark, 2026-10-15
+No production changes. One stronger ASR candidate, official k2-fsa 2026-03-25 int8 archive, verified release SHA256 in model-source.json; extracted file hashes in model-files.json. Runtime official PyPI sherpa-onnx 1.13.8, isolated venv; fixed requirements.txt. Native API defaults verified against v1.13.8 official-example.py. 2 CPU affinity / 2 inference threads. SenseVoice same runtime, same int8 model, ja + ITN. Qwen Japanese language stream hint, no hotwords or reference prompt, greedy near-zero temperature, seed42, total512/new128 defaults. Exact previous Silero VAD intervals reused for both models, not regenerated or reference-segmented; gaps retained and not counted as recognized. Fixed PCM verified against prior manifest. Full Emoji and Kishida plus separately truncated first114s Kishida, one initial pass and two warm repeats, full raw text and segments retained. Only first114s has independent edited Commons reference; normalization identical NFKC lowercase whitespace/P/S removal, remove unspoken parenthesized question, 436chars. Emoji has no gold CER. VAD compute excluded from new runtime numbers. First-text timing is whole-segment offline decode with its input-ready position, not token streaming. Model-load recorded separately; OS cache is uncontrolled. PeakRSS process-wide. Qwen timestamps expected empty; VAD envelope cannot supply word alignment. Cloud CPU figures are not OPPO device promises. No MT benchmark.
+
+## Verified official sources
+- https://k2-fsa.github.io/sherpa/onnx/qwen3-asr/pretrained.html
+- https://github.com/k2-fsa/sherpa-onnx/releases/tag/v1.13.8
+- https://github.com/k2-fsa/sherpa-onnx/blob/v1.13.8/python-api-examples/offline-qwen3-asr-decode-files.py
+- https://huggingface.co/Qwen/Qwen3-ASR-0.6B (metadata revision 5eb144179a02acc5e5ba31e748d22b0cf3e303b0, Apache-2.0)
+- https://github.com/QwenLM/Qwen3-ASR/blob/main/LICENSE (retrieved copy QWEN-LICENSE)
+
+Model/tokenizer/readme bytes excluding supplied test audio:987015675 (941.29MiB). Archive878702423bytes.
+Host CPU model/quota unavailable from mounted sysfs; two scheduler-affinity IDs and inference threads are controlled, hardware identity is not known.
+
+First-visible fields in SUMMARY are arithmetic estimates: source first VAD-ready position plus measured first-pass segment decode (and model-load for cold estimate); they are not observed live playback latencies, exclude VAD computation and IO/player costs, and assume initialization completes before sequential playback begins. Only Emoji is the process's first decode; later clips are loaded-model conditions. `load_seconds` is first process model creation, not guaranteed disk-cache cold. Runtime ASR elapsed includes small local evidence-write overhead between segments. Final results contain three passes with identical text. Qwen max decoded output tokens74<128, no observed generation-cap exhaustion. Process peakRSS grows across repeated tests, final 3282.49MiB; not an Android memory bound.
+
+## Public fixture attribution and reuse
+Emoji: Simpleshow Japan, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:Emoji.webm . Machine-derived transcripts are testing adaptations, may contain errors, and are shared under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
+Kishida: Cabinet Public Affairs Office / Prime Minister's Office of Japan, CC BY 4.0 via Commons GJSTU declaration, https://commons.wikimedia.org/wiki/File:Fumio_Kishida%27s_press_conference_the_day_after_attacked.webm . ASR is a testing adaptation, not an official transcript or endorsement. https://creativecommons.org/licenses/by/4.0/ .
+Independent edited community captions: https://commons.wikimedia.org/wiki/TimedText:Fumio_Kishida%27s_press_conference_the_day_after_attacked.webm.ja.srt . Frozen SRT hash in CONTROL-VERIFICATION.json; not verbatim gold. No media or model weights are committed.

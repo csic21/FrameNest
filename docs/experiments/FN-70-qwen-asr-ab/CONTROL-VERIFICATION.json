@@ -1,0 +1,60 @@
+{
+  "models": [
+    {
+      "file": "sensevoice/tokens.txt",
+      "url": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/tokens.txt",
+      "bytes": 315894,
+      "sha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+      "verified_sha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc"
+    },
+    {
+      "file": "sensevoice/model.int8.onnx",
+      "url": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/model.int8.onnx",
+      "bytes": 239233841,
+      "sha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+      "verified_sha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51"
+    },
+    {
+      "file": "silero_vad.onnx",
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+      "bytes": 643854,
+      "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+      "verified_sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"
+    }
+  ],
+  "window_hashes": {
+    "emoji": "d9d425840e27aa14834c4ce3003e9b67beec0666c0cf2f85b74f947b56de427a",
+    "kishida": "05d6290db94beb5444b320998323bb6ac47ff8b423b23fc331bcca01efdb4d64",
+    "kishida114": "1006a6810a6dcf1ae44f95bdc54012faf9c87ab9b22eb6a2004cf0b5313bf6a2"
+  },
+  "pcm_and_reference_manifest": [
+    {
+      "file": "emoji.webm",
+      "bytes": 9487128,
+      "sha256": "ad3af093836cad823ef1793ff4d505139eed92dd7e7402de4c015a2ed50d5956"
+    },
+    {
+      "file": "kishida.webm",
+      "bytes": 62832144,
+      "sha256": "f99bc9087c05ba69ad6b33ac7fbe35856a4c8ca0d261a38b7f76f5b8a1f60de9"
+    },
+    {
+      "file": "emoji.wav",
+      "bytes": 3646798,
+      "sha256": "d86a5232679fdd0d8633770014c9e18a7fd76eb0070fc7585e543303724cedfe"
+    },
+    {
+      "file": "kishida.wav",
+      "bytes": 5625252,
+      "sha256": "eb8d168d4b4b4c608be8d8bc212cbc24c5ee568f6b7cb190d87abe372072a698"
+    },
+    {
+      "file": "kishida-reference.srt",
+      "bytes": 2498,
+      "sha256": "ce02aff6fe86dc09f632f490786c4a159fc3387aaf0b10061018882a3ce56635"
+    }
+  ],
+  "same_affinity_and_threads": true,
+  "old_script": "/workspace/scratch/46a1f16e529d/reazon-ab/benchmark_vad.py",
+  "new_script": "/workspace/scratch/46a1f16e529d/qwen-asr-ab/benchmark.py"
+}
