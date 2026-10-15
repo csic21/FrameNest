@@ -1,7 +1,9 @@
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -12,26 +14,55 @@ import collect_source_asr_pair as target
 
 
 class PairManifestTests(unittest.TestCase):
-    def test_generated_config_separates_version_identity_and_disables_hy(self):
-        values = {'SHERPA_ASR_SOURCE': 'true', 'HY_MT_NATIVE': 'false',
+    def compile_config(self, root, identity=None, hy=False, package='com.framenest'):
+        values = {'SHERPA_ASR_SOURCE': 'true', 'HY_MT_NATIVE': str(hy).lower(),
                   'SHERPA_RUNTIME_VERSION': '"1.13.8"',
-                  'SHERPA_RUNTIME_IDENTITY': '"' + target.LOCK['runtime_identity'] + '"',
-                  'SHERPA_AAR_SHA256': '"' + target.LOCK['aar_sha256'] + '"'}
-        text = '\n'.join('public static final ' + ('boolean' if k in ('HY_MT_NATIVE', 'SHERPA_ASR_SOURCE') else 'String')
-                         + ' ' + k + ' = ' + v + ';' for k, v in values.items())
+                  'SHERPA_RUNTIME_IDENTITY': json.dumps(identity or target.LOCK['runtime_identity']),
+                  'SHERPA_AAR_SHA256': json.dumps(target.LOCK['aar_sha256'])}
+        declarations = '\n'.join('public static final ' + ('boolean' if k in ('HY_MT_NATIVE', 'SHERPA_ASR_SOURCE') else 'String')
+                                 + ' ' + k + ' = ' + v + ';' for k, v in values.items())
+        source = root / 'source' / package.replace('.', '/') / 'BuildConfig.java'
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text('package ' + package + '; public final class BuildConfig {' + declarations + '}')
+        output = root / 'intermediates/javac/debug/compileDebugJavaWithJavac/classes'
+        subprocess.run(['java', '-m', 'jdk.compiler/com.sun.tools.javac.Main', '-source', '17', '-target', '17', '-d', str(output), str(source)], check=True, capture_output=True)
+        return output / package.replace('.', '/') / 'BuildConfig.class'
+
+    def test_compiled_config_separates_version_identity_and_disables_hy(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory); path = root / 'BuildConfig.java'
-            path.write_text(text)
-            target.verify_build_config(root)
-            path.write_text(text.replace('HY_MT_NATIVE = false', 'HY_MT_NATIVE = true'))
+            root = Path(directory)
+            self.compile_config(root)
+            self.compile_config(root, package='com.framenest.test')
+            report = target.verify_build_config(root, root)
+            self.assertEqual(report['observed_constants']['SHERPA_RUNTIME_VERSION'], '1.13.8')
+            self.assertEqual(report['observed_constants']['HY_MT_NATIVE'], False)
+            self.assertEqual(len(report['paths']), 1)
+            self.assertEqual(hashlib.sha256((root / 'compiled-BuildConfig.class').read_bytes()).hexdigest(), report['sha256'])
+            self.compile_config(root, hy=True)
             with self.assertRaisesRegex(ValueError, 'HY_MT_NATIVE'):
                 target.verify_build_config(root)
-            path.write_text(text.replace('SHERPA_RUNTIME_VERSION = "1.13.8"',
-                                         'SHERPA_RUNTIME_VERSION = "' + target.LOCK['runtime_identity'] + '"'))
-            with self.assertRaisesRegex(ValueError, 'SHERPA_RUNTIME_VERSION'):
+            path = self.compile_config(root, identity='stock-1.13.8')
+            with self.assertRaisesRegex(ValueError, 'SHERPA_RUNTIME_IDENTITY'):
                 target.verify_build_config(root)
             path.unlink()
-            with self.assertRaises(ValueError):
+            with self.assertRaisesRegex(ValueError, 'Missing compiled'):
+                target.verify_build_config(root)
+
+    def test_conflicting_compiled_class_or_wrong_internal_name_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = self.compile_config(root)
+            duplicate = root / 'other/debug/com/framenest/BuildConfig.class'
+            duplicate.parent.mkdir(parents=True)
+            duplicate.write_bytes(path.read_bytes())
+            self.assertEqual(len(target.verify_build_config(root)['paths']), 2)
+            self.compile_config(root, hy=True)
+            with self.assertRaisesRegex(ValueError, 'Conflicting'):
+                target.verify_build_config(root)
+            duplicate.unlink()
+            wrong = self.compile_config(root, package='com.framenest.test')
+            path.write_bytes(wrong.read_bytes())
+            with self.assertRaisesRegex(ValueError, 'wrong class identity'):
                 target.verify_build_config(root)
 
     def test_real_frozen_manifest_uses_pcm_sha256_and_exact_byte_lengths(self):
@@ -79,6 +110,43 @@ class PairManifestTests(unittest.TestCase):
             assets, sha, apk = self.fixture(Path(directory))
             with patch.object(target, 'ASSETS', assets), patch.object(target, 'FROZEN_MANIFEST', sha):
                 self.assertEqual(target.verify_test_assets(apk)['prepared_assets_verified'], 5)
+
+    def test_collector_end_to_end_contract_with_compiled_profile(self):
+        # App payloads stand in for previously audited APKs; fixture assets are
+        # synthetic. This exercises collector paths/schema, not Android runtime.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            assets, sha, test_apk = self.fixture(root)
+            self.compile_config(root / 'app/build')
+            apk_root = root / 'app/build/outputs/apk'
+            evidence = root / 'evidence'; evidence.mkdir()
+            audited = []
+            for member, abis in target.APP_VARIANTS.items():
+                path = apk_root / member; path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(member.encode())
+                audited.append(dict(target.file_record(path, str(path)), abis=abis,
+                                    source_profile_supplement_verified=True))
+            test_destination = apk_root / target.TEST_APK
+            test_destination.parent.mkdir(parents=True)
+            test_destination.write_bytes(test_apk.read_bytes())
+            (evidence / 'apk-static-audit.json').write_text(json.dumps({
+                'status': 'static-content-checks-passed', 'aar_sha256': target.LOCK['aar_sha256'],
+                'apks': audited}))
+            (evidence / 'input-preparation.json').write_text(json.dumps({
+                'status': 'passed', 'all_inputs_verified': True, 'manifest_sha256': sha}))
+            env = {'GITHUB_REPOSITORY': target.LOCK['repository'], 'GITHUB_SHA': 'a' * 40,
+                   'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '1'}
+            with patch.object(target, 'ROOT', root), patch.object(target, 'ASSETS', assets), \
+                    patch.object(target, 'FROZEN_MANIFEST', sha), patch.dict(os.environ, env):
+                target.collect(apk_root, evidence)
+            report = json.loads((apk_root / 'source-app-pair.json').read_text())
+            self.assertEqual(len(report['apks']), 4)
+            self.assertEqual(len(report['evidence_files']), 4)
+            self.assertEqual(report['source']['commit'], 'a' * 40)
+            self.assertFalse(report['runtime_tested'])
+            self.assertEqual((apk_root / 'source-app-pair.json').read_bytes(),
+                             (evidence / 'source-app-pair.json').read_bytes())
+            self.assertEqual(len(list(apk_root.rglob('*.*'))), 9)
 
     def test_corrupt_extra_missing_or_unready_test_assets_fail(self):
         def corrupt_model(members):

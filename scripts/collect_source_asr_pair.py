@@ -7,8 +7,9 @@ import os
 from pathlib import Path
 import re
 import shutil
+import subprocess
 
-from check_source_asr_apk import SafeZip, SUPPLEMENT_SHA256, file_sha256, require
+from check_source_asr_apk import SafeZip, SUPPLEMENT_SHA256, classfile, file_sha256, require
 from prepare_source_asr import LOCK, ROOT
 
 ASSETS = ROOT / 'app/src/androidTest/assets/runtime-comparison'
@@ -21,18 +22,41 @@ APP_VARIANTS = {
 TEST_APK = 'androidTest/debug/app-debug-androidTest.apk'
 
 
-def verify_build_config(generated_root):
-    sources = [p.read_text() for p in generated_root.rglob('BuildConfig.java')]
-    sources = [text for text in sources if 'SHERPA_RUNTIME_IDENTITY' in text]
-    require(len(sources) == 1, 'Expected exactly one generated app source BuildConfig')
-    text = sources[0]
-    expected = {'SHERPA_ASR_SOURCE': 'true', 'HY_MT_NATIVE': 'false',
-                'SHERPA_RUNTIME_VERSION': '"' + LOCK['upstream_version'] + '"',
-                'SHERPA_RUNTIME_IDENTITY': '"' + LOCK['runtime_identity'] + '"',
-                'SHERPA_AAR_SHA256': '"' + LOCK['aar_sha256'] + '"'}
+def verify_build_config(build_root, evidence=None):
+    # AGP generates both app and test BuildConfig sources. Inspect the actual
+    # compiled app class by exact namespace, never source text or test constants.
+    suffix = 'com/framenest/BuildConfig.class'
+    classes = [p for p in build_root.rglob('BuildConfig.class')
+               if p.as_posix().endswith('/' + suffix)
+               and 'debug' in p.relative_to(build_root).parts]
+    require(bool(classes), 'Missing compiled debug app BuildConfig.class')
+    hashes = {file_sha256(p) for p in classes}
+    require(len(hashes) == 1, 'Conflicting compiled app BuildConfig classes')
+    path = sorted(classes)[0]
+    require(classfile(path.read_bytes())[0] == 'Lcom/framenest/BuildConfig;',
+            'Compiled BuildConfig has wrong class identity')
+    output = subprocess.run(['java', '-m', 'jdk.jdeps/com.sun.tools.javap.Main', '-constants', '-p', str(path)],
+                            check=True, capture_output=True, text=True).stdout
+    expected = {'SHERPA_ASR_SOURCE': True, 'HY_MT_NATIVE': False,
+                'SHERPA_RUNTIME_VERSION': LOCK['upstream_version'],
+                'SHERPA_RUNTIME_IDENTITY': LOCK['runtime_identity'],
+                'SHERPA_AAR_SHA256': LOCK['aar_sha256']}
+    observed = {}
     for name, value in expected.items():
-        values = re.findall(r'public\s+static\s+final\s+(?:String|boolean)\s+' + name + r'\s*=\s*([^;]+);', text)
-        require(values == [value], 'Generated BuildConfig profile mismatch: ' + name)
+        kind = 'boolean' if isinstance(value, bool) else r'java\.lang\.String'
+        values = re.findall(r'public\s+static\s+final\s+' + kind + r'\s+' + name + r'\s*=\s*([^;]+);', output)
+        require(len(values) == 1, 'Missing or duplicate compiled BuildConfig constant: ' + name)
+        observed[name] = json.loads(values[0])
+        require(type(observed[name]) is type(value) and observed[name] == value,
+                'Compiled BuildConfig profile mismatch: ' + name)
+    report = {'method': 'JDK javap -constants on compiled app class (not executed)',
+              'class': 'com.framenest.BuildConfig', 'sha256': next(iter(hashes)),
+              'paths': [p.relative_to(build_root).as_posix() for p in sorted(classes)],
+              'observed_constants': observed}
+    if evidence is not None:
+        (evidence / 'compiled-build-config.json').write_text(json.dumps(report, indent=2) + '\n')
+        (evidence / 'compiled-BuildConfig.class').write_bytes(path.read_bytes())
+    return report
 
 
 def fixture_asset_specs(manifest):
@@ -84,7 +108,7 @@ def collect(apk_root, evidence):
     require(os.environ.get('GITHUB_REPOSITORY') == LOCK['repository'], 'Require same-repository CI provenance')
     sha = os.environ.get('GITHUB_SHA', '')
     require(bool(re.fullmatch('[0-9a-f]{40}', sha)), 'Missing exact source commit')
-    verify_build_config(ROOT / 'app/build/generated')
+    verify_build_config(ROOT / 'app/build', evidence)
     require({p.relative_to(apk_root).as_posix() for p in apk_root.rglob('*.apk')}
             == set(APP_VARIANTS) | {TEST_APK}, 'Unexpected app/test APK fullset')
     audit_path = evidence / 'apk-static-audit.json'

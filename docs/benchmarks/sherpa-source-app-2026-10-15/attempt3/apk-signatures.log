@@ -1,0 +1,20 @@
+app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
+Signer #1 certificate DN: C=US, O=Android, CN=Android Debug
+Signer #1 certificate SHA-256 digest: 1c86a83d180b1e300a926ab3ca22f8692bcbadcd40a5cc7183c5857cef73f9a1
+Signer #1 certificate SHA-1 digest: c01aaf6cb7feae058b3afcfddd28575b9cc0d66a
+Signer #1 certificate MD5 digest: ae9a1a1277a8259a29b09518bcc495bd
+app/build/outputs/apk/debug/app-universal-debug.apk
+Signer #1 certificate DN: C=US, O=Android, CN=Android Debug
+Signer #1 certificate SHA-256 digest: 1c86a83d180b1e300a926ab3ca22f8692bcbadcd40a5cc7183c5857cef73f9a1
+Signer #1 certificate SHA-1 digest: c01aaf6cb7feae058b3afcfddd28575b9cc0d66a
+Signer #1 certificate MD5 digest: ae9a1a1277a8259a29b09518bcc495bd
+app/build/outputs/apk/debug/app-x86_64-debug.apk
+Signer #1 certificate DN: C=US, O=Android, CN=Android Debug
+Signer #1 certificate SHA-256 digest: 1c86a83d180b1e300a926ab3ca22f8692bcbadcd40a5cc7183c5857cef73f9a1
+Signer #1 certificate SHA-1 digest: c01aaf6cb7feae058b3afcfddd28575b9cc0d66a
+Signer #1 certificate MD5 digest: ae9a1a1277a8259a29b09518bcc495bd
+app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+Signer #1 certificate DN: C=US, O=Android, CN=Android Debug
+Signer #1 certificate SHA-256 digest: 1c86a83d180b1e300a926ab3ca22f8692bcbadcd40a5cc7183c5857cef73f9a1
+Signer #1 certificate SHA-1 digest: c01aaf6cb7feae058b3afcfddd28575b9cc0d66a
+Signer #1 certificate MD5 digest: ae9a1a1277a8259a29b09518bcc495bd

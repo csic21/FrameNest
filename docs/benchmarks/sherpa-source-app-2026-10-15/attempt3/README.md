@@ -1,0 +1,9 @@
+# Source app attempt 3: static APK checks passed, pair retention blocked
+
+[Ordinary CI run](https://github.com/csic21/FrameNest/actions/runs/38726295943), source `988154d8929de469cf553eb32058c965be04b7c9`. Build, unit tests, prepared input packaging, instrumentation compilation and lint passed. The actual arm64, x86_64 and universal app APKs passed all content checks, official ZIP alignment and signatures. Exact results and hashes are retained here.
+
+The final collector failed closed because it assumed a single generated source `BuildConfig.java`. That assumption did not hold after instrumentation compilation. The broad scan did not select the exact app namespace; the failure did not record its match count, so missing versus multiple generated sources is not established by this run. The fix reads constants from the actual compiled debug app class, verifies its exact namespace, retains that class and observed constants, and rejects missing/conflicting/wrong values. No fallback to Gradle source or assumed observations. Regression tests compile real JVM classes, include separate test namespace, test corrupted/missing/conflicting classes and exercise collector output end to end.
+
+The accepted APK upload runs only after every check succeeds. It was deliberately skipped, while the generic diagnostic artifact was retained. Thus these APK hashes are evidence of this run, not a retained installable pair; a new successful ordinary run is needed. Attempt 2 was cancelled by the same concurrency group after the fixture-schema collector fix, not a product failure.
+
+The 29 original notices plus supplemental text are present and hash checked. All inspected native ELF LOAD and stored ZIP offsets meet 16KB static alignment; arm64 ORT unrounded RELRO-end warning remains, with no runtime failure demonstrated. These are static checks, not device/ASR/UI or full-app 16KB runtime acceptance. No release approval.
