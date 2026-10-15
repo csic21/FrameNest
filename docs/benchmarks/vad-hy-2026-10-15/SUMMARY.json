@@ -1,0 +1,44 @@
+{
+  "emoji": {
+    "segments": 13,
+    "duration_seconds": 113.96,
+    "selected_seconds": 95.2,
+    "selected_audio_fraction": 0.8353808353808354,
+    "excluded_seconds": 18.75999999999999,
+    "mt_seconds": 33.37492360900251,
+    "first_segment_input_ready_seconds": 5.28,
+    "first_segment_mt_seconds": 1.9092569450003793,
+    "first_segment_first_stdout_seconds": 1.5936744190003083,
+    "first_segment_text": "このイラストの意味わかりますか？",
+    "asr_compute_range_seconds": [
+      2.5085099219995755,
+      3.252393492999545
+    ],
+    "vad_compute_range_seconds": [
+      0.4682316700309457,
+      0.571232887044971
+    ],
+    "completed_app_coverage_added_ms": 0
+  },
+  "kishida": {
+    "segments": 12,
+    "duration_seconds": 175.7866875,
+    "selected_seconds": 168.932,
+    "selected_audio_fraction": 0.9610056506696504,
+    "excluded_seconds": 6.854687500000011,
+    "mt_seconds": 35.26461136900434,
+    "first_segment_input_ready_seconds": 5.088,
+    "first_segment_mt_seconds": 1.9514640689994849,
+    "first_segment_first_stdout_seconds": 1.5155153569994582,
+    "first_segment_text": "はい、あの、まず昨日の事件については。",
+    "asr_compute_range_seconds": [
+      4.153557509000166,
+      5.739586667999902
+    ],
+    "vad_compute_range_seconds": [
+      0.782733926873334,
+      0.8487558529523085
+    ],
+    "completed_app_coverage_added_ms": 0
+  }
+}
