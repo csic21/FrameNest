@@ -1,0 +1,14 @@
+{
+  "source_commit": "d81235049384534c167caea52b85a694f6103d14",
+  "source_archive_sha256": "6b58785f0a82898f4c3442417ff962e2d4b231b1bee5d033902ad90b27901e14",
+  "configure": "cmake -S pinned-llama-source -B runtime-build -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=OFF -DLLAMA_CURL=OFF -DLLAMA_BUILD_TESTS=OFF",
+  "build": "cmake --build runtime-build --target llama-completion -j4",
+  "cpu": "model name\t: AMD EPYC 9V74 80-Core Processor",
+  "cmake_cache_selected": [
+    "CMAKE_BUILD_TYPE:STRING=Release",
+    "CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG",
+    "GGML_CUDA:BOOL=OFF",
+    "GGML_NATIVE:BOOL=ON",
+    "GGML_OPENMP:BOOL=ON"
+  ]
+}
