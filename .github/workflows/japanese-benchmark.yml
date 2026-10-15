@@ -22,7 +22,7 @@ jobs:
   emulator:
     # Heavy runtime validation is explicit after the approved one-run experiment.
     # A skipped PR job is not runtime acceptance evidence.
-    if: github.run_number == 11 && github.run_attempt == 1
+    if: github.run_number == 21 && github.run_attempt == 1
     name: Real PCM · SenseVoice · ML Kit + Hy · overlay
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -54,7 +54,7 @@ jobs:
       # Owner approval is limited to this one next run, first attempt only.
       # Later runs never inherit this device-access grant.
       - name: Grant approved one-run KVM access to current runner only
-        if: github.run_number == 11 && github.run_attempt == 1
+        if: github.run_number == 21 && github.run_attempt == 1
         run: |
           test -c /dev/kvm
           command -v setfacl || { sudo apt-get update && sudo apt-get install --no-install-recommends -y acl; }

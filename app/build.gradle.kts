@@ -24,8 +24,8 @@ android {
         applicationId = "com.framenest"
         minSdk = 26
         targetSdk = 36
-        versionCode = 19
-        versionName = "0.6.8-internal"
+        versionCode = 20
+        versionName = "0.6.9-internal"
         buildConfigField("boolean", "HY_MT_NATIVE", hyMtNative.toString())
         if (hyMtNative) {
             externalNativeBuild {

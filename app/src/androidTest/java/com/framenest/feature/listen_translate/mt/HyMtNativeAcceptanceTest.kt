@@ -142,6 +142,7 @@ class HyMtNativeAcceptanceTest {
     @Test
     fun recordedProducerOnPinnedPublicJapaneseFixture() = runBlocking {
         requireOptIn()
+        val acceptanceStarted = now()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val report = baseReport("Real recorded-file producer on pinned public fixture; no Room/UI/NAS/physical-rendering claim")
         val rows = JSONArray()
@@ -149,6 +150,7 @@ class HyMtNativeAcceptanceTest {
         report.put("cues", rows).put("audio_windows", reads)
             .put("semantic_acceptance_passed", JSONObject.NULL)
             .put("manual_semantic_review", "pending")
+            .put("startup_clock_definition", "Test entry through first finalized bilingual callback, including fixture copy, model installation/verification/loading and PCM/ASR/MT. Existing model files and OS caches may be warm from preceding tests; not a phone, NAS, Room or physical-render latency.")
         val output = File(context.filesDir, "hy-mt-recorded-fixture-acceptance.json")
         save(output, report)
         var media: File? = null
@@ -206,6 +208,10 @@ class HyMtNativeAcceptanceTest {
                         if (cue.isFinal) {
                             assertTranslation(cue.textSrc, cue.textTgt)
                             assertNotNull(cue.coverageStartMs); assertNotNull(cue.coverageEndMs)
+                            if (finalCount == 0) {
+                                report.put("first_final_bilingual_from_test_start_ms", now() - acceptanceStarted)
+                                    .put("first_final_bilingual_from_prepared_producer_ms", now() - began)
+                            }
                             finalCount++
                         } else {
                             // Bounded provisional units may have an explicitly temporary
@@ -223,6 +229,7 @@ class HyMtNativeAcceptanceTest {
                             .put("coverage_end_ms", cue.coverageEndMs ?: JSONObject.NULL)
                             .put("decoded_through_ms", cue.decodedThroughMs)
                             .put("ready_since_producer_start_ms", now() - began)
+                            .put("ready_since_test_start_ms", now() - acceptanceStarted)
                             .put("pcm_ms", cue.timings?.pcmReadMs ?: JSONObject.NULL)
                             .put("asr_ms", cue.timings?.asrMs ?: JSONObject.NULL)
                             .put("mt_ms", cue.timings?.translationMs ?: JSONObject.NULL))
