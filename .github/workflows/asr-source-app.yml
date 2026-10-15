@@ -14,8 +14,15 @@ on:
       - 'settings.gradle.kts'
       - 'scripts/prepare_source_asr.py'
       - 'scripts/check_source_asr_apk.py'
+      - 'scripts/collect_source_asr_pair.py'
+      - 'scripts/check_android_test_signatures.py'
+      - 'scripts/prepare-sensevoice-runtime-comparison.py'
       - 'scripts/tests/test_prepare_source_asr.py'
       - 'scripts/tests/test_check_source_asr_apk.py'
+      - 'scripts/tests/test_collect_source_asr_pair.py'
+      - 'scripts/tests/test_check_android_test_signatures.py'
+      - 'scripts/tests/test_prepare_sensevoice_runtime_comparison.py'
+      - 'scripts/tests/test_source_runtime_profile.py'
       - 'docs/experiments/FN-74-asr-source-app/artifact-lock.json'
 
 permissions:
@@ -72,7 +79,7 @@ jobs:
             --archive "$RUNNER_TEMP/reviewed-aar.zip" \
             --report "$RUNNER_TEMP/source-app-evidence/source-aar-import.json"
           FN74_SOURCE_AAR="$PWD/app/libs/sherpa-onnx-1.13.8-asr-no-tts.aar" \
-            python3 -m unittest discover -s scripts/tests -p 'test_check_source_asr_apk.py' -v
+            python3 -m unittest discover -s scripts/tests -v
 
       - name: Set up existing Android SDK
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
@@ -90,22 +97,40 @@ jobs:
       - name: Assemble source-profile debug APKs
         run: |
           set -o pipefail
-          ./gradlew -PsherpaAsrSource=true --dependency-verification strict --no-build-cache assembleDebug --stacktrace 2>&1 | tee "$RUNNER_TEMP/source-app-evidence/assemble.log"
+          ./gradlew -PsherpaAsrSource=true -PhyMtNative=false --dependency-verification strict --no-build-cache assembleDebug --stacktrace 2>&1 | tee "$RUNNER_TEMP/source-app-evidence/assemble.log"
 
       - name: Run source-profile unit tests
         run: |
           set -o pipefail
-          ./gradlew -PsherpaAsrSource=true --dependency-verification strict testDebugUnitTest --stacktrace 2>&1 | tee "$RUNNER_TEMP/source-app-evidence/unit-tests.log"
+          ./gradlew -PsherpaAsrSource=true -PhyMtNative=false --dependency-verification strict testDebugUnitTest --stacktrace 2>&1 | tee "$RUNNER_TEMP/source-app-evidence/unit-tests.log"
+
+      - name: Prepare the frozen public runtime-test inputs without running a device
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install --no-install-recommends -y ffmpeg
+          fi
+          ffmpeg -version > "$RUNNER_TEMP/source-app-evidence/ffmpeg-version.txt"
+          for test in test_prepare_sensevoice_runtime_comparison.py test_check_android_test_signatures.py test_source_runtime_profile.py; do
+            python3 -m unittest discover -s scripts/tests -p "$test" -v
+          done
+          python3 scripts/prepare-sensevoice-runtime-comparison.py --download \
+            --source-dir "$RUNNER_TEMP/fn74-frozen-inputs" \
+            --report "$RUNNER_TEMP/source-app-evidence/input-preparation.json" \
+            2>&1 | tee "$RUNNER_TEMP/source-app-evidence/input-preparation.log"
 
       - name: Compile source-profile instrumentation APK only
         run: |
           set -o pipefail
-          ./gradlew -PsherpaAsrSource=true --dependency-verification strict assembleDebugAndroidTest --stacktrace 2>&1 | tee "$RUNNER_TEMP/source-app-evidence/instrumentation-compile.log"
+          ./gradlew -PsherpaAsrSource=true -PhyMtNative=false --dependency-verification strict assembleDebugAndroidTest --stacktrace 2>&1 | tee "$RUNNER_TEMP/source-app-evidence/instrumentation-compile.log"
+          python3 scripts/check_android_test_signatures.py app/build --path-contains androidtest \
+            2>&1 | tee "$RUNNER_TEMP/source-app-evidence/instrumentation-signatures.log"
 
       - name: Lint source profile
         run: |
           set -o pipefail
-          ./gradlew -PsherpaAsrSource=true --dependency-verification strict lintDebug --stacktrace 2>&1 | tee "$RUNNER_TEMP/source-app-evidence/lint.log"
+          ./gradlew -PsherpaAsrSource=true -PhyMtNative=false --dependency-verification strict lintDebug --stacktrace 2>&1 | tee "$RUNNER_TEMP/source-app-evidence/lint.log"
 
       - name: Audit exact embedded source natives, classes, notices and ZIP alignment
         run: |
@@ -117,6 +142,11 @@ jobs:
             "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$apk" >> "$RUNNER_TEMP/source-app-evidence/zipalign.log"
           done
           sha256sum app/build/outputs/apk/debug/*.apk app/build/outputs/apk/androidTest/debug/*.apk > "$RUNNER_TEMP/source-app-evidence/APK-SHA256SUMS"
+          for apk in app/build/outputs/apk/debug/*.apk app/build/outputs/apk/androidTest/debug/*.apk; do
+            echo "$apk" >> "$RUNNER_TEMP/source-app-evidence/apk-signatures.log"
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk" >> "$RUNNER_TEMP/source-app-evidence/apk-signatures.log"
+          done
+          python3 scripts/collect_source_asr_pair.py --evidence "$RUNNER_TEMP/source-app-evidence"
 
       - name: Retain exact audited app and compiled test APKs
         if: success()
@@ -126,6 +156,11 @@ jobs:
           path: |
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/androidTest/debug/*.apk
+            app/build/outputs/apk/source-app-pair.json
+            app/build/outputs/apk/apk-static-audit.json
+            app/build/outputs/apk/input-preparation.json
+            app/build/outputs/apk/fixture-manifest.json
+            app/build/outputs/apk/source-profile.json
           retention-days: 14
           if-no-files-found: error
 

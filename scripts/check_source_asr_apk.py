@@ -19,10 +19,14 @@ import zipfile
 import zlib
 
 AAR_SHA256 = "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503"
+SUPPLEMENT_ASSET = "assets/source_asr_notices/SUPPLEMENTAL-NOTICE.txt"
+SUPPLEMENT_SHA256 = "e2fa4a31a1b49181a284e278704f6d5ae40906a9f5fbd0ce625d8a909718460d"
+SUPPLEMENT_FILE = Path(__file__).resolve().parents[1] / "app/src/sourceAsr" / SUPPLEMENT_ASSET
 ABIS = {"arm64-v8a": 183, "x86_64": 62}
 LIBRARIES = {"libsherpa-onnx-jni.so", "libonnxruntime.so"}
 NOTICE_PREFIX = "assets/third_party_licenses/"
 SHERPA_PREFIX = "Lcom/k2fsa/sherpa/onnx/"
+GENERATED_RESOURCE_CLASS = SHERPA_PREFIX + "R;"
 ORT_PREFIXES = ("Lai/onnxruntime/", "Lcom/microsoft/onnxruntime/", "Lorg/onnxruntime/")
 PAGE = 16384
 MAX_ENTRY = 512 * 1024 * 1024
@@ -222,6 +226,73 @@ def dex_classes(data):
         require(index < strings_count and (not type_strings or index > type_strings[-1]),
                 "Invalid DEX type string index/order")
         type_strings.append(index)
+
+    def string(index):
+        require(index < strings_count, "DEX string index out of bounds")
+        offset = unpack("<I", data, strings_off + index * 4, "DEX string ID")[0]
+        return dex_string(data, offset, data_off)
+
+    def type_name(index):
+        require(index < types_count, "DEX type index out of bounds")
+        return string(type_strings[index])
+
+    def constructor(index, owner):
+        count, offset = tables[4]
+        require(index < count, "Generated R method index out of bounds")
+        cls, proto, name = unpack("<HHI", data, offset + index * 8, "Generated R method ID")
+        require(type_name(cls) == owner and string(name) == "<init>",
+                "Generated R permits only its constructor and Object.<init>")
+        count, offset = tables[2]
+        require(proto < count, "Generated R prototype index out of bounds")
+        shorty, returns, parameters = unpack("<III", data, offset + proto * 12, "Generated R prototype")
+        require(string(shorty) == "V" and type_name(returns) == "V",
+                "Generated R constructor must return void")
+        if parameters:
+            require(data_off <= parameters < len(data) and parameters % 4 == 0,
+                    "Generated R parameters offset out of bounds")
+            require(unpack("<I", data, parameters, "Generated R parameters")[0] == 0,
+                    "Generated R constructor must have no parameters")
+
+    def generated_resource(flags, superclass, interfaces, annotations, class_data, static_values):
+        # AGP generates this exact, empty resource holder even when R.txt is
+        # empty. It is not one of the 48 classes compiled into classes.jar.
+        # Do not widen this exception to R$*, arbitrary methods or native APIs.
+        require(flags & ~(0x1 | 0x10 | 0x1000) == 0,
+                "Generated R has unexpected class flags")
+        require(type_name(superclass) == "Ljava/lang/Object;", "Generated R superclass must be Object")
+        require(not interfaces or unpack("<I", data, interfaces, "Generated R interfaces")[0] == 0,
+                "Generated R must have no interfaces")
+        require(annotations == 0 and static_values == 0,
+                "Generated R must have no annotations or static values")
+        if not class_data:
+            return
+        counts = []
+        pos = class_data
+        for _ in range(4):
+            value, pos = uleb128(data, pos)
+            counts.append(value)
+        static_fields, instance_fields, direct_methods, virtual_methods = counts
+        require(static_fields == instance_fields == virtual_methods == 0 and direct_methods <= 1,
+                "Generated R must have no fields and at most one direct constructor")
+        if not direct_methods:
+            return
+        method, pos = uleb128(data, pos)
+        access, pos = uleb128(data, pos)
+        code, pos = uleb128(data, pos)
+        require(access in (0x10000, 0x10001, 0x10002, 0x10004),
+                "Generated R constructor must be non-native, non-static and concrete")
+        constructor(method, GENERATED_RESOURCE_CLASS)
+        require(data_off <= code < len(data) and code % 4 == 0,
+                "Generated R constructor code offset out of bounds")
+        registers, ins, outs, tries, debug, size = unpack("<4H2I", data, code, "Generated R code")
+        require((registers, ins, outs, tries, size) == (1, 1, 1, 0, 4),
+                "Generated R constructor must only invoke Object.<init> and return")
+        require(debug == 0 or data_off <= debug < len(data), "Generated R debug offset out of bounds")
+        invoke, target, args, returns = unpack("<4H", data, code + 16, "Generated R instructions")
+        require(invoke in (0x1070, 0x0176) and args == 0 and returns == 0x000e,
+                "Generated R constructor must only invoke Object.<init> and return")
+        constructor(target, "Ljava/lang/Object;")
+
     classes = set()
     for i in range(classes_count):
         index, flags, superclass, interfaces, source, annotations, class_data, static_values = unpack(
@@ -236,13 +307,14 @@ def dex_classes(data):
             values = span(data, interfaces + 4, count * 2, "DEX interfaces")
             require(all(x[0] < types_count for x in struct.iter_unpack("<H", values)),
                     "DEX interface type index out of bounds")
-        string_offset = unpack("<I", data, strings_off + type_strings[index] * 4, "DEX string ID")[0]
-        name = dex_string(data, string_offset, data_off)
+        name = type_name(index)
         require(name.startswith("L") and name.endswith(";") and len(name) > 2
                 and all(p for p in name[1:-1].split("/"))
                 and not any(c in ".;[" or ord(c) < 33 for c in name[1:-1]),
                 "Invalid DEX class descriptor")
         require(name not in classes, "Duplicate DEX class definition: " + name)
+        if name == GENERATED_RESOURCE_CLASS:
+            generated_resource(flags, superclass, interfaces, annotations, class_data, static_values)
         classes.add(name)
     return classes
 
@@ -432,6 +504,12 @@ def load_reference(path):
                             "exports_matching_packaged_native_declarations": len(matched),
                             "additional_jni_exports": len(exports - matched)})
         native_info[name] = details
+    # The AAR remains byte-identical. The app supplies an independently pinned
+    # Eigen source-access / Android changed-file notice alongside its assets.
+    supplement = SUPPLEMENT_FILE.read_bytes()
+    require(len(supplement) == 2209 and sha256(supplement) == SUPPLEMENT_SHA256,
+            "Source-profile supplemental notice differs from reviewed pin")
+    assets[SUPPLEMENT_ASSET] = supplement
     return {"native": native, "native_info": native_info, "assets": assets,
             "classes": classes, "native_declaration_count": len(methods), "notice_count": len(notice_names)}
 
@@ -486,7 +564,8 @@ def check_apk(path, reference):
             require(not classes & found, "Duplicate class definitions across DEX files")
             classes.update(found)
             dex_reports.append({"path": name, "class_definition_count": len(found)})
-        sherpa = {c for c in classes if c.startswith(SHERPA_PREFIX)}
+        generated_resources = classes & {GENERATED_RESOURCE_CLASS}
+        sherpa = {c for c in classes if c.startswith(SHERPA_PREFIX)} - generated_resources
         require(sherpa == reference["classes"], "DEX sherpa class set mismatch; missing="
                 + repr(sorted(reference["classes"] - sherpa)) + "; extra=" + repr(sorted(sherpa - reference["classes"])))
         require(not any(c.startswith(ORT_PREFIXES) for c in classes), "Forbidden ORT Java class definition")
@@ -498,8 +577,10 @@ def check_apk(path, reference):
         return {"path": str(path), "sha256": file_sha256(path), "size_bytes": Path(path).stat().st_size,
                 "abis": sorted(abis), "native_members": members, "dex": dex_reports,
                 "total_class_definition_count": len(classes), "sherpa_class_definition_count": len(sherpa),
+                "generated_resource_classes_verified": sorted(generated_resources),
                 "notice_count_verified": reference["notice_count"],
                 "attribution_and_provenance_assets_verified": len(reference["assets"]),
+                "source_profile_supplement_verified": SUPPLEMENT_ASSET in reference["assets"],
                 "stored_native_zip_16k_pass": not unaligned,
                 "external_zipalign_run": False, "other_native_load_16k_failures": other_load_failures,
                 "runtime_tested": False, "native_execution_tested": False, "warnings": warnings}

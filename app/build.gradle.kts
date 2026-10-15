@@ -186,6 +186,9 @@ android {
     }
 
     sourceSets.getByName("androidTest").assets.directories.add("$projectDir/schemas")
+    if (sherpaAsrSource) {
+        sourceSets.getByName("main").assets.directories.add("$projectDir/src/sourceAsr/assets")
+    }
 }
 
 // Fail closed for release packaging, while keeping ordinary debug CI usable

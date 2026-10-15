@@ -20,6 +20,8 @@ SPEC.loader.exec_module(c)
 ASR = "Lcom/k2fsa/sherpa/onnx/OfflineRecognizer;"
 TTS = "Lcom/k2fsa/sherpa/onnx/OfflineTts;"
 ORT = "Lai/onnxruntime/OrtEnvironment;"
+RESOURCE = "Lcom/k2fsa/sherpa/onnx/R;"
+OBJECT = "Ljava/lang/Object;"
 
 
 def uleb(value):
@@ -80,6 +82,70 @@ def make_dex(classes=(ASR,), references=(), strings=()):
     for i, value in enumerate(classes):
         struct.pack_into("<8I", data, classes_off + i * 32, all_types.index(value), 1,
                          0xffffffff, 0, 0xffffffff, 0, 0, 0)
+    return seal_dex(data)
+
+
+def make_resource_dex(constructor=False, method_name="<init>", method_flags=0x10001,
+                      field_count=0, interface=False, superclass=OBJECT,
+                      instructions=None, code_override=None, direct_count=None,
+                      virtual_count=0, class_flags=0x11):
+    """AGP-like empty R fixture with optional narrowly executable constructor."""
+    classes = [ASR, RESOURCE]
+    types = sorted({ASR, RESOURCE, OBJECT, "V", superclass})
+    strings = sorted(set(types) | {"<init>", method_name, "field"})
+    string_off = 112
+    type_off = string_off + len(strings) * 4
+    proto_off = type_off + len(types) * 4
+    method_off = proto_off + 12
+    class_off = method_off + 16
+    data_off = class_off + len(classes) * 32
+    data = bytearray(data_off)
+    data[:8] = b"dex\n035\0"
+    offsets = []
+    for value in strings:
+        offsets.append(len(data))
+        data.extend(uleb(len(value)) + value.encode() + b"\0")
+    data.extend(b"\0" * (-len(data) % 4))
+    items = [(0, 1, 0), (1, len(strings), string_off), (2, len(types), type_off),
+             (3, 1, proto_off), (5, 2, method_off), (6, 2, class_off),
+             (0x2002, len(strings), data_off)]
+    interface_off = 0
+    if interface:
+        interface_off = len(data)
+        data.extend(struct.pack("<IH", 1, types.index(OBJECT)))
+        items.append((0x1001, 1, interface_off))
+        data.extend(b"\0" * (-len(data) % 4))
+    code_off = len(data)
+    data.extend(struct.pack("<4H2I", 1, 1, 1, 0, 0, 4))
+    data.extend(struct.pack("<4H", *(instructions or (0x1070, 1, 0, 0x000e))))
+    items.append((0x2001, 1, code_off))
+    class_data = len(data)
+    direct = int(constructor) if direct_count is None else direct_count
+    data.extend(uleb(field_count) + b"\0" + uleb(direct) + uleb(virtual_count))
+    if constructor:
+        data.extend(uleb(0) + uleb(method_flags) + uleb(code_off if code_override is None else code_override))
+    items.append((0x2000, 1, class_data))
+    data.extend(b"\0" * (-len(data) % 4))
+    map_off = len(data)
+    items.append((0x1000, 1, map_off))
+    data.extend(struct.pack("<I", len(items)))
+    for kind, count, offset in items:
+        data.extend(struct.pack("<HHII", kind, 0, count, offset))
+    struct.pack_into("<20I", data, 32, len(data), 112, 0x12345678, 0, 0, map_off,
+                     len(strings), string_off, len(types), type_off, 1, proto_off,
+                     0, 0, 2, method_off, 2, class_off, len(data) - data_off, data_off)
+    for i, offset in enumerate(offsets):
+        struct.pack_into("<I", data, string_off + i * 4, offset)
+    for i, name in enumerate(types):
+        struct.pack_into("<I", data, type_off + i * 4, strings.index(name))
+    struct.pack_into("<III", data, proto_off, strings.index("V"), types.index("V"), 0)
+    struct.pack_into("<HHI", data, method_off, types.index(RESOURCE), 0, strings.index(method_name))
+    struct.pack_into("<HHI", data, method_off + 8, types.index(OBJECT), 0, strings.index("<init>"))
+    for i, name in enumerate(classes):
+        struct.pack_into("<8I", data, class_off + i * 32, types.index(name), class_flags if name == RESOURCE else 1,
+                         types.index(superclass if name == RESOURCE else OBJECT),
+                         interface_off if name == RESOURCE else 0, 0xffffffff, 0,
+                         class_data if name == RESOURCE else 0, 0)
     return seal_dex(data)
 
 
@@ -320,6 +386,65 @@ class ApkTests(unittest.TestCase):
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "class set mismatch|ORT Java"):
                 self.check(members)
 
+    def test_exact_empty_generated_r_is_separate_from_aar_classes(self):
+        for constructor in (False, True):
+            for instructions in (None, (0x0176, 1, 0, 0x000e)):
+                members = apk_members(self.ref)
+                members["classes.dex"] = make_resource_dex(constructor=constructor, instructions=instructions)
+                with self.subTest(constructor=constructor, instructions=instructions):
+                    result = self.check(members)
+                    self.assertEqual(result["sherpa_class_definition_count"], 1)
+                    self.assertEqual(result["total_class_definition_count"], 2)
+                    self.assertEqual(result["generated_resource_classes_verified"], [RESOURCE])
+
+    def test_generated_r_has_no_blanket_namespace_exception(self):
+        for name in ("Lcom/k2fsa/sherpa/onnx/R$layout;", "Lcom/k2fsa/sherpa/onnx/R2;"):
+            members = apk_members(self.ref)
+            members["classes.dex"] = make_dex([ASR, name])
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "class set mismatch"):
+                self.check(members)
+
+    def test_generated_r_rejects_fields_interfaces_and_non_object_superclass(self):
+        for options in ({"field_count": 1}, {"interface": True}, {"superclass": ASR},
+                        {"virtual_count": 1}, {"direct_count": 2}, {"class_flags": 0x201}):
+            members = apk_members(self.ref)
+            members["classes.dex"] = make_resource_dex(**options)
+            with self.subTest(options=options), self.assertRaisesRegex(ValueError, "Generated R"):
+                self.check(members)
+
+    def test_generated_r_rejects_arbitrary_or_native_methods_and_effectful_constructor(self):
+        for options in ({"method_name": "run"}, {"method_name": "<clinit>"},
+                        {"method_flags": 0x10101}, {"method_flags": 0x10401},
+                        {"method_flags": 0x10009}, {"instructions": (0x1071, 1, 0, 0x000e)},
+                        {"instructions": (0x1070, 0, 0, 0x000e)},
+                        {"instructions": (0x1070, 1, 0, 0x000f)},
+                        {"code_override": 0xfffffffc}):
+            members = apk_members(self.ref)
+            members["classes.dex"] = make_resource_dex(constructor=True, **options)
+            with self.subTest(options=options), self.assertRaisesRegex(ValueError, "Generated R"):
+                self.check(members)
+
+    def test_generated_r_rejects_malformed_class_data_and_method_indices(self):
+        good = make_resource_dex(constructor=True)
+        class_off = struct.unpack_from("<I", good, 100)[0] + 32
+        class_data = struct.unpack_from("<I", good, class_off + 24)[0]
+        method_off = struct.unpack_from("<I", good, 92)[0]
+        damaged = []
+        for offset, value in ((class_off + 8, 0xffffffff), (class_off + 24, len(good) - 1),
+                              (class_off + 20, class_data), (class_off + 28, class_data)):
+            damaged.append(mutate(good, offset, value))
+        invalid_method = bytearray(good)
+        invalid_method[class_data + 4] = 127
+        damaged.append(seal_dex(invalid_method))
+        invalid_proto = bytearray(good)
+        struct.pack_into("<H", invalid_proto, method_off + 2, 65535)
+        damaged.append(seal_dex(invalid_proto))
+        for dex in damaged:
+            members = apk_members(self.ref)
+            members["classes.dex"] = dex
+            with self.subTest(digest=c.sha256(dex)), self.assertRaises(ValueError):
+                self.check(members)
+
     def test_references_and_plain_strings_do_not_count_as_classes(self):
         members = apk_members(self.ref)
         members["classes.dex"] = make_dex([ASR], [TTS, ORT], ["GeneratedAudio"])
@@ -396,7 +521,7 @@ class RealAarTests(unittest.TestCase):
     def test_pinned_aar_and_structural_apk(self):
         ref = c.load_reference(Path(os.environ["FN74_SOURCE_AAR"]))
         self.assertEqual((len(ref["classes"]), ref["native_declaration_count"], ref["notice_count"], len(ref["assets"])),
-                         (48, 32, 29, 36))
+                         (48, 32, 29, 37))
         for abi in c.ABIS:
             jni = ref["native_info"][f"{abi}/libsherpa-onnx-jni.so"]
             self.assertEqual(jni["defined_jni_exports"], 117)
@@ -407,7 +532,8 @@ class RealAarTests(unittest.TestCase):
             result = c.check_apk(path, ref)
             self.assertEqual(result["sherpa_class_definition_count"], 48)
             self.assertEqual(result["notice_count_verified"], 29)
-            self.assertEqual(result["attribution_and_provenance_assets_verified"], 36)
+            self.assertEqual(result["attribution_and_provenance_assets_verified"], 37)
+            self.assertTrue(result["source_profile_supplement_verified"])
             self.assertTrue(result["stored_native_zip_16k_pass"])
             self.assertTrue(any("RELRO" in text and "no runtime failure" in text for text in result["warnings"]))
             self.assertFalse(result["native_execution_tested"])

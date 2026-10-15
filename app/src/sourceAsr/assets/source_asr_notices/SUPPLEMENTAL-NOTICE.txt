@@ -1,0 +1,37 @@
+映舟：sherpa-onnx 源码构建候选的许可与源码补充说明
+
+本说明补充候选 AAR 内保留的工程清单，不修改任何组件的许可证条款。
+完整许可与版权声明随应用保留；可在“开源许可与源码”中查看。
+
+Eigen 5.0.1
+本候选使用 Eigen 5.0.1 的头文件代码，未修改 Eigen 源代码。
+其 MPL-2.0 覆盖的源码可按 Mozilla Public License 2.0 获取、使用及再分发。
+原始源码归档（公开下载，无需账号）：
+https://gitlab.com/libeigen/eigen/-/archive/5.0.1/eigen-5.0.1.tar.gz
+归档大小：2,967,272 字节
+SHA-256：e9c326dc8c05cd1e044c71f30f1b2e34a6161a3b6ecf445d56b53ff1669e3dec
+许可证：
+https://www.mozilla.org/en-US/MPL/2.0/
+应用保留 eigen/LICENSE、COPYING.MPL2、COPYING.README、COPYING.BSD、
+COPYING.APACHE 和 COPYING.MINPACK 的原始文本与相关声明。
+
+simple-sentencepiece 0.7：Android 构建变更
+本候选包含经过 Android 适配的 simple-sentencepiece 文件。
+以下变更由 sherpa-onnx 固定源码版本的上游 CMake 配置在构建时应用；
+arm64-v8a 与 x86_64 使用相同的配置后源码。
+- ssentencepiece/csrc/ssentencepiece.h：移除 ThreadPool 头文件引用、
+  成员及构造初始化；三个构造函数的 num_threads 默认值由
+  std::thread::hardware_concurrency() 改为 1，参数保留但不再使用。
+- ssentencepiece/csrc/ssentencepiece.cc：将两个批量 Encode 重载和
+  批量 Decode 的线程池任务提交/等待改为同步循环调用。
+- ssentencepiece/csrc/threadpool.h：原线程池实现替换为带 include guard
+  的空桩，并标注 Android/Termux 已移除线程支持。
+变更来源：sherpa-onnx 11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf，
+cmake/simple-sentencepiece.cmake。
+本组件的 Apache-2.0 许可及 Darts-clone 的 BSD-2-Clause 声明均已保留。
+
+其他已保留声明
+ONNX Runtime 的 Microsoft MIT 许可和上游 ThirdPartyNotices、JSON 的
+MIT 许可及嵌入组件版权声明、所用 Android NDK 的原始及合并声明均随应用保留。
+本补充不移除、替换或限制这些原始声明，也不将工具链清单中的所有组件
+描述为应用实际使用的运行时代码。
