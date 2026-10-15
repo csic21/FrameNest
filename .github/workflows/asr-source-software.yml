@@ -1,0 +1,113 @@
+name: One bounded source ASR software-emulation probe
+
+on:
+  push:
+    branches: ['experiment/FN-74-asr-source-acceptance']
+    paths:
+      - .github/workflows/asr-source-software.yml
+      - scripts/run_source_software_sessions.sh
+      - scripts/check_source_software_probe.py
+      - scripts/tests/test_source_software_probe.py
+      - docs/experiments/FN-74-asr-source-app/SOFTWARE-PROBE.md
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: source-asr-software-${{ github.ref }}
+  cancel-in-progress: false # Do not cancel the single approved probe for a later push.
+
+jobs:
+  source-software-probe:
+    # One new workflow run only; retries and subsequent pushes cannot execute it.
+    if: github.run_number == 1 && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      FN74_RESULTS: ${{ github.workspace }}/source-software-results
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout only validation code
+        timeout-minutes: 1
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Record validator identity and exercise fail-closed checks
+        timeout-minutes: 1
+        run: |
+          set -euo pipefail
+          mkdir -p "$FN74_RESULTS"
+          git rev-parse HEAD > "$FN74_RESULTS/validator-commit.txt"
+          cp docs/experiments/FN-74-asr-source-app/runtime-input-lock.json "$FN74_RESULTS/"
+          python3 -m unittest discover -s scripts/tests -p 'test_source_software_probe.py' -v 2>&1 | tee "$FN74_RESULTS/validator-tests.log"
+          bash -n scripts/run_source_software_sessions.sh
+          python3 - <<'PY'
+          import json, os, platform
+          from pathlib import Path
+          record = {'github': {k: os.environ.get(k) for k in ['GITHUB_REPOSITORY','GITHUB_SHA','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT']},
+                    'image': {k: os.environ.get(k) for k in ['ImageOS','ImageVersion']}, 'platform': platform.platform(),
+                    'scope': 'One API35 x86_64 software AVD; stop on boot/first-session failure; later phases run only on success',
+                    'emulator_memory_mib': 4096, 'emulator_cores': 2, 'session_limit_seconds': 1500,
+                    'boot_limit_seconds': 900, 'instrumentation_limit_seconds': 1200, 'ui_instrumentation_limit_seconds': 300,
+                    'ui_session_limit_seconds': 600, 'ui_tests_expected': 7, 'release_approved': False,
+                    'acceleration': 'off', 'timing_interpretation': 'Software-emulation cost only; never product speed',
+                    'hardware_performance_accepted': False, 'global_replay_limit_seconds': 3660,
+                    'whole_job_limit_minutes': 90}
+          (Path(os.environ['FN74_RESULTS'])/'host.json').write_text(json.dumps(record,indent=2)+'\n')
+          PY
+
+      - name: Verify successful ordinary CI artifact and exact retained app/test pair
+        timeout-minutes: 8
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/prepare_source_runtime_pair.py --download \
+            --archive "$RUNNER_TEMP/source-runtime-input.zip" \
+            --destination "$FN74_RESULTS/input" \
+            --report "$FN74_RESULTS/input-verification.json"
+          # No Gradle, AAR recompilation, fixture regeneration, or replacement APKs.
+
+      - name: Set up existing Android SDK without accepting licenses
+        timeout-minutes: 2
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+          accept-android-sdk-licenses: false
+
+      - name: Install the previously used API35 x86_64 image only
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          test -s "$ANDROID_HOME/licenses/android-sdk-license"
+          sdkmanager --install emulator 'system-images;android-35;google_apis;x86_64' < /dev/null
+          test -f "$ANDROID_HOME/system-images/android-35/google_apis/x86_64/system.img"
+          cp "$ANDROID_HOME/system-images/android-35/google_apis/x86_64/source.properties" "$FN74_RESULTS/system-image.properties"
+          "$ANDROID_HOME/emulator/emulator" -version > "$FN74_RESULTS/emulator-version.txt" 2>&1
+
+      - name: Install official emulator runtime libraries
+        timeout-minutes: 3
+        run: |
+          sudo -n apt-get update
+          sudo -n apt-get install --no-install-recommends -y libpulse0 libnss3 libxkbcommon0 libxcomposite1 libxcursor1 libxi6 libxrandr2 libxtst6
+          ldd "$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64" > "$FN74_RESULTS/emulator-libraries.txt"
+
+      - name: Run one fail-fast software probe using the exact retained pair
+        timeout-minutes: 63
+        run: timeout --signal=TERM --kill-after=60s 3660 bash scripts/run_source_software_sessions.sh run
+
+      - name: Stop only this probe emulator
+        if: always()
+        timeout-minutes: 1
+        run: bash scripts/run_source_software_sessions.sh cleanup
+
+      - name: Retain complete input identity, selected APK pair and all results
+        timeout-minutes: 4
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: source-asr-software-${{ github.sha }}-${{ github.run_attempt }}
+          path: source-software-results/
+          retention-days: 14
+          if-no-files-found: warn
