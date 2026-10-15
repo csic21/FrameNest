@@ -86,6 +86,78 @@ fun ListenTranslateControls(
             )
         }
 
+        if (uiState.isInstallingModels) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = uiState.message ?: stringResource(R.string.listen_translate_installing),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.testTag("listen_translate_installing"),
+            )
+        }
+
+        if (uiState.enabled || uiState.modelsReady || uiState.message != null ||
+            uiState.errorMessage != null
+        ) {
+            Spacer(Modifier.height(8.dp))
+            val statusLabel = when (uiState.status) {
+                ListenTranslateJobStatus.Idle -> stringResource(R.string.listen_translate_status_idle)
+                ListenTranslateJobStatus.Running -> stringResource(R.string.listen_translate_status_running)
+                ListenTranslateJobStatus.Partial -> stringResource(R.string.listen_translate_status_partial)
+                ListenTranslateJobStatus.Complete -> stringResource(R.string.listen_translate_status_complete)
+                ListenTranslateJobStatus.Failed -> stringResource(R.string.listen_translate_status_failed)
+            }
+            val statusLine = buildString {
+                append(stringResource(R.string.listen_translate_status, statusLabel))
+                if (uiState.isProcessing) append(" · …")
+                if (uiState.modelsReady) {
+                    append(" · ")
+                    append(stringResource(R.string.listen_translate_models_ready))
+                }
+            }
+            Text(
+                text = statusLine,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("listen_translate_status"),
+            )
+            if (uiState.currentTranslationMissing && !uiState.currentCaptionUnconfirmed) {
+                Text(
+                    stringResource(R.string.listen_translate_translation_missing),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("listen_translation_missing"),
+                )
+            }
+            if (uiState.errorMessage == null) {
+                val blankMessage = when (uiState.lastBlankReason) {
+                    ListenBlankReason.EmptyPcm ->
+                        stringResource(R.string.listen_translate_blank_no_audio)
+                    ListenBlankReason.NearSilence ->
+                        stringResource(R.string.listen_translate_blank_silence)
+                    ListenBlankReason.UnrecognizedSpeech ->
+                        stringResource(R.string.listen_translate_blank_unrecognized)
+                    null -> null
+                }
+                blankMessage?.let { message ->
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.testTag("listen_translate_blank_reason"),
+                    )
+                }
+            }
+            uiState.errorMessage?.let { err ->
+                Text(
+                    text = err,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.testTag("listen_translate_error"),
+                )
+            }
+        }
+
         Spacer(Modifier.height(8.dp))
         TextButton(
             onClick = onPrepareSubtitles,
@@ -218,36 +290,11 @@ fun ListenTranslateControls(
             HighQualityJapaneseChoice(uiState, onHighQualityJapaneseChange)
         }
 
-        if (uiState.isInstallingModels) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = uiState.message ?: stringResource(R.string.listen_translate_installing),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.testTag("listen_translate_installing"),
-            )
-        }
-
-        if (uiState.enabled || uiState.modelsReady || uiState.message != null ||
-            uiState.errorMessage != null
-        ) {
-            Spacer(Modifier.height(8.dp))
-            val statusLabel = when (uiState.status) {
-                ListenTranslateJobStatus.Idle -> stringResource(R.string.listen_translate_status_idle)
-                ListenTranslateJobStatus.Running -> stringResource(R.string.listen_translate_status_running)
-                ListenTranslateJobStatus.Partial -> stringResource(R.string.listen_translate_status_partial)
-                ListenTranslateJobStatus.Complete -> stringResource(R.string.listen_translate_status_complete)
-                ListenTranslateJobStatus.Failed -> stringResource(R.string.listen_translate_status_failed)
-            }
-            val statusLine = buildString {
-                append(stringResource(R.string.listen_translate_status, statusLabel))
-                if (uiState.isProcessing) append(" · …")
-                if (uiState.modelsReady) {
-                    append(" · ")
-                    append(stringResource(R.string.listen_translate_models_ready))
-                }
+        // Detailed cache/model metadata stays below the controls; active feedback is next to the switch.
+        if (uiState.enabled || uiState.modelsReady || uiState.message != null || uiState.errorMessage != null) {
+            val progressLine = buildString {
                 if (uiState.prefetchLookAheadMs > 0L) {
-                    append(" · ")
+                    if (isNotEmpty()) append(" · ")
                     append(
                         stringResource(
                             R.string.listen_translate_prefetch,
@@ -256,7 +303,7 @@ fun ListenTranslateControls(
                     )
                 }
                 if (uiState.coveredUntilMs > 0L) {
-                    append(" · ")
+                    if (isNotEmpty()) append(" · ")
                     append(
                         stringResource(
                             R.string.listen_translate_scanned,
@@ -264,65 +311,33 @@ fun ListenTranslateControls(
                         ),
                     )
                 }
-                append(" · ")
-                append(
-                    stringResource(
-                        R.string.listen_translate_generated_count,
-                        uiState.generatedCueCount,
-                    ),
-                )
+                if (isNotEmpty()) append(" · ")
+                append(stringResource(R.string.listen_translate_generated_count, uiState.generatedCueCount))
             }
             Text(
-                text = statusLine,
+                progressLine,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.testTag("listen_translate_status"),
+                modifier = Modifier.testTag("listen_translate_progress"),
             )
-            if (uiState.recordedReadThroughMs > 0L) {
-                Text(
-                    text = stringResource(
-                        R.string.listen_translate_audio_read_through,
-                        uiState.recordedReadThroughMs / 1_000L,
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag("listen_audio_read_through"),
-                )
-            }
-            uiState.message?.takeUnless { uiState.isInstallingModels }?.let { msg ->
-                Text(
-                    text = msg,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (uiState.errorMessage == null) {
-                val blankMessage = when (uiState.lastBlankReason) {
-                    ListenBlankReason.EmptyPcm ->
-                        stringResource(R.string.listen_translate_blank_no_audio)
-                    ListenBlankReason.NearSilence ->
-                        stringResource(R.string.listen_translate_blank_silence)
-                    ListenBlankReason.UnrecognizedSpeech ->
-                        stringResource(R.string.listen_translate_blank_unrecognized)
-                    null -> null
-                }
-                blankMessage?.let { message ->
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.testTag("listen_translate_blank_reason"),
-                    )
-                }
-            }
-            uiState.errorMessage?.let { err ->
-                Text(
-                    text = err,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.testTag("listen_translate_error"),
-                )
-            }
+        }
+        if (uiState.recordedReadThroughMs > 0L) {
+            Text(
+                text = stringResource(
+                    R.string.listen_translate_audio_read_through,
+                    uiState.recordedReadThroughMs / 1_000L,
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("listen_audio_read_through"),
+            )
+        }
+        uiState.message?.takeUnless { uiState.isInstallingModels }?.let { msg ->
+            Text(
+                text = msg,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

@@ -11,6 +11,12 @@ enum class ListenDisplayMode {
     Bilingual,
 }
 
+/** Missing target text is a presentation fact, not evidence that MT is still running. */
+internal fun isListenCaptionTranslationMissing(cue: ListenTranslateCue?, mode: ListenDisplayMode): Boolean =
+    mode != ListenDisplayMode.SourceOnly && cue != null &&
+        cue.textSrc.isNotBlank() && cue.textTgt.isBlank() &&
+        !cue.languages.sourceLang.equals(cue.languages.targetLang, ignoreCase = true)
+
 /**
  * Curated language tags for manual source/target pickers (decision 0005).
  * Codes are lowercase BCP-47 primary tags.
@@ -81,6 +87,9 @@ data class ListenTranslateUiState(
     /** Audio read progress, separate from confirmed subtitle coverage. */
     val recordedReadThroughMs: Long = 0L,
 ) {
+    val currentTranslationMissing: Boolean
+        get() = enabled && isListenCaptionTranslationMissing(activeCue, displayMode)
+
     val languages: ListenLanguagePair
         get() = ListenLanguagePair(
             sourceLang, if (displayMode == ListenDisplayMode.SourceOnly) sourceLang else targetLang,

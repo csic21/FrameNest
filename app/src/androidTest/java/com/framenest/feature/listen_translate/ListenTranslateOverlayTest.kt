@@ -165,6 +165,125 @@ class ListenTranslateOverlayTest(private val widthDp: Int) {
         compose.onNodeWithTag("listen_caption_full_target").assertDoesNotExist()
     }
 
+    @Test
+    fun targetOnlyMissingTranslationHasQuietPlaceholderAndClearsWhenReady() {
+        val current = mutableStateOf<ListenTranslateCue?>(cue("原文", ""))
+        compose.setContent {
+            MaterialTheme {
+                Box(Modifier.width(widthDp.dp).height(300.dp)) {
+                    ListenTranslateOverlay(current.value, ListenDisplayMode.TargetOnly)
+                }
+            }
+        }
+        compose.onNodeWithTag("listen_caption_translation_missing", useUnmergedTree = true)
+            .assertIsDisplayed().assertTextEquals("译文尚未就绪")
+        compose.onNodeWithTag("listen_caption_source", useUnmergedTree = true).assertDoesNotExist()
+        compose.runOnIdle { current.value = cue("原文", "译文") }
+        compose.onNodeWithTag("listen_caption_translation_missing", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("listen_caption_target", useUnmergedTree = true).assertTextEquals("译文")
+        compose.runOnIdle { current.value = null }
+        compose.onNodeWithTag("listen_translate_overlay").assertDoesNotExist()
+    }
+
+    @Test
+    fun fastBilingualTranslationNeverFlashesHintOrDelaysSource() {
+        compose.mainClock.autoAdvance = false
+        val current = mutableStateOf(cue("原文", ""))
+        compose.setContent {
+            MaterialTheme {
+                Box(Modifier.width(widthDp.dp).height(300.dp)) {
+                    ListenTranslateOverlay(current.value, ListenDisplayMode.Bilingual)
+                }
+            }
+        }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("listen_caption_source", useUnmergedTree = true).assertTextEquals("原文")
+        compose.onNodeWithTag("listen_caption_translation_missing", useUnmergedTree = true).assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(200L)
+        compose.runOnIdle { current.value = cue("原文", "译文") }
+        compose.mainClock.advanceTimeBy(LISTEN_TRANSLATION_HINT_DELAY_MS + 100L)
+        compose.onNodeWithTag("listen_caption_translation_missing", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("listen_caption_target", useUnmergedTree = true).assertTextEquals("译文")
+    }
+
+    @Test
+    fun slowBilingualHintIsBoundToCueAndSeekResetAndDoesNotSurviveModeOrGap() {
+        compose.mainClock.autoAdvance = false
+        val current = mutableStateOf<ListenTranslateCue?>(cue("原文", ""))
+        val mode = mutableStateOf(ListenDisplayMode.Bilingual)
+        val epoch = mutableStateOf(0)
+        compose.setContent {
+            MaterialTheme {
+                Box(Modifier.width(widthDp.dp).height(300.dp)) {
+                    ListenTranslateOverlay(current.value, mode.value, expansionResetKey = epoch.value)
+                }
+            }
+        }
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(LISTEN_TRANSLATION_HINT_DELAY_MS + 100L)
+        compose.onNodeWithTag("listen_caption_translation_missing", useUnmergedTree = true)
+            .assertIsDisplayed().assertTextEquals("译文尚未就绪")
+        compose.runOnIdle { epoch.value++ }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("listen_caption_translation_missing", useUnmergedTree = true).assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(250L)
+        compose.runOnIdle { current.value = cue("另一句", "").copy(startMs = 30_000L, endMs = 33_000L) }
+        compose.mainClock.advanceTimeBy(400L)
+        compose.onNodeWithTag("listen_caption_translation_missing", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("listen_caption_source", useUnmergedTree = true).assertTextEquals("另一句")
+        compose.mainClock.advanceTimeBy(300L)
+        compose.onNodeWithTag("listen_caption_translation_missing", useUnmergedTree = true).assertIsDisplayed()
+        compose.runOnIdle { mode.value = ListenDisplayMode.SourceOnly }
+        compose.mainClock.advanceTimeBy(LISTEN_TRANSLATION_HINT_DELAY_MS + 100L)
+        compose.onNodeWithTag("listen_caption_translation_missing", useUnmergedTree = true).assertDoesNotExist()
+        compose.runOnIdle { mode.value = ListenDisplayMode.Bilingual; current.value = null }
+        compose.mainClock.advanceTimeBy(LISTEN_TRANSLATION_HINT_DELAY_MS + 100L)
+        compose.onNodeWithTag("listen_translate_overlay").assertDoesNotExist()
+    }
+
+    @Test
+    fun sameLanguageAndSourceOnlyNeverShowMissingTranslation() {
+        val mode = mutableStateOf(ListenDisplayMode.TargetOnly)
+        compose.setContent {
+            MaterialTheme {
+                Box(Modifier.width(widthDp.dp).height(300.dp)) {
+                    ListenTranslateOverlay(cue("原文", "").copy(languages = ListenLanguagePair("ja", "ja")), mode.value)
+                }
+            }
+        }
+        compose.onNodeWithTag("listen_caption_translation_missing", useUnmergedTree = true).assertDoesNotExist()
+        compose.runOnIdle { mode.value = ListenDisplayMode.SourceOnly }
+        compose.onNodeWithTag("listen_caption_source", useUnmergedTree = true).assertTextEquals("原文")
+        compose.onNodeWithTag("listen_caption_translation_missing", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun expandedMissingTargetDescribesFrozenSnapshotEvenIfTranslationFinishes() {
+        compose.mainClock.autoAdvance = false
+        val current = mutableStateOf(cue(longSource, ""))
+        compose.setContent {
+            MaterialTheme {
+                Box(Modifier.width(widthDp.dp).height(300.dp)) {
+                    ListenTranslateOverlay(current.value, ListenDisplayMode.Bilingual)
+                }
+            }
+        }
+        compose.mainClock.advanceTimeByFrame()
+        // Open before the delayed live hint: the snapshot must still retain the missing-target fact.
+        compose.onNodeWithTag("listen_caption_expand").performClick()
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("listen_caption_full_translation_missing").performScrollTo()
+            .assertTextEquals("打开时译文尚未就绪")
+        compose.runOnIdle { current.value = cue(longSource, longTarget) }
+        compose.mainClock.advanceTimeBy(LISTEN_TRANSLATION_HINT_DELAY_MS + 100L)
+        compose.onNodeWithTag("listen_caption_full_translation_missing").assertTextEquals("打开时译文尚未就绪")
+        compose.onNodeWithTag("listen_caption_full_target").assertDoesNotExist()
+        compose.onNodeWithTag("listen_caption_full_close").performClick()
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("listen_caption_target", useUnmergedTree = true).assertTextEquals(longTarget)
+        compose.onNodeWithTag("listen_caption_translation_missing", useUnmergedTree = true).assertDoesNotExist()
+    }
+
     private fun textLayout(tag: String): TextLayoutResult {
         val results = mutableListOf<TextLayoutResult>()
         compose.onNodeWithTag(tag, useUnmergedTree = true)

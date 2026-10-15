@@ -19,9 +19,15 @@ import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import com.framenest.BuildConfig
 import com.framenest.R
+import com.framenest.core.model.PlaybackIdentity
+import com.framenest.data.listen_translate.ListenLanguagePair
+import com.framenest.data.listen_translate.ListenTranslateCue
+import com.framenest.data.listen_translate.ListenTranslateJobStatus
 import android.graphics.Bitmap
 import java.io.File
 import org.junit.Assume.assumeTrue
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -194,6 +200,61 @@ class ListenTranslateDiagnosticsControlsTest(private val widthDp: Int) {
         compose.runOnIdle { state.value = state.value.copy(currentCaptionUnconfirmed = false) }
         compose.onNodeWithTag("listen_caption_unconfirmed").assertDoesNotExist()
         compose.onNodeWithTag("listen_translate_error").performScrollTo().assertTextContains("翻译失败")
+    }
+
+    @Test
+    fun installationRunningAndFailureFeedbackAreVisibleBesideTheSwitchWithoutScrolling() {
+        val state = mutableStateOf(ListenTranslateUiState(isInstallingModels = true, message = "正在准备模型"))
+        compose.setContent {
+            MaterialTheme {
+                ListenTranslateControls(
+                    uiState = state.value,
+                    onEnabledChange = {}, onSourceLang = {}, onTargetLang = {}, onDisplayMode = {},
+                    modifier = Modifier.width(widthDp.dp).height(260.dp),
+                )
+            }
+        }
+        compose.onNodeWithTag("listen_translate_enable").assertIsDisplayed()
+        compose.onNodeWithTag("listen_translate_installing").assertIsDisplayed().assertTextContains("正在准备模型")
+        compose.runOnIdle {
+            state.value = ListenTranslateUiState(enabled = true, isProcessing = true, status = ListenTranslateJobStatus.Running)
+        }
+        compose.onNodeWithTag("listen_translate_status").assertIsDisplayed().assertTextContains("处理中", substring = true)
+        compose.runOnIdle {
+            state.value = state.value.copy(
+                isProcessing = false, status = ListenTranslateJobStatus.Failed, errorMessage = "翻译失败，请稍后重试",
+                activeCue = ListenTranslateCue(
+                    1L, PlaybackIdentity("test", "share", "video.mkv"), ListenLanguagePair("ja", "zh"),
+                    0L, 3_000L, "原文", "", 1,
+                ),
+            )
+        }
+        compose.onNodeWithTag("listen_translation_missing").assertIsDisplayed().assertTextContains("译文尚未就绪")
+        compose.onNodeWithTag("listen_translate_error").assertIsDisplayed().assertTextContains("翻译失败", substring = true)
+        val switchBounds = compose.onNodeWithTag("listen_translate_enable").fetchSemanticsNode().boundsInRoot
+        val statusBounds = compose.onNodeWithTag("listen_translate_status").fetchSemanticsNode().boundsInRoot
+        assertTrue(switchBounds.bottom <= statusBounds.top)
+        compose.runOnIdle { state.value = state.value.copy(enabled = false, activeCue = null) }
+        compose.onNodeWithTag("listen_translation_missing").assertDoesNotExist()
+        compose.onNodeWithTag("listen_translate_error").assertIsDisplayed()
+    }
+
+    @Test
+    fun unrecognizedSpeechCopyDoesNotMisidentifyTheSelectedEngine() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val text = context.getString(R.string.listen_translate_blank_unrecognized)
+        assertFalse(text.contains("Vosk"))
+        assertFalse(text.contains("SenseVoice"))
+        compose.setContent {
+            MaterialTheme {
+                ListenTranslateControls(
+                    uiState = ListenTranslateUiState(enabled = true, lastBlankReason = ListenBlankReason.UnrecognizedSpeech),
+                    onEnabledChange = {}, onSourceLang = {}, onTargetLang = {}, onDisplayMode = {},
+                    modifier = Modifier.width(widthDp.dp).height(260.dp),
+                )
+            }
+        }
+        compose.onNodeWithTag("listen_translate_blank_reason").assertIsDisplayed().assertTextContains(text)
     }
 
     companion object {
