@@ -80,9 +80,11 @@ the manifest before later testing; rebuilding is not proof of identical APKs.
 
 ## Validation boundary
 
-At initial implementation: local exact artifact import and six importer tests
-pass. Android app assemble/unit/lint/instrumentation compilation are pending the
-new CI; there is no local Android SDK. The separate APK checker has its own tests.
+At initial implementation: local exact artifact import and 39 focused importer /
+APK-checker tests pass, including the real pinned AAR with a synthetic,
+non-installable APK container. Android app assemble/unit/lint/instrumentation
+compilation are pending the new CI; there is no local Android SDK. The synthetic
+container validates the checker, not the app or runtime.
 
 Compilation and static checks do not establish native execution, real 4KB/16KB
 device compatibility, performance, accuracy/ITN, timestamps, cancellation, long
