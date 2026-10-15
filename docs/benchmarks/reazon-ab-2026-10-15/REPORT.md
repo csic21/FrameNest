@@ -8,6 +8,10 @@ On identical nonoverlapping 15-second windows, Kishida first-114-second edited-c
 
 A deliberately oracle-aligned control using the independent caption boundaries improves Reazon to **8.49% vs SenseVoice 14.91%**. This is evidence of segmentation sensitivity, not a deployable result: production does not know these caption boundaries, final syllables remain missing in several cues, and the Reazon process reaches a higher peak RSS on longer windows. Emoji still loses the language list and the answer even in the selected cue-boundary control. There is no quality-without-regression win across the required cases.
 
+## Official preprocessing follow-up
+
+A final single-configuration official Silero VAD control also rejects Reazon: **23.17% CER vs SenseVoice 10.09%**, with identical selected PCM and no oracle boundaries. It recovers the Emoji answer/Hollywood clause but drops the language question and the consequential arrest clause inside selected audio. Peak process RSS is 776,316 KiB vs 594,528 KiB. See [VAD-CONTROL.md](VAD-CONTROL.md) for exact configuration, padding/EOF handling, timing, full sample accounting and limits. Reazon exploration stops here.
+
 ## Measurements
 
 Three passes per profile/model; raw text/tokens/PTS identical across all three. Full fixtures used for fixed windows: Emoji 113.960 seconds and Kishida 175.7866875 seconds. The oracle diagnostic is deliberately bounded to Emoji 0–42.22 seconds and Kishida 0–114 seconds. CER always scores only Kishida 0–114 seconds, 436 normalized reference characters. Emoji has no verified gold and no claimed CER.
@@ -57,7 +61,7 @@ The original first 15 s experiment files are named sensevoice.json and reazon.js
 
 - Status: bounded A/B complete; promotion rejected on measured quality regressions.
 - Branch: experiment/FN-70-reazon-ab, based on da49192. Docs/reproduction/evidence only; stable PR4 and main untouched.
-- Checks: 36 fixture passes; all model/video accepted hashes verified; 436 reference chars verified; all repeated raw output identical; token counts, monotonicity and within-input range pass; Python compilation passes.
+- Checks: 54 fixture passes across the initial A/B and final VAD control; all model/video accepted hashes verified; 436 reference chars verified; all repeated raw output identical; token counts, monotonicity and within-input range pass; Python compilation passes.
 - No Android build needed for docs/scripts-only change. No Android execution, phone/NAS, rendering, energy or MT acceptance claimed.
 - Decision: retain SenseVoice and experimental defaults as-is. Reazon would require a separately justified causal segmentation/coverage solution and a fresh controlled comparison before an adapter or default switch. Oracle boundaries are not that solution.
 - Shared-file edits required: none.
