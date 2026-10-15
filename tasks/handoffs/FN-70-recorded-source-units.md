@@ -35,3 +35,10 @@
   Captured Kishida regression preserves 35.57/50.11/64.13/98.22/115.3 s boundaries.
   Actual Emoji `使う 新しい表現スタイルです` stays joined. Missing newly requested union
   captures are explicitly failed; benchmark owner must regenerate them before acceptance.
+
+- Restored v3 ownership correction after workspace rollback: archive only the owned old
+  prefix at a hard character cap, retain newer suffix once, preserve the seam anchor.
+  Four regressions cover disjoint concatenation, stable text, repeated caps/EOF and union.
+  Original local commit was lost; this restoration has no model/morphology changes.
+- Revalidated after restoration: `bash scripts/experimental/run-recorded-source-unit-tests.sh`
+  passes 39 tests; `git diff --check` passes. Android/real model quality not rerun.

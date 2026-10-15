@@ -113,3 +113,12 @@ An ASR comma inside a conjugation (for example the captured `でしょ、うか`
 change morphological analysis. No punctuation-elision parser or no-quiet stability
 heuristic was introduced in this scoped correction. Exact-zero PCM silence also needs
 an explicit future input contract; arbitrary blank ASR continues to mean unknown audio.
+
+## v3 hard-character-cap ownership repair
+
+The matched splice lies inside the overlap, not at the old hypothesis end. v3 archives
+only stable text plus the old prefix through that splice, then installs the newer tail.
+An earlier whole-context snapshot is superseded. Tentative intervals share one estimated
+seam PTS, without certifying semantic or word alignment. The archived-prefix anchor
+remains available for the next bounded union. Exact reconstruction tests cover repeated
+caps, stable prefixes, supersession, EOF and later recovery. Morphology is unchanged.

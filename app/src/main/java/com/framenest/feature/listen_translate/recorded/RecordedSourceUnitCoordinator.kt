@@ -110,13 +110,21 @@ internal class RecordedSourceUnitCoordinator(
                 val added = Chunk(old.window, old.rawStart, cut.oldOffset)
                 val candidateSize = stable.sumOf { it.end - it.begin } + added.end - added.begin + h.text.length - cut.newOffset
                 if (candidateSize > maxContextChars) {
-                    // Never truncate a source string merely to fit the working-memory bound.
+                    // The splice is in the middle of the shared overlap, NOT at the
+                    // old hypothesis end. Only archive stable + old-prefix ownership;
+                    // the newer tail owns every character after the matched seam.
                     check(oldContext.sumOf { it.end - it.begin } <= maxContextChars)
-                    emitContext(RecordedSourceStatus.PROVISIONAL, RecordedSourceReason.NO_BOUNDARY_CONTEXT_LIMIT,
-                        old.window.endMs, ready, records, consume = true)
-                    // The verified overlap already supplies a new raw cursor. Even
-                    // under the hard character cap, do not replay the omitted prefix.
-                    seed(input, completeLeft = false, rawStart = cut.newOffset)
+                    val retainedPrefixSize = stable.sumOf { it.end - it.begin } + added.end - added.begin
+                    val newTail = Chunk(h, cut.newOffset, h.text.length)
+                    val seamMs = maxOf(coverageStart + 1,
+                        anchors(listOf(newTail)).firstOrNull()?.estimatedTokenStartMs ?: h.endMs)
+                    emit(retainedPrefixSize, RecordedSourceStatus.PROVISIONAL,
+                        RecordedSourceReason.NO_BOUNDARY_CONTEXT_LIMIT, seamMs, ready, records, consume = true)
+                    // consume() preserves the actually archived old-prefix anchor for
+                    // a possible later union. One estimated seam PTS bounds both sides;
+                    // neither this text cut nor its timing claims semantic completion.
+                    pending = RecordedPending(h, cut.newOffset, coverageStart)
+                    leftComplete = false
                 } else {
                     stable += added
                     frozenAnchor = RecordedFrozenAnchor(old.window, old.rawStart, cut.oldOffset)

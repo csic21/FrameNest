@@ -309,19 +309,100 @@ class RecordedSourceUnitCoordinatorTest {
         assertTrue(completed.startMs>=9000)
     }
 
-    @Test fun hardCharacterCapRetainsVerifiedNewRawCursorRatherThanReplayingPrefix() {
-        val c = RecordedSourceUnitCoordinator(noBoundaries,maxContextChars=128)
-        fun window(start: Long): RecordedWindowInput = RecordedWindowInput(RecordedHypothesis(0,start,start+15000,
-            (0 until 128).map { i -> RecordedToken((0x4e00+start.toInt()/100+i).toChar().toString(),start+i*100L) }),emptyList())
-        val first=window(0);val next=window(9000)
-        val cut=com.framenest.feature.listen_translate.RecordedOverlapAlignment.align(
-            com.framenest.feature.listen_translate.RecordedPending(first.hypothesis,0,0),next.hypothesis).cut!!
-        val initial=c.push(first)
+    private fun denseUniqueWindow(start: Long): RecordedWindowInput = RecordedWindowInput(
+        RecordedHypothesis(0, start, start + 15000, (0 until 128).map { i ->
+            RecordedToken((0x4e00 + start.toInt() / 100 + i).toChar().toString(), start + i * 100L)
+        }), emptyList())
+
+    @Test fun hardCharacterCapPartitionsSourceExactlyAtVerifiedSeam() {
+        val c = RecordedSourceUnitCoordinator(noBoundaries, maxContextChars = 128)
+        val first = denseUniqueWindow(0)
+        val next = denseUniqueWindow(9000)
+        val cut = com.framenest.feature.listen_translate.RecordedOverlapAlignment.align(
+            com.framenest.feature.listen_translate.RecordedPending(first.hypothesis, 0, 0), next.hypothesis).cut!!
+        val initial = c.push(first)
         initial.readyUnits.forEach { c.deferUnconfirmed(it) }
-        val r=c.push(next)
-        assertEquals(next.hypothesis.text.substring(cut.newOffset),r.pendingText)
-        assertTrue(r.pendingText.length<=128)
-        assertEquals(18000L,r.nextWindowStartMs)
+        val r = c.push(next)
+        val archived = r.readyUnits.single().unit
+        assertEquals(first.hypothesis.text.substring(0, cut.oldOffset), archived.text)
+        assertEquals(next.hypothesis.text.substring(cut.newOffset), r.pendingText)
+        val expected = (0 until 218).joinToString("") { (0x4e00 + it).toChar().toString() }
+        assertEquals(expected, archived.text + r.pendingText)
+        assertEquals(initial.readyUnits.single().unit.id, archived.supersedes)
+        assertTrue(r.records.any { it.state == RecordedResultState.SUPERSEDED })
+        assertEquals(archived.coverageEndMs, r.pendingSource!!.estimatedStartMs)
+        assertTrue(archived.coverageEndMs < first.hypothesis.endMs)
+        assertTrue(r.pendingText.length <= 128)
+        assertEquals(18000L, r.nextWindowStartMs)
+        assertNull(r.completedCoverage)
+    }
+
+    @Test fun hardCharacterCapAlsoPreservesPreviouslyStitchedStablePrefix() {
+        val c = RecordedSourceUnitCoordinator(noBoundaries, maxContextChars = 128, maxContextMs = 30000)
+        fun window(start: Long) = RecordedWindowInput(RecordedHypothesis(0, start, start + 15000,
+            (0 until 60).map { i -> RecordedToken((0x4e00 + start.toInt() / 250 + i).toChar().toString(),
+                start + i * 250L) }), emptyList())
+        assertTrue(c.push(window(0)).readyUnits.isEmpty())
+        assertTrue(c.push(window(9000)).readyUnits.isEmpty())
+        val r = c.push(window(18000))
+        val archived = r.readyUnits.single().unit
+        val expected = (0 until 132).joinToString("") { (0x4e00 + it).toChar().toString() }
+        assertEquals(expected, archived.text + r.pendingText)
+        assertTrue(archived.anchors.any { it.hypothesisStartMs == 0L })
+        assertTrue(archived.anchors.any { it.hypothesisStartMs == 9000L })
+        assertEquals(archived.coverageEndMs, r.pendingSource!!.estimatedStartMs)
+        assertEquals(27000L, r.nextWindowStartMs)
+    }
+
+    @Test fun hardCharacterCapRetainsArchivedPrefixAnchorForLaterUnion() {
+        val c = RecordedSourceUnitCoordinator(noBoundaries, maxContextChars = 128)
+        c.push(denseUniqueWindow(0)).readyUnits.forEach { c.deferUnconfirmed(it) }
+        val next = denseUniqueWindow(9000)
+        val capped = c.push(next)
+        capped.readyUnits.forEach { c.deferUnconfirmed(it) }
+        val conflict = RecordedWindowInput(RecordedHypothesis(0, 18000, 33000,
+            letters("これは前の認識とは全く異なる文章です", 18000, 22000)), emptyList())
+        assertTrue(c.push(conflict).nextAction is RecordedNextAction.DecodeUnion)
+        val recovered = c.recoverUnion(next.copy(hypothesis = next.hypothesis.copy(endMs = 33000)))
+        assertTrue(recovered.accepted)
+        assertNull(recovered.error)
+        assertEquals(capped.pendingText, recovered.pendingText)
+        assertTrue(recovered.readyUnits.isEmpty())
+        assertEquals(27000L, recovered.nextWindowStartMs)
+        assertNull(recovered.completedCoverage)
+    }
+
+    @Test fun repeatedHardCharacterCapsReconstructDisjointActiveSourceThroughEof() {
+        val c = RecordedSourceUnitCoordinator(noBoundaries, maxContextChars = 128)
+        val active = linkedMapOf<RecordedUnitId, RecordedSourceUnit>()
+        fun retainAndDefer(r: RecordedCoordinatorResult) {
+            assertTrue(r.accepted)
+            assertNull(r.completedCoverage)
+            for (record in r.records) when (record.state) {
+                RecordedResultState.SUPERSEDED -> active.remove(record.unit.id)
+                else -> active[record.unit.id] = record.unit
+            }
+            assertTrue(r.pendingText.length <= 128)
+            for (ticket in r.readyUnits) {
+                assertEquals(RecordedSourceStatus.PROVISIONAL, ticket.unit.status)
+                assertTrue(c.deferUnconfirmed(ticket).accepted)
+            }
+        }
+        repeat(8) { i ->
+            retainAndDefer(c.push(denseUniqueWindow(i * 9000L)))
+            assertEquals((i + 1) * 9000L, c.snapshot().nextWindowStartMs)
+        }
+        retainAndDefer(c.finish(0, 78000))
+        val units = active.values.toList()
+        val expected = (0 until 758).joinToString("") { (0x4e00 + it).toChar().toString() }
+        assertEquals(expected, units.joinToString("") { it.text })
+        assertEquals(8, units.size)
+        assertTrue(units.all { it.text.length <= 128 && it.coverageStartMs < it.coverageEndMs })
+        assertTrue(units.zipWithNext().all { (a, b) -> a.coverageEndMs == b.coverageStartMs })
+        assertEquals(0L, units.first().coverageStartMs)
+        assertEquals(78000L, units.last().coverageEndMs)
+        assertEquals("", c.snapshot().pendingText)
+        assertEquals(RecordedNextAction.Finished, c.snapshot().nextAction)
     }
 
     @Test fun noBoundaryNeverYieldsNoneAndSourceInputIsBounded() {
