@@ -1,0 +1,120 @@
+{
+  "fixture_id": "fn76-mcdc-ja-20221104-113460-161180",
+  "description": "Held-out Japanese interpretation-channel excerpt about how to use language channels; no ASR output was used to select or group the reference.",
+  "selected_utc": "2026-10-15T16:22:00Z",
+  "title": "MCDC Onboarding \"Ask me Anything\" session - Japanese language",
+  "media_source": {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/0/0c/MCDC_Onboarding_%22Ask_me_Anything%22_session_-_Japanese_language.webm",
+    "page_url": "https://commons.wikimedia.org/wiki/File:MCDC_Onboarding_%22Ask_me_Anything%22_session_-_Japanese_language.webm",
+    "page_revision": 1140357430,
+    "original_published_utc": "2022-11-04T21:21:45Z",
+    "author": "TCappelletto (WMF)",
+    "license": "CC-BY-SA-4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "source_duration_ms": 1389928,
+    "source_size_bytes": 78139308,
+    "source_sha1": "faa6b2df63f3f14beeb3c240bd80972b96acdd3f",
+    "source_sha1_status": "Computed locally from complete original; exactly matches publisher SHA-1.",
+    "source_sha256": "fd5f4acad07dce6c67a0e200e79b535300452b3fdb5c1f6929ddd2d3d29ee90a",
+    "source_sha256_status": "Computed locally from the complete 78,139,308-byte original WebM.",
+    "source_video": "VP9, 1920x1080",
+    "source_audio": "Opus",
+    "download_permission_evidence": "Copyright holder self-published the audiovisual work on Commons under CC BY-SA 4.0; page permits sharing and adaptation.",
+    "local_original_file": "mcdc-ja-original.webm"
+  },
+  "excerpt": {
+    "start_ms": 113460,
+    "end_ms": 161180,
+    "duration_ms": 47720,
+    "video_file": "mcdc-ja-113460-161180.mp4",
+    "video_processing": "ffmpeg accurate seek from original; scale width640; H264 CRF26; AAC96k; faststart.",
+    "wav_file": "mcdc-ja-113460-161180.wav",
+    "pcm_file": "mcdc-ja-113460-161180.pcm",
+    "audio_processing": "Decode original Opus track directly with ffmpeg; accurate seek113.460; duration47.720; mono16000Hz signed16LE. No additional lossy codec in benchmark PCM.",
+    "audio": {
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "sample_width_bytes": 2,
+      "frames": 763520,
+      "duration_ms": 47720,
+      "format": "pcm_s16le"
+    }
+  },
+  "reference": {
+    "file": "reference.json",
+    "full_source_srt": "source.ja.srt",
+    "license": "CC-BY-SA-4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "reference_kind": "human_corrected_published_timed_text",
+    "provenance_status": "public_revision_history_verified",
+    "is_verbatim_gold": false,
+    "original_creator": "CKibelka (WMF)",
+    "creation_revision": 703925007,
+    "correction_revision": 711665194,
+    "final_revision": 711665459,
+    "correction_author": "Syunsyunminmin",
+    "correction_summary": "明らかな間違いは修正",
+    "history_url": "https://commons.wikimedia.org/w/index.php?title=TimedText%3AMCDC_Onboarding_%22Ask_me_Anything%22_session_-_Japanese_language.webm.ja.srt&action=history",
+    "correction_diff_url": "https://commons.wikimedia.org/w/index.php?title=TimedText:MCDC_Onboarding_%22Ask_me_Anything%22_session_-_Japanese_language.webm.ja.srt&diff=711665194&oldid=703925007",
+    "final_revision_url": "https://commons.wikimedia.org/w/index.php?title=TimedText:MCDC_Onboarding_%22Ask_me_Anything%22_session_-_Japanese_language.webm.ja.srt&oldid=711665459",
+    "caveat": "Human correction of obvious errors is documented; initial caption generation method, exhaustive correction, and word-for-word accuracy are not. Independent fluent listening/semantic review has not been performed."
+  },
+  "attribution": "Video: TCappelletto (WMF), MCDC Onboarding \"Ask me Anything\" session - Japanese language (2022), Wikimedia Commons, CC BY-SA 4.0. Japanese timed text: CKibelka (WMF), corrected by Syunsyunminmin (2022), Wikimedia Commons, CC BY-SA 4.0. Changes:47.72-second excerpt, transcoding/resampling, and assistant grouping of unchanged caption wording.",
+  "acceptance": {
+    "semantic_acceptance": null,
+    "human_listening_review": false,
+    "reliability_claim": "Diagnostic reference only; not verbatim gold, not accuracy acceptance."
+  },
+  "files": {
+    "mcdc-ja-113460-161180.mp4": {
+      "bytes": 753702,
+      "sha256": "20ae36348a7681d5f52a914dcb86448eaad0215b3948c367befd99d5e0f8064c"
+    },
+    "mcdc-ja-113460-161180.pcm": {
+      "bytes": 1527040,
+      "sha256": "be9bfbefe12f1ac32694e4c20667dc1428bdaa5f96a8124bd723de5f7fbf4fb9"
+    },
+    "mcdc-ja-113460-161180.wav": {
+      "bytes": 1527118,
+      "sha256": "08582ef2c3176338486734d330b25dc8486c308f55e1cbaf38e11257baeee35b"
+    },
+    "mcdc-ja-original.webm": {
+      "bytes": 78139308,
+      "sha256": "fd5f4acad07dce6c67a0e200e79b535300452b3fdb5c1f6929ddd2d3d29ee90a"
+    },
+    "media-license-page.html": {
+      "bytes": 120257,
+      "sha256": "d907ad46e7876894fef691ca5107375af3f5081280ad42d2185f1ebb654946ab"
+    },
+    "reference-history-page.html": {
+      "bytes": 108905,
+      "sha256": "9308a67baecbe4e17c35ef1e3f331d76eefb118cba032b30acb13b8cd57e6627"
+    },
+    "reference-source-page.html": {
+      "bytes": 71149,
+      "sha256": "77fd88eea52949a380c0fc1544993f8e02cc544928d3bcb35b8590c8aa68db95"
+    },
+    "reference.json": {
+      "bytes": 6653,
+      "sha256": "f918c0780b40234c45772ca232eeb87a94158357651acff3dcf402309357af3e"
+    },
+    "reproduce.sh": {
+      "bytes": 966,
+      "sha256": "9fc8f3c9a2d98c29b0a50306eec7b7cd04ef79af78216f66b4ba3ab20ab2bf2b"
+    },
+    "source.ja.srt": {
+      "bytes": 24532,
+      "sha256": "553086a86554764c6430ad0524a5b8ccf81eb128c62e1f101711d7955a880a38"
+    }
+  },
+  "verification": {
+    "mp4_complete_decode_exit_code": 0,
+    "wav_complete_decode_exit_code": 0,
+    "direct_local_original_pcm_matches_range_download_pcm": true,
+    "pcm_expected_bytes": 1527040,
+    "pcm_actual_bytes": 1527040,
+    "independent_audio_listening": false,
+    "source_revision_in_html": "711665459"
+  },
+  "reproduction_command_file": "reproduce.sh"
+}

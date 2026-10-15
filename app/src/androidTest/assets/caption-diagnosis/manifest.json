@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "id": "fn76-mcdc-ja-20221104-113460-161180",
+  "duration_ms": 47720,
+  "original_media_start_ms": 113460,
+  "source_language": "ja",
+  "target_language": "zh",
+  "source_url": "https://commons.wikimedia.org/wiki/File:MCDC_Onboarding_%22Ask_me_Anything%22_session_-_Japanese_language.webm",
+  "media_url": "https://upload.wikimedia.org/wikipedia/commons/0/0c/MCDC_Onboarding_%22Ask_me_Anything%22_session_-_Japanese_language.webm",
+  "author": "TCappelletto (WMF)",
+  "license": "CC-BY-SA-4.0",
+  "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+  "attribution": "Video: TCappelletto (WMF), MCDC Onboarding \"Ask me Anything\" session - Japanese language (2022), Wikimedia Commons, CC BY-SA 4.0. Japanese timed text: CKibelka (WMF), corrected by Syunsyunminmin (2022), Wikimedia Commons, CC BY-SA 4.0. Changes:47.72-second excerpt, transcoding/resampling, and assistant grouping of unchanged caption wording.",
+  "media": {
+    "file": "mcdc-ja-original.webm",
+    "bytes": 78139308,
+    "sha256": "fd5f4acad07dce6c67a0e200e79b535300452b3fdb5c1f6929ddd2d3d29ee90a"
+  },
+  "wav": {
+    "file": "mcdc-ja-113460-161180.wav",
+    "bytes": 1527118,
+    "sha256": "08582ef2c3176338486734d330b25dc8486c308f55e1cbaf38e11257baeee35b"
+  },
+  "pcm": {
+    "file": "mcdc-ja-113460-161180.pcm",
+    "bytes": 1527040,
+    "sha256": "be9bfbefe12f1ac32694e4c20667dc1428bdaa5f96a8124bd723de5f7fbf4fb9",
+    "sample_rate_hz": 16000,
+    "channels": 1,
+    "encoding": "s16le",
+    "samples": 763520
+  },
+  "reference": {
+    "file": "reference.json",
+    "bytes": 6653,
+    "sha256": "f918c0780b40234c45772ca232eeb87a94158357651acff3dcf402309357af3e",
+    "source_url": "https://commons.wikimedia.org/wiki/TimedText:MCDC_Onboarding_%22Ask_me_Anything%22_session_-_Japanese_language.webm.ja.srt",
+    "revision_url": "https://commons.wikimedia.org/w/index.php?title=TimedText:MCDC_Onboarding_%22Ask_me_Anything%22_session_-_Japanese_language.webm.ja.srt&oldid=711665459",
+    "kind": "human_corrected_published_timed_text",
+    "verbatim_gold": false,
+    "provenance_note": "Human correction of obvious errors is documented; initial caption generation method, exhaustive correction, and word-for-word accuracy are not. Independent fluent listening/semantic review has not been performed."
+  },
+  "units": [
+    {
+      "id": "u1",
+      "start_ms": 0,
+      "end_ms": 8939,
+      "cue_ids": [
+        17,
+        18
+      ],
+      "text": "通訳チャンネルについては画面に出ていると思うんですけれどもリスニングというツールバーの中の右の端に日本語というのがあります",
+      "unit_kind": "assistant_manually_grouped_published_caption_span",
+      "grouping_note": "Assistant manually grouped complete semantic statement(s) without seeing ASR output, retaining exact published wording; no inferred intra-cue timestamp splits.",
+      "independently_listened": false,
+      "original_start_ms": 113460,
+      "original_end_ms": 122399
+    },
+    {
+      "id": "u2",
+      "start_ms": 8939,
+      "end_ms": 18900,
+      "cue_ids": [
+        19,
+        20
+      ],
+      "text": "それからその左側に英語というものがありますのでそれを切り替えますとチャンネルが変わります",
+      "unit_kind": "assistant_manually_grouped_published_caption_span",
+      "grouping_note": "Assistant manually grouped complete semantic statement(s) without seeing ASR output, retaining exact published wording; no inferred intra-cue timestamp splits.",
+      "independently_listened": false,
+      "original_start_ms": 122399,
+      "original_end_ms": 132360
+    },
+    {
+      "id": "u3",
+      "start_ms": 18900,
+      "end_ms": 39040,
+      "cue_ids": [
+        21,
+        22,
+        23,
+        24
+      ],
+      "text": "日本語のチャンネルにしたまま質問をお話になりますとそうすると通訳者に皆さんの声が聞こえますそして通訳者の側でスイッチを変えて英語に変えて説明いたします",
+      "unit_kind": "assistant_manually_grouped_published_caption_span",
+      "grouping_note": "Assistant manually grouped complete semantic statement(s) without seeing ASR output, retaining exact published wording; no inferred intra-cue timestamp splits.",
+      "independently_listened": false,
+      "original_start_ms": 132360,
+      "original_end_ms": 152500
+    },
+    {
+      "id": "u4",
+      "start_ms": 39040,
+      "end_ms": 47720,
+      "cue_ids": [
+        25,
+        26
+      ],
+      "text": "もし英語で発言したい場合は日本語ではなくて反対のチャンネルをお使いください",
+      "unit_kind": "assistant_manually_grouped_published_caption_span",
+      "grouping_note": "Assistant manually grouped complete semantic statement(s) without seeing ASR output, retaining exact published wording; no inferred intra-cue timestamp splits.",
+      "independently_listened": false,
+      "original_start_ms": 152500,
+      "original_end_ms": 161180
+    }
+  ],
+  "models": [
+    {
+      "file": "tokens.txt",
+      "bytes": 315894,
+      "sha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc"
+    },
+    {
+      "file": "model.int8.onnx",
+      "bytes": 239233841,
+      "sha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51"
+    }
+  ],
+  "semantic_acceptance_passed": null,
+  "independent_listening": false,
+  "pcm_derivation": "Decode the verified original Opus directly with ffmpeg -ss 113.460 before -i, -t 47.720 -vn -ac 1 -ar 16000 -c:a pcm_s16le -f s16le; exact output sample SHA-256 required. WAV container hash is provenance only."
+}

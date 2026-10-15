@@ -1,0 +1,124 @@
+name: Caption diagnosis build
+
+on:
+  push:
+    branches: ['agent/FN-75-caption-clarity']
+    paths:
+      - '.github/workflows/caption-diagnosis-build.yml'
+      - 'app/**'
+      - 'scripts/prepare-caption-diagnosis.py'
+      - 'scripts/tests/test_caption_diagnosis.py'
+      - 'scripts/caption_diagnosis_schema.py'
+      - 'docs/benchmarks/caption-diagnosis-2026-10-15/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: caption-diagnosis-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: gradle/wrapper-validation-action@f9c9c575b8b21b6485636a91ffecd10e558c62f6
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Import the exact published source runtime and test preparation
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/caption-evidence"
+          python3 scripts/prepare_source_asr_from_release.py
+          FN74_SOURCE_AAR="$PWD/app/libs/sherpa-onnx-1.13.8-asr-no-tts.aar" python3 -m unittest discover -s scripts/tests -v
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+          accept-android-sdk-licenses: false
+      - name: Install stable SDK using previously accepted license
+        run: |
+          set -euo pipefail
+          test -s "$ANDROID_HOME/licenses/android-sdk-license"
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" < /dev/null
+          test -f "$ANDROID_HOME/platforms/android-36/android.jar"
+          test -x "$ANDROID_HOME/build-tools/36.0.0/apksigner"
+      - name: Prepare fixed public video reference and existing model
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install --no-install-recommends -y ffmpeg
+          fi
+          ffmpeg -version > "$RUNNER_TEMP/caption-evidence/ffmpeg.txt"
+          python3 - <<'PY'
+          import importlib.util, json, os
+          from pathlib import Path
+          spec = importlib.util.spec_from_file_location('runtime_inputs', 'scripts/prepare-sensevoice-runtime-comparison.py')
+          module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+          manifest = json.loads(Path('app/src/androidTest/assets/runtime-comparison/manifest.json').read_text())
+          for model in manifest['models']:
+              module.download_verified(model['url'], Path(os.environ['RUNNER_TEMP'])/'caption-models'/model['file'], model)
+          PY
+          python3 scripts/prepare-caption-diagnosis.py --download \
+            --input-dir "$RUNNER_TEMP/caption-inputs" \
+            --model-dir "$RUNNER_TEMP/caption-models/sensevoice"
+      - name: Compile and test exact source profile without device execution
+        run: |
+          set -euo pipefail
+          ./gradlew -PsherpaAsrSource=true -PhyMtNative=false --dependency-verification strict \
+            assembleDebug testDebugUnitTest assembleDebugAndroidTest lintDebug \
+            --no-daemon --stacktrace
+          python3 scripts/check_android_test_signatures.py app/build --path-contains androidtest
+      - name: Verify native identity and retain exact APK hashes
+        run: |
+          set -euo pipefail
+          python3 scripts/check_source_asr_apk.py --aar app/libs/sherpa-onnx-1.13.8-asr-no-tts.aar \
+            --report "$RUNNER_TEMP/caption-evidence/apk-static-audit.json" --require-all-variants \
+            app/build/outputs/apk/debug/*.apk
+          for apk in app/build/outputs/apk/debug/*.apk app/build/outputs/apk/androidTest/debug/*.apk; do
+            "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk" >> "$RUNNER_TEMP/caption-evidence/signatures.txt"
+            "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 4 "$apk"
+          done
+          PYTHONPATH=scripts python3 - <<'PY'
+          import hashlib,json,os,shutil
+          from pathlib import Path
+          from collect_source_asr_pair import verify_build_config
+          root=Path(os.environ['RUNNER_TEMP'])/'caption-evidence'
+          profile=verify_build_config(Path('app/build'),root)
+          paths=[Path('app/build/outputs/apk/debug/app-x86_64-debug.apk'),Path('app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk')]
+          record={'schema_version':1,'source_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'runtime_executed':False,'profile':profile,'apks':[]}
+          staged=Path(os.environ['RUNNER_TEMP'])/'caption-apks'; staged.mkdir()
+          for path,name in zip(paths,['app.apk','test.apk']):
+              shutil.copyfile(path,staged/name)
+              record['apks'].append({'path':str(path),'artifact_name':name,'bytes':path.stat().st_size,'sha256':hashlib.sha256(path.read_bytes()).hexdigest()})
+          (root/'apk-pair.json').write_text(json.dumps(record,indent=2)+'\n')
+          shutil.copyfile(root/'apk-pair.json',staged/'apk-pair.json')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: success()
+        with:
+          name: caption-diagnosis-apks-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/caption-apks/
+          retention-days: 14
+          if-no-files-found: error
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: caption-diagnosis-build-evidence-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/caption-evidence/
+            app/build/test-results/testDebugUnitTest/*.xml
+            app/build/reports/lint-results-debug.*
+            app/src/androidTest/assets/caption-diagnosis/*.json
+          retention-days: 14
+          if-no-files-found: warn
