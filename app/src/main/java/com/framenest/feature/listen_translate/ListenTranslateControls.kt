@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.framenest.BuildConfig
 import com.framenest.R
 import com.framenest.data.listen_translate.ListenTranslateJobStatus
 
@@ -212,8 +213,10 @@ fun ListenTranslateControls(
             )
         }
 
-        Spacer(Modifier.height(8.dp))
-        HighQualityJapaneseChoice(uiState, onHighQualityJapaneseChange)
+        if (BuildConfig.HY_MT_NATIVE) {
+            Spacer(Modifier.height(8.dp))
+            HighQualityJapaneseChoice(uiState, onHighQualityJapaneseChange)
+        }
 
         if (uiState.isInstallingModels) {
             Spacer(Modifier.height(8.dp))

@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "scope": "real Android JNI; authored complete-sentence controls",
+  "started_at_epoch_ms": 1792042967030,
+  "api": 35,
+  "abis": [
+    "x86_64",
+    "arm64-v8a"
+  ],
+  "available_processors": 2,
+  "model_revision": "a0c709d9fac510f2c807aa3af52872340dc37a4a",
+  "model_sha256": "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699",
+  "model_bytes": 1133080448,
+  "runtime": "llama-b11429-d812350-ctx1024-out256-official-prompt-v1",
+  "cpu_threads": 2,
+  "context_tokens": 1024,
+  "output_token_cap": 256,
+  "hardware_performance_accepted": false,
+  "memory_definition": "Android Debug snapshots in KiB; native allocated heap in bytes. These are not peak RSS or a memory-budget acceptance.",
+  "controls": [
+    {
+      "id": "language_question",
+      "source_ja": "今、世界中で使われているのは何語でしょうか。",
+      "translation_zh": "现在世界上使用的语言是什么语呢？",
+      "example_zh": "现在全世界都在使用的是哪种语言呢？",
+      "semantic_checks": "Preserve which-language question, present time, worldwide scope.",
+      "inference_mode": "first_inference_after_fresh_engine_load",
+      "resident_model_inference_ms": 5077,
+      "memory_after_inference": {
+        "total_pss_kib": 1403522,
+        "native_pss_kib": 111179,
+        "dalvik_pss_kib": 1811,
+        "private_dirty_kib": 290760,
+        "native_heap_allocated_bytes": 205360416
+      }
+    },
+    {
+      "id": "language_entities",
+      "source_ja": "英語、スペイン語、中国語の中で、あなたはどの言語を使いますか。",
+      "translation_zh": "在英语、西班牙语和中文中，你使用哪种语言呢？",
+      "example_zh": "英语、西班牙语和中文，你使用其中哪种语言？",
+      "semantic_checks": "Preserve English, Spanish, Chinese and question; Chinese is 中文\/汉语, not 术语.",
+      "inference_mode": "resident_context_reuse",
+      "resident_model_inference_ms": 7149,
+      "memory_after_inference": {
+        "total_pss_kib": 1404530,
+        "native_pss_kib": 112163,
+        "dalvik_pss_kib": 1835,
+        "private_dirty_kib": 291764,
+        "native_heap_allocated_bytes": 205361632
+      }
+    },
+    {
+      "id": "negation_scope",
+      "source_ja": "この表現は日常会話では使われますが、ビジネス文書では使われません。",
+      "translation_zh": "这种表达在日常对话中会使用，但在商务文书中则不会使用。",
+      "example_zh": "这种表达用于日常对话，但不用于商务文件。",
+      "semantic_checks": "Daily conversation positive, business documents negative; preserve contrast.",
+      "inference_mode": "resident_context_reuse",
+      "resident_model_inference_ms": 7353,
+      "memory_after_inference": {
+        "total_pss_kib": 1404574,
+        "native_pss_kib": 112163,
+        "dalvik_pss_kib": 1879,
+        "private_dirty_kib": 291808,
+        "native_heap_allocated_bytes": 205362160
+      }
+    },
+    {
+      "id": "emoji_answer",
+      "source_ja": "正解は絵文字です。",
+      "translation_zh": "正确的答案是表情符号。",
+      "example_zh": "正确答案是表情符号。",
+      "semantic_checks": "Preserve correct-answer and emoji concepts; 形符\/颜文字\/象形文字 alone fail.",
+      "inference_mode": "resident_context_reuse",
+      "resident_model_inference_ms": 3860,
+      "memory_after_inference": {
+        "total_pss_kib": 1404610,
+        "native_pss_kib": 112163,
+        "dalvik_pss_kib": 1915,
+        "private_dirty_kib": 291844,
+        "native_heap_allocated_bytes": 205362624
+      }
+    },
+    {
+      "id": "popularity_scope",
+      "source_ja": "絵文字は若い人だけでなく幅広い年代の人に人気があり、世界中でメッセージのやり取りに使われています。",
+      "translation_zh": "表情符号不仅受到年轻人的喜爱，也受到各年龄层的人欢迎，被全球用于信息交流。",
+      "example_zh": "表情符号不仅受年轻人欢迎，也受到不同年龄段人群的喜爱，并在世界各地的信息交流中使用。",
+      "semantic_checks": "Not only young people, broad ages, popular, worldwide message use; not everyone uses it.",
+      "inference_mode": "resident_context_reuse",
+      "resident_model_inference_ms": 9666,
+      "memory_after_inference": {
+        "total_pss_kib": 1405898,
+        "native_pss_kib": 113411,
+        "dalvik_pss_kib": 1955,
+        "private_dirty_kib": 293132,
+        "native_heap_allocated_bytes": 205424624
+      }
+    },
+    {
+      "id": "neutral_statement",
+      "source_ja": "総理大臣は官邸で記者会見を開き、今日の会議の内容を説明しました。",
+      "translation_zh": "首相在官邸召开记者会，说明了今天的会议内容。",
+      "example_zh": "首相在官邸举行了记者会，并说明了今天的会议内容。",
+      "semantic_checks": "Preserve prime minister, official residence, press conference and explanation in past tense. No invented name\/country\/policy.",
+      "inference_mode": "resident_context_reuse",
+      "resident_model_inference_ms": 7187,
+      "memory_after_inference": {
+        "total_pss_kib": 1405942,
+        "native_pss_kib": 113411,
+        "dalvik_pss_kib": 2011,
+        "private_dirty_kib": 293176,
+        "native_heap_allocated_bytes": 205425344
+      }
+    }
+  ],
+  "semantic_acceptance_passed": null,
+  "memory_before_model": {
+    "total_pss_kib": 191486,
+    "native_pss_kib": 5905,
+    "dalvik_pss_kib": 2973,
+    "private_dirty_kib": 186232,
+    "native_heap_allocated_bytes": 5960368
+  },
+  "initial_sha256_verification_ms": 1,
+  "verified_model_present_before_test": false,
+  "download_and_install_verification_ms": 90148,
+  "model_downloaded_this_test": true,
+  "first_native_load_ms": 421,
+  "load_definition": "Fresh engine initialization; excludes download\/hash verification. Native library may already be loaded; verification warms filesystem caches, which were not cleared.",
+  "memory_after_load": {
+    "total_pss_kib": 1402450,
+    "native_pss_kib": 110903,
+    "dalvik_pss_kib": 1763,
+    "private_dirty_kib": 290424,
+    "native_heap_allocated_bytes": 201394304
+  },
+  "cancellation": {
+    "native_call_entered": true,
+    "native_cancellation_observed": true,
+    "late_publication": false,
+    "cancel_to_completion_ms": 47,
+    "memory_after": {
+      "total_pss_kib": 1408501,
+      "native_pss_kib": 114127,
+      "dalvik_pss_kib": 2083,
+      "private_dirty_kib": 294004,
+      "native_heap_allocated_bytes": 205496400
+    }
+  },
+  "post_cancel_resident_inference_ms": 5125,
+  "close_during_native_generation": {
+    "native_call_entered": true,
+    "native_cancellation_observed": true,
+    "late_publication": false,
+    "cancel_to_completion_ms": 82,
+    "memory_after": {
+      "total_pss_kib": 220473,
+      "native_pss_kib": 27583,
+      "dalvik_pss_kib": 2155,
+      "private_dirty_kib": 207532,
+      "native_heap_allocated_bytes": 8813088
+    }
+  },
+  "native_open_calls": 1,
+  "native_close_calls": 1,
+  "verified_path_requests": 1,
+  "functional_acceptance_passed": true,
+  "memory_after_close": {
+    "total_pss_kib": 220473,
+    "native_pss_kib": 27583,
+    "dalvik_pss_kib": 2155,
+    "private_dirty_kib": 207532,
+    "native_heap_allocated_bytes": 8813088
+  }
+}

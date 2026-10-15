@@ -17,9 +17,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
+import com.framenest.BuildConfig
 import com.framenest.R
 import android.graphics.Bitmap
 import java.io.File
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -86,7 +88,26 @@ class ListenTranslateDiagnosticsControlsTest(private val widthDp: Int) {
     }
 
     @Test
+    fun nonNativeBuildDoesNotExposeWholeSegmentChoiceEvenForStaleState() {
+        assumeTrue(!BuildConfig.HY_MT_NATIVE)
+        compose.setContent {
+            MaterialTheme {
+                ListenTranslateControls(
+                    uiState = ListenTranslateUiState(
+                        sourceLang = "ja", targetLang = "zh",
+                        highQualityAvailable = true, highQualityJapanese = true,
+                    ),
+                    onEnabledChange = {}, onSourceLang = {}, onTargetLang = {}, onDisplayMode = {},
+                )
+            }
+        }
+        compose.onNodeWithTag("listen_high_quality_japanese").assertDoesNotExist()
+        compose.onNodeWithTag("listen_high_quality_cost").assertDoesNotExist()
+    }
+
+    @Test
     fun highQualityChoiceIsExplicitAndShowsCostBeforeListening() {
+        assumeTrue(BuildConfig.HY_MT_NATIVE)
         val state = mutableStateOf(ListenTranslateUiState(
             sourceLang = "ja", targetLang = "zh", highQualityAvailable = true,
         ))
@@ -120,6 +141,7 @@ class ListenTranslateDiagnosticsControlsTest(private val widthDp: Int) {
 
     @Test
     fun unavailableAndSourceOnlyChoicesCannotOptInButSavedChoiceCanBeCleared() {
+        assumeTrue(BuildConfig.HY_MT_NATIVE)
         val state = mutableStateOf(ListenTranslateUiState(sourceLang = "ja", targetLang = "zh"))
         compose.setContent {
             MaterialTheme {
