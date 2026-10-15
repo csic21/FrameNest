@@ -45,7 +45,7 @@ jobs:
     name: Check source and build signed APKs
     needs: request
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       RELEASE_TAG: ${{ needs.request.outputs.tag }}
       RELEASE_SOURCE_SHA: ${{ needs.request.outputs.source_sha }}
@@ -69,7 +69,7 @@ jobs:
       - name: Install exact supported SDK
         run: |
           set -euo pipefail
-          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" < /dev/null
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1" < /dev/null
           test -f "$ANDROID_HOME/platforms/android-36/android.jar"
           test -x "$ANDROID_HOME/build-tools/36.0.0/apksigner"
           test -x "$ANDROID_HOME/build-tools/36.0.0/aapt2"
@@ -84,7 +84,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$RELEASE_SOURCE_SHA"
           python3 -m unittest discover -s scripts/tests -v
       - name: Unit tests, lint and instrumentation compilation
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebugAndroidTest --no-daemon --no-configuration-cache --stacktrace
+        run: ./gradlew -PhyMtNative=true testDebugUnitTest lintDebug assembleDebugAndroidTest --no-daemon --no-configuration-cache --stacktrace
       - name: Verify owner-confirmed signing key, build and verify release APKs
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -100,7 +100,9 @@ jobs:
           unset ANDROID_KEYSTORE_BASE64
           # Package the large native ABI splits one at a time. Parallel zipflinger
           # buffers exhausted the heap in FN-67 even after compilation succeeded.
-          ./gradlew assembleRelease --no-daemon --no-configuration-cache --max-workers=1 --no-parallel '-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8' --stacktrace
+          ./gradlew -PhyMtNative=true assembleRelease --no-daemon --no-configuration-cache --max-workers=1 --no-parallel '-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8' --stacktrace
+          python3 scripts/check_hy_native_apk.py app/build/outputs/apk/release/app-universal-release.apk
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 app/build/outputs/apk/release/app-universal-release.apk
           python3 scripts/release.py package --build-tools "$ANDROID_HOME/build-tools/36.0.0"
       - name: Remove temporary signing material
         if: always()

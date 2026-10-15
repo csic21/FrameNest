@@ -192,6 +192,7 @@ class HyMtNativeAcceptanceTest {
                 val began = now()
                 var stalled = false
                 var finalCount = 0
+                var temporaryBilingualCount = 0
                 var maximumReadMs = 0L
                 for (step in 0 until 32) {
                     val progress = checkNotNull(producer).processAhead(
@@ -207,7 +208,12 @@ class HyMtNativeAcceptanceTest {
                             assertNotNull(cue.coverageStartMs); assertNotNull(cue.coverageEndMs)
                             finalCount++
                         } else {
-                            assertTrue("Provisional source must not be translated", cue.textTgt.isEmpty())
+                            // Bounded provisional units may have an explicitly temporary
+                            // translation. They must never claim completed coverage.
+                            if (cue.textTgt.isNotBlank()) {
+                                assertTranslation(cue.textSrc, cue.textTgt)
+                                temporaryBilingualCount++
+                            }
                             assertNull(cue.coverageStartMs); assertNull(cue.coverageEndMs)
                         }
                         rows.put(JSONObject().put("source_ja", cue.textSrc).put("translation_zh", cue.textTgt)
@@ -229,7 +235,9 @@ class HyMtNativeAcceptanceTest {
                 assertTrue("Producer must stop instead of decoding the entire file", stalled)
                 assertTrue("At least one real finalized bilingual source unit", finalCount > 0)
                 report.put("producer_elapsed_ms", now() - began).put("read_through_ms", maximumReadMs)
-                    .put("final_bilingual_cues", finalCount).put("functional_acceptance_passed", true)
+                    .put("final_bilingual_cues", finalCount)
+                    .put("temporary_bilingual_cues", temporaryBilingualCount)
+                    .put("functional_acceptance_passed", true)
             }
         } catch (failure: Throwable) {
             report.put("functional_acceptance_passed", false).put("failure_type", failure.javaClass.simpleName)

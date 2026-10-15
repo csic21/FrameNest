@@ -89,7 +89,7 @@ jobs:
           if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL=on; fi
           printf 'acceleration=%s\n' "$ACCEL" > benchmark-results/environment.txt
           "$ANDROID_HOME/emulator/emulator" -version >> benchmark-results/environment.txt 2>&1
-          "$ANDROID_HOME/emulator/emulator" -avd japanese-benchmark -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel "$ACCEL" -memory 4096 -cores 2 > benchmark-results/emulator.log 2>&1 &
+          "$ANDROID_HOME/emulator/emulator" -avd japanese-benchmark -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel "$ACCEL" -memory 4096 -partition-size 8192 -cores 2 > benchmark-results/emulator.log 2>&1 &
           EMULATOR_PID=$!
           export EMULATOR_PID
           timeout 600 bash -c 'until adb shell getprop sys.boot_completed 2>/dev/null | grep -q 1; do kill -0 "$EMULATOR_PID" || { cat benchmark-results/emulator.log; exit 1; }; sleep 5; done'
