@@ -1,0 +1,1 @@
+PASS: 101 compiled JUnit4 @Test signatures in 35 classes; public void, zero arguments

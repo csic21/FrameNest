@@ -1,0 +1,4 @@
+13df11248ca36c7d0a2dacab0f6115d68dd4783869efd6ff79da82760e809a33  app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
+699b69fd3c073c556ade14c438321d3392310fc54cc8c25f5e626a0fdd18c6ac  app/build/outputs/apk/debug/app-universal-debug.apk
+d1966647e9cf6bfe7bede04fadb4f74f11a7f40143a288211f37f9cf37160d64  app/build/outputs/apk/debug/app-x86_64-debug.apk
+05e5e76f6f2b602942b6f97aa911b588ca4d826d279f9d2c752c4b1371788775  app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk

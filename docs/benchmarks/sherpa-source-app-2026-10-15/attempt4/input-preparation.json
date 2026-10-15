@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "manifest_sha256": "9231712ec85ec7a16b31000f3cb960f2a15b7e3ccc28758515452a2351f66f77",
+  "all_inputs_verified": true,
+  "windows": 33,
+  "production_float_roundtrip_max_abs_error": 0.0,
+  "wav_container_provenance": [
+    {
+      "file": "emoji.wav",
+      "actual_container_bytes": 3646798,
+      "actual_container_sha256": "0b24562f237ea8ebcd31233ee978a5c7828f34671b591249e2f9a4cabac457ac",
+      "reference_container_bytes": 3646798,
+      "reference_container_sha256": "d86a5232679fdd0d8633770014c9e18a7fd76eb0070fc7585e543303724cedfe",
+      "reference_container_matches": false,
+      "metadata_only_exception_used": true,
+      "verification": "Canonical PCM16 format/frame count and pinned signed-PCM16/float32 hashes exact; only bounded LIST/INFO metadata may differ",
+      "samples": 1823360,
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "s16le_sha256": "e3e4e1de9395948bc3e03c0f88a93cb55bbbb0768280344bd7f4bd3f164700a6",
+      "f32le_sha256": "7e3496d4085844928a028f045998c4767eaf7d4207f2d465bcf59e5b19888915",
+      "fixture_id": "emoji"
+    },
+    {
+      "file": "kishida.wav",
+      "actual_container_bytes": 5625252,
+      "actual_container_sha256": "162c6b434bce98c06e07af5b4ffb4ba519a45e2e20f97b2db16cb1f86eb69787",
+      "reference_container_bytes": 5625252,
+      "reference_container_sha256": "eb8d168d4b4b4c608be8d8bc212cbc24c5ee568f6b7cb190d87abe372072a698",
+      "reference_container_matches": false,
+      "metadata_only_exception_used": true,
+      "verification": "Canonical PCM16 format/frame count and pinned signed-PCM16/float32 hashes exact; only bounded LIST/INFO metadata may differ",
+      "samples": 2812587,
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "s16le_sha256": "be7666aab85c2ab8b987fc5e5d297c7efff27751f755212f0e0a4c734763a91b",
+      "f32le_sha256": "8dd584776d12c42d80b773e5811dafe6bf17f796357e1eea4aeb93db428ac438",
+      "fixture_id": "kishida"
+    }
+  ],
+  "gap_coverage_accepted": false,
+  "status": "passed"
+}

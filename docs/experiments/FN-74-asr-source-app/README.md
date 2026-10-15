@@ -88,18 +88,27 @@ the manifest before later testing; rebuilding is not proof of identical APKs.
 
 ## Validation boundary
 
-First ordinary CI `38723292529` compiled the actual source-profile app, passed
-881 JVM tests and lint, and compiled instrumentation. Its strict APK audit failed
-closed on the AGP-generated empty `R` class. That narrow checker omission is now
-covered by structural positive/negative tests; the next CI must still pass on
-the final APKs. First-run evidence is in
-`docs/benchmarks/sherpa-source-app-2026-10-15/attempt1`.
+Ordinary CI [38728412567](https://github.com/csic21/FrameNest/actions/runs/38728412567)
+at source `6216ecc3ad6cfe7a0cbb2100140ff4a7f9c788d0` passed app assembly,
+891 JVM tests, prepared-input packaging, instrumentation compilation (101 JUnit
+methods in 35 classes), lint and all three real APK audits. Official 16KB ZIP
+alignment and signatures passed. The exact app/test pair was retained and both
+archives were independently downloaded, hash checked and re-audited. Results,
+artifact IDs, expiry and exact binary hashes are in
+`docs/benchmarks/sherpa-source-app-2026-10-15/attempt4`.
 
-After the checker repair, 44 focused Python tests pass including a real pinned
-AAR and synthetic non-installable APK container. The synthetic container tests
-the checker, not Android runtime execution. The new notice reader has 10 passing
-host JVM tests and all 30 actual text files pass size/hash/UTF-8/lossless paging
-readback. Its seven Compose tests still need compilation and phone/tablet execution.
+The collector checks constants from the actual compiled debug app BuildConfig
+class by exact namespace, retains its byte hash and observed constants, and
+fails on missing, conflicting or incorrect values. It does not infer compiled
+identity from Gradle source. The SHA-qualified label remains separate from the
+expected upstream JNI version; actual JNI VersionInfo awaits device execution.
+
+Earlier failures are retained in `attempt1` (AGP namespace R audit omission) and
+`attempt3` (collector source-scan assumption). The narrowly repaired checks and
+end-to-end collector regression pass within 116 host Python tests. The notice
+reader's 10 JVM tests passed in actual app CI; its seven Compose tests compiled
+but still await device execution. No emulator/runtime/performance result is
+claimed by this ordinary CI.
 
 ## Source-profile notice delivery
 
@@ -120,8 +129,7 @@ request is made. The source URL is readable/selectable without mandatory browsin
 Compilation and static checks do not establish native execution, real 4KB/16KB
 device compatibility, performance, accuracy/ITN, timestamps, cancellation, long
 media or bilingual playback. The retained vendor ORT arm64 unrounded RELRO-end
-warning remains unresolved; it is not demonstrated runtime failure. Full app/model
-license review, exact ORT vendor build/transitive SBOM and reproducibility gates
-also remain open. Stock PR #6 ABBA measurements cannot be attributed to this
+warning remains unresolved; it is not demonstrated runtime failure. This profile does not assert complete app/model legal clearance, exact ORT
+vendor-build reproducibility or complete transitive SBOM coverage. Stock PR #6 ABBA measurements cannot be attributed to this
 different source-built binary. The adapted harness uses the exact stock
 fixture/PCM/parameters without importing or activating its device workflow.

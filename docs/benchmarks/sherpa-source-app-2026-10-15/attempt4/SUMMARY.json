@@ -1,0 +1,121 @@
+{
+  "source_commit": "6216ecc3ad6cfe7a0cbb2100140ff4a7f9c788d0",
+  "local_equivalent": "e1928933e502c26a86d02d2a13fcb07a12d58a84",
+  "run_id": 38728412567,
+  "run_attempt": 1,
+  "job_id": 116399860836,
+  "workflow_conclusion": "success",
+  "apk_artifact": {
+    "id": 11969082716,
+    "size_bytes": 482671323,
+    "sha256": "052799959778364fc98d44a1acd966648400cf6f1270e0a44189acb4577470c2",
+    "safe_unique_canonical_members": 9,
+    "pair_manifest_sha256": "9de1545a5760a9f4f44e61812b2450cc028b5736ffba080009a568818b1cfe53",
+    "expires_at": "2026-10-29T11:42:40Z"
+  },
+  "evidence_artifact": {
+    "id": 11969237436,
+    "size_bytes": 215451,
+    "sha256": "de3a664c332181dfc20c9ef48af76f33794d927e655da5223df631a0ef71b952",
+    "safe_unique_canonical_members": 176,
+    "expires_at": "2026-10-29T11:42:56Z"
+  },
+  "stages": {
+    "assembleDebug": "passed",
+    "testDebugUnitTest": "passed",
+    "frozen_public_inputs": "passed; actual test APK contains all 7 exact assets / 33 windows",
+    "assembleDebugAndroidTest": "passed (compile only)",
+    "junit_method_signatures": "101 tests / 35 classes passed",
+    "lintDebug": "passed",
+    "apk_static_audit": "passed for all 3 actual app APKs",
+    "zipalign": "passed: official build-tools 36.0.0 zipalign -c -P 16 -v 4, 3 APKs",
+    "apksigner": "passed: 3 app APKs and test APK",
+    "compiled_app_identity": "passed: exact class namespace and actual javap constant values",
+    "pair_collector_and_retention": "passed"
+  },
+  "unit_suites": 154,
+  "unit_totals": {
+    "tests": 891,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lint_severities": {
+    "Warning": 68,
+    "Hint": 5
+  },
+  "independent_download_recheck": {
+    "both_outer_archive_sizes_and_sha256": "passed",
+    "metadata_run_head_and_names": "passed",
+    "canonical_paths_duplicate_entries_and_member_fullsets": "passed",
+    "all_9_apk_artifact_members_size_hash_and_pair_provenance": "passed",
+    "pair_manifest_same_as_evidence_copy": "passed",
+    "actual_3_apk_content_reaudit": "exactly matches CI report apart from local file paths",
+    "actual_test_asset_rehash": "passed: 7 assets; 33 windows",
+    "compiled_build_config_class_hash_and_constants": "independently rechecked via JDK javap; no execution"
+  },
+  "source_aar_sha256": "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+  "runtime_identity": "1.13.8-asr-no-tts-sha256-6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+  "upstream_runtime_version_expected": "1.13.8",
+  "upstream_runtime_version_observed": null,
+  "hy_mt_native": false,
+  "apks": [
+    {
+      "path": "debug/app-arm64-v8a-debug.apk",
+      "size_bytes": 147777415,
+      "sha256": "13df11248ca36c7d0a2dacab0f6115d68dd4783869efd6ff79da82760e809a33",
+      "kind": "app",
+      "abis": [
+        "arm64-v8a"
+      ]
+    },
+    {
+      "path": "debug/app-x86_64-debug.apk",
+      "size_bytes": 158342476,
+      "sha256": "d1966647e9cf6bfe7bede04fadb4f74f11a7f40143a288211f37f9cf37160d64",
+      "kind": "app",
+      "abis": [
+        "x86_64"
+      ]
+    },
+    {
+      "path": "debug/app-universal-debug.apk",
+      "size_bytes": 263086077,
+      "sha256": "699b69fd3c073c556ade14c438321d3392310fc54cc8c25f5e626a0fdd18c6ac",
+      "kind": "app",
+      "abis": [
+        "arm64-v8a",
+        "x86_64"
+      ]
+    },
+    {
+      "path": "androidTest/debug/app-debug-androidTest.apk",
+      "size_bytes": 178041598,
+      "sha256": "05e5e76f6f2b602942b6f97aa911b588ca4d826d279f9d2c752c4b1371788775",
+      "kind": "instrumentation"
+    }
+  ],
+  "notice_texts": {
+    "aar_originals": 29,
+    "source_supplement": 1,
+    "total_attribution_provenance_assets_per_app_apk": 37
+  },
+  "sherpa_api": {
+    "kotlin_classes": 48,
+    "generated_resource_holders": 1,
+    "native_method_declarations": 32,
+    "jni_exports_per_abi": 117,
+    "additional_compiled_jni_exports_per_abi": 85,
+    "tts_generated_audio_diarization_wrappers_present": false
+  },
+  "all_native_static_16kb_alignment": {
+    "distinct_native_elfs": 18,
+    "pt_load_passed": true,
+    "stored_zip_offsets_passed": true,
+    "note": "Not device acceptance. arm64 ORT unrounded RELRO-end warning retained, not an observed failure."
+  },
+  "native_execution_tested": false,
+  "ui_device_tested": false,
+  "full_app_16k_runtime_accepted": false,
+  "release_approved": false
+}
