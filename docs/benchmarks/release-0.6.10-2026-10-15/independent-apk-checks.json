@@ -1,0 +1,23 @@
+[
+  {
+    "abi": "arm64-v8a",
+    "sha256": "bb78f6fb5314923941ee0931508be4aa8e1ae1ac59f721b3c3cd05bc0590ff87",
+    "size": 123488394,
+    "embedded_v2_certificate_sha256": "31324de514179999b94c2afc395b2190e3c8c242b8cf13f699656303822fd8e8",
+    "no_hy_or_gguf": true
+  },
+  {
+    "abi": "x86_64",
+    "sha256": "272632aa12ae13696510f565e372118bc76a171a6732fc49d51ed7aa82a78c0a",
+    "size": 134053455,
+    "embedded_v2_certificate_sha256": "31324de514179999b94c2afc395b2190e3c8c242b8cf13f699656303822fd8e8",
+    "no_hy_or_gguf": true
+  },
+  {
+    "abi": "universal",
+    "sha256": "168e6ac9c4f4085a62beb25dedb454d51368d09673717e113eac919ae6d51398",
+    "size": 238797056,
+    "embedded_v2_certificate_sha256": "31324de514179999b94c2afc395b2190e3c8c242b8cf13f699656303822fd8e8",
+    "no_hy_or_gguf": true
+  }
+]

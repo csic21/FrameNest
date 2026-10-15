@@ -1,0 +1,43 @@
+{
+  "aar_sha256": "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+  "aar_size_bytes": 59632871,
+  "arm64_16kb_runtime_tested": false,
+  "eigen_source_sha256": "e9c326dc8c05cd1e044c71f30f1b2e34a6161a3b6ecf445d56b53ff1669e3dec",
+  "eigen_source_url": "https://gitlab.com/libeigen/eigen/-/archive/5.0.1/eigen-5.0.1.tar.gz",
+  "input_actions_artifact": {
+    "aar_member": "candidate/sherpa-onnx-1.13.8-asr-no-tts.aar",
+    "aar_sha256": "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+    "aar_size_bytes": 59632871,
+    "artifact_id": 11960534932,
+    "artifact_name": "asr-aar-strict-c4088fab8d0e7daf0af5fa6895a9f88b11adcf81-1",
+    "commit": "c4088fab8d0e7daf0af5fa6895a9f88b11adcf81",
+    "expires_at": "2026-10-29T09:31:42Z",
+    "release_approved": false,
+    "repository": "csic21/FrameNest",
+    "review": "docs/benchmarks/sherpa-source-aar-2026-10-15/REPORT.md",
+    "run_id": 38713363406,
+    "runtime_identity": "1.13.8-asr-no-tts-sha256-6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+    "upstream_version": "1.13.8",
+    "zip_sha256": "1aa5aca91348cb103c3b6fbd05370ba0c0d6bf951312aca9724c09c5fae9775b",
+    "zip_size_bytes": 21153522
+  },
+  "native_rebuilt_for_app_release": false,
+  "release_source_commit": "5a16f1cc4dc7875dd1237c898e795007dc461e94",
+  "release_tag": "v0.6.10-internal",
+  "repository": "csic21/FrameNest",
+  "runtime_acceptance": {
+    "aar_sha256": "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+    "approved": true,
+    "runtime_report_sha256": "03ff9bdd12c3da65baaeabae1fa40400171df6baae0520f6b64825723be0ce6c",
+    "runtime_run_id": 38739397163,
+    "schema_version": 1,
+    "source_app_commit": "6216ecc3ad6cfe7a0cbb2100140ff4a7f9c788d0"
+  },
+  "runtime_identity": "1.13.8-asr-no-tts-sha256-6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+  "schema_version": 1,
+  "source_input_manifest_url": "https://github.com/csic21/FrameNest/blob/5a16f1cc4dc7875dd1237c898e795007dc461e94/docs/experiments/FN-74-asr-only-recipe/manifest.json",
+  "source_recipe_url": "https://github.com/csic21/FrameNest/tree/5a16f1cc4dc7875dd1237c898e795007dc461e94/docs/experiments/FN-74-asr-only-recipe",
+  "upstream_runtime_version": "1.13.8",
+  "upstream_source_url": "https://github.com/k2-fsa/sherpa-onnx/archive/11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf.tar.gz",
+  "warning": "Static PT_LOAD/ZIP alignment passes. arm64 ORT unrounded RELRO-end warning remains; no known overlapping LOAD protection or demonstrated runtime failure. Not a measured speedup claim."
+}

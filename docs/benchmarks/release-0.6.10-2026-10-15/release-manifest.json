@@ -1,0 +1,53 @@
+{
+  "applicationId": "com.framenest",
+  "assets": [
+    {
+      "abi": "arm64-v8a",
+      "sha256": "bb78f6fb5314923941ee0931508be4aa8e1ae1ac59f721b3c3cd05bc0590ff87",
+      "size": 123488394,
+      "url": "https://github.com/csic21/FrameNest/releases/download/v0.6.10-internal/FrameNest-0.6.10-internal-arm64-v8a.apk"
+    },
+    {
+      "abi": "x86_64",
+      "sha256": "272632aa12ae13696510f565e372118bc76a171a6732fc49d51ed7aa82a78c0a",
+      "size": 134053455,
+      "url": "https://github.com/csic21/FrameNest/releases/download/v0.6.10-internal/FrameNest-0.6.10-internal-x86_64.apk"
+    },
+    {
+      "abi": "universal",
+      "sha256": "168e6ac9c4f4085a62beb25dedb454d51368d09673717e113eac919ae6d51398",
+      "size": 238797056,
+      "url": "https://github.com/csic21/FrameNest/releases/download/v0.6.10-internal/FrameNest-0.6.10-internal-universal.apk"
+    }
+  ],
+  "minSdk": 26,
+  "repository": "csic21/FrameNest",
+  "schemaVersion": 1,
+  "signer_sha256": "31324de514179999b94c2afc395b2190e3c8c242b8cf13f699656303822fd8e8",
+  "source_asr_assets": [
+    {
+      "name": "sherpa-onnx-1.13.8-asr-no-tts.aar",
+      "sha256": "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+      "size": 59632871,
+      "url": "https://github.com/csic21/FrameNest/releases/download/v0.6.10-internal/sherpa-onnx-1.13.8-asr-no-tts.aar"
+    },
+    {
+      "name": "sherpa-onnx-1.13.8-asr-no-tts-NOTICE.txt",
+      "sha256": "b6c9f22a3478981b3c7c9aeb1c66b449335ffd123a9769ef4541c052662fc0f3",
+      "size": 4334022,
+      "url": "https://github.com/csic21/FrameNest/releases/download/v0.6.10-internal/sherpa-onnx-1.13.8-asr-no-tts-NOTICE.txt"
+    },
+    {
+      "name": "source-asr-provenance.json",
+      "sha256": "a32f36d18a3c5f4c5ec5077171ab83335cbc291be9b604220c5cd1077a0965d4",
+      "size": 2577,
+      "url": "https://github.com/csic21/FrameNest/releases/download/v0.6.10-internal/source-asr-provenance.json"
+    }
+  ],
+  "source_sha": "5a16f1cc4dc7875dd1237c898e795007dc461e94",
+  "tag": "v0.6.10-internal",
+  "versionCode": 21,
+  "versionName": "0.6.10-internal",
+  "workflow_attempt": "1",
+  "workflow_url": "https://github.com/csic21/FrameNest/actions/runs/38745096573"
+}

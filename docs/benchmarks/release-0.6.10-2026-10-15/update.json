@@ -1,0 +1,29 @@
+{
+  "applicationId": "com.framenest",
+  "assets": [
+    {
+      "abi": "arm64-v8a",
+      "sha256": "bb78f6fb5314923941ee0931508be4aa8e1ae1ac59f721b3c3cd05bc0590ff87",
+      "size": 123488394,
+      "url": "https://github.com/csic21/FrameNest/releases/download/v0.6.10-internal/FrameNest-0.6.10-internal-arm64-v8a.apk"
+    },
+    {
+      "abi": "x86_64",
+      "sha256": "272632aa12ae13696510f565e372118bc76a171a6732fc49d51ed7aa82a78c0a",
+      "size": 134053455,
+      "url": "https://github.com/csic21/FrameNest/releases/download/v0.6.10-internal/FrameNest-0.6.10-internal-x86_64.apk"
+    },
+    {
+      "abi": "universal",
+      "sha256": "168e6ac9c4f4085a62beb25dedb454d51368d09673717e113eac919ae6d51398",
+      "size": 238797056,
+      "url": "https://github.com/csic21/FrameNest/releases/download/v0.6.10-internal/FrameNest-0.6.10-internal-universal.apk"
+    }
+  ],
+  "minSdk": 26,
+  "notes": "- 改用固定 SHA-256 的 sherpa-onnx 1.13.8 源码构建 ASR-facing/no-TTS AAR；SenseVoice 模型、Vosk 与 ML Kit 翻译链路不变，Hy-MT 保持关闭和隐藏。\n- 识别缓存带独立的源码产物身份，避免复用旧运行库结果。升级有机会改善某些识别结果，但不保证准确率提升；目前没有这份源码构建的同条件实测提速结论。\n- 设置中可离线读取完整开源许可、源码链接及 Android simple-sentencepiece 变更说明；发布附件同时提供原始 AAR、完整 NOTICE 和来源记录。\n- 固定公开语料上，源码运行库两次 Android 会话的 396 行文本与时间戳与 stock 1.13.8 一致（耗时不作等价比较）；114 秒 Kishida 标注片段的 Android 参考结果由旧版的 CER 10.78% 降至 38/436（约 8.72%），这两次源码会话重现 stock 1.13.8 的结果。仍会将「広島サミット」识别为「広島さと」、「握り拳」识别为「握りこ」；不把有限语料结果当作普遍准确率保证。\n- 原生库 PT_LOAD 与 APK ZIP 的 16KB 静态对齐检查通过。arm64 16KB 真机尚未验收；ORT 未取整 RELRO 末端仍保留静态警告，未发现已知 LOAD 保护重叠或已证实的运行失败。\n- 保留原安装标识、签名、模型及用户数据；AI 识别与翻译仍可能出错，不承诺逐字同传或未经实测的加速倍数。",
+  "schemaVersion": 1,
+  "tag": "v0.6.10-internal",
+  "versionCode": 21,
+  "versionName": "0.6.10-internal"
+}
