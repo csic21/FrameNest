@@ -1,0 +1,47 @@
+[
+  {
+    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/f/ffmpeg/ffmpeg_6.1.1-3ubuntu5_amd64.deb",
+    "bytes": 1878920,
+    "sha256": "1a23baace5f2688a47e28119aedae6993cd638e6279a7227dfc52d9a337a1c17"
+  },
+  {
+    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/f/ffmpeg/libavcodec60_6.1.1-3ubuntu5_amd64.deb",
+    "bytes": 5851220,
+    "sha256": "970d92c1697f762235af439d72df8c6cb492be45050a1a00bbe0d0842a137f93"
+  },
+  {
+    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/f/ffmpeg/libavdevice60_6.1.1-3ubuntu5_amd64.deb",
+    "bytes": 82320,
+    "sha256": "62c55a1209332142eb01488894b3443060e59b44940189469ac7f8fbe03406ca"
+  },
+  {
+    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/f/ffmpeg/libavfilter9_6.1.1-3ubuntu5_amd64.deb",
+    "bytes": 4235172,
+    "sha256": "083b800aaf4fd1de817fb8dc12995e6a277c3500159c4a0fa21d36a76b6208ea"
+  },
+  {
+    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/f/ffmpeg/libavformat60_6.1.1-3ubuntu5_amd64.deb",
+    "bytes": 1153444,
+    "sha256": "3a855488d50b4ebe04425e5f690e00ebd65d70e60f85c9765d5823a2f82b4969"
+  },
+  {
+    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/f/ffmpeg/libavutil58_6.1.1-3ubuntu5_amd64.deb",
+    "bytes": 401184,
+    "sha256": "e57f8cc358f4b1b2af721ca6242723dc12290df543a142811ce7747e2d5b30cc"
+  },
+  {
+    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/f/ffmpeg/libpostproc57_6.1.1-3ubuntu5_amd64.deb",
+    "bytes": 49884,
+    "sha256": "f0984bf6bff85dc29a44f650841b01a0594775f628b7a4bf5dd45d85d82cb2a7"
+  },
+  {
+    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/f/ffmpeg/libswresample4_6.1.1-3ubuntu5_amd64.deb",
+    "bytes": 63782,
+    "sha256": "d55afe23e07b02b2def1647181a727dfad996001f72b5172da8a99691c3fa208"
+  },
+  {
+    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/f/ffmpeg/libswscale7_6.1.1-3ubuntu5_amd64.deb",
+    "bytes": 192938,
+    "sha256": "2c17ae58b35112aace5179d7deea51faa20e82e04847b257f339376b11744e22"
+  }
+]

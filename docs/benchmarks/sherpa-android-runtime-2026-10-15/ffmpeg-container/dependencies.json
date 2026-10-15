@@ -1,0 +1,32 @@
+[
+  {
+    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/s/svt-av1/libsvtav1enc1d1_1.7.0+dfsg-2build1_amd64.deb",
+    "bytes": 2424900,
+    "sha256": "bac5f768bff928e85cecb39da8e37276a579639ef884692b089ed2de6c1cd2ad"
+  },
+  {
+    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/j/jpeg-xl/libjxl0.7_0.7.0-10.2ubuntu6_amd64.deb",
+    "bytes": 998652,
+    "sha256": "044cc070d74df8cfb37c2c55693b1806bee6e83b0961b2a01af74e39f69ae910"
+  },
+  {
+    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/libp/libplacebo/libplacebo338_6.338.2-2build1_amd64.deb",
+    "bytes": 2654026,
+    "sha256": "9c173df229673887df3cce7d4a26de15f7477a62cd1391f9a88c346018ecad1f"
+  },
+  {
+    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/r/rust-rav1e/librav1e0_0.7.1-2_amd64.deb",
+    "bytes": 1021698,
+    "sha256": "be10d7e2dc028d9d7791997a8710b7a9a3147151613750f0f08963fbe9ac993c"
+  },
+  {
+    "url": "https://archive.ubuntu.com/ubuntu/pool/main/libs/libssh/libssh-gcrypt-4_0.10.6-2ubuntu0.5_amd64.deb",
+    "bytes": 225808,
+    "sha256": "ae5179eb5b44c5e258d5bec75dca8578064c0a0956dd0402762e65c8a7b9e208"
+  },
+  {
+    "url": "https://archive.ubuntu.com/ubuntu/pool/universe/x/x265/libx265-199_3.5-2build1_amd64.deb",
+    "bytes": 1226422,
+    "sha256": "795a6ca9287cd521882178d6503703ee8f0cde955f0ffc03e5ceee9f6d084de7"
+  }
+]

@@ -66,6 +66,14 @@ class RuntimeComparisonPreparationTest(unittest.TestCase):
     def run_prepare(self):
         return prepare.prepare(self.source, self.assets, manifest_path=self.manifest_path)
 
+    @staticmethod
+    def wav_with_info(wav_bytes, value=b"Lavf60.16.100\0"):
+        info = b"INFOISFT" + struct.pack("<I", len(value)) + value + b"\0" * (len(value) % 2)
+        chunk = b"LIST" + struct.pack("<I", len(info)) + info
+        # The unit fixture from wave has fmt/data only. Keep both chunks exact.
+        body = wav_bytes[8:36] + chunk + wav_bytes[36:]
+        return b"RIFF" + struct.pack("<I", len(body)) + body
+
     def test_exact_signed_pcm_edges_roundtrip_and_ready_manifest(self):
         ready = self.run_prepare()
         generated = self.assets / "runtime-comparison/generated"
@@ -164,10 +172,99 @@ class RuntimeComparisonPreparationTest(unittest.TestCase):
         def changed_output(command, **kwargs):
             Path(command[-1]).write_bytes(b"x" * spec["bytes"])
         with patch.object(prepare.subprocess, "run", side_effect=changed_output):
-            with self.assertRaisesRegex(ValueError, "SHA-256"):
-                prepare.extract_wav(self.fixtures / "test.webm", destination, spec)
+            with self.assertRaisesRegex(ValueError, "WAV verification failed"):
+                prepare.extract_wav(self.fixtures / "test.webm", destination, spec, self.manifest["fixtures"][0]["pcm"])
         self.assertFalse(destination.exists())
         self.assertFalse(destination.with_suffix(".partial.wav").exists())
+
+    def test_metadata_only_difference_keeps_pcm_and_reports_actual_container(self):
+        path = self.fixtures / "test.wav"
+        reference_bytes = path.read_bytes()
+        for value in [b"Lavf60.16.100\0", b"Longer different encoder metadata\0"]:
+            with self.subTest(metadata=value):
+                variant = self.wav_with_info(reference_bytes, value)
+                path.write_bytes(variant)
+                ready = self.run_prepare()
+                provenance = ready["wav_container_provenance"][0]
+                self.assertTrue(provenance["metadata_only_exception_used"])
+                self.assertFalse(provenance["reference_container_matches"])
+                self.assertEqual(provenance["actual_container_sha256"], prepare.digest(variant))
+                self.assertEqual(provenance["reference_container_sha256"], prepare.digest(reference_bytes))
+                self.assertEqual(provenance["f32le_sha256"], prepare.digest(self.f32))
+                self.assertEqual(provenance["s16le_sha256"], prepare.digest(self.s16))
+                self.assertEqual(path.read_bytes(), variant, "Existing metadata-only WAV is not rewritten")
+
+    def test_extraction_accepts_only_verified_pcm_despite_metadata_difference(self):
+        fixture = self.manifest["fixtures"][0]
+        original = (self.fixtures / "test.wav").read_bytes()
+        destination = self.fixtures / "extracted.wav"
+        variant = self.wav_with_info(original)
+        def ffmpeg_metadata_variant(command, **kwargs):
+            Path(command[-1]).write_bytes(variant)
+        with patch.object(prepare.subprocess, "run", side_effect=ffmpeg_metadata_variant):
+            prepare.extract_wav(self.fixtures / "test.webm", destination, fixture["wav"], fixture["pcm"])
+        self.assertEqual(destination.read_bytes(), variant)
+
+    def test_corrupt_pcm_with_valid_metadata_is_not_replaced_or_accepted(self):
+        fixture = self.manifest["fixtures"][0]
+        path = self.fixtures / "test.wav"
+        corrupt = bytearray(self.wav_with_info(path.read_bytes()))
+        corrupt[-2] ^= 1
+        path.write_bytes(corrupt)
+        for extraction in [False, True]:
+            with self.subTest(extraction=extraction), patch.object(prepare.subprocess, "run") as ffmpeg:
+                with self.assertRaisesRegex(ValueError, "Signed PCM16 content hash mismatch") as caught:
+                    if extraction:
+                        prepare.extract_wav(self.fixtures / "test.webm", path, fixture["wav"], fixture["pcm"])
+                    else:
+                        self.run_prepare()
+                self.assertIn(prepare.digest(corrupt), str(caught.exception))
+                self.assertIn("float32_actual=", str(caught.exception))
+                self.assertEqual(path.read_bytes(), corrupt)
+                self.assertFalse(self.assets.exists())
+                ffmpeg.assert_not_called()
+
+    def test_wav_exception_rejects_extra_audio_trailing_bytes_and_bad_metadata(self):
+        fixture = self.manifest["fixtures"][0]
+        path = self.fixtures / "test.wav"
+        original = path.read_bytes()
+        def riff(body):
+            return b"RIFF" + struct.pack("<I", len(body)) + body
+        variants = [original + b"trailing",
+                    riff(original[8:] + b"data" + struct.pack("<I", 2) + b"\0\0"),
+                    riff(original[8:] + b"JUNK" + struct.pack("<I", 2) + b"\0\0"),
+                    self.wav_with_info(original).replace(b"INFO", b"adtl", 1),
+                    self.wav_with_info(original).replace(b"ISFT" + struct.pack("<I", 14), b"ISFT\xff\xff\xff\xff", 1)]
+        for variant in variants:
+            with self.subTest(variant=variant[:80]):
+                path.write_bytes(variant)
+                with self.assertRaisesRegex(ValueError, "WAV verification failed"):
+                    prepare.verify_wav(path, fixture["wav"], fixture["pcm"])
+
+    def test_metadata_exception_does_not_relax_pcm_format_or_frame_count(self):
+        fixture = self.manifest["fixtures"][0]
+        path = self.fixtures / "test.wav"
+        original = path.read_bytes()
+        for offset, value in [(22, 2), (24, 48000), (28, 12345), (32, 4), (34, 8)]:
+            changed = bytearray(original)
+            struct.pack_into("<H" if offset in (22, 32, 34) else "<I", changed, offset, value)
+            path.write_bytes(self.wav_with_info(changed))
+            with self.assertRaisesRegex(ValueError, "PCM16 WAV format"):
+                prepare.verify_wav(path, fixture["wav"], fixture["pcm"])
+        path.write_bytes(self.wav_with_info(original))
+        with self.assertRaisesRegex(ValueError, "frame count mismatch"):
+            prepare.verify_wav(path, fixture["wav"], dict(fixture["pcm"], samples=8))
+
+    def test_cli_failure_report_preserves_fail_closed_diagnostics(self):
+        report = self.root / "results/preparation.json"
+        with patch("sys.argv", [str(SCRIPT), "--source-dir", str(self.source), "--report", str(report)]), \
+                patch.object(prepare, "prepare", side_effect=ValueError("PCM expected=abc actual=def")):
+            with self.assertRaises(ValueError):
+                prepare.main()
+        diagnostic = json.loads(report.read_text())
+        self.assertEqual(diagnostic["status"], "failed")
+        self.assertFalse(diagnostic["all_inputs_verified"])
+        self.assertEqual(diagnostic["failure"], "PCM expected=abc actual=def")
 
     def test_paths_cannot_escape_or_follow_external_symlink(self):
         for relative in ["../outside", "/absolute"]:
