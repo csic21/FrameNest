@@ -1,0 +1,53 @@
+{
+  "kind": "github-hosted-exploratory",
+  "reproducible": false,
+  "release_gate": "closed",
+  "immutable_host_image_digest": null,
+  "runner_image_os": "ubuntu24",
+  "runner_image_version": "20261012.334.1",
+  "runner_image_release_url": "https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334",
+  "runner_image_manifest_url": "https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md",
+  "installed_image_metadata": [
+    {
+      "group": "Operating System",
+      "detail": "Ubuntu\n24.04.5\nLTS"
+    },
+    {
+      "group": "Runner Image",
+      "detail": "Image: ubuntu-24.04\nVersion: 20261012.334.1\nIncluded Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md\nImage Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334"
+    }
+  ],
+  "github": {
+    "GITHUB_REPOSITORY": "csic21/FrameNest",
+    "GITHUB_SHA": "8fb54b09e405a9cb9d2a0211d83176ced0328af8",
+    "GITHUB_RUN_ID": "38706441953",
+    "GITHUB_RUN_ATTEMPT": "1",
+    "GITHUB_WORKFLOW": "ASR source native audit"
+  },
+  "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+  "python_version": "3.12.3",
+  "installed_tools": {
+    "cmake": {
+      "path": "/usr/local/bin/cmake",
+      "version_output": "cmake version 3.31.6\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake)."
+    },
+    "ninja": {
+      "path": "/usr/local/bin/ninja",
+      "version_output": "1.13.2"
+    }
+  },
+  "installed_ndk_revisions": [
+    {
+      "directory": "27.3.13750724",
+      "source_properties": "Pkg.Desc = Android NDK\nPkg.Revision = 27.3.13750724\nPkg.BaseRevision = 27.3.13750724\nPkg.ReleaseName = r27d\n"
+    },
+    {
+      "directory": "29.0.14206865",
+      "source_properties": "Pkg.Desc = Android NDK\nPkg.Revision = 29.0.14206865\nPkg.BaseRevision = 29.0.14206865\nPkg.ReleaseName = r29\n"
+    },
+    {
+      "directory": "30.0.16248370",
+      "source_properties": "Pkg.Desc = Android NDK\nPkg.Revision = 30.0.16248370\nPkg.BaseRevision = 30.0.16248370\nPkg.ReleaseName = r30\n"
+    }
+  ]
+}

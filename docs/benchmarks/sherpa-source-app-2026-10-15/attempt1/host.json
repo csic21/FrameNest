@@ -1,0 +1,17 @@
+{
+  "github": {
+    "GITHUB_REPOSITORY": "csic21/FrameNest",
+    "GITHUB_SHA": "b576107f9c170cb9aa416e256def3c10d9841d01",
+    "GITHUB_RUN_ID": "38723292529",
+    "GITHUB_RUN_ATTEMPT": "1"
+  },
+  "image": {
+    "ImageOS": "ubuntu24",
+    "ImageVersion": "20261004.327.1"
+  },
+  "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+  "java": "openjdk version \"17.0.20.1\" 2026-08-18\nOpenJDK Runtime Environment Temurin-17.0.20.1+1 (build 17.0.20.1+1)\nOpenJDK 64-Bit Server VM Temurin-17.0.20.1+1 (build 17.0.20.1+1, mixed mode, sharing)\n",
+  "runtime_executed": false,
+  "kvm_used": false,
+  "release_approved": false
+}

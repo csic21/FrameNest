@@ -1,0 +1,37 @@
+{
+  "status": "tool-inputs-and-local-fixtures-validated-native-not-built",
+  "checks": [
+    {
+      "name": "ndk",
+      "sha256": "dfb20d396df28ca02a8c708314b814a4d961dc9074f9a161932746f815aa552f",
+      "size_bytes": 722261334,
+      "official_archive_verified": true,
+      "archive_entries": 8996,
+      "relative_symlinks_validated": 35
+    },
+    {
+      "name": "cmake",
+      "sha256": "5a1133ff103c71eb5120e2cc3de922733e7d8a26a98ae716397e8676adb367bf",
+      "size_bytes": 55010959,
+      "official_archive_verified": true,
+      "archive_entries": 8158,
+      "tar_data_filter_passed": true
+    },
+    {
+      "name": "ninja",
+      "sha256": "6f98805688d19672bd699fbbfa2c2cf0fc054ac3df1f0e6a47664d963d530255",
+      "size_bytes": 123084,
+      "official_archive_verified": true,
+      "archive_entries": 1,
+      "relative_symlinks_validated": 0
+    }
+  ],
+  "recipe_tests_passed": 7,
+  "native_ci_tests_passed": 9,
+  "workflow_yaml_trigger_permission_pins_checked": true,
+  "native_configure_executed": false,
+  "native_build_executed": false,
+  "gradle_executed": false,
+  "android_runtime_tested": false,
+  "legal_clearance": false
+}

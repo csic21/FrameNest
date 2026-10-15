@@ -192,6 +192,7 @@ fun SettingsScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.testTag("settings_version"),
         )
+        if (BuildConfig.SHERPA_ASR_SOURCE) SourceAsrLicensesEntry()
         Spacer(Modifier.height(12.dp))
         Text(
             text = stringResource(R.string.settings_intro),

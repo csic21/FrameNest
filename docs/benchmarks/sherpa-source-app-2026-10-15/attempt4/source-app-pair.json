@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "status": "compiled-static-verified-not-runtime-tested",
+  "source": {
+    "repository": "csic21/FrameNest",
+    "commit": "6216ecc3ad6cfe7a0cbb2100140ff4a7f9c788d0",
+    "run_id": 38728412567,
+    "run_attempt": 1
+  },
+  "profile": {
+    "upstream_runtime_version_expected": "1.13.8",
+    "upstream_runtime_version_observed": null,
+    "runtime_identity": "1.13.8-asr-no-tts-sha256-6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+    "aar_sha256": "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+    "hy_mt_native": false,
+    "supplemental_notice_sha256": "e2fa4a31a1b49181a284e278704f6d5ae40906a9f5fbd0ce625d8a909718460d"
+  },
+  "fixture_manifest_sha256": "9231712ec85ec7a16b31000f3cb960f2a15b7e3ccc28758515452a2351f66f77",
+  "prepared_assets_verified": 7,
+  "windows": 33,
+  "packaged_prepared_sha256": "d94d11c30422acedb8858c18ddda6f91853387f9667edf09e7f52d1d73455a10",
+  "apks": [
+    {
+      "path": "debug/app-arm64-v8a-debug.apk",
+      "size_bytes": 147777415,
+      "sha256": "13df11248ca36c7d0a2dacab0f6115d68dd4783869efd6ff79da82760e809a33",
+      "kind": "app",
+      "abis": [
+        "arm64-v8a"
+      ]
+    },
+    {
+      "path": "debug/app-x86_64-debug.apk",
+      "size_bytes": 158342476,
+      "sha256": "d1966647e9cf6bfe7bede04fadb4f74f11a7f40143a288211f37f9cf37160d64",
+      "kind": "app",
+      "abis": [
+        "x86_64"
+      ]
+    },
+    {
+      "path": "debug/app-universal-debug.apk",
+      "size_bytes": 263086077,
+      "sha256": "699b69fd3c073c556ade14c438321d3392310fc54cc8c25f5e626a0fdd18c6ac",
+      "kind": "app",
+      "abis": [
+        "arm64-v8a",
+        "x86_64"
+      ]
+    },
+    {
+      "path": "androidTest/debug/app-debug-androidTest.apk",
+      "size_bytes": 178041598,
+      "sha256": "05e5e76f6f2b602942b6f97aa911b588ca4d826d279f9d2c752c4b1371788775",
+      "kind": "instrumentation"
+    }
+  ],
+  "evidence_files": [
+    {
+      "path": "apk-static-audit.json",
+      "size_bytes": 17850,
+      "sha256": "db9dad52ec4cf06b8918231c92e24b25e4986c65332e2f74ccd8a7ed0d0827a6"
+    },
+    {
+      "path": "input-preparation.json",
+      "size_bytes": 2016,
+      "sha256": "0028880d78afdf1590cf091b128dc39b6f5e2f8d29fee6cd995c175b51c5f7e2"
+    },
+    {
+      "path": "fixture-manifest.json",
+      "size_bytes": 19194,
+      "sha256": "9231712ec85ec7a16b31000f3cb960f2a15b7e3ccc28758515452a2351f66f77"
+    },
+    {
+      "path": "source-profile.json",
+      "size_bytes": 2013,
+      "sha256": "f1474fa4e16906d13c1289e4852096f8f79e5f3aa75c3effd26982ec499e1ea3"
+    }
+  ],
+  "runtime_tested": false,
+  "ui_device_tested": false,
+  "release_approved": false
+}

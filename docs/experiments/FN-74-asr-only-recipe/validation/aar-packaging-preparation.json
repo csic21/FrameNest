@@ -1,0 +1,28 @@
+{
+  "status": "quarantine-and-full-official-graph-review-passed-awaiting-strict-aar-ci",
+  "tests_passed": 54,
+  "strip_evidence_sha256": "c12c57214652da053757634c44357b51a6be6672649a87c6ca9018f1bc7fc8e1",
+  "native_zip_sha256": "5dc4019557ce6ac0f9a203fb6e00bd4e52f58153e2cf17347805cf108744e48e",
+  "official_ndk_archive_sha256": "dfb20d396df28ca02a8c708314b814a4d961dc9074f9a161932746f815aa552f",
+  "kotlin_sources_staged": 8,
+  "gradle_executed": true,
+  "aar_built": false,
+  "android_runtime_tested": false,
+  "reproducibility_proven": false,
+  "legal_clearance": false,
+  "sdk_license_acceptance_performed": false,
+  "capture": {
+    "run_id": 38710270425,
+    "artifact_id": 11960470515,
+    "commit": "65ffdaf32a7e6c1a5b06d12d02a1d7c55484746f",
+    "zip_sha256": "2bd2198262f5c874fcb327cc1fd8a2550ce9b58492791cdcbbd0d13f87a7cee3",
+    "captured_artifacts": 428,
+    "captured_components": 242,
+    "executed_tasks": 26,
+    "native_in_capture": false
+  },
+  "aar_built_scope": "Quarantine task built raw source-only AAR, deliberately not uploaded/accepted as candidate.",
+  "independently_verified_gradle_artifacts": 460,
+  "reviewed_download_bytes": 326450244,
+  "approved_lock_sha256": "9da10673dcb8b6d410f272a15103505c4bbd069657686d3ba8f472ad708984e1"
+}

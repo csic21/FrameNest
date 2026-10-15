@@ -1,0 +1,59 @@
+{
+  "status": "actual-aar-independent-static-audit-passed",
+  "source_commit": "c4088fab8d0e7daf0af5fa6895a9f88b11adcf81",
+  "run_id": 38713363406,
+  "candidate_artifact_id": 11960534932,
+  "candidate_zip_sha256": "1aa5aca91348cb103c3b6fbd05370ba0c0d6bf951312aca9724c09c5fae9775b",
+  "aar_sha256": "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+  "aar_size_bytes": 59632871,
+  "class_count": 48,
+  "source_files": [
+    "FeatureConfig.kt",
+    "HomophoneReplacerConfig.kt",
+    "OfflineRecognizer.kt",
+    "OfflineStream.kt",
+    "OnlineRecognizer.kt",
+    "OnlineStream.kt",
+    "QnnConfig.kt",
+    "VersionInfo.kt"
+  ],
+  "min_sdk": 21,
+  "consumer_keep_rules_verified": true,
+  "native_sections": [
+    {
+      "path": "jni/arm64-v8a/libonnxruntime.so",
+      "debug_sections": []
+    },
+    {
+      "path": "jni/arm64-v8a/libsherpa-onnx-jni.so",
+      "debug_sections": []
+    },
+    {
+      "path": "jni/x86_64/libonnxruntime.so",
+      "debug_sections": []
+    },
+    {
+      "path": "jni/x86_64/libsherpa-onnx-jni.so",
+      "debug_sections": []
+    }
+  ],
+  "strict_cache_files_verified": 404,
+  "reviewed_lock_files": 460,
+  "debug_artifact_id": 11960694902,
+  "debug_zip_sha256": "524403cf264a9e42d59a626e2217c46bc133b8d7633aa63852f88dbfbbb32e68",
+  "debug_originals_preserved": [
+    {
+      "path": "jniLibs/arm64-v8a/libsherpa-onnx-jni.so",
+      "sha256": "f2184ae4b1204356551c55b43d8e722658ac48ae33ed50d57b64651ba4357f0d",
+      "size_bytes": 70491184
+    },
+    {
+      "path": "jniLibs/x86_64/libsherpa-onnx-jni.so",
+      "sha256": "37759e9147824134ed6da17acc5ca56a34844d2532c0f73600bc8e7a8ce7dd69",
+      "size_bytes": 69695368
+    }
+  ],
+  "runtime_tested": false,
+  "legal_clearance": false,
+  "reproducibility_proven": false
+}

@@ -1,0 +1,29 @@
+{
+  "status": "built-static-audit-only",
+  "static_audit_passed": true,
+  "release_gate": "closed",
+  "host_provenance_kind": "github-hosted-exploratory",
+  "reproducibility_proven": false,
+  "outputs": [
+    {
+      "path": "jniLibs/arm64-v8a/libsherpa-onnx-jni.so",
+      "sha256": "f2184ae4b1204356551c55b43d8e722658ac48ae33ed50d57b64651ba4357f0d",
+      "size_bytes": 70491184
+    },
+    {
+      "path": "jniLibs/arm64-v8a/libonnxruntime.so",
+      "sha256": "33847ad43bffe204699fd4a27f7f3603452a8cdaf2f9a44983a0bc31ffcf2da1",
+      "size_bytes": 22249560
+    },
+    {
+      "path": "jniLibs/x86_64/libsherpa-onnx-jni.so",
+      "sha256": "37759e9147824134ed6da17acc5ca56a34844d2532c0f73600bc8e7a8ce7dd69",
+      "size_bytes": 69695368
+    },
+    {
+      "path": "jniLibs/x86_64/libonnxruntime.so",
+      "sha256": "087e84297cad64acb823c3d901d6e0cc934e91add7cdb20da802cd1c0bea5c3e",
+      "size_bytes": 25581120
+    }
+  ]
+}

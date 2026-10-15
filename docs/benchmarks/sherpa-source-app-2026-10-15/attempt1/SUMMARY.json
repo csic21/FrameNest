@@ -1,0 +1,34 @@
+{
+  "source_commit": "b576107f9c170cb9aa416e256def3c10d9841d01",
+  "local_equivalent": "c63e8dd4e8bd4f2b76183756d086e28ffaa9fd07",
+  "run_id": 38723292529,
+  "job_id": 116382901935,
+  "workflow_conclusion": "failure",
+  "evidence_artifact_id": 11966894268,
+  "evidence_zip_size_bytes": 180046,
+  "evidence_zip_sha256": "20aadd8cb960c94f09930d11b0b0bd68b3f2825284d00ac26494c4c8545c8c28",
+  "stages": {
+    "assembleDebug": "passed",
+    "testDebugUnitTest": "passed",
+    "assembleDebugAndroidTest": "passed (compile only)",
+    "lintDebug": "passed",
+    "apk_static_audit": "failed: sole additional AGP namespace R class",
+    "zipalign": "not run",
+    "qualified_apk_retention": "skipped"
+  },
+  "unit_suites": 153,
+  "unit_totals": {
+    "tests": 881,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lint_severities": {
+    "Hint": 5,
+    "Warning": 68
+  },
+  "native_execution_tested": false,
+  "full_app_static_audit_passed": false,
+  "device_tests_run": false,
+  "release_approved": false
+}

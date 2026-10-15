@@ -1,0 +1,12 @@
+test_duplicate_zip_rejected (__main__.RecipeTests.test_duplicate_zip_rejected) ... ok
+test_elf_relro_unrounded_and_wrong_abi (__main__.RecipeTests.test_elf_relro_unrounded_and_wrong_abi) ... ok
+test_exact_abi_and_native_whitelist (__main__.RecipeTests.test_exact_abi_and_native_whitelist) ... ok
+test_gradle_lock_structural_validation (__main__.RecipeTests.test_gradle_lock_structural_validation) ... ok
+test_jni_overload_exact_descriptor (__main__.RecipeTests.test_jni_overload_exact_descriptor) ... ok
+test_licenses_verified (__main__.RecipeTests.test_licenses_verified) ... ok
+test_unsafe_zip_rejected (__main__.RecipeTests.test_unsafe_zip_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.004s
+
+OK

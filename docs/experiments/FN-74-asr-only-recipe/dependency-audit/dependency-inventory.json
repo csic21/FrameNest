@@ -1,0 +1,494 @@
+{
+  "schema_version": 1,
+  "audit_date_utc": "2026-10-15",
+  "status": "static_source_dependency_and_notice_inventory_complete_with_release_gates",
+  "scope": "Official sherpa-onnx v1.13.8 no-TTS/no-diarization Android JNI configuration and ASR-facing wrapper plan. Read-only source/build-graph and notice audit; no executed Android build and no legal clearance.",
+  "sherpa_onnx_commit": "11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf",
+  "dependencies": [
+    {
+      "name": "kaldi-native-fbank",
+      "version": "1.22.3",
+      "kind": "source_archive",
+      "fetchcontent_name": "kaldi_native_fbank",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_KALDI_NATIVE_FBANK",
+      "archive_url": "https://github.com/csukuangfj/kaldi-native-fbank/archive/refs/tags/v1.22.3.tar.gz",
+      "archive_sha256": "9176cc66fc7ce1edf85cf355b06e320c57db6297df74277f575183468893cf61",
+      "actual_sha256": "9176cc66fc7ce1edf85cf355b06e320c57db6297df74277f575183468893cf61",
+      "sha256_verified": true,
+      "archive_size_bytes": 71144,
+      "archive_filename": "kaldi-native-fbank-v1.22.3.tar.gz",
+      "archive_root": "kaldi-native-fbank-1.22.3",
+      "archive_path": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/archives/kaldi-native-fbank-v1.22.3.tar.gz",
+      "source_directory": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/kaldi-native-fbank-1.22.3",
+      "cmake_declaration": "sherpa-onnx/cmake/kaldi-native-fbank.cmake",
+      "direct_dependencies": [
+        "kissfft"
+      ],
+      "license_summary": "Apache-2.0",
+      "license_files": [
+        "licenses/kaldi-native-fbank/LICENSE"
+      ],
+      "upstream_declared_fallback_urls": [
+        "https://hf-mirror.com/csukuangfj/sherpa-ncnn-cmake-deps/resolve/main/kaldi-native-fbank-1.22.3.tar.gz"
+      ],
+      "download_origin_used": "Pinned official project or explicitly selected maintainer-fork URL; no fallback mirror used",
+      "cmake_declaration_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/inputs/sherpa-onnx-11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf/cmake/kaldi-native-fbank.cmake",
+      "cmake_declaration_sha256": "619f0046f568e85790f4180899e666053f246f5c0fc36c951421441f3e992e38",
+      "fetchcontent_declaration_uses_sha256": true,
+      "nested_downloads_active": [
+        "kissfft"
+      ],
+      "linkage_role": "static library linked into sherpa-onnx-core"
+    },
+    {
+      "name": "kaldi-decoder",
+      "version": "0.3.0",
+      "kind": "source_archive",
+      "fetchcontent_name": "kaldi_decoder",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_KALDI_DECODER",
+      "archive_url": "https://github.com/k2-fsa/kaldi-decoder/archive/refs/tags/v0.3.0.tar.gz",
+      "archive_sha256": "b9f34cfb4fd3b1344100eead79ef4d37aa15962274b9e3056de345021f76a1b0",
+      "actual_sha256": "b9f34cfb4fd3b1344100eead79ef4d37aa15962274b9e3056de345021f76a1b0",
+      "sha256_verified": true,
+      "archive_size_bytes": 51199,
+      "archive_filename": "kaldi-decoder-v0.3.0.tar.gz",
+      "archive_root": "kaldi-decoder-0.3.0",
+      "archive_path": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/archives/kaldi-decoder-v0.3.0.tar.gz",
+      "source_directory": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/kaldi-decoder-0.3.0",
+      "cmake_declaration": "sherpa-onnx/cmake/kaldi-decoder.cmake",
+      "direct_dependencies": [
+        "kaldifst",
+        "eigen"
+      ],
+      "license_summary": "Apache-2.0",
+      "license_files": [
+        "licenses/kaldi-decoder/LICENSE"
+      ],
+      "upstream_declared_fallback_urls": [],
+      "download_origin_used": "Pinned official project or explicitly selected maintainer-fork URL; no fallback mirror used",
+      "cmake_declaration_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/inputs/sherpa-onnx-11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf/cmake/kaldi-decoder.cmake",
+      "cmake_declaration_sha256": "af34b17974474a70b12978d49ac0831276839082924e5ac93bd9bb194a7fd310",
+      "fetchcontent_declaration_uses_sha256": true,
+      "nested_downloads_active": [
+        "kaldifst",
+        "eigen"
+      ],
+      "linkage_role": "static library linked into sherpa-onnx-core"
+    },
+    {
+      "name": "simple-sentencepiece",
+      "version": "0.7",
+      "kind": "source_archive",
+      "fetchcontent_name": "simple-sentencepiece",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_SIMPLE-SENTENCEPIECE",
+      "archive_url": "https://github.com/pkufool/simple-sentencepiece/archive/refs/tags/v0.7.tar.gz",
+      "archive_sha256": "1748a822060a35baa9f6609f84efc8eb54dc0e74b9ece3d82367b7119fdc75af",
+      "actual_sha256": "1748a822060a35baa9f6609f84efc8eb54dc0e74b9ece3d82367b7119fdc75af",
+      "sha256_verified": true,
+      "archive_size_bytes": 355335,
+      "archive_filename": "simple-sentencepiece-v0.7.tar.gz",
+      "archive_root": "simple-sentencepiece-0.7",
+      "archive_path": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/archives/simple-sentencepiece-v0.7.tar.gz",
+      "source_directory": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/simple-sentencepiece-0.7",
+      "cmake_declaration": "sherpa-onnx/cmake/simple-sentencepiece.cmake",
+      "direct_dependencies": [],
+      "license_summary": "Apache-2.0 AND BSD-2-Clause; bundled Zlib ThreadPool is replaced/excluded on Android",
+      "license_files": [
+        "licenses/simple-sentencepiece/LICENSE",
+        "licenses/simple-sentencepiece/DARTS-BSD-2-Clause.txt"
+      ],
+      "upstream_declared_fallback_urls": [
+        "https://hf-mirror.com/csukuangfj/sherpa-onnx-cmake-deps/resolve/main/simple-sentencepiece-0.7.tar.gz"
+      ],
+      "download_origin_used": "Pinned official project or explicitly selected maintainer-fork URL; no fallback mirror used",
+      "cmake_declaration_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/inputs/sherpa-onnx-11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf/cmake/simple-sentencepiece.cmake",
+      "cmake_declaration_sha256": "af791de58aa82fe575d709f773b526cd31a3a5b6b56397ea3da665eee12659ad",
+      "fetchcontent_declaration_uses_sha256": true,
+      "nested_downloads_active": [],
+      "linkage_role": "static ssentencepiece_core linked into sherpa-onnx-core",
+      "upstream_android_source_mutation": "sherpa cmake/simple-sentencepiece.cmake replaces threadpool.h and edits ssentencepiece.h/.cc when CMAKE_SYSTEM_NAME STREQUAL Android (after the disabled WASM branch). Keep pristine archive and record modified files; source override directories are writable inputs.",
+      "reported_version_note": "Archive tag v0.7 is authoritative input pin. Its own CMakeLists.txt retains SBPE_VERSION 0.2."
+    },
+    {
+      "name": "json",
+      "version": "3.12.0",
+      "kind": "source_archive",
+      "fetchcontent_name": "json",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_JSON",
+      "archive_url": "https://github.com/nlohmann/json/archive/refs/tags/v3.12.0.tar.gz",
+      "archive_sha256": "4b92eb0c06d10683f7447ce9406cb97cd4b453be18d7279320f7b2f025c10187",
+      "actual_sha256": "4b92eb0c06d10683f7447ce9406cb97cd4b453be18d7279320f7b2f025c10187",
+      "sha256_verified": true,
+      "archive_size_bytes": 9678593,
+      "archive_filename": "json-v3.12.0.tar.gz",
+      "archive_root": "json-3.12.0",
+      "archive_path": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/archives/json-v3.12.0.tar.gz",
+      "source_directory": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/json-3.12.0",
+      "cmake_declaration": "sherpa-onnx/cmake/json.cmake",
+      "direct_dependencies": [],
+      "license_summary": "MIT; embedded attribution details require retention",
+      "license_files": [
+        "licenses/json/LICENSE.MIT",
+        "licenses/json/UPSTREAM-license-documentation.md",
+        "licenses/json/Hedley-header-attributions.txt",
+        "licenses/json/Grisu2-header-attributions.txt",
+        "licenses/json/UTF8-header-attributions.txt",
+        "licenses/json/Abseil-CXX11-fallback-attributions.txt"
+      ],
+      "upstream_declared_fallback_urls": [
+        "https://hf-mirror.com/csukuangfj/sherpa-onnx-cmake-deps/resolve/main/json-3.12.0.tar.gz"
+      ],
+      "download_origin_used": "Pinned official project or explicitly selected maintainer-fork URL; no fallback mirror used",
+      "cmake_declaration_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/inputs/sherpa-onnx-11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf/cmake/json.cmake",
+      "cmake_declaration_sha256": "e318b4065954cb479318d191c91e32d5a0cae94a53fff70987791b6f9828b1de",
+      "fetchcontent_declaration_uses_sha256": true,
+      "nested_downloads_active": [],
+      "linkage_role": "header-only nlohmann_json headers used by sherpa-onnx-core"
+    },
+    {
+      "name": "eigen",
+      "version": "5.0.1",
+      "kind": "source_archive",
+      "fetchcontent_name": "eigen",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_EIGEN",
+      "archive_url": "https://gitlab.com/libeigen/eigen/-/archive/5.0.1/eigen-5.0.1.tar.gz",
+      "archive_sha256": "e9c326dc8c05cd1e044c71f30f1b2e34a6161a3b6ecf445d56b53ff1669e3dec",
+      "actual_sha256": "e9c326dc8c05cd1e044c71f30f1b2e34a6161a3b6ecf445d56b53ff1669e3dec",
+      "sha256_verified": true,
+      "archive_size_bytes": 2967272,
+      "archive_filename": "eigen-eigen-5.0.1.tar.gz",
+      "archive_root": "eigen-5.0.1",
+      "archive_path": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/archives/eigen-eigen-5.0.1.tar.gz",
+      "source_directory": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/eigen-5.0.1",
+      "cmake_declaration": "sherpa-onnx/cmake/eigen.cmake",
+      "direct_dependencies": [],
+      "license_summary": "MPL-2.0; bundled compatible BSD/Apache/MINPACK notices",
+      "license_files": [
+        "licenses/eigen/LICENSE",
+        "licenses/eigen/COPYING.MPL2",
+        "licenses/eigen/COPYING.README",
+        "licenses/eigen/COPYING.BSD",
+        "licenses/eigen/COPYING.APACHE",
+        "licenses/eigen/COPYING.MINPACK"
+      ],
+      "upstream_declared_fallback_urls": [],
+      "download_origin_used": "Pinned official project or explicitly selected maintainer-fork URL; no fallback mirror used",
+      "cmake_declaration_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/inputs/sherpa-onnx-11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf/cmake/eigen.cmake",
+      "cmake_declaration_sha256": "8239d74b44e37e1bb05be2e1c86f6b1e931f0daca93b325fb2e0b6d6e996b2ed",
+      "fetchcontent_declaration_uses_sha256": true,
+      "nested_downloads_active": [],
+      "linkage_role": "header-only Eigen3::Eigen templates used by kaldi-decoder-core",
+      "module_resolution": "Sherpa root cmake directory precedes kaldi-decoder cmake in CMAKE_MODULE_PATH. include(eigen) therefore resolves to sherpa 5.0.1 pin, not decoder 3.4.0 pin."
+    },
+    {
+      "name": "openfst",
+      "version": "1.8.5-2026-07-09",
+      "kind": "source_archive",
+      "fetchcontent_name": "openfst",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_OPENFST",
+      "archive_url": "https://github.com/csukuangfj/openfst/archive/refs/tags/v1.8.5-2026-07-09.tar.gz",
+      "archive_sha256": "2ff712a32952fcb01d351121a6bc8ccf4fdc6b2aa06ce8df2b3095dedd518c0e",
+      "actual_sha256": "2ff712a32952fcb01d351121a6bc8ccf4fdc6b2aa06ce8df2b3095dedd518c0e",
+      "sha256_verified": true,
+      "archive_size_bytes": 1501685,
+      "archive_filename": "openfst-v1.8.5-2026-07-09.tar.gz",
+      "archive_root": "openfst-1.8.5-2026-07-09",
+      "archive_path": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/archives/openfst-v1.8.5-2026-07-09.tar.gz",
+      "source_directory": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/openfst-1.8.5-2026-07-09",
+      "cmake_declaration": "sherpa-onnx/cmake/openfst.cmake",
+      "direct_dependencies": [],
+      "license_summary": "Apache-2.0",
+      "license_files": [
+        "licenses/openfst/COPYING",
+        "licenses/sherpa-onnx/LICENSE"
+      ],
+      "upstream_declared_fallback_urls": [],
+      "download_origin_used": "Pinned official project or explicitly selected maintainer-fork URL; no fallback mirror used",
+      "cmake_declaration_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/inputs/sherpa-onnx-11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf/cmake/openfst.cmake",
+      "cmake_declaration_sha256": "1658b8ba6bc449daef239cece7ebf6d0bef09665dd4a078ccf6cb66ec01e5d1f",
+      "fetchcontent_declaration_uses_sha256": true,
+      "nested_downloads_active": [],
+      "linkage_role": "static fst/fstfar linked into sherpa-onnx-core",
+      "module_resolution": "Sherpa root cmake directory precedes kaldifst cmake in CMAKE_MODULE_PATH. include(openfst) therefore resolves to sherpa v1.8.5-2026-07-09 pin, not kaldifst v1.8.5-2026-04-10 pin."
+    },
+    {
+      "name": "kissfft",
+      "version": "febd4caeed32e33ad8b2e0bb5ea77542c40f18ec",
+      "kind": "source_archive",
+      "fetchcontent_name": "kissfft",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_KISSFFT",
+      "archive_url": "https://github.com/mborgerding/kissfft/archive/febd4caeed32e33ad8b2e0bb5ea77542c40f18ec.zip",
+      "archive_sha256": "497103e664168ebe39580b757adbe616f6cf85a16572af581ca7bc42d0ab13fd",
+      "actual_sha256": "497103e664168ebe39580b757adbe616f6cf85a16572af581ca7bc42d0ab13fd",
+      "sha256_verified": true,
+      "archive_size_bytes": 74252,
+      "archive_filename": "kissfft-febd4caeed32e33ad8b2e0bb5ea77542c40f18ec.zip",
+      "archive_root": "kissfft-febd4caeed32e33ad8b2e0bb5ea77542c40f18ec",
+      "archive_path": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/archives/kissfft-febd4caeed32e33ad8b2e0bb5ea77542c40f18ec.zip",
+      "source_directory": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/kissfft-febd4caeed32e33ad8b2e0bb5ea77542c40f18ec",
+      "cmake_declaration": "kaldi-native-fbank-1.22.3/cmake/kissfft.cmake",
+      "direct_dependencies": [],
+      "license_summary": "BSD-3-Clause",
+      "license_files": [
+        "licenses/kissfft/COPYING",
+        "licenses/kissfft/LICENSES/BSD-3-Clause"
+      ],
+      "upstream_declared_fallback_urls": [],
+      "download_origin_used": "Pinned official project or explicitly selected maintainer-fork URL; no fallback mirror used",
+      "cmake_declaration_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/kaldi-native-fbank-1.22.3/cmake/kissfft.cmake",
+      "cmake_declaration_sha256": "f6038500a227a48df0e309b9490bd9c8cec8ee376008d7211e3fc96f0c689580",
+      "fetchcontent_declaration_uses_sha256": true,
+      "nested_downloads_active": [],
+      "linkage_role": "static library linked through kaldi-native-fbank-core"
+    },
+    {
+      "name": "kaldifst",
+      "version": "1.8.0",
+      "kind": "source_archive",
+      "fetchcontent_name": "kaldifst",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_KALDIFST",
+      "archive_url": "https://github.com/k2-fsa/kaldifst/archive/refs/tags/v1.8.0.tar.gz",
+      "archive_sha256": "3f247b7e5a2409071202f5e2bc6200060f66728c0a3443c03923ad2723e040b3",
+      "actual_sha256": "3f247b7e5a2409071202f5e2bc6200060f66728c0a3443c03923ad2723e040b3",
+      "sha256_verified": true,
+      "archive_size_bytes": 172147,
+      "archive_filename": "kaldifst-v1.8.0.tar.gz",
+      "archive_root": "kaldifst-1.8.0",
+      "archive_path": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/archives/kaldifst-v1.8.0.tar.gz",
+      "source_directory": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/kaldifst-1.8.0",
+      "cmake_declaration": "kaldi-decoder-0.3.0/cmake/kaldifst.cmake",
+      "direct_dependencies": [
+        "openfst"
+      ],
+      "license_summary": "Apache-2.0",
+      "license_files": [
+        "licenses/kaldifst/LICENSE"
+      ],
+      "upstream_declared_fallback_urls": [],
+      "download_origin_used": "Pinned official project or explicitly selected maintainer-fork URL; no fallback mirror used",
+      "cmake_declaration_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/kaldi-decoder-0.3.0/cmake/kaldifst.cmake",
+      "cmake_declaration_sha256": "3fc84cb97584d944ad23cccacfcb958f163873ffae62a0764d8e75930f9a8bb3",
+      "fetchcontent_declaration_uses_sha256": true,
+      "nested_downloads_active": [
+        "openfst"
+      ],
+      "linkage_role": "static library linked through kaldi-decoder-core"
+    },
+    {
+      "name": "onnxruntime",
+      "version": "1.28.2",
+      "kind": "vendor_prebuilt_archive",
+      "fetchcontent_name": "onnxruntime",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_ONNXRUNTIME",
+      "archive_url": "https://github.com/csukuangfj/onnxruntime-libs/releases/download/v1.28.2/onnxruntime-android-1.28.2.zip",
+      "archive_sha256": "01518867f78241138b6aa25925802e843a4fa9085af8d303d49e35bbb52aff4d",
+      "actual_sha256": "01518867f78241138b6aa25925802e843a4fa9085af8d303d49e35bbb52aff4d",
+      "sha256_verified": true,
+      "archive_size_bytes": 33765715,
+      "archive_filename": "onnxruntime-android-1.28.2.zip",
+      "archive_root": null,
+      "archive_roots": [
+        "AndroidManifest.xml",
+        "META-INF",
+        "R.txt",
+        "classes.jar",
+        "headers",
+        "jni"
+      ],
+      "archive_path": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/inputs/onnxruntime-android-1.28.2.zip",
+      "source_directory": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/inputs/onnxruntime-1.28.2",
+      "cmake_declaration": "sherpa-onnx/cmake/onnxruntime-android-{aarch64,arm,x86_64,i686}.cmake",
+      "license_summary": "MIT for ONNX Runtime; accompanying upstream ThirdPartyNotices retained verbatim; exact vendor-binary dependency/license coverage unverified",
+      "license_files": [
+        "licenses/onnxruntime/LICENSE",
+        "licenses/onnxruntime/ThirdPartyNotices.txt"
+      ],
+      "notice_upstream_commit": "33ca9628233dc8f002435e868d4c2e9f82766ca1",
+      "vendor_archive_contains_license_or_notice": false,
+      "vendor_classes_jar_contains_license_or_notice": false,
+      "direct_dependencies": "Not recursively attested: prebuilt vendor binary, not built from source in this recipe",
+      "upstream_declared_fallback_urls": [],
+      "download_origin_used": "Pinned official project or explicitly selected maintainer-fork URL; no fallback mirror used",
+      "cmake_declaration_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/inputs/sherpa-onnx-11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf/cmake/onnxruntime-android-aarch64.cmake",
+      "cmake_declaration_sha256": "593cd72a365fb13f60858756fdb78925a20f6dcfa5343e1d4ed549f632cedeee",
+      "fetchcontent_declaration_uses_sha256": true,
+      "nested_downloads_active": "Not recursively attested: prebuilt vendor binary, not built from source in this recipe",
+      "linkage_role": "imported shared libonnxruntime.so selected by Android ABI"
+    }
+  ],
+  "excluded_dependencies": [
+    {
+      "name": "espeak-ng-for-piper and piper-phonemize",
+      "reason": "SHERPA_ONNX_ENABLE_TTS=OFF; not downloaded or licensed by this audit"
+    },
+    {
+      "name": "hclust-cpp",
+      "reason": "SHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION=OFF; not downloaded"
+    },
+    {
+      "name": "portaudio",
+      "reason": "SHERPA_ONNX_ENABLE_PORTAUDIO=OFF and SHERPA_ONNX_ENABLE_BINARY=OFF"
+    },
+    {
+      "name": "websocketpp and asio",
+      "reason": "SHERPA_ONNX_ENABLE_WEBSOCKET=OFF"
+    },
+    {
+      "name": "pybind11 and googletest",
+      "reason": "Parent and nested Python/tests OFF; excluded CMake pins exist but are not active"
+    },
+    {
+      "name": "Eigen 3.4.0",
+      "reason": "Shadowed by earlier sherpa cmake/eigen.cmake selecting 5.0.1",
+      "archive_url": "https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz",
+      "archive_sha256": "8586084f71f9bde545ee7fa6d00288b264a2b7ac3607b974e54d13e7162c1c72"
+    },
+    {
+      "name": "OpenFst 1.8.5-2026-04-10",
+      "reason": "Shadowed by earlier sherpa cmake/openfst.cmake selecting 2026-07-09 pin",
+      "archive_url": "https://github.com/csukuangfj/openfst/archive/refs/tags/v1.8.5-2026-04-10.tar.gz",
+      "archive_sha256": "c3549940384cbe4fa9f18c2bcfb1bfbd0a80492fd1b0bfa27433cee395a6a199"
+    },
+    {
+      "name": "Eigen LAPACK reference addons",
+      "reason": "Nested conditional requires Eigen LAPACK/Fortran/tests; explicitly keep disabled",
+      "url": "http://downloads.tuxfamily.org/eigen/lapack_addons_3.4.1.tgz",
+      "non_sha256_pin": "EXPECTED_MD5=ab5742640617e3221a873aba44bbdc93",
+      "risk": "HTTP plus MD5 and direct tar extraction; no active SHA256 pin; not downloaded",
+      "source": "eigen-5.0.1/lapack/CMakeLists.txt:47-69"
+    },
+    {
+      "name": "nlohmann/json_test_data",
+      "reason": "Only JSON tests/benchmarks; explicitly keep disabled",
+      "url": "https://github.com/nlohmann/json_test_data.git",
+      "non_sha256_pin": "shallow git clone --branch v3.1.0; no archive digest",
+      "source": "json-3.12.0/cmake/download_test_data.cmake:1-17"
+    },
+    {
+      "name": "Google benchmark",
+      "reason": "Standalone JSON benchmark subproject, not added by selected main graph",
+      "url": "https://github.com/google/benchmark.git",
+      "non_sha256_pin": "GIT_TAG origin/main (mutable)",
+      "source": "json-3.12.0/tests/benchmarks/CMakeLists.txt:11-16"
+    },
+    {
+      "name": "OpenFst optional Abseil",
+      "reason": "OPENFST_USE_ABSL=OFF; if enabled uses external find_package(absl CONFIG REQUIRED) without source pin"
+    },
+    {
+      "name": "Eigen BTL benchmarks",
+      "reason": "EIGEN_BUILD_BTL=OFF; full source archive contains GPL-2.0 benchmark files, not selected runtime components; full GPL text preserved in excluded notice subfile"
+    },
+    {
+      "name": "KISS FFT test/doit.c",
+      "reason": "KISSFFT_TEST=OFF; Unlicense source only in test tree"
+    }
+  ],
+  "release_gates": [
+    "Package the collected license texts and relevant copyright/attribution notices with the distributed runtime; no NOTICE-only label should imply license texts are optional.",
+    "Review Eigen MPL-2.0 sections 3.1-3.3, supply required source availability information for covered Eigen code, and preserve exact source/modification records. This audit does not decide product-level legal compliance.",
+    "Confirm exact ONNX Runtime vendor binary build provenance/SBOM and notice coverage; Microsoft source notices do not prove which optional third-party components are present in the csukuangfj prebuilt archive.",
+    "Keep disabled test/example/benchmark/provider paths off in a clean cache; source overrides bypass FetchContent archive verification, so validate archives before extraction.",
+    "Preserve pristine simple-sentencepiece sources and record the deterministic upstream Android configuration modifications before distributing modified sources.",
+    "Reconcile nlohmann JSON embedded Hedley and Abseil attribution evidence before finalizing public notice wording.",
+    "After a real Android build, inspect selected link dependencies, JNI exports, packaged .so files and any NDK libc++ runtime; this static audit does not verify the resulting binary contents.",
+    "Review the actual ASR/VAD/tokenizer model licenses separately; they are not covered by native source-code licenses."
+  ],
+  "verification": {
+    "method": "Downloaded official project/selected maintainer-fork archives and matched each complete archive against the SHA-256 literal in the effective CMake declaration; inspected nested CMake files and actual license/notice text. ONNX Runtime vendor archive independently rehashed; Microsoft upstream notices separately fetched at resolved tag commit.",
+    "android_configure_executed": false,
+    "android_build_executed": false,
+    "binary_link_map_verified": false,
+    "model_license_audited": false,
+    "ndk_runtime_license_audited": false,
+    "active_archive_inputs_with_non_sha256_pins_found": false,
+    "unconditional_unpinned_downloads_found_in_selected_source_graph": false,
+    "caveat": "The active graph is a static source inference for a clean cache and the stated OFF options. It is not a full binary SBOM and does not attest the transitive build contents of prebuilt ONNX Runtime."
+  },
+  "main_project": {
+    "name": "sherpa-onnx",
+    "version": "1.13.8",
+    "commit": "11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf",
+    "archive_url": "https://github.com/k2-fsa/sherpa-onnx/archive/11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf.tar.gz",
+    "archive_sha256": "0a8db6c55dd318f4a688faba85f7760b99a6c92e8ef8864479d418531bee1ac2",
+    "archive_sha256_provenance": "locally computed fixed-commit archive digest; archive provided by parent, not an independently signed publisher digest",
+    "archive_size_bytes": 11645413,
+    "license_summary": "Apache-2.0",
+    "license_files": [
+      "licenses/sherpa-onnx/LICENSE"
+    ]
+  },
+  "recommended_offline_cache_flags": {
+    "BUILD_TESTING": "OFF",
+    "JSON_BuildTests": "OFF",
+    "JSON_CI": "OFF",
+    "EIGEN_BUILD_TESTING": "OFF",
+    "EIGEN_BUILD_BLAS": "OFF",
+    "EIGEN_BUILD_LAPACK": "OFF",
+    "EIGEN_ENABLE_LAPACK_TESTS": "OFF",
+    "EIGEN_BUILD_BTL": "OFF",
+    "EIGEN_BUILD_SPBENCH": "OFF",
+    "EIGEN_BUILD_DEMOS": "OFF",
+    "EIGEN_BUILD_DOC": "OFF",
+    "OPENFST_USE_ABSL": "OFF",
+    "KISSFFT_TEST": "OFF",
+    "KISSFFT_TOOLS": "OFF",
+    "KISSFFT_PKGCONFIG": "OFF",
+    "KISSFFT_OPENMP": "OFF",
+    "FETCHCONTENT_FULLY_DISCONNECTED": "ON",
+    "SHERPA_ONNX_USE_PRE_INSTALLED_ONNXRUNTIME_IF_AVAILABLE": "OFF"
+  },
+  "bundled_source_components": [
+    {
+      "name": "Darts-clone",
+      "parent": "simple-sentencepiece",
+      "version_header": "0.32",
+      "source_file": "ssentencepiece/csrc/darts.h",
+      "license": "BSD-2-Clause",
+      "download": "none; vendored bytes covered by parent archive SHA256",
+      "runtime_selection": "included by ssentencepiece.h"
+    },
+    {
+      "name": "ThreadPool",
+      "parent": "simple-sentencepiece",
+      "source_file": "ssentencepiece/csrc/threadpool.h",
+      "license": "Zlib",
+      "download": "none; vendored bytes covered by parent archive SHA256",
+      "runtime_selection": "removed/replaced by sherpa upstream Android configuration patch"
+    },
+    {
+      "name": "Hedley",
+      "parent": "json",
+      "source_file": "include/nlohmann/thirdparty/hedley/hedley.hpp",
+      "license": "source SPDX says MIT; repository license documentation describes CC0-1.0; preserve both attribution records and review discrepancy",
+      "download": "none; vendored in SHA256-pinned JSON archive"
+    },
+    {
+      "name": "Grisu2",
+      "parent": "json",
+      "source_file": "include/nlohmann/detail/conversions/to_chars.hpp",
+      "license": "MIT; Florian Loitsch 2009",
+      "download": "none; vendored"
+    },
+    {
+      "name": "UTF-8 decoder",
+      "parent": "json",
+      "source_file": "include/nlohmann/detail/output/serializer.hpp",
+      "license": "MIT; Bjorn Hoehrmann 2008-2009",
+      "download": "none; vendored"
+    },
+    {
+      "name": "Abseil integer_sequence fallback",
+      "parent": "json",
+      "source_file": "include/nlohmann/detail/meta/cpp_future.hpp",
+      "license": "header SPDX MIT, embedded attribution Apache-2.0; C++11 fallback is excluded by C++17 target",
+      "download": "none; vendored"
+    },
+    {
+      "name": "Eigen bundled third-party portions",
+      "parent": "eigen",
+      "license": "MPL-2.0 and included compatible BSD/Apache/MINPACK notices; exact header usage requires final compile dependency review",
+      "download": "none; vendored in Eigen archive"
+    }
+  ]
+}

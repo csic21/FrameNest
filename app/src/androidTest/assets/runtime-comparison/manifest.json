@@ -1,0 +1,542 @@
+{
+  "schema_version": 1,
+  "id": "sensevoice-runtime-ab-fn74",
+  "allowed_runtimes": [
+    "1.12.32",
+    "1.13.8"
+  ],
+  "recognizer": {
+    "language": "ja",
+    "use_itn": true,
+    "decoding_method": "greedy_search",
+    "max_active_paths": 4,
+    "provider": "cpu",
+    "num_threads": 2,
+    "sample_rate_hz": 16000
+  },
+  "input_contract": "Raw native and production adapter receive bit-identical binary32 samples. Each accepted source WAV is signed PCM16, so short/32768f is exact. Test fails rather than rounding any nonrepresentable float. No VAD recomputation, token-based clipping, MT, user media, or production cache writes.",
+  "scope": "Pinned public fixture runtime comparison only; excluded VAD gaps remain untested and cannot count as completed coverage. No phone/NAS, paced video, translation or accuracy acceptance.",
+  "changes": "Machine-derived audio excerpts and ASR text; may contain recognition errors. Retain each fixture attribution and license on derived reports.",
+  "provenance_evidence": {
+    "window_source_file": "sensevoice-official-vad-deduplicated.json",
+    "window_source_sha256": "5fb0214b28768b723518857b5489a697b5ec8b9275d8b26e5d700e4a151e15a8",
+    "control_verification_sha256": "0ad23b9b95854aa177bf050466c16478fb1288d1469f2b3dd2a0cf15b9d34630",
+    "runtime_replay_sha256": "3a0b3ef855985f2863ce9ecea1285b30582f7fa9c3aa54ce8e364e953e8da0da",
+    "benchmark_script_sha256": "cd91a3998a474f3068843eefd858659b8f82ad5114bbfe7fe1f4ed56c2a80500",
+    "old_result_sha256": "b184c8a916c8474654456eebf4687ff51149f0278f356be324933f7cf2cadb9e",
+    "new_result_sha256": "a2ae1996fdb3127881337e8167fa2de256a9698f361b73584f7dc7995f35eb85",
+    "window_index_derivation": "Python round(start_seconds * 16000) and round(end_seconds * 16000), exactly as benchmark.py. Source rows retained in their original order."
+  },
+  "models": [
+    {
+      "file": "sensevoice/tokens.txt",
+      "url": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/tokens.txt",
+      "bytes": 315894,
+      "sha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+      "asset": "runtime-comparison/generated/tokens.txt"
+    },
+    {
+      "file": "sensevoice/model.int8.onnx",
+      "url": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/model.int8.onnx",
+      "bytes": 239233841,
+      "sha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+      "asset": "runtime-comparison/generated/model.int8.onnx"
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "emoji",
+      "media_url": "https://upload.wikimedia.org/wikipedia/commons/a/a4/Emoji.webm",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Emoji.webm",
+      "author": "Simpleshow Japan",
+      "license": "CC-BY-SA-4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "video": {
+        "file": "emoji.webm",
+        "bytes": 9487128,
+        "sha256": "ad3af093836cad823ef1793ff4d505139eed92dd7e7402de4c015a2ed50d5956"
+      },
+      "wav": {
+        "file": "emoji.wav",
+        "bytes": 3646798,
+        "sha256": "d86a5232679fdd0d8633770014c9e18a7fd76eb0070fc7585e543303724cedfe"
+      },
+      "pcm": {
+        "asset": "runtime-comparison/generated/emoji.f32le",
+        "samples": 1823360,
+        "bytes": 7293440,
+        "sha256": "7e3496d4085844928a028f045998c4767eaf7d4207f2d465bcf59e5b19888915",
+        "s16le_sha256": "e3e4e1de9395948bc3e03c0f88a93cb55bbbb0768280344bd7f4bd3f164700a6",
+        "sample_rate_hz": 16000,
+        "channels": 1,
+        "encoding": "IEEE-754 binary32 little-endian",
+        "conversion": "WAV PCM signed 16-bit / 32768; exact binary32; no normalization or resampling at runtime"
+      }
+    },
+    {
+      "id": "kishida",
+      "media_url": "https://upload.wikimedia.org/wikipedia/commons/3/37/Fumio_Kishida%27s_press_conference_the_day_after_attacked.webm",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Fumio_Kishida%27s_press_conference_the_day_after_attacked.webm",
+      "author": "Cabinet Public Affairs Office / Prime Minister's Office of Japan",
+      "license": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "license_basis": "Commons GJSTU declaration; audio extraction/ASR are testing adaptations, not an official transcript or endorsement.",
+      "video": {
+        "file": "kishida.webm",
+        "bytes": 62832144,
+        "sha256": "f99bc9087c05ba69ad6b33ac7fbe35856a4c8ca0d261a38b7f76f5b8a1f60de9"
+      },
+      "wav": {
+        "file": "kishida.wav",
+        "bytes": 5625252,
+        "sha256": "eb8d168d4b4b4c608be8d8bc212cbc24c5ee568f6b7cb190d87abe372072a698"
+      },
+      "pcm": {
+        "asset": "runtime-comparison/generated/kishida.f32le",
+        "samples": 2812587,
+        "bytes": 11250348,
+        "sha256": "8dd584776d12c42d80b773e5811dafe6bf17f796357e1eea4aeb93db428ac438",
+        "s16le_sha256": "be7666aab85c2ab8b987fc5e5d297c7efff27751f755212f0e0a4c734763a91b",
+        "sample_rate_hz": 16000,
+        "channels": 1,
+        "encoding": "IEEE-754 binary32 little-endian",
+        "conversion": "WAV PCM signed 16-bit / 32768; exact binary32; no normalization or resampling at runtime"
+      }
+    }
+  ],
+  "samples": [
+    {
+      "id": "emoji",
+      "fixture_id": "emoji",
+      "extent_samples": 1823360,
+      "rows": [
+        {
+          "index": 0,
+          "start_sample": 47712,
+          "end_sample": 80480,
+          "ready_input_seconds": 5.28,
+          "f32le_sha256": "a9dda0796e5bdcd1dc4cbd133c7790af71ec6840bbb2f09fc0ff2a8f07508a26"
+        },
+        {
+          "index": 1,
+          "start_sample": 100448,
+          "end_sample": 271456,
+          "ready_input_seconds": 17.216,
+          "f32le_sha256": "b51ac32f4908368c790456d919f7f22c22917445797d601e4f877e5ae93f9754"
+        },
+        {
+          "index": 2,
+          "start_sample": 275040,
+          "end_sample": 310368,
+          "ready_input_seconds": 19.648,
+          "f32le_sha256": "303d952c5717c98f006befc6f011fc5fe847eae52acf95e50d956703d3777dd0"
+        },
+        {
+          "index": 3,
+          "start_sample": 345696,
+          "end_sample": 522848,
+          "ready_input_seconds": 32.928,
+          "f32le_sha256": "58022ac35544ea85a3defac9edc3398198de23c59787607535f46fbc6bfd5be7"
+        },
+        {
+          "index": 4,
+          "start_sample": 538208,
+          "end_sample": 587360,
+          "ready_input_seconds": 36.96,
+          "f32le_sha256": "ef96c973c995320fa006cd2129214fb4adcf7758f7003bb25e8f891376e1306a"
+        },
+        {
+          "index": 5,
+          "start_sample": 591456,
+          "end_sample": 666720,
+          "ready_input_seconds": 41.92,
+          "f32le_sha256": "6f1cb3601fbd41163b33a050f70316e47b9c0339f31e300b6799bb9d15137b75"
+        },
+        {
+          "index": 6,
+          "start_sample": 678496,
+          "end_sample": 795744,
+          "ready_input_seconds": 49.984,
+          "f32le_sha256": "b97e602d094b037bc90b54b6f4539d937c32f7a48c33619ec782a375f5d68b6e"
+        },
+        {
+          "index": 7,
+          "start_sample": 801376,
+          "end_sample": 858720,
+          "ready_input_seconds": 53.92,
+          "f32le_sha256": "728a098de98dd2d833ffb69f9f129b64d5a603a0b1f7d9fa9ce8448083a236d2"
+        },
+        {
+          "index": 8,
+          "start_sample": 892000,
+          "end_sample": 1128544,
+          "ready_input_seconds": 70.784,
+          "f32le_sha256": "e6685abd221dc11809d28c3ee5a7cd260a87649388f8087425b9e5905cf49fba"
+        },
+        {
+          "index": 9,
+          "start_sample": 1147488,
+          "end_sample": 1193568,
+          "ready_input_seconds": 74.848,
+          "f32le_sha256": "a9bac684b55e4b11d873e694dd25a17a2ec65dddfe18b63201ec089b434eeb4b"
+        },
+        {
+          "index": 10,
+          "start_sample": 1209440,
+          "end_sample": 1259616,
+          "ready_input_seconds": 78.976,
+          "f32le_sha256": "847db04eaa2c1bb12e88a66bf1d9af82549a4604e6555b316905b04421fecfba"
+        },
+        {
+          "index": 11,
+          "start_sample": 1272416,
+          "end_sample": 1537632,
+          "ready_input_seconds": 96.352,
+          "f32le_sha256": "04a863463077f8424bdd74835c60a2d5bf42d2143f409a1b741ed01cff09975d"
+        },
+        {
+          "index": 12,
+          "start_sample": 1556576,
+          "end_sample": 1766496,
+          "ready_input_seconds": 110.656,
+          "f32le_sha256": "1675c95c4a1e261544d6f0dafc75a08f48d6ee1b3e17b92ac50ee859b0c69bcd"
+        }
+      ],
+      "gaps": [
+        {
+          "start_sample": 0,
+          "end_sample": 47712,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 80480,
+          "end_sample": 100448,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 271456,
+          "end_sample": 275040,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 310368,
+          "end_sample": 345696,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 522848,
+          "end_sample": 538208,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 587360,
+          "end_sample": 591456,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 666720,
+          "end_sample": 678496,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 795744,
+          "end_sample": 801376,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 858720,
+          "end_sample": 892000,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 1128544,
+          "end_sample": 1147488,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 1193568,
+          "end_sample": 1209440,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 1259616,
+          "end_sample": 1272416,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 1537632,
+          "end_sample": 1556576,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 1766496,
+          "end_sample": 1823360,
+          "status": "excluded, not decoded or accepted coverage"
+        }
+      ]
+    },
+    {
+      "id": "kishida",
+      "fixture_id": "kishida",
+      "extent_samples": 2812587,
+      "rows": [
+        {
+          "index": 0,
+          "start_sample": 20576,
+          "end_sample": 77408,
+          "ready_input_seconds": 5.088,
+          "f32le_sha256": "309dc0c92a35932cf1bac3f22a7f74c42dc1e941a64edc7bbbe873fa0aa0da65"
+        },
+        {
+          "index": 1,
+          "start_sample": 83552,
+          "end_sample": 107616,
+          "ready_input_seconds": 6.976,
+          "f32le_sha256": "ef915ef5e014d4d0f6fb4d7c467392a13d1b52f07efa18c57613ded9d4b4d5ea"
+        },
+        {
+          "index": 2,
+          "start_sample": 116320,
+          "end_sample": 372320,
+          "ready_input_seconds": 23.52,
+          "f32le_sha256": "892221c1c2b06ab4189c06490fd2af010f7351bdcdfa86ccb9b031b3bc0ab8fd"
+        },
+        {
+          "index": 3,
+          "start_sample": 380512,
+          "end_sample": 742848,
+          "ready_input_seconds": 46.528,
+          "f32le_sha256": "96585a24c5e6400368bce1e463ee4134d83575fb92a22e85d3dbf5f5af0be509"
+        },
+        {
+          "index": 4,
+          "start_sample": 744032,
+          "end_sample": 1081792,
+          "ready_input_seconds": 67.712,
+          "f32le_sha256": "aa67d616ee431a9da3434dbd9fe420c5aeb8b715d3f85d1820725afe8445e72c"
+        },
+        {
+          "index": 5,
+          "start_sample": 1082976,
+          "end_sample": 1109088,
+          "ready_input_seconds": 69.568,
+          "f32le_sha256": "8f9deaecf955a0cb66669506edb358e0e32318bed4539b8828f4bdd0dab63339"
+        },
+        {
+          "index": 6,
+          "start_sample": 1115744,
+          "end_sample": 1444800,
+          "ready_input_seconds": 90.4,
+          "f32le_sha256": "cd77d178915a3cf7cc22a7f9afcb957bc9dff37d1c94053767be32463dce7980"
+        },
+        {
+          "index": 7,
+          "start_sample": 1445984,
+          "end_sample": 1824704,
+          "ready_input_seconds": 114.144,
+          "f32le_sha256": "335baae4b3de298c6411710a0c230e933f6c988f638587e16146bb270cd9bfb2"
+        },
+        {
+          "index": 8,
+          "start_sample": 1834080,
+          "end_sample": 1968736,
+          "ready_input_seconds": 123.296,
+          "f32le_sha256": "8ff223f80dbd2142b9fcf6fbb204ebb1d0ee115ea9634ea9fa024e1decd8296d"
+        },
+        {
+          "index": 9,
+          "start_sample": 1983072,
+          "end_sample": 2311616,
+          "ready_input_seconds": 144.576,
+          "f32le_sha256": "36992332f65be0233b10438ebc2cf538554c2cd86ae2f196c44b1c06c1ccf47b"
+        },
+        {
+          "index": 10,
+          "start_sample": 2312800,
+          "end_sample": 2708416,
+          "ready_input_seconds": 169.376,
+          "f32le_sha256": "c7ba1e5ee3fa7e14774c0a2459ace8dd6c001a9f0c9c9e82488d4d0c23ff625c"
+        },
+        {
+          "index": 11,
+          "start_sample": 2709600,
+          "end_sample": 2782816,
+          "ready_input_seconds": 174.176,
+          "f32le_sha256": "b50facc7c3fe52c1ce18386f8ae42f0cd699126380abc9b815d46f6f8f6567b6"
+        }
+      ],
+      "gaps": [
+        {
+          "start_sample": 0,
+          "end_sample": 20576,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 77408,
+          "end_sample": 83552,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 107616,
+          "end_sample": 116320,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 372320,
+          "end_sample": 380512,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 742848,
+          "end_sample": 744032,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 1081792,
+          "end_sample": 1082976,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 1109088,
+          "end_sample": 1115744,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 1444800,
+          "end_sample": 1445984,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 1824704,
+          "end_sample": 1834080,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 1968736,
+          "end_sample": 1983072,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 2311616,
+          "end_sample": 2312800,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 2708416,
+          "end_sample": 2709600,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 2782816,
+          "end_sample": 2812587,
+          "status": "excluded, not decoded or accepted coverage"
+        }
+      ]
+    },
+    {
+      "id": "kishida114",
+      "fixture_id": "kishida",
+      "extent_samples": 1824000,
+      "rows": [
+        {
+          "index": 0,
+          "start_sample": 20576,
+          "end_sample": 77408,
+          "ready_input_seconds": 5.088,
+          "f32le_sha256": "309dc0c92a35932cf1bac3f22a7f74c42dc1e941a64edc7bbbe873fa0aa0da65"
+        },
+        {
+          "index": 1,
+          "start_sample": 83552,
+          "end_sample": 107616,
+          "ready_input_seconds": 6.976,
+          "f32le_sha256": "ef915ef5e014d4d0f6fb4d7c467392a13d1b52f07efa18c57613ded9d4b4d5ea"
+        },
+        {
+          "index": 2,
+          "start_sample": 116320,
+          "end_sample": 372320,
+          "ready_input_seconds": 23.52,
+          "f32le_sha256": "892221c1c2b06ab4189c06490fd2af010f7351bdcdfa86ccb9b031b3bc0ab8fd"
+        },
+        {
+          "index": 3,
+          "start_sample": 380512,
+          "end_sample": 742848,
+          "ready_input_seconds": 46.528,
+          "f32le_sha256": "96585a24c5e6400368bce1e463ee4134d83575fb92a22e85d3dbf5f5af0be509"
+        },
+        {
+          "index": 4,
+          "start_sample": 744032,
+          "end_sample": 1081792,
+          "ready_input_seconds": 67.712,
+          "f32le_sha256": "aa67d616ee431a9da3434dbd9fe420c5aeb8b715d3f85d1820725afe8445e72c"
+        },
+        {
+          "index": 5,
+          "start_sample": 1082976,
+          "end_sample": 1109088,
+          "ready_input_seconds": 69.568,
+          "f32le_sha256": "8f9deaecf955a0cb66669506edb358e0e32318bed4539b8828f4bdd0dab63339"
+        },
+        {
+          "index": 6,
+          "start_sample": 1115744,
+          "end_sample": 1444800,
+          "ready_input_seconds": 90.4,
+          "f32le_sha256": "cd77d178915a3cf7cc22a7f9afcb957bc9dff37d1c94053767be32463dce7980"
+        },
+        {
+          "index": 7,
+          "start_sample": 1445984,
+          "end_sample": 1824000,
+          "ready_input_seconds": 114.0,
+          "f32le_sha256": "5afcd218c8126c07a443dda0d22d129fec3d0dcfd27b887cdc41436179f646c0"
+        }
+      ],
+      "gaps": [
+        {
+          "start_sample": 0,
+          "end_sample": 20576,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 77408,
+          "end_sample": 83552,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 107616,
+          "end_sample": 116320,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 372320,
+          "end_sample": 380512,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 742848,
+          "end_sample": 744032,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 1081792,
+          "end_sample": 1082976,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 1109088,
+          "end_sample": 1115744,
+          "status": "excluded, not decoded or accepted coverage"
+        },
+        {
+          "start_sample": 1444800,
+          "end_sample": 1445984,
+          "status": "excluded, not decoded or accepted coverage"
+        }
+      ]
+    }
+  ]
+}

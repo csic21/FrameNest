@@ -1,0 +1,52 @@
+{
+  "status": "actual-aar-independent-static-audit-passed",
+  "source_commit": "c4088fab8d0e7daf0af5fa6895a9f88b11adcf81",
+  "run_id": 38713363406,
+  "candidate_artifact_id": 11960534932,
+  "candidate_zip_sha256": "1aa5aca91348cb103c3b6fbd05370ba0c0d6bf951312aca9724c09c5fae9775b",
+  "aar_sha256": "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+  "aar_size_bytes": 59632871,
+  "class_count": 48,
+  "source_files": [
+    "FeatureConfig.kt",
+    "HomophoneReplacerConfig.kt",
+    "OfflineRecognizer.kt",
+    "OfflineStream.kt",
+    "OnlineRecognizer.kt",
+    "OnlineStream.kt",
+    "QnnConfig.kt",
+    "VersionInfo.kt"
+  ],
+  "min_sdk": 21,
+  "consumer_keep_rules_verified": true,
+  "strict_cache_files_verified": 404,
+  "reviewed_lock_files": 460,
+  "debug_artifact_id": 11960694902,
+  "debug_zip_sha256": "524403cf264a9e42d59a626e2217c46bc133b8d7633aa63852f88dbfbbb32e68",
+  "native_method_count": 32,
+  "notice_files_verified": 29,
+  "abi_whitelist": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "library_whitelist": [
+    "libsherpa-onnx-jni.so",
+    "libonnxruntime.so"
+  ],
+  "artifact_expires_at": "2026-10-29T09:31:42Z",
+  "debug_expires_at": "2026-10-29T09:31:45Z",
+  "tests_passed": 54,
+  "android_runtime_tested": false,
+  "app_integration_tested": false,
+  "reproducibility_proven": false,
+  "legal_clearance": false,
+  "release_gate": "closed",
+  "remaining_gates": [
+    "FrameNest compilation and runtime against narrowed AAR",
+    "4KB and actual16KB Android load/call tests and finalAPK ZIP alignment",
+    "Unchanged vendorORT arm64 RELRO-end static warning assessment",
+    "Independent complete native+AAR build reproducibility and immutable-host gate",
+    "Latency/memory/accuracy/ITN/seek/cancel/long-media regression",
+    "ORT exact vendor build/transitiveSBOM, Eigen source availability, embedded attribution, staticC++/model/app license review"
+  ]
+}

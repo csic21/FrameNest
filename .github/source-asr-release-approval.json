@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "approved": true,
+  "aar_sha256": "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+  "source_app_commit": "6216ecc3ad6cfe7a0cbb2100140ff4a7f9c788d0",
+  "runtime_run_id": 38739397163,
+  "runtime_report_sha256": "03ff9bdd12c3da65baaeabae1fa40400171df6baae0520f6b64825723be0ce6c"
+}

@@ -46,6 +46,10 @@ jobs:
     needs: request
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    # Existing short-lived token reads only the exact locked same-repository AAR.
+    permissions:
+      contents: read
+      actions: read
     env:
       RELEASE_TAG: ${{ needs.request.outputs.tag }}
       RELEASE_SOURCE_SHA: ${{ needs.request.outputs.source_sha }}
@@ -83,8 +87,19 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$RELEASE_SOURCE_SHA"
           python3 -m unittest discover -s scripts/tests -v
+      - name: Require accepted source runtime and import exact reviewed AAR
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PYTHONPATH=scripts python3 -c 'from source_asr_release_assets import approval; approval()'
+          python3 scripts/prepare_source_asr.py --download \
+            --archive "$RUNNER_TEMP/reviewed-source-aar.zip" \
+            --report "$RUNNER_TEMP/source-aar-import.json"
+          # This build consumes the existing verified Actions artifact. The new
+          # release download URL is only for reproducing it after publication.
       - name: Unit tests, lint and instrumentation compilation
-        run: ./gradlew -PhyMtNative=false testDebugUnitTest lintDebug assembleDebugAndroidTest --no-daemon --no-configuration-cache --stacktrace
+        run: ./gradlew -PsherpaAsrSource=true -PhyMtNative=false --dependency-verification strict testDebugUnitTest lintDebug assembleDebugAndroidTest --no-daemon --no-configuration-cache --stacktrace
       - name: Verify owner-confirmed signing key, build and verify release APKs
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -100,7 +115,7 @@ jobs:
           unset ANDROID_KEYSTORE_BASE64
           # Package the large native ABI splits one at a time. Parallel zipflinger
           # buffers exhausted the heap in FN-67 even after compilation succeeded.
-          ./gradlew -PhyMtNative=false assembleRelease --no-daemon --no-configuration-cache --max-workers=1 --no-parallel '-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8' --stacktrace
+          ./gradlew -PsherpaAsrSource=true -PhyMtNative=false --dependency-verification strict assembleRelease --no-daemon --no-configuration-cache --max-workers=1 --no-parallel '-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8' --stacktrace
           # The unaccepted whole-segment engine is not included in this release.
           python3 - <<'PYAPK'
           import zipfile
@@ -109,7 +124,12 @@ jobs:
               with zipfile.ZipFile(apk) as archive:
                   assert not any(n.endswith('/libframenest_hymt.so') or n.lower().endswith('.gguf') for n in archive.namelist()), apk
           PYAPK
-          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 app/build/outputs/apk/release/app-universal-release.apk
+          python3 scripts/check_source_asr_apk.py --aar app/libs/sherpa-onnx-1.13.8-asr-no-tts.aar \
+            --report "$RUNNER_TEMP/source-asr-release-apk-audit.json" --require-all-variants \
+            app/build/outputs/apk/release/*.apk
+          for apk in app/build/outputs/apk/release/*.apk; do
+            "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 "$apk"
+          done
           python3 scripts/release.py package --build-tools "$ANDROID_HOME/build-tools/36.0.0"
       - name: Remove temporary signing material
         if: always()
@@ -129,6 +149,8 @@ jobs:
           path: |
             app/build/reports/tests/testDebugUnitTest/
             app/build/reports/lint-results*
+            ${{ runner.temp }}/source-aar-import.json
+            ${{ runner.temp }}/source-asr-release-apk-audit.json
           if-no-files-found: ignore
           retention-days: 14
 

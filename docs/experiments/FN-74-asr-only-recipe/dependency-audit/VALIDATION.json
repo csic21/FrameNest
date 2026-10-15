@@ -1,0 +1,44 @@
+{
+  "verification_date_utc": "2026-10-15",
+  "checks": "all input archive bytes/digests/sizes, source archive roots, existing source directories, inventory license paths and all 27 notice digests/sizes",
+  "results": [
+    {
+      "name": "kaldi-native-fbank",
+      "archive_hash_size_root_validated": true
+    },
+    {
+      "name": "kaldi-decoder",
+      "archive_hash_size_root_validated": true
+    },
+    {
+      "name": "simple-sentencepiece",
+      "archive_hash_size_root_validated": true
+    },
+    {
+      "name": "json",
+      "archive_hash_size_root_validated": true
+    },
+    {
+      "name": "eigen",
+      "archive_hash_size_root_validated": true
+    },
+    {
+      "name": "openfst",
+      "archive_hash_size_root_validated": true
+    },
+    {
+      "name": "kissfft",
+      "archive_hash_size_root_validated": true
+    },
+    {
+      "name": "kaldifst",
+      "archive_hash_size_root_validated": true
+    },
+    {
+      "name": "onnxruntime",
+      "archive_hash_size_root_validated": true
+    }
+  ],
+  "notice_record_count": 27,
+  "android_build_executed": false
+}

@@ -1,0 +1,17 @@
+{
+  "status": "independently-reviewed",
+  "verification_sha256": "754b38d7f15102bd67807fa9a02f7c4f31382feb419bbab93ea921b7f4cbbf1d",
+  "review_sha256": "0253d456fdda5cb69a1dd3ded28716c96a5d282f3614ceb373c07d3101f30d0a",
+  "reconciliation_sha256": "c8d85b6a856171999103657103cbcb83472a2a69ac36e90a2a64bc93c18f928a",
+  "captured_commit": "65ffdaf32a7e6c1a5b06d12d02a1d7c55484746f",
+  "capture_run_id": 38710270425,
+  "capture_artifact_id": 11960470515,
+  "capture_zip_sha256": "2bd2198262f5c874fcb327cc1fd8a2550ce9b58492791cdcbbd0d13f87a7cee3",
+  "captured_xml_sha256": "3deed371aec1c1c60eecb26cc7380d8bb6163da278c522dbf2486d1cd1cfec8c",
+  "captured_artifacts": 428,
+  "supplemented_downloaded_poms": 32,
+  "reviewed_artifacts": 460,
+  "reviewed_components": 242,
+  "review_method": "Fresh canonical official Google Maven/Maven Central bytes, independent of Gradle cache; available same-repository checksum sidecars checked. Not a publisher-signature proof.",
+  "release_gate": "closed"
+}

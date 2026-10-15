@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "variant": "sherpa-onnx-1.13.8-asr-facing-no-tts-recipe",
+  "status": "prepared-not-native-built-not-android-tested",
+  "source": {
+    "name": "sherpa-onnx",
+    "url": "https://github.com/k2-fsa/sherpa-onnx/archive/11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf.tar.gz",
+    "path": "inputs/sherpa-onnx-11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf.tar.gz",
+    "sha256": "0a8db6c55dd318f4a688faba85f7760b99a6c92e8ef8864479d418531bee1ac2",
+    "size_bytes": 11645413,
+    "archive_root": "sherpa-onnx-11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf",
+    "commit": "11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf",
+    "excluded_nonbuild_symlinks": [
+      {
+        "path": "sherpa-onnx-11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf/scripts/go/_internal/vad-spoken-language-identification/main.go",
+        "target": "/Users/fangjun/open-source/sherpa-onnx/go-api-examples/vad-spoken-language-identification/main.go",
+        "reason": "AbsoluteLinkError"
+      },
+      {
+        "path": "sherpa-onnx-11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf/scripts/go/_internal/vad-spoken-language-identification/run.sh",
+        "target": "/Users/fangjun/open-source/sherpa-onnx/go-api-examples/vad-spoken-language-identification/run.sh",
+        "reason": "AbsoluteLinkError"
+      }
+    ]
+  },
+  "onnxruntime": {
+    "name": "onnxruntime",
+    "url": "https://github.com/csukuangfj/onnxruntime-libs/releases/download/v1.28.2/onnxruntime-android-1.28.2.zip",
+    "path": "inputs/onnxruntime-android-1.28.2.zip",
+    "sha256": "01518867f78241138b6aa25925802e843a4fa9085af8d303d49e35bbb52aff4d",
+    "size_bytes": 33765715,
+    "archive_root": null,
+    "version": "1.28.2"
+  },
+  "dependencies": [
+    {
+      "name": "kaldi-native-fbank",
+      "url": "https://github.com/csukuangfj/kaldi-native-fbank/archive/refs/tags/v1.22.3.tar.gz",
+      "path": "dependency-audit/archives/kaldi-native-fbank-v1.22.3.tar.gz",
+      "sha256": "9176cc66fc7ce1edf85cf355b06e320c57db6297df74277f575183468893cf61",
+      "size_bytes": 71144,
+      "archive_root": "kaldi-native-fbank-1.22.3",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_KALDI_NATIVE_FBANK"
+    },
+    {
+      "name": "kaldi-decoder",
+      "url": "https://github.com/k2-fsa/kaldi-decoder/archive/refs/tags/v0.3.0.tar.gz",
+      "path": "dependency-audit/archives/kaldi-decoder-v0.3.0.tar.gz",
+      "sha256": "b9f34cfb4fd3b1344100eead79ef4d37aa15962274b9e3056de345021f76a1b0",
+      "size_bytes": 51199,
+      "archive_root": "kaldi-decoder-0.3.0",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_KALDI_DECODER"
+    },
+    {
+      "name": "simple-sentencepiece",
+      "url": "https://github.com/pkufool/simple-sentencepiece/archive/refs/tags/v0.7.tar.gz",
+      "path": "dependency-audit/archives/simple-sentencepiece-v0.7.tar.gz",
+      "sha256": "1748a822060a35baa9f6609f84efc8eb54dc0e74b9ece3d82367b7119fdc75af",
+      "size_bytes": 355335,
+      "archive_root": "simple-sentencepiece-0.7",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_SIMPLE-SENTENCEPIECE"
+    },
+    {
+      "name": "json",
+      "url": "https://github.com/nlohmann/json/archive/refs/tags/v3.12.0.tar.gz",
+      "path": "dependency-audit/archives/json-v3.12.0.tar.gz",
+      "sha256": "4b92eb0c06d10683f7447ce9406cb97cd4b453be18d7279320f7b2f025c10187",
+      "size_bytes": 9678593,
+      "archive_root": "json-3.12.0",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_JSON"
+    },
+    {
+      "name": "eigen",
+      "url": "https://gitlab.com/libeigen/eigen/-/archive/5.0.1/eigen-5.0.1.tar.gz",
+      "path": "dependency-audit/archives/eigen-eigen-5.0.1.tar.gz",
+      "sha256": "e9c326dc8c05cd1e044c71f30f1b2e34a6161a3b6ecf445d56b53ff1669e3dec",
+      "size_bytes": 2967272,
+      "archive_root": "eigen-5.0.1",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_EIGEN"
+    },
+    {
+      "name": "openfst",
+      "url": "https://github.com/csukuangfj/openfst/archive/refs/tags/v1.8.5-2026-07-09.tar.gz",
+      "path": "dependency-audit/archives/openfst-v1.8.5-2026-07-09.tar.gz",
+      "sha256": "2ff712a32952fcb01d351121a6bc8ccf4fdc6b2aa06ce8df2b3095dedd518c0e",
+      "size_bytes": 1501685,
+      "archive_root": "openfst-1.8.5-2026-07-09",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_OPENFST"
+    },
+    {
+      "name": "kissfft",
+      "url": "https://github.com/mborgerding/kissfft/archive/febd4caeed32e33ad8b2e0bb5ea77542c40f18ec.zip",
+      "path": "dependency-audit/archives/kissfft-febd4caeed32e33ad8b2e0bb5ea77542c40f18ec.zip",
+      "sha256": "497103e664168ebe39580b757adbe616f6cf85a16572af581ca7bc42d0ab13fd",
+      "size_bytes": 74252,
+      "archive_root": "kissfft-febd4caeed32e33ad8b2e0bb5ea77542c40f18ec",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_KISSFFT"
+    },
+    {
+      "name": "kaldifst",
+      "url": "https://github.com/k2-fsa/kaldifst/archive/refs/tags/v1.8.0.tar.gz",
+      "path": "dependency-audit/archives/kaldifst-v1.8.0.tar.gz",
+      "sha256": "3f247b7e5a2409071202f5e2bc6200060f66728c0a3443c03923ad2723e040b3",
+      "size_bytes": 172147,
+      "archive_root": "kaldifst-1.8.0",
+      "fetchcontent_override": "FETCHCONTENT_SOURCE_DIR_KALDIFST"
+    }
+  ],
+  "abis": [
+    "arm64-v8a",
+    "x86_64"
+  ],
+  "native_target": "sherpa-onnx-jni",
+  "packaged_native_libraries": [
+    "libsherpa-onnx-jni.so",
+    "libonnxruntime.so"
+  ],
+  "source_date_epoch": 1789048365,
+  "toolchain": {
+    "host": "Linux x86_64",
+    "ndk_revision": "28.2.13676358",
+    "ndk_label": "r28c",
+    "cmake_version": "3.31.6",
+    "ninja_version": "1.12.1",
+    "jdk_major": 21,
+    "gradle_version": "8.6",
+    "gradle_distribution_url": "https://services.gradle.org/distributions/gradle-8.6-bin.zip",
+    "gradle_distribution_sha256": "9631d53cf3e74bfa726893aee1f8994fee4e060c401335946dba2156f440f24c",
+    "android_gradle_plugin": "8.4.0",
+    "kotlin_plugin": "1.7.20",
+    "compile_sdk": 34,
+    "build_tools": "34.0.0",
+    "min_sdk": 21,
+    "jvm_target": "1.8",
+    "host_image_digest": "REQUIRED_FOR_REPRODUCIBILITY; native-only hosted CI may explicitly record exploratory VM provenance with release gate closed",
+    "gradle_dependency_verification": "REQUIRED_REVIEWED_LOCK_BEFORE_RELEASE_BUILD"
+  },
+  "cmake_options": {
+    "SHERPA_ONNX_ENABLE_TTS": "OFF",
+    "SHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION": "OFF",
+    "SHERPA_ONNX_ENABLE_C_API": "OFF",
+    "SHERPA_ONNX_BUILD_C_API_EXAMPLES": "OFF",
+    "SHERPA_ONNX_ENABLE_BINARY": "OFF",
+    "SHERPA_ONNX_ENABLE_PYTHON": "OFF",
+    "SHERPA_ONNX_ENABLE_TESTS": "OFF",
+    "SHERPA_ONNX_ENABLE_CHECK": "OFF",
+    "SHERPA_ONNX_ENABLE_PORTAUDIO": "OFF",
+    "SHERPA_ONNX_ENABLE_WEBSOCKET": "OFF",
+    "SHERPA_ONNX_ENABLE_GPU": "OFF",
+    "SHERPA_ONNX_ENABLE_DIRECTML": "OFF",
+    "SHERPA_ONNX_ENABLE_RKNN": "OFF",
+    "SHERPA_ONNX_ENABLE_AXERA": "OFF",
+    "SHERPA_ONNX_ENABLE_AXCL": "OFF",
+    "SHERPA_ONNX_ENABLE_ASCEND_NPU": "OFF",
+    "SHERPA_ONNX_ENABLE_QNN": "OFF",
+    "SHERPA_ONNX_ENABLE_SPACEMIT": "OFF",
+    "SHERPA_ONNX_ENABLE_WASM": "OFF",
+    "SHERPA_ONNX_ENABLE_SANITIZER": "OFF",
+    "BUILD_TESTING": "OFF",
+    "EIGEN_BUILD_TESTING": "OFF",
+    "EIGEN_BUILD_LAPACK": "OFF",
+    "EIGEN_ENABLE_LAPACK_TESTS": "OFF",
+    "EIGEN_BUILD_BLAS": "OFF",
+    "JSON_BuildTests": "OFF",
+    "JSON_CI": "OFF",
+    "OPENFST_USE_ABSL": "OFF",
+    "SHERPA_ONNX_ENABLE_JNI": "ON",
+    "BUILD_SHARED_LIBS": "ON",
+    "SHERPA_ONNX_USE_PRE_INSTALLED_ONNXRUNTIME_IF_AVAILABLE": "ON",
+    "FETCHCONTENT_FULLY_DISCONNECTED": "ON",
+    "FETCHCONTENT_UPDATES_DISCONNECTED": "ON",
+    "CMAKE_DISABLE_FIND_PACKAGE_Git": "TRUE",
+    "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+    "CMAKE_BUILD_TYPE": "Release",
+    "ANDROID_STL": "c++_static",
+    "ANDROID_PLATFORM": "android-21",
+    "ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES": "ON"
+  },
+  "kotlin_sources": [
+    {
+      "path": "sherpa-onnx/kotlin-api/OfflineRecognizer.kt",
+      "sha256": "85054fa9722913bce96c94c5c7eaaa7fd99606b79fbfbeac6cfb60040eae2164"
+    },
+    {
+      "path": "sherpa-onnx/kotlin-api/OfflineStream.kt",
+      "sha256": "5c90b7c060cdd0a2222cc935b54f69465a4a7544de29240bafe4d3a8d86dbb6e"
+    },
+    {
+      "path": "sherpa-onnx/kotlin-api/OnlineRecognizer.kt",
+      "sha256": "3204ff816361d99d94dda1e8c26681f6d4a5ad749a68d8fee93b4e8bb2b21d17"
+    },
+    {
+      "path": "sherpa-onnx/kotlin-api/OnlineStream.kt",
+      "sha256": "6b9f8de317e6a0bb51f0f29d940617b781cb31b190e1c725dd438231836c06ab"
+    },
+    {
+      "path": "sherpa-onnx/kotlin-api/FeatureConfig.kt",
+      "sha256": "829c7adc4db1324f21b9a9cbf5bf10eacf759714fe50956f48317c1ffef044f6"
+    },
+    {
+      "path": "sherpa-onnx/kotlin-api/HomophoneReplacerConfig.kt",
+      "sha256": "fe926b6413f4d87e67c41feb21b8363923a67cbd3a5eb687b76390a5f1f7db60"
+    },
+    {
+      "path": "sherpa-onnx/kotlin-api/QnnConfig.kt",
+      "sha256": "86c963f27677f690eb0d6639735052eba5e60d9f81ccd4c1df0aa831fd680d6f"
+    },
+    {
+      "path": "sherpa-onnx/kotlin-api/VersionInfo.kt",
+      "sha256": "8a9ada883d8cb802b4e70cc6770af20f4b7d85935a16b0b71974d22d55d0c90a"
+    }
+  ],
+  "warnings": [
+    "No native compile, AAR packaging, Android install, 16KB runtime, latency or accuracy results exist for this variant.",
+    "This is a no-TTS native build with an ASR-facing Kotlin API, not an assertion that every unrelated native subsystem is removed.",
+    "Prebuilt ORT arm64 has a documented PT_GNU_RELRO end-alignment static-check warning; retain it until a separate acceptance decision.",
+    "Gradle transitive checksum lock and a pinned CI image digest remain required; reproducible output has not been demonstrated.",
+    "Upstream version.cc has a stale embedded SHA 8c8e275d; source/archive pins here are authoritative."
+  ],
+  "packaging_wrapper_files": [
+    {
+      "path": "android/SherpaOnnxAar/gradlew",
+      "sha256": "63135287117a1e6d12c84580f1f49c61d1ba02218ecd28660605e97f976e7d65"
+    },
+    {
+      "path": "android/SherpaOnnxAar/gradlew.bat",
+      "sha256": "af835f98787e9269af5a046edcb821a592fed372139df7b947b471a63cfc236b"
+    },
+    {
+      "path": "android/SherpaOnnxAar/gradle/wrapper/gradle-wrapper.jar",
+      "sha256": "e996d452d2645e70c01c11143ca2d3742734a28da2bf61f25c82bdc288c9e637"
+    }
+  ],
+  "license_file_manifest_sha256": "4b6aa92aea6c0a952126743f1b028453740815e6f9901431672e1f2f3c86deb8",
+  "notice_template_sha256": "e56277e18ea4ae772b85ae121f019b30448940e01e42e09e8c6b2e844a22b539",
+  "native_ci": {
+    "workflow": ".github/workflows/asr-native-source.yml",
+    "scope": "native-only exploratory compile and static audit",
+    "host_provenance": "actual GitHub hosted image metadata; never a fabricated OCI digest",
+    "release_gate": "closed",
+    "toolchain_lock": "toolchain-lock.json"
+  }
+}

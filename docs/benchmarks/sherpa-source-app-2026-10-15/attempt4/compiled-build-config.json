@@ -1,0 +1,15 @@
+{
+  "method": "JDK javap -constants on compiled app class (not executed)",
+  "class": "com.framenest.BuildConfig",
+  "sha256": "6f20d789e4c2fb2e8f5898b7419b9fae64d81c390fd85c74e8ffbfb788c340f3",
+  "paths": [
+    "intermediates/javac/debug/compileDebugJavaWithJavac/classes/com/framenest/BuildConfig.class"
+  ],
+  "observed_constants": {
+    "SHERPA_ASR_SOURCE": true,
+    "HY_MT_NATIVE": false,
+    "SHERPA_RUNTIME_VERSION": "1.13.8",
+    "SHERPA_RUNTIME_IDENTITY": "1.13.8-asr-no-tts-sha256-6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+    "SHERPA_AAR_SHA256": "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503"
+  }
+}

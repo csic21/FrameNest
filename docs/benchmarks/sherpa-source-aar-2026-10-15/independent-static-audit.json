@@ -1,0 +1,519 @@
+{
+  "status": "static-checks-only",
+  "runtime_tested": false,
+  "documented_relro_rule": "(p_vaddr + p_memsz) % 16384 == 0; no pre-rounding",
+  "source": "https://developer.android.com/guide/practices/page-sizes",
+  "aar_sha256": "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+  "notice_files_verified": 29,
+  "native": [
+    {
+      "path": "arm64-v8a/libonnxruntime.so",
+      "sha256": "33847ad43bffe204699fd4a27f7f3603452a8cdaf2f9a44983a0bc31ffcf2da1",
+      "size_bytes": 22249560,
+      "needed": [
+        "libdl.so",
+        "liblog.so",
+        "libm.so",
+        "libc.so"
+      ],
+      "load": [
+        {
+          "offset": 0,
+          "vaddr": 0,
+          "filesz": 5536600,
+          "memsz": 5536600,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 5536608,
+          "vaddr": 5552992,
+          "filesz": 16234464,
+          "memsz": 16234464,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 21771072,
+          "vaddr": 21803840,
+          "filesz": 471968,
+          "memsz": 474304,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 22243040,
+          "vaddr": 22292192,
+          "filesz": 4232,
+          "memsz": 38792,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        }
+      ],
+      "relro": [
+        {
+          "offset": 21771072,
+          "vaddr": 21803840,
+          "filesz": 471968,
+          "memsz": 474304,
+          "align": 1,
+          "unrounded_end": 22278144,
+          "unrounded_end_mod_16384": 12288
+        }
+      ],
+      "warnings": [
+        "Documented RELRO end-alignment static-check warning; no runtime incompatibility demonstrated"
+      ]
+    },
+    {
+      "path": "arm64-v8a/libsherpa-onnx-jni.so",
+      "sha256": "7c2add157be1d7ad3208f99ff4e5ebed6e50cccac6ef75b33b7b08d77cd7ddc7",
+      "size_bytes": 3433440,
+      "needed": [
+        "libandroid.so",
+        "liblog.so",
+        "libonnxruntime.so",
+        "libm.so",
+        "libdl.so",
+        "libc.so"
+      ],
+      "load": [
+        {
+          "offset": 0,
+          "vaddr": 0,
+          "filesz": 3381040,
+          "memsz": 3381040,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 3381040,
+          "vaddr": 3397424,
+          "filesz": 49544,
+          "memsz": 59600,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 3430584,
+          "vaddr": 3463352,
+          "filesz": 498,
+          "memsz": 16089,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        }
+      ],
+      "relro": [
+        {
+          "offset": 3381040,
+          "vaddr": 3397424,
+          "filesz": 49544,
+          "memsz": 59600,
+          "align": 1,
+          "unrounded_end": 3457024,
+          "unrounded_end_mod_16384": 0
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "path": "x86_64/libonnxruntime.so",
+      "sha256": "087e84297cad64acb823c3d901d6e0cc934e91add7cdb20da802cd1c0bea5c3e",
+      "size_bytes": 25581120,
+      "needed": [
+        "libdl.so",
+        "liblog.so",
+        "libm.so",
+        "libc.so"
+      ],
+      "load": [
+        {
+          "offset": 0,
+          "vaddr": 0,
+          "filesz": 5745632,
+          "memsz": 5745632,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 5745632,
+          "vaddr": 5762016,
+          "filesz": 19363904,
+          "memsz": 19363904,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 25109536,
+          "vaddr": 25142304,
+          "filesz": 465616,
+          "memsz": 465888,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 25575152,
+          "vaddr": 25624304,
+          "filesz": 3680,
+          "memsz": 37648,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        }
+      ],
+      "relro": [
+        {
+          "offset": 25109536,
+          "vaddr": 25142304,
+          "filesz": 465616,
+          "memsz": 465888,
+          "align": 1,
+          "unrounded_end": 25608192,
+          "unrounded_end_mod_16384": 0
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "path": "x86_64/libsherpa-onnx-jni.so",
+      "sha256": "d5a02856e9e0a05b035628dbff5c6cdd6a3e8ef06e7a661ba1b364df746816e9",
+      "size_bytes": 3728696,
+      "needed": [
+        "libandroid.so",
+        "liblog.so",
+        "libonnxruntime.so",
+        "libm.so",
+        "libdl.so",
+        "libc.so"
+      ],
+      "load": [
+        {
+          "offset": 0,
+          "vaddr": 0,
+          "filesz": 3677424,
+          "memsz": 3677424,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 3677424,
+          "vaddr": 3693808,
+          "filesz": 48416,
+          "memsz": 58128,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 3725840,
+          "vaddr": 3758608,
+          "filesz": 498,
+          "memsz": 16105,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        }
+      ],
+      "relro": [
+        {
+          "offset": 3677424,
+          "vaddr": 3693808,
+          "filesz": 48416,
+          "memsz": 58128,
+          "align": 1,
+          "unrounded_end": 3751936,
+          "unrounded_end_mod_16384": 0
+        }
+      ],
+      "warnings": []
+    }
+  ],
+  "kotlin_classes": 48,
+  "kotlin_native_methods": [
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OfflineRecognizer",
+      "method": "delete",
+      "descriptor": "(J)V",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_delete",
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_delete__J"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OfflineRecognizer",
+      "method": "createStream",
+      "descriptor": "(J)J",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_createStream",
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_createStream__J"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OfflineRecognizer",
+      "method": "createStreamWithHotwords",
+      "descriptor": "(JLjava/lang/String;)J",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_createStreamWithHotwords",
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_createStreamWithHotwords__JLjava_lang_String_2"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OfflineRecognizer",
+      "method": "setConfig",
+      "descriptor": "(JLcom/k2fsa/sherpa/onnx/OfflineRecognizerConfig;)V",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_setConfig",
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_setConfig__JLcom_k2fsa_sherpa_onnx_OfflineRecognizerConfig_2"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OfflineRecognizer",
+      "method": "newFromAsset",
+      "descriptor": "(Landroid/content/res/AssetManager;Lcom/k2fsa/sherpa/onnx/OfflineRecognizerConfig;)J",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_newFromAsset",
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_newFromAsset__Landroid_content_res_AssetManager_2Lcom_k2fsa_sherpa_onnx_OfflineRecognizerConfig_2"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OfflineRecognizer",
+      "method": "newFromFile",
+      "descriptor": "(Lcom/k2fsa/sherpa/onnx/OfflineRecognizerConfig;)J",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_newFromFile",
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_newFromFile__Lcom_k2fsa_sherpa_onnx_OfflineRecognizerConfig_2"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OfflineRecognizer",
+      "method": "decode",
+      "descriptor": "(JJ)V",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_decode",
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_decode__JJ"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OfflineRecognizer",
+      "method": "getResult",
+      "descriptor": "(J)Lcom/k2fsa/sherpa/onnx/OfflineRecognizerResult;",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_getResult",
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_getResult__J"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OfflineRecognizer",
+      "method": "prependAdspLibraryPath",
+      "descriptor": "(Ljava/lang/String;)V",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_prependAdspLibraryPath",
+        "Java_com_k2fsa_sherpa_onnx_OfflineRecognizer_prependAdspLibraryPath__Ljava_lang_String_2"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OfflineStream",
+      "method": "acceptWaveform",
+      "descriptor": "(J[FI)V",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OfflineStream_acceptWaveform",
+        "Java_com_k2fsa_sherpa_onnx_OfflineStream_acceptWaveform__J_3FI"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OfflineStream",
+      "method": "setOption",
+      "descriptor": "(JLjava/lang/String;Ljava/lang/String;)V",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OfflineStream_setOption",
+        "Java_com_k2fsa_sherpa_onnx_OfflineStream_setOption__JLjava_lang_String_2Ljava_lang_String_2"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OfflineStream",
+      "method": "getOption",
+      "descriptor": "(JLjava/lang/String;)Ljava/lang/String;",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OfflineStream_getOption",
+        "Java_com_k2fsa_sherpa_onnx_OfflineStream_getOption__JLjava_lang_String_2"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OfflineStream",
+      "method": "delete",
+      "descriptor": "(J)V",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OfflineStream_delete",
+        "Java_com_k2fsa_sherpa_onnx_OfflineStream_delete__J"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OnlineRecognizer",
+      "method": "delete",
+      "descriptor": "(J)V",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_delete",
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_delete__J"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OnlineRecognizer",
+      "method": "newFromAsset",
+      "descriptor": "(Landroid/content/res/AssetManager;Lcom/k2fsa/sherpa/onnx/OnlineRecognizerConfig;)J",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_newFromAsset",
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_newFromAsset__Landroid_content_res_AssetManager_2Lcom_k2fsa_sherpa_onnx_OnlineRecognizerConfig_2"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OnlineRecognizer",
+      "method": "newFromFile",
+      "descriptor": "(Lcom/k2fsa/sherpa/onnx/OnlineRecognizerConfig;)J",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_newFromFile",
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_newFromFile__Lcom_k2fsa_sherpa_onnx_OnlineRecognizerConfig_2"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OnlineRecognizer",
+      "method": "createStream",
+      "descriptor": "(JLjava/lang/String;)J",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_createStream",
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_createStream__JLjava_lang_String_2"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OnlineRecognizer",
+      "method": "reset",
+      "descriptor": "(JJ)V",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_reset",
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_reset__JJ"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OnlineRecognizer",
+      "method": "decode",
+      "descriptor": "(JJ)V",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_decode",
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_decode__JJ"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OnlineRecognizer",
+      "method": "isEndpoint",
+      "descriptor": "(JJ)Z",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_isEndpoint",
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_isEndpoint__JJ"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OnlineRecognizer",
+      "method": "isReady",
+      "descriptor": "(JJ)Z",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_isReady",
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_isReady__JJ"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OnlineRecognizer",
+      "method": "getResult",
+      "descriptor": "(JJ)Lcom/k2fsa/sherpa/onnx/OnlineRecognizerResult;",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_getResult",
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_getResult__JJ"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OnlineRecognizer",
+      "method": "prependAdspLibraryPath",
+      "descriptor": "(Ljava/lang/String;)V",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_prependAdspLibraryPath",
+        "Java_com_k2fsa_sherpa_onnx_OnlineRecognizer_prependAdspLibraryPath__Ljava_lang_String_2"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OnlineStream",
+      "method": "acceptWaveform",
+      "descriptor": "(J[FI)V",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OnlineStream_acceptWaveform",
+        "Java_com_k2fsa_sherpa_onnx_OnlineStream_acceptWaveform__J_3FI"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OnlineStream",
+      "method": "inputFinished",
+      "descriptor": "(J)V",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OnlineStream_inputFinished",
+        "Java_com_k2fsa_sherpa_onnx_OnlineStream_inputFinished__J"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OnlineStream",
+      "method": "setOption",
+      "descriptor": "(JLjava/lang/String;Ljava/lang/String;)V",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OnlineStream_setOption",
+        "Java_com_k2fsa_sherpa_onnx_OnlineStream_setOption__JLjava_lang_String_2Ljava_lang_String_2"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OnlineStream",
+      "method": "getOption",
+      "descriptor": "(JLjava/lang/String;)Ljava/lang/String;",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OnlineStream_getOption",
+        "Java_com_k2fsa_sherpa_onnx_OnlineStream_getOption__JLjava_lang_String_2"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/OnlineStream",
+      "method": "delete",
+      "descriptor": "(J)V",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_OnlineStream_delete",
+        "Java_com_k2fsa_sherpa_onnx_OnlineStream_delete__J"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/VersionInfo$Companion",
+      "method": "getVersionStr2",
+      "descriptor": "()Ljava/lang/String;",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_VersionInfo_00024Companion_getVersionStr2",
+        "Java_com_k2fsa_sherpa_onnx_VersionInfo_00024Companion_getVersionStr2__"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/VersionInfo$Companion",
+      "method": "getGitSha12",
+      "descriptor": "()Ljava/lang/String;",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_VersionInfo_00024Companion_getGitSha12",
+        "Java_com_k2fsa_sherpa_onnx_VersionInfo_00024Companion_getGitSha12__"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/VersionInfo$Companion",
+      "method": "getGitDate2",
+      "descriptor": "()Ljava/lang/String;",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_VersionInfo_00024Companion_getGitDate2",
+        "Java_com_k2fsa_sherpa_onnx_VersionInfo_00024Companion_getGitDate2__"
+      ]
+    },
+    {
+      "class_name": "com/k2fsa/sherpa/onnx/VersionInfo$Companion",
+      "method": "getOnnxruntimeVersionStr2",
+      "descriptor": "()Ljava/lang/String;",
+      "allowed_exports": [
+        "Java_com_k2fsa_sherpa_onnx_VersionInfo_00024Companion_getOnnxruntimeVersionStr2",
+        "Java_com_k2fsa_sherpa_onnx_VersionInfo_00024Companion_getOnnxruntimeVersionStr2__"
+      ]
+    }
+  ]
+}

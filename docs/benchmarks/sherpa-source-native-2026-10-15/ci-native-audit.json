@@ -1,0 +1,226 @@
+{
+  "status": "static-checks-only",
+  "runtime_tested": false,
+  "documented_relro_rule": "(p_vaddr + p_memsz) % 16384 == 0; no pre-rounding",
+  "source": "https://developer.android.com/guide/practices/page-sizes",
+  "native": [
+    {
+      "path": "arm64-v8a/libonnxruntime.so",
+      "sha256": "33847ad43bffe204699fd4a27f7f3603452a8cdaf2f9a44983a0bc31ffcf2da1",
+      "size_bytes": 22249560,
+      "needed": [
+        "libdl.so",
+        "liblog.so",
+        "libm.so",
+        "libc.so"
+      ],
+      "load": [
+        {
+          "offset": 0,
+          "vaddr": 0,
+          "filesz": 5536600,
+          "memsz": 5536600,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 5536608,
+          "vaddr": 5552992,
+          "filesz": 16234464,
+          "memsz": 16234464,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 21771072,
+          "vaddr": 21803840,
+          "filesz": 471968,
+          "memsz": 474304,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 22243040,
+          "vaddr": 22292192,
+          "filesz": 4232,
+          "memsz": 38792,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        }
+      ],
+      "relro": [
+        {
+          "offset": 21771072,
+          "vaddr": 21803840,
+          "filesz": 471968,
+          "memsz": 474304,
+          "align": 1,
+          "unrounded_end": 22278144,
+          "unrounded_end_mod_16384": 12288
+        }
+      ],
+      "warnings": [
+        "Documented RELRO end-alignment static-check warning; no runtime incompatibility demonstrated"
+      ]
+    },
+    {
+      "path": "arm64-v8a/libsherpa-onnx-jni.so",
+      "sha256": "f2184ae4b1204356551c55b43d8e722658ac48ae33ed50d57b64651ba4357f0d",
+      "size_bytes": 70491184,
+      "needed": [
+        "libandroid.so",
+        "liblog.so",
+        "libonnxruntime.so",
+        "libm.so",
+        "libdl.so",
+        "libc.so"
+      ],
+      "load": [
+        {
+          "offset": 0,
+          "vaddr": 0,
+          "filesz": 3381040,
+          "memsz": 3381040,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 3381040,
+          "vaddr": 3397424,
+          "filesz": 49544,
+          "memsz": 59600,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 3430584,
+          "vaddr": 3463352,
+          "filesz": 498,
+          "memsz": 16089,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        }
+      ],
+      "relro": [
+        {
+          "offset": 3381040,
+          "vaddr": 3397424,
+          "filesz": 49544,
+          "memsz": 59600,
+          "align": 1,
+          "unrounded_end": 3457024,
+          "unrounded_end_mod_16384": 0
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "path": "x86_64/libonnxruntime.so",
+      "sha256": "087e84297cad64acb823c3d901d6e0cc934e91add7cdb20da802cd1c0bea5c3e",
+      "size_bytes": 25581120,
+      "needed": [
+        "libdl.so",
+        "liblog.so",
+        "libm.so",
+        "libc.so"
+      ],
+      "load": [
+        {
+          "offset": 0,
+          "vaddr": 0,
+          "filesz": 5745632,
+          "memsz": 5745632,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 5745632,
+          "vaddr": 5762016,
+          "filesz": 19363904,
+          "memsz": 19363904,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 25109536,
+          "vaddr": 25142304,
+          "filesz": 465616,
+          "memsz": 465888,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 25575152,
+          "vaddr": 25624304,
+          "filesz": 3680,
+          "memsz": 37648,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        }
+      ],
+      "relro": [
+        {
+          "offset": 25109536,
+          "vaddr": 25142304,
+          "filesz": 465616,
+          "memsz": 465888,
+          "align": 1,
+          "unrounded_end": 25608192,
+          "unrounded_end_mod_16384": 0
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "path": "x86_64/libsherpa-onnx-jni.so",
+      "sha256": "37759e9147824134ed6da17acc5ca56a34844d2532c0f73600bc8e7a8ce7dd69",
+      "size_bytes": 69695368,
+      "needed": [
+        "libandroid.so",
+        "liblog.so",
+        "libonnxruntime.so",
+        "libm.so",
+        "libdl.so",
+        "libc.so"
+      ],
+      "load": [
+        {
+          "offset": 0,
+          "vaddr": 0,
+          "filesz": 3677424,
+          "memsz": 3677424,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 3677424,
+          "vaddr": 3693808,
+          "filesz": 48416,
+          "memsz": 58128,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        },
+        {
+          "offset": 3725840,
+          "vaddr": 3758608,
+          "filesz": 498,
+          "memsz": 16105,
+          "align": 16384,
+          "load_alignment_16kb_pass": true
+        }
+      ],
+      "relro": [
+        {
+          "offset": 3677424,
+          "vaddr": 3693808,
+          "filesz": 48416,
+          "memsz": 58128,
+          "align": 1,
+          "unrounded_end": 3751936,
+          "unrounded_end_mod_16384": 0
+        }
+      ],
+      "warnings": []
+    }
+  ]
+}

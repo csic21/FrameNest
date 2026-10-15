@@ -1,0 +1,51 @@
+Downloading https://services.gradle.org/distributions/gradle-8.6-bin.zip
+............10%.............20%............30%.............40%.............50%............60%.............70%.............80%............90%.............100%
+
+Welcome to Gradle 8.6!
+
+Here are the highlights of this release:
+ - Configurable encryption key for configuration cache
+ - Build init improvements
+ - Build authoring improvements
+
+For more details see https://docs.gradle.org/8.6/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.6/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :asr:preBuild UP-TO-DATE
+> Task :asr:preReleaseBuild UP-TO-DATE
+> Task :asr:mergeReleaseJniLibFolders
+> Task :asr:generateReleaseResValues
+> Task :asr:extractDeepLinksForAarRelease
+> Task :asr:generateReleaseResources
+> Task :asr:packageReleaseResources
+> Task :asr:mergeReleaseNativeLibs
+> Task :asr:javaPreCompileRelease
+> Task :asr:mergeReleaseShaders
+> Task :asr:compileReleaseShaders NO-SOURCE
+> Task :asr:generateReleaseAssets UP-TO-DATE
+> Task :asr:parseReleaseLocalResources
+> Task :asr:packageReleaseAssets
+> Task :asr:stripReleaseDebugSymbols
+> Task :asr:prepareLintJarForPublish
+> Task :asr:generateReleaseRFile
+> Task :asr:prepareReleaseArtProfile
+> Task :asr:copyReleaseJniLibsProjectAndLocalJars
+> Task :asr:mapReleaseSourceSetPaths
+> Task :asr:writeReleaseAarMetadata
+> Task :asr:mergeReleaseResources
+> Task :asr:processReleaseManifest
+> Task :asr:verifyReleaseResources
+> Task :asr:compileReleaseKotlin
+> Task :asr:extractReleaseAnnotations
+> Task :asr:compileReleaseJavaWithJavac NO-SOURCE
+> Task :asr:mergeReleaseGeneratedProguardFiles
+> Task :asr:mergeReleaseConsumerProguardFiles
+> Task :asr:processReleaseJavaRes
+> Task :asr:mergeReleaseJavaResource
+> Task :asr:syncReleaseLibJars
+> Task :asr:bundleReleaseAar
+> Task :asr:assembleRelease
+
+BUILD SUCCESSFUL in 1m 7s
+28 actionable tasks: 28 executed

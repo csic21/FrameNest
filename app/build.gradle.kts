@@ -1,3 +1,6 @@
+import java.security.MessageDigest
+import groovy.json.JsonSlurper
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -6,6 +9,61 @@ plugins {
 
 // Optional native experiment: ordinary builds retain the ML Kit-only artifact.
 val hyMtNative = providers.gradleProperty("hyMtNative").map(String::toBooleanStrict).getOrElse(false)
+
+// FN-74: explicit experimental profile; ordinary builds retain the stock dependency.
+// File dependencies bypass Gradle's Maven checksum metadata, so verify the exact
+// reviewed AAR here, before it can become a compiler/packager input. No fallback.
+val sherpaAsrSource = providers.gradleProperty("sherpaAsrSource").map(String::toBooleanStrict).getOrElse(false)
+val sherpaSourceSha256 = "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503"
+val sherpaSourceAar = layout.projectDirectory.file("libs/sherpa-onnx-1.13.8-asr-no-tts.aar").asFile
+val sherpaRuntimeVersion = if (sherpaAsrSource) "1.13.8" else libs.versions.sherpaOnnx.get()
+val sherpaRuntimeIdentity = if (sherpaAsrSource) {
+    "1.13.8-asr-no-tts-sha256-$sherpaSourceSha256"
+} else {
+    sherpaRuntimeVersion
+}
+if (sherpaAsrSource) {
+    check(sherpaSourceAar.isFile) {
+        "Missing reviewed source AAR. See docs/experiments/FN-74-asr-source-app/README.md."
+    }
+    val actualSha256 = MessageDigest.getInstance("SHA-256").run {
+        sherpaSourceAar.inputStream().use { input ->
+            val buffer = ByteArray(1024 * 1024)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                update(buffer, 0, count)
+            }
+        }
+        digest().joinToString("") { "%02x".format(it) }
+    }
+    check(actualSha256 == sherpaSourceSha256) { "Source AAR SHA-256 mismatch; refusing build." }
+}
+
+// Recheck at execution as well: an existing/configuration-cached build must not
+// package a file replaced after project configuration. This task has no outputs.
+val verifySourceAsrAar = tasks.register("verifySourceAsrAar") {
+    group = "verification"
+    if (sherpaAsrSource) {
+        inputs.file(sherpaSourceAar)
+        inputs.property("expectedSha256", sherpaSourceSha256)
+        doLast {
+            val sha256 = MessageDigest.getInstance("SHA-256")
+            inputs.files.singleFile.inputStream().use { input ->
+                val buffer = ByteArray(1024 * 1024)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    sha256.update(buffer, 0, count)
+                }
+            }
+            check(sha256.digest().joinToString("") { "%02x".format(it) } == inputs.properties["expectedSha256"]) {
+                "Source AAR changed; refusing build."
+            }
+        }
+    }
+}
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(verifySourceAsrAar) }
 
 android {
     namespace = "com.framenest"
@@ -24,9 +82,14 @@ android {
         applicationId = "com.framenest"
         minSdk = 26
         targetSdk = 36
-        versionCode = 20
-        versionName = "0.6.9-internal"
+        versionCode = 21
+        versionName = "0.6.10-internal"
         buildConfigField("boolean", "HY_MT_NATIVE", hyMtNative.toString())
+        buildConfigField("boolean", "SHERPA_ASR_SOURCE", sherpaAsrSource.toString())
+        // Upstream VersionInfo returns the plain version. Keep the artifact identity separate.
+        buildConfigField("String", "SHERPA_RUNTIME_VERSION", "\"$sherpaRuntimeVersion\"")
+        buildConfigField("String", "SHERPA_RUNTIME_IDENTITY", "\"$sherpaRuntimeIdentity\"")
+        buildConfigField("String", "SHERPA_AAR_SHA256", "\"${if (sherpaAsrSource) sherpaSourceSha256 else ""}\"")
         if (hyMtNative) {
             externalNativeBuild {
                 cmake {
@@ -109,6 +172,11 @@ android {
     }
 
     packaging {
+        if (sherpaAsrSource) {
+            // JNI is already explicitly stripped with pinned NDK evidence; preserve
+            // those reviewed bytes (and unchanged vendor ORT) into the actual APK.
+            jniLibs.keepDebugSymbols += setOf("**/libsherpa-onnx-jni.so", "**/libonnxruntime.so")
+        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "META-INF/versions/9/previous-compilation-data.bin"
@@ -119,6 +187,9 @@ android {
     }
 
     sourceSets.getByName("androidTest").assets.directories.add("$projectDir/schemas")
+    if (sherpaAsrSource) {
+        sourceSets.getByName("main").assets.directories.add("$projectDir/src/sourceAsr/assets")
+    }
 }
 
 // Fail closed for release packaging, while keeping ordinary debug CI usable
@@ -127,6 +198,15 @@ val requireReleaseSigning = tasks.register("requireReleaseSigning") {
     group = "verification"
     description = "Require maintainer-supplied signing material before release builds."
     doLast {
+        check(sherpaAsrSource) { "Release requires the exact source-ASR profile; legacy is debug-only." }
+        check(!hyMtNative) { "Hy-MT native remains disabled for this release." }
+        val acceptance = JsonSlurper().parse(rootProject.file(".github/source-asr-release-approval.json")) as Map<*, *>
+        check(acceptance["approved"] == true && acceptance["aar_sha256"] == sherpaSourceSha256 &&
+            acceptance["source_app_commit"] == "6216ecc3ad6cfe7a0cbb2100140ff4a7f9c788d0" &&
+            acceptance["runtime_report_sha256"] is String &&
+            Regex("[0-9a-f]{64}").matches(acceptance["runtime_report_sha256"] as String)) {
+            "Source-ASR release awaits explicit runtime acceptance; refusing signing."
+        }
         val required = listOf(
             "ANDROID_KEYSTORE_PATH", "ANDROID_STORE_PASSWORD", "ANDROID_KEY_ALIAS", "ANDROID_KEY_PASSWORD",
         )
@@ -213,8 +293,12 @@ dependencies {
     // FN-51: SenseVoice-Small int8 ASR via sherpa-onnx (default engine).
     // AAR bundles the JNI bridge + onnxruntime natives for all ABIs; the
     // arm64-v8a/x86_64 abiFilters above keep only the two shipped ABIs.
-    implementation(libs.sherpa.onnx) {
-        exclude(group = "net.java.dev.jna", module = "jna")
+    if (sherpaAsrSource) {
+        implementation(files(sherpaSourceAar))
+    } else {
+        implementation(libs.sherpa.onnx) {
+            exclude(group = "net.java.dev.jna", module = "jna")
+        }
     }
     implementation(libs.mlkit.translate)
     implementation(libs.kotlinx.coroutines.play.services)

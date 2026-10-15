@@ -1,0 +1,42 @@
+{
+  "source_commit": "988154d8929de469cf553eb32058c965be04b7c9",
+  "local_equivalent": "4da08bd52036cc099c6fda7e644976a3ef075533",
+  "run_id": 38726295943,
+  "job_id": 116393004252,
+  "workflow_conclusion": "failure",
+  "evidence_artifact_id": 11968504232,
+  "evidence_zip_size_bytes": 212696,
+  "evidence_zip_sha256": "075194712b773282feb4f26a171b43b98179640b7a9488441aac32627f3ce4f5",
+  "stages": {
+    "assembleDebug": "passed",
+    "testDebugUnitTest": "passed",
+    "prepared_public_inputs": "passed: frozen manifest, all bytes verified, 33 windows",
+    "assembleDebugAndroidTest": "passed (compile only)",
+    "junit_method_signatures": "101 tests / 35 classes passed",
+    "lintDebug": "passed",
+    "apk_static_audit": "passed for all 3 actual app APKs",
+    "zipalign": "passed: official build-tools 36.0.0 zipalign -c -P 16 -v 4, 3 APKs",
+    "apksigner": "passed, 3 app APKs and test APK",
+    "pair_collector": "failed: Expected exactly one generated app source BuildConfig",
+    "qualified_apk_retention": "deliberately skipped on failure; no APK pair available for runtime replay"
+  },
+  "unit_suites": 154,
+  "unit_totals": {
+    "tests": 891,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lint_severities": {
+    "Warning": 68,
+    "Hint": 5
+  },
+  "superseded_run": {
+    "run_id": 38726002308,
+    "source_commit": "cb80bdf89b29e222101c475d0ee4e2674ce0e145",
+    "conclusion": "cancelled by same-group corrected collector build during assemble; not a product failure"
+  },
+  "native_execution_tested": false,
+  "device_tests_run": false,
+  "release_approved": false
+}
