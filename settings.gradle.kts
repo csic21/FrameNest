@@ -21,7 +21,8 @@ dependencyResolutionManagement {
         // Content-filtered to its own group so no other artifact resolves from here.
         maven("https://jitpack.io") {
             content {
-                includeGroup("com.github.k2-fsa")
+                includeGroup("com.github.k2-fsa") // Exact old runtime only for the controlled baseline.
+                includeModule("com.github.k2-fsa.sherpa-onnx", "sherpa-onnx")
             }
         }
     }

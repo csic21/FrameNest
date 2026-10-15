@@ -7,6 +7,10 @@ plugins {
 // Optional native experiment: ordinary builds retain the ML Kit-only artifact.
 val hyMtNative = providers.gradleProperty("hyMtNative").map(String::toBooleanStrict).getOrElse(false)
 
+// FN-74: a fixed old-native baseline for paired instrumentation, never an arbitrary dependency override.
+val sherpaRuntimeBaseline = providers.gradleProperty("sherpaRuntimeBaseline").map(String::toBooleanStrict).getOrElse(false)
+val sherpaRuntimeVersion = if (sherpaRuntimeBaseline) "1.12.32" else libs.versions.sherpaOnnx.get()
+
 android {
     namespace = "com.framenest"
     compileSdk = 36
@@ -27,6 +31,7 @@ android {
         versionCode = 20
         versionName = "0.6.9-internal"
         buildConfigField("boolean", "HY_MT_NATIVE", hyMtNative.toString())
+        buildConfigField("String", "SHERPA_RUNTIME_VERSION", "\"$sherpaRuntimeVersion\"")
         if (hyMtNative) {
             externalNativeBuild {
                 cmake {
@@ -213,7 +218,7 @@ dependencies {
     // FN-51: SenseVoice-Small int8 ASR via sherpa-onnx (default engine).
     // AAR bundles the JNI bridge + onnxruntime natives for all ABIs; the
     // arm64-v8a/x86_64 abiFilters above keep only the two shipped ABIs.
-    implementation(libs.sherpa.onnx) {
+    implementation(if (sherpaRuntimeBaseline) "com.github.k2-fsa:sherpa-onnx:1.12.32" else libs.sherpa.onnx.get()) {
         exclude(group = "net.java.dev.jna", module = "jna")
     }
     implementation(libs.mlkit.translate)

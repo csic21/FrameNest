@@ -8,6 +8,15 @@ import org.junit.Test
 class SherpaModelSpecTest {
 
     @Test
+    fun cacheIdentityIncludesRuntimeWithoutChangingInstalledPack() {
+        val baseline = SherpaAsrModelSupport.cacheModelLabel("1.12.32")
+        val candidate = SherpaAsrModelSupport.cacheModelLabel("1.13.8")
+        assertNotEquals(baseline, candidate)
+        assertNotEquals(SherpaModelInstaller.MODEL_VERSION, candidate)
+        assertEquals("${SherpaModelInstaller.MODEL_VERSION}|sherpa-1.13.8", candidate)
+    }
+
+    @Test
     fun packFiles_arePinnedToAnImmutableRevision() {
         assertEquals(2, SherpaModelInstaller.FILES.size)
         val byName = SherpaModelInstaller.FILES.associateBy { it.name }
