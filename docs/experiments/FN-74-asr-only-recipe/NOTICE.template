@@ -1,0 +1,42 @@
+sherpa-onnx 1.13.8 ASR-facing, no-TTS Android candidate
+Source commit: 11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf
+Source project: https://github.com/k2-fsa/sherpa-onnx
+
+This candidate uses upstream source with a custom build configuration and a
+restricted Kotlin source whitelist. It is not an official upstream release.
+Upstream source license: Apache License 2.0. Original copyright notices are
+retained in the corresponding source archives and license files.
+
+Included native-source components and their primary license records:
+- sherpa-onnx: Apache-2.0; sherpa-onnx/LICENSE
+- kaldi-native-fbank 1.22.3: Apache-2.0; kaldi-native-fbank/LICENSE
+- kaldi-decoder 0.3.0: Apache-2.0; kaldi-decoder/LICENSE
+- kaldifst 1.8.0: Apache-2.0 and legal notices; kaldifst/LICENSE
+- OpenFst 1.8.5-2026-07-09: Apache-2.0; openfst/COPYING
+- kissfft febd4caeed32e33ad8b2e0bb5ea77542c40f18ec: BSD-3-Clause;
+  kissfft/COPYING and kissfft/LICENSES/
+- simple-sentencepiece 0.7: Apache-2.0; simple-sentencepiece/LICENSE
+  Its embedded Darts-clone header: BSD-2-Clause;
+  simple-sentencepiece/DARTS-BSD-2-Clause.txt
+- Eigen 5.0.1: primarily MPL-2.0 with the additional notices in eigen/.
+  Review source-availability requirements for the distributed binary.
+- nlohmann/json 3.12.0: MIT plus embedded attribution records in json/.
+- ONNX Runtime 1.28.2: Microsoft MIT and upstream third-party notices in
+  onnxruntime/. The exact prebuilt vendor binary's transitive contents need
+  separate SBOM/notice confirmation; source notices alone are not proof.
+- Android NDK runtime: the build copies the selected NDK's reviewed runtime
+  notice text into android-ndk/. Static C++ runtime notices must be retained.
+
+Exact archive provenance, checksums, versions and configuration are recorded
+in source-build-manifest.json. Source archives are available at the exact
+URLs recorded there. The corresponding immutable source bundles and any
+actual build-time source changes must be retained for release review.
+The upstream Android CMake patches simple-sentencepiece's threading code;
+retain those configured source files as well as the original pinned archive.
+
+espeak-ng, piper-phonemize, TTS source files and speaker-diarization wrappers
+are excluded by this candidate's intended build configuration. Absence must
+be checked in the actual compile commands, link map and packaged artifact.
+This notice template is an engineering inventory, not a license clearance.
+Model files and the host app's Kotlin/Android dependencies are outside this
+native-library inventory and require their own notices and review.

@@ -1,0 +1,22 @@
+{
+  "repository": "https://github.com/microsoft/onnxruntime",
+  "tag": "v1.28.2",
+  "files": [
+    {
+      "file": "licenses/onnxruntime/LICENSE",
+      "source_url": "https://raw.githubusercontent.com/microsoft/onnxruntime/33ca9628233dc8f002435e868d4c2e9f82766ca1/LICENSE",
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c",
+      "size_bytes": 1073,
+      "verification": "official v1.28.2 tag resolved to commit with git ls-remote; notice bytes re-downloaded at commit and SHA256 matched; local SHA256 not vendor-attested"
+    },
+    {
+      "file": "licenses/onnxruntime/ThirdPartyNotices.txt",
+      "source_url": "https://raw.githubusercontent.com/microsoft/onnxruntime/33ca9628233dc8f002435e868d4c2e9f82766ca1/ThirdPartyNotices.txt",
+      "sha256": "0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2",
+      "size_bytes": 325054,
+      "verification": "official v1.28.2 tag resolved to commit with git ls-remote; notice bytes re-downloaded at commit and SHA256 matched; local SHA256 not vendor-attested"
+    }
+  ],
+  "resolved_commit": "33ca9628233dc8f002435e868d4c2e9f82766ca1",
+  "tag_resolution": "git ls-remote https://github.com/microsoft/onnxruntime.git refs/tags/v1.28.2 => 33ca9628233dc8f002435e868d4c2e9f82766ca1"
+}
