@@ -74,11 +74,18 @@ jobs:
       - name: Compile instrumentation tests
         run: ./gradlew assembleDebugAndroidTest --stacktrace
 
+      - name: Validate compiled JUnit4 instrumentation signatures without a device
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_check_android_test_signatures.py' -v
+          python3 scripts/check_android_test_signatures.py app/build --path-contains androidtest
+
       - name: Lint
         run: ./gradlew lintDebug --stacktrace
 
       - name: Compile and test fixed old-runtime baseline
-        run: ./gradlew -PsherpaRuntimeBaseline=true -PhyMtNative=false assembleDebug assembleDebugAndroidTest testDebugUnitTest --stacktrace
+        run: |
+          ./gradlew -PsherpaRuntimeBaseline=true -PhyMtNative=false assembleDebug assembleDebugAndroidTest testDebugUnitTest --stacktrace
+          python3 scripts/check_android_test_signatures.py app/build --path-contains androidtest
 
       # Compile the explicitly opt-in engine without enabling downloads in the app.
       # This job uses no emulator/KVM device and creates no signing credentials.
@@ -89,7 +96,9 @@ jobs:
           test -x "$ANDROID_HOME/cmake/3.22.1/bin/cmake"
 
       - name: Compile optional quality engine and instrumented tests
-        run: ./gradlew -PhyMtNative=true assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug --stacktrace
+        run: |
+          ./gradlew -PhyMtNative=true assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug --stacktrace
+          python3 scripts/check_android_test_signatures.py app/build --path-contains androidtest
 
       - name: Audit actual optimized native Debug commands
         run: |

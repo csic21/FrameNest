@@ -52,7 +52,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class SenseVoiceRuntimeComparisonTest {
     @Test
-    fun comparePinnedPcmThroughRealNativeAndProductionAdapter() = runBlocking {
+    fun comparePinnedPcmThroughRealNativeAndProductionAdapter(): Unit = runBlocking<Unit> {
         val arguments = InstrumentationRegistry.getArguments()
         assumeTrue(arguments.getString("runtimeComparison") == "true")
         val expectedRuntime = requireNotNull(arguments.getString("expectedRuntime"))
@@ -215,6 +215,8 @@ class SenseVoiceRuntimeComparisonTest {
                 save()
             }
         }
+        // JUnit4 requires a JVM void method; never infer JSONObject from put().
+        Unit
     }
 
     private suspend fun cancellationProbe(engine: SherpaAsrEngine, window: Window, counters: JSONObject): JSONObject = coroutineScope {
