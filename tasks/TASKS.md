@@ -1201,3 +1201,12 @@ unit test、lint、debug/release assemble 与 AndroidTest 编译通过。真实 
 **目标**：通过真实File PCM、SenseVoice、ML Kit ja→zh、Room及会话叠层选择跑通固定样本；严禁用假译文替代。
 
 验收：默认3秒窗口，分开记录媒体PTS与源/双语就绪；冷下载和暖下载缓存/重新加载native分组。视频URL/字节长度/SHA固定，许可归属随fixture；原视频不提交仓库。独立PR路径/手动触发限定重型下载，失败关闭，无新密钥或系统权限修改。结果只证明模拟器本地文件功能子门槛，不等于OPPO/NAS/物理渲染或翻译准确率验收。用户已授权测试与验收成功后的发布；未满足相关验收前不得发布。
+
+
+## FN-74：SenseVoice 原生运行库受控升级对照
+
+**依赖**：已发布 0.6.9-internal（ec9ff089）；FN-73 公开样片证据。
+**拥有路径**：Sherpa Android 依赖坐标/摘要、运行库字幕缓存身份、对应回归、独立原生对照仪器测试/fixture/工作流、决策与交接。
+**目标**：比较官方 sherpa-onnx 1.12.32 与 1.13.8，保持 SenseVoice 模型、语言/ITN/CPU 配置及 ML Kit 不变；不启用 Hy、不变更稳定版或版本号。
+
+验收：官方 AAR/POM 逐字节校验、API/ABI/16KB 与许可审查，旧/新真实 APK 使用相同已核验 PCM/模型/窗口输出原文与时间戳；完整 JVM、Lint、Android 构建与仪器编译通过。云端 Python 差异只作为测试动机，不当 Android/OPPO 收益。重型 Android 测试须待当次设备权限批准，未运行清楚标明；禁止假原生、替换模型或把 VAD 排除区间记为已完成覆盖。普通独立开发分支/草稿 PR 已授权，发布需另经实际验收。

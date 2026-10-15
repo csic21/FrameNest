@@ -23,7 +23,7 @@ securityCrypto = "1.1.0"
 voskAndroid = "0.3.75"
 # sherpa-onnx Android AAR via JitPack (pinned: artifact verified on Maven index).
 # 1.12.x carries the stable OfflineRecognizer/SenseVoice Java API used by FN-51.
-sherpaOnnx = "1.12.32"
+sherpaOnnx = "1.13.8"
 # Already on the runtime classpath via sherpa/vosk. Pinned so cover callbacks compile.
 jna = "5.18.1"
 mlkitTranslate = "17.0.3"
@@ -66,7 +66,7 @@ kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "playServicesCoroutines" }
 vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "voskAndroid" }
-sherpa-onnx = { group = "com.github.k2-fsa", name = "sherpa-onnx", version.ref = "sherpaOnnx" }
+sherpa-onnx = { group = "com.github.k2-fsa.sherpa-onnx", name = "sherpa-onnx", version.ref = "sherpaOnnx" }
 jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 mlkit-translate = { group = "com.google.mlkit", name = "translate", version.ref = "mlkitTranslate" }
 

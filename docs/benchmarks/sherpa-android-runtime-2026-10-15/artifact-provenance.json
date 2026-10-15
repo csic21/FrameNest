@@ -1,0 +1,38 @@
+[
+  {
+    "path": "sherpa-onnx-1.12.32.aar",
+    "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.12.32/sherpa-onnx-1.12.32.aar",
+    "size": 46589150,
+    "sha256": "43450d480eda70de929be82711851e8e91d82ea640f7d2296c1f6526fd792cad"
+  },
+  {
+    "path": "sherpa-onnx-1.13.8.aar",
+    "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar",
+    "size": 50129134,
+    "sha256": "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96"
+  },
+  {
+    "path": "jitpack-android-1.13.8.aar",
+    "url": "https://jitpack.io/com/github/k2-fsa/sherpa-onnx/sherpa-onnx/1.13.8/sherpa-onnx-1.13.8.aar",
+    "size": 50129134,
+    "sha256": "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96"
+  },
+  {
+    "path": "jitpack-android-1.13.8.pom",
+    "url": "https://jitpack.io/com/github/k2-fsa/sherpa-onnx/sherpa-onnx/1.13.8/sherpa-onnx-1.13.8.pom",
+    "size": 1205,
+    "sha256": "755acf5ea7ce090b6b30768ed5dd95c52a5ebc7ba983fb3d944b1efaf574a263"
+  },
+  {
+    "path": "ESPEAK-NG-COPYING",
+    "url": "https://raw.githubusercontent.com/csukuangfj/espeak-ng/ed530aa113046142eb5115cf2fc9157854d0ffe1/COPYING",
+    "size": 35147,
+    "sha256": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903"
+  },
+  {
+    "path": "ONNXRUNTIME-LICENSE",
+    "url": "https://raw.githubusercontent.com/microsoft/onnxruntime/v1.28.2/LICENSE",
+    "size": 1073,
+    "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+  }
+]

@@ -1,0 +1,322 @@
+[
+  {
+    "path": "1.12.32/aar/jni/arm64-v8a/libonnxruntime.so",
+    "size": 19347616,
+    "sha256": "e40f09d07dc53726b8bfbf48a7907673b8f86718a057655a62790a39874a7302",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      8192
+    ]
+  },
+  {
+    "path": "1.12.32/aar/jni/arm64-v8a/libsherpa-onnx-c-api.so",
+    "size": 4782304,
+    "sha256": "c5b06830f0489584af1c10a11785300c32395a08327ac428d5a43104d211293b",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      12288
+    ]
+  },
+  {
+    "path": "1.12.32/aar/jni/arm64-v8a/libsherpa-onnx-cxx-api.so",
+    "size": 416064,
+    "sha256": "bc564e3c2c20f783bc4a36d73d97f4161ec39f4b6e88f8b2d23ca4a848bc3876",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      4096
+    ]
+  },
+  {
+    "path": "1.12.32/aar/jni/arm64-v8a/libsherpa-onnx-jni.so",
+    "size": 5099088,
+    "sha256": "9d05ac68c9412c66ff46be828c4fc7b4dc9374a4c0500b37805929663c648268",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      4096
+    ]
+  },
+  {
+    "path": "1.12.32/aar/jni/armeabi-v7a/libonnxruntime.so",
+    "size": 13992328,
+    "sha256": "57048b8d54896d16355ee367bfc129c5925468ae503b681b8d0cd49ceefa468e",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      12288
+    ]
+  },
+  {
+    "path": "1.12.32/aar/jni/armeabi-v7a/libsherpa-onnx-c-api.so",
+    "size": 3320612,
+    "sha256": "c294d341f14181be658cc44e31e54bf2f68489cce64e216877dfc06f39f6964d",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      12288
+    ]
+  },
+  {
+    "path": "1.12.32/aar/jni/armeabi-v7a/libsherpa-onnx-cxx-api.so",
+    "size": 263792,
+    "sha256": "93908ab05e63a746f3c155aa1dc95bacc141e715482ca9b39b0832ee6cc44c54",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      4096
+    ]
+  },
+  {
+    "path": "1.12.32/aar/jni/armeabi-v7a/libsherpa-onnx-jni.so",
+    "size": 3550620,
+    "sha256": "7b78b3c719b847f2e489e8fcc1e6f2c4339fc1596cca9b0b1e9a561c464c2a37",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      12288
+    ]
+  },
+  {
+    "path": "1.12.32/aar/jni/x86/libonnxruntime.so",
+    "size": 22761828,
+    "sha256": "213d91ebb0cfd511c18c0057c69145de0abc6bdc9c63429bf04dcdeaf3fd861a",
+    "loads_16kb": true,
+    "relro_16kb": true,
+    "relro_end_modulo": [
+      0
+    ]
+  },
+  {
+    "path": "1.12.32/aar/jni/x86/libsherpa-onnx-c-api.so",
+    "size": 5272000,
+    "sha256": "f0a065c11a8050cd6899da4fd258c2d142a8bc69d1f9de02d8d2850d1b9586d8",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      12288
+    ]
+  },
+  {
+    "path": "1.12.32/aar/jni/x86/libsherpa-onnx-cxx-api.so",
+    "size": 368552,
+    "sha256": "f7219fbf7303436ffc7210eb517f912936a9780b9da1a44532720015cadac276",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      8192
+    ]
+  },
+  {
+    "path": "1.12.32/aar/jni/x86/libsherpa-onnx-jni.so",
+    "size": 5590624,
+    "sha256": "785d783859ee21af4e1075d1df2d73970ea9de1f3b30443b2d0081565772d15b",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      4096
+    ]
+  },
+  {
+    "path": "1.12.32/aar/jni/x86_64/libonnxruntime.so",
+    "size": 23181616,
+    "sha256": "972c17c056eaae946a415d9efdd8018b729639974df075e495f0092441478fb7",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      8192
+    ]
+  },
+  {
+    "path": "1.12.32/aar/jni/x86_64/libsherpa-onnx-c-api.so",
+    "size": 5225560,
+    "sha256": "b385cf6029d2cff24f1961e7032800a31ada81e7a06ce742ecea8fd7b3a9fb07",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      12288
+    ]
+  },
+  {
+    "path": "1.12.32/aar/jni/x86_64/libsherpa-onnx-cxx-api.so",
+    "size": 412152,
+    "sha256": "192733023e654433fb4ba8b2490851fe8f12013a5dc45c8ebe0ab4cc1df7ac12",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      4096
+    ]
+  },
+  {
+    "path": "1.12.32/aar/jni/x86_64/libsherpa-onnx-jni.so",
+    "size": 5518040,
+    "sha256": "6721f329d839844b6cd38dbdbfd7edfc1cfc2692429f466e222166ea50f872ff",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      12288
+    ]
+  },
+  {
+    "path": "1.13.8/aar/jni/arm64-v8a/libonnxruntime.so",
+    "size": 22249560,
+    "sha256": "33847ad43bffe204699fd4a27f7f3603452a8cdaf2f9a44983a0bc31ffcf2da1",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      12288
+    ]
+  },
+  {
+    "path": "1.13.8/aar/jni/arm64-v8a/libsherpa-onnx-c-api.so",
+    "size": 4465168,
+    "sha256": "c85e2382e2ca12b0513826be926eaccfea896b4cbf568182e287671ba526f80d",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      8192
+    ]
+  },
+  {
+    "path": "1.13.8/aar/jni/arm64-v8a/libsherpa-onnx-cxx-api.so",
+    "size": 440688,
+    "sha256": "5eabb2bcf5a8af66aeab37431c09fab4a9c65cdebf02bd7e50f8c589044bd70e",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      12288
+    ]
+  },
+  {
+    "path": "1.13.8/aar/jni/arm64-v8a/libsherpa-onnx-jni.so",
+    "size": 4771760,
+    "sha256": "3c6492ea91ea68fd3b72b9495efdde6dd913f6b58c387e3b07389cf335f4d26f",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      4096
+    ]
+  },
+  {
+    "path": "1.13.8/aar/jni/armeabi-v7a/libonnxruntime.so",
+    "size": 15359592,
+    "sha256": "7a8f17a707e52e0ac3a026be319272876d9eae61f4bb19585292772d785f7744",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      8192
+    ]
+  },
+  {
+    "path": "1.13.8/aar/jni/armeabi-v7a/libsherpa-onnx-c-api.so",
+    "size": 3202700,
+    "sha256": "2294b9cc929ca0d22c5da52864ec8176f8fd119a739c9d594384763f6101d33f",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      8192
+    ]
+  },
+  {
+    "path": "1.13.8/aar/jni/armeabi-v7a/libsherpa-onnx-cxx-api.so",
+    "size": 282008,
+    "sha256": "c5517f3ce8a6f84f18bd0f814331c6069140d59df60030581cb83308572d8da7",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      4096
+    ]
+  },
+  {
+    "path": "1.13.8/aar/jni/armeabi-v7a/libsherpa-onnx-jni.so",
+    "size": 3428780,
+    "sha256": "3d6b6daf6d23162dceb1df91ac075a42a09b60fafb5f9400cba22562f10a1dc0",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      4096
+    ]
+  },
+  {
+    "path": "1.13.8/aar/jni/x86/libonnxruntime.so",
+    "size": 26491148,
+    "sha256": "fcb6cd80415f7951e58fdd8158a238946dce3710d5fee492b67174d5131f9eee",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      12288
+    ]
+  },
+  {
+    "path": "1.13.8/aar/jni/x86/libsherpa-onnx-c-api.so",
+    "size": 5051192,
+    "sha256": "fc08ee45be6eaafde43e128f22f130aec4ef2c5362e44d95f7ae54e9ad6e752e",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      4096
+    ]
+  },
+  {
+    "path": "1.13.8/aar/jni/x86/libsherpa-onnx-cxx-api.so",
+    "size": 392768,
+    "sha256": "f7677ec51867f2774b3e6749e1d44fedc6973077a10d251ba54f695c1377fa24",
+    "loads_16kb": true,
+    "relro_16kb": true,
+    "relro_end_modulo": [
+      0
+    ]
+  },
+  {
+    "path": "1.13.8/aar/jni/x86/libsherpa-onnx-jni.so",
+    "size": 5358928,
+    "sha256": "04831b079ebd68557b6e9605f90be1dc76118973ee1aef5a75cc0d0889dc3778",
+    "loads_16kb": true,
+    "relro_16kb": true,
+    "relro_end_modulo": [
+      0
+    ]
+  },
+  {
+    "path": "1.13.8/aar/jni/x86_64/libonnxruntime.so",
+    "size": 25581120,
+    "sha256": "087e84297cad64acb823c3d901d6e0cc934e91add7cdb20da802cd1c0bea5c3e",
+    "loads_16kb": true,
+    "relro_16kb": true,
+    "relro_end_modulo": [
+      0
+    ]
+  },
+  {
+    "path": "1.13.8/aar/jni/x86_64/libsherpa-onnx-c-api.so",
+    "size": 4927096,
+    "sha256": "631ca2828e47b61d8afe4b3c75a157423cbafaba6f8c0db89c27d21f1b173d9a",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      12288
+    ]
+  },
+  {
+    "path": "1.13.8/aar/jni/x86_64/libsherpa-onnx-cxx-api.so",
+    "size": 436952,
+    "sha256": "09cd2ea23b15ae3234b0b4678fbef14639c58792dd36d2cd435c030dc030c5d0",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      12288
+    ]
+  },
+  {
+    "path": "1.13.8/aar/jni/x86_64/libsherpa-onnx-jni.so",
+    "size": 5201192,
+    "sha256": "1dc24c88fb364f1022a5217b70ab3bc3c9cae3120ae2e1ed358e1f68ed120b04",
+    "loads_16kb": true,
+    "relro_16kb": false,
+    "relro_end_modulo": [
+      8192
+    ]
+  }
+]

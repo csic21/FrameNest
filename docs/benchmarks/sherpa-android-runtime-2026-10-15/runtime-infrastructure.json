@@ -1,0 +1,39 @@
+{
+  "status": "android_asr_not_executed",
+  "runs": [
+    {
+      "number": 4,
+      "id": 38712499660,
+      "result": "SDK step failed; missing ffmpeg check inferred and fixed",
+      "kvm_acl_granted": false
+    },
+    {
+      "number": 5,
+      "id": 38713207898,
+      "result": "recovery_only_skipped",
+      "kvm_acl_granted": false
+    },
+    {
+      "number": 6,
+      "id": 38714162571,
+      "result": "whole_WAV_hash_mismatch_before_model",
+      "kvm_acl_granted": false,
+      "fix": "RIFF metadata exception with exact PCM pins; official FFmpeg6.1.1 local comparison passed"
+    },
+    {
+      "number": 7,
+      "id": 38716249483,
+      "source": "4d979d27c988ecf253d9a72ab0fede6bfce56b22",
+      "job_id": 116359529513,
+      "result": "JUnit initializationError: test method should be void",
+      "kvm_acl_granted": true,
+      "kvm_acl_restore_and_diff_passed": true,
+      "acl_grant_utc": "2026-10-15T09:57:17Z",
+      "acl_restore_utc": "2026-10-15T09:58:30Z",
+      "asr_windows_decoded": 0,
+      "artifact_id": 11962659222,
+      "artifact_zip_sha256": "476a7eecbd6a640f51c59adf5fd33d62834e4fbe14c020a03ef376d3f09e2aaa"
+    }
+  ],
+  "no_performance_or_accuracy_conclusions": true
+}
