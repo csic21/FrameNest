@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "scope": "real Android JNI; authored complete-sentence controls",
+  "started_at_epoch_ms": 1792036312113,
+  "api": 35,
+  "abis": [
+    "x86_64",
+    "arm64-v8a"
+  ],
+  "available_processors": 2,
+  "model_revision": "a0c709d9fac510f2c807aa3af52872340dc37a4a",
+  "model_sha256": "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699",
+  "model_bytes": 1133080448,
+  "runtime": "llama-b11429-d812350-ctx1024-out256-official-prompt-v1",
+  "cpu_threads": 2,
+  "context_tokens": 1024,
+  "output_token_cap": 256,
+  "hardware_performance_accepted": false,
+  "memory_definition": "Android Debug snapshots in KiB; native allocated heap in bytes. These are not peak RSS or a memory-budget acceptance.",
+  "controls": [],
+  "semantic_acceptance_passed": null,
+  "memory_before_model": {
+    "total_pss_kib": 191364,
+    "native_pss_kib": 5925,
+    "dalvik_pss_kib": 2985,
+    "private_dirty_kib": 185944,
+    "native_heap_allocated_bytes": 5947744
+  },
+  "initial_sha256_verification_ms": 2,
+  "verified_model_present_before_test": false,
+  "download_and_install_verification_ms": 148526,
+  "model_downloaded_this_test": true,
+  "first_native_load_ms": 1535,
+  "load_definition": "Fresh engine initialization; excludes download\/hash verification. Native library may already be loaded; verification warms filesystem caches, which were not cleared.",
+  "memory_after_load": {
+    "total_pss_kib": 1400503,
+    "native_pss_kib": 104079,
+    "dalvik_pss_kib": 4131,
+    "private_dirty_kib": 286104,
+    "native_heap_allocated_bytes": 201401008
+  },
+  "functional_acceptance_passed": false,
+  "failure_type": "TimeoutCancellationException",
+  "memory_after_close": {
+    "total_pss_kib": 229347,
+    "native_pss_kib": 31855,
+    "dalvik_pss_kib": 4183,
+    "private_dirty_kib": 213904,
+    "native_heap_allocated_bytes": 8807120
+  }
+}
