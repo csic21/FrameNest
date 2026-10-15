@@ -6,12 +6,38 @@ on:
     branches: ['experiment/FN-74-asr-only-recipe']
     paths:
       - '.github/workflows/asr-native-source.yml'
-      - 'docs/experiments/FN-74-asr-only-recipe/**'
+      - 'docs/experiments/FN-74-asr-only-recipe/manifest.json'
+      - 'docs/experiments/FN-74-asr-only-recipe/toolchain-lock.json'
+      - 'docs/experiments/FN-74-asr-only-recipe/NOTICE.template'
+      - 'docs/experiments/FN-74-asr-only-recipe/dependency-audit/**'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/inputs.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/build_native.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/ci_toolchain.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/audit_artifact.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/classfiles.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/collect_ci_artifacts.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/test_recipe.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/test_ci_native.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/package_aar.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/gradle_lock.py'
   pull_request:
     branches: [main]
     paths:
       - '.github/workflows/asr-native-source.yml'
-      - 'docs/experiments/FN-74-asr-only-recipe/**'
+      - 'docs/experiments/FN-74-asr-only-recipe/manifest.json'
+      - 'docs/experiments/FN-74-asr-only-recipe/toolchain-lock.json'
+      - 'docs/experiments/FN-74-asr-only-recipe/NOTICE.template'
+      - 'docs/experiments/FN-74-asr-only-recipe/dependency-audit/**'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/inputs.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/build_native.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/ci_toolchain.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/audit_artifact.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/classfiles.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/collect_ci_artifacts.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/test_recipe.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/test_ci_native.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/package_aar.py'
+      - 'docs/experiments/FN-74-asr-only-recipe/scripts/gradle_lock.py'
 
 # No publishing, signing, secrets, OIDC, emulator or KVM permissions.
 permissions:

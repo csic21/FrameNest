@@ -1,0 +1,14 @@
+{
+  "status": "local-import-strip-and-stage-verified-awaiting-gradle-quarantine-ci",
+  "tests_passed": 49,
+  "strip_evidence_sha256": "c12c57214652da053757634c44357b51a6be6672649a87c6ca9018f1bc7fc8e1",
+  "native_zip_sha256": "5dc4019557ce6ac0f9a203fb6e00bd4e52f58153e2cf17347805cf108744e48e",
+  "official_ndk_archive_sha256": "dfb20d396df28ca02a8c708314b814a4d961dc9074f9a161932746f815aa552f",
+  "kotlin_sources_staged": 8,
+  "gradle_executed": false,
+  "aar_built": false,
+  "android_runtime_tested": false,
+  "reproducibility_proven": false,
+  "legal_clearance": false,
+  "sdk_license_acceptance_performed": false
+}

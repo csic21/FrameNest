@@ -1,0 +1,132 @@
+name: ASR source AAR audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['experiment/FN-74-asr-only-recipe']
+    paths:
+      - '.github/workflows/asr-aar-source.yml'
+      - 'docs/experiments/FN-74-asr-only-recipe/**'
+
+# Read existing same-repository native artifact only. No publish/signing/KVM.
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: asr-aar-source-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  aar-audit:
+    name: Quarantine capture or independently locked candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      RECIPE: docs/experiments/FN-74-asr-only-recipe
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout isolated recipe
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Validate recipe and record actual environment
+        id: mode
+        run: |
+          set -euo pipefail
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_21_X64/bin" >> "$GITHUB_PATH"
+          mkdir -p "$RUNNER_TEMP/aar-evidence"
+          python3 "$RECIPE/scripts/ci_toolchain.py" record-host --report "$RUNNER_TEMP/aar-evidence/host-provenance.json"
+          python3 -m py_compile "$RECIPE"/scripts/*.py
+          for test in test_recipe test_ci_native test_aar_packaging test_gradle_lock; do
+            python3 "$RECIPE/scripts/$test.py" -v 2>&1 | tee -a "$RUNNER_TEMP/aar-evidence/tests.log"
+          done
+          if test -f "$RECIPE/gradle-lock/approved-lock.json"; then
+            echo 'mode=strict' >> "$GITHUB_OUTPUT"
+          else
+            echo 'mode=capture' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify pinned source inputs
+        run: python3 "$RECIPE/scripts/inputs.py" fetch
+
+      - name: Prepare source-only quarantine workspace
+        if: steps.mode.outputs.mode == 'capture'
+        run: python3 "$RECIPE/scripts/inputs.py" prepare --work "$RUNNER_TEMP/aar-native-work"
+
+      - name: Download exact reviewed native artifact
+        if: steps.mode.outputs.mode == 'strict'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 "$RECIPE/scripts/download_native_artifact.py" \
+            --out "$RUNNER_TEMP/native-candidate.zip" \
+            --report "$RUNNER_TEMP/aar-evidence/native-download.json"
+          python3 "$RECIPE/scripts/import_native.py" \
+            --artifact "$RUNNER_TEMP/native-candidate.zip" --work "$RUNNER_TEMP/aar-native-work"
+
+      - name: Prepare verified tools for explicit strip
+        if: steps.mode.outputs.mode == 'strict'
+        id: tools
+        run: |
+          set -euo pipefail
+          python3 "$RECIPE/scripts/ci_toolchain.py" prepare \
+            --root "$RUNNER_TEMP/aar-tools" \
+            --sdk-license "$ANDROID_HOME/licenses/android-sdk-license" \
+            --report "$RUNNER_TEMP/aar-evidence/toolchain-provenance.json" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Strip rebuilt JNI and preserve debug evidence
+        if: steps.mode.outputs.mode == 'strict'
+        env:
+          NDK: ${{ steps.tools.outputs.ndk }}
+        run: |
+          python3 "$RECIPE/scripts/strip_native.py" \
+            --work "$RUNNER_TEMP/aar-native-work" --ndk "$NDK" \
+            --toolchain-provenance "$RUNNER_TEMP/aar-evidence/toolchain-provenance.json"
+
+      - name: Stage eight official Kotlin files and notice bundle
+        run: |
+          python3 "$RECIPE/scripts/package_aar.py" stage \
+            --work "$RUNNER_TEMP/aar-native-work" --project "$RUNNER_TEMP/aar-project"
+
+      - name: Capture complete Gradle graph in quarantine
+        if: steps.mode.outputs.mode == 'capture'
+        run: |
+          python3 "$RECIPE/scripts/package_aar.py" capture-lock \
+            --project "$RUNNER_TEMP/aar-project" --sdk "$ANDROID_HOME" \
+            --exploratory-host-provenance "$RUNNER_TEMP/aar-evidence/host-provenance.json"
+
+      - name: Build with separately reviewed strict lock
+        if: steps.mode.outputs.mode == 'strict'
+        run: |
+          python3 "$RECIPE/scripts/run_strict_aar.py" \
+            --project "$RUNNER_TEMP/aar-project" --sdk "$ANDROID_HOME" \
+            --host-provenance "$RUNNER_TEMP/aar-evidence/host-provenance.json"
+
+      - name: Collect bounded packaging evidence
+        if: always()
+        run: |
+          python3 "$RECIPE/scripts/collect_aar_evidence.py" \
+            --project "$RUNNER_TEMP/aar-project" --work "$RUNNER_TEMP/aar-native-work" \
+            --evidence "$RUNNER_TEMP/aar-evidence" --out "$RUNNER_TEMP/aar-artifacts"
+
+      - name: Upload quarantine or candidate evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: asr-aar-${{ steps.mode.outputs.mode }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/aar-artifacts/
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload original JNI debug artifacts separately
+        if: always() && steps.mode.outputs.mode == 'strict'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: asr-jni-debug-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/aar-native-work/debug-symbols/
+          retention-days: 14
+          if-no-files-found: warn

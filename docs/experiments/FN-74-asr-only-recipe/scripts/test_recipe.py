@@ -23,7 +23,7 @@ class RecipeTests(unittest.TestCase):
         self.assertEqual(sum(not any(s in symbols for s in m['allowed_exports']) for m in bindings),1)
         self.assertEqual(jni_escape('VersionInfo$Companion'),'VersionInfo_00024Companion')
     def test_gradle_lock_structural_validation(self):
-        valid='<verification-metadata><configuration><verify-metadata>true</verify-metadata></configuration><components><sha256 value="'+'a'*64+'"/></components></verification-metadata>'
+        valid='<verification-metadata><configuration><verify-metadata>true</verify-metadata><verify-signatures>false</verify-signatures></configuration><components><component group="example" name="lib" version="1"><artifact name="lib-1.jar"><sha256 value="'+'a'*64+'"/></artifact></component></components></verification-metadata>'
         validate_gradle_lock(valid)
         for tag in ['<trusted-artifacts ><trust group=".*" regex="true"/></trusted-artifacts>','<x:trusted-artifacts xmlns:x="urn:test"/>','<ignored-keys/>','<trusted-keys/>']:
             with self.assertRaises(SystemExit):validate_gradle_lock(valid.replace('</configuration>',tag+'</configuration>'))

@@ -1,6 +1,8 @@
 # sherpa-onnx 1.13.8 ASR-facing / no-TTS Android recipe
 
-Prepared 2026-10-15. **Candidate recipe only: no native build, AAR build, Android execution, 16 KB device test, benchmark, or legal clearance has been completed.** The original recipe did not change FrameNest's stock runtime A/B, production dependency, CI, or PR. The later CI-NATIVE extension adds only a dedicated experimental workflow; production dependency and existing app CI remain unchanged. This is a separate future variant and must receive separate acceptance; stock-AAR results do not transfer to it.
+Prepared 2026-10-15. Current milestone: the first native-only CI run has since passed; its independent evidence is in `docs/benchmarks/sherpa-source-native-2026-10-15`. The isolated two-phase AAR extension is described in [CI-AAR.md](CI-AAR.md). The statements below describe the original preparation stage.
+
+Prepared 2026-10-15. **Original preparation state: candidate recipe only, with no native/AAR or Android execution completed at that time.** The original recipe did not change FrameNest's stock runtime A/B, production dependency, CI, or PR. The later CI-NATIVE extension adds only a dedicated experimental workflow; production dependency and existing app CI remain unchanged. This is a separate future variant and must receive separate acceptance; stock-AAR results do not transfer to it.
 
 An optional ordinary native-only CI extension is documented in [CI-NATIVE.md](CI-NATIVE.md). It permits explicitly exploratory hosted-VM provenance, with the release/reproducibility gate closed; it does not change the stock app dependency or execute Gradle/KVM.
 

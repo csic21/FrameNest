@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "repository": "csic21/FrameNest",
+  "run_id": 38706441953,
+  "artifact_id": 11958847995,
+  "commit": "8fb54b09e405a9cb9d2a0211d83176ced0328af8",
+  "zip_sha256": "5dc4019557ce6ac0f9a203fb6e00bd4e52f58153e2cf17347805cf108744e48e",
+  "source": "https://github.com/csic21/FrameNest/actions/runs/38706441953",
+  "policy": "Exact reviewed native artifact only. Expiry or mismatch fails closed; rebuild native separately and review a new lock."
+}

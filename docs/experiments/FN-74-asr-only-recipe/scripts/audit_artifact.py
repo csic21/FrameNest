@@ -95,8 +95,15 @@ def main():
                 required_notices['NOTICE.txt']=LOCK['notice_template_sha256']
                 tools=json.loads(aar.read(prefix+'toolchain.json'))
                 required_notices['android-ndk/ndk-runtime-NOTICE.txt']=tools['ndk_runtime_notice_sha256']
+                for item in json.loads((ROOT/'toolchain-lock.json').read_text())['ndk_notices']:
+                    required_notices['android-ndk/original/'+item['path']]=item['sha256']
                 bundle=json.loads(aar.read(prefix+'license-bundle-manifest.json'))
+                if len(bundle)!=len({x['path'] for x in bundle}):raise ValueError('Duplicate notice manifest entry')
                 if {x['path']:x['sha256'] for x in bundle}!=required_notices:raise ValueError('License bundle inventory mismatch')
+                metadata_files={'license-bundle-manifest.json','source-build-manifest.json','toolchain.json','native-output-manifest.json','native-audit.json','strip-evidence.json','imported-native-artifact.json'}
+                actual_assets={n.removeprefix(prefix) for n in names if n.startswith(prefix) and not n.endswith('/')}
+                if actual_assets!=set(required_notices)|metadata_files:raise ValueError('AAR license/provenance asset fullset mismatch')
+                if hashlib.sha256(aar.read(prefix+'source-build-manifest.json')).hexdigest()!=digest(ROOT/'manifest.json'):raise ValueError('AAR source manifest mismatch')
                 for name,sha in required_notices.items():
                     if hashlib.sha256(aar.read(prefix+name)).hexdigest()!=sha:raise ValueError('Packaged notice mismatch: '+name)
                 report['notice_files_verified']=len(required_notices)
