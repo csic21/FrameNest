@@ -1,0 +1,38 @@
+{
+  "lock": {
+    "repository": "csic21/FrameNest",
+    "run_id": 38713363406,
+    "commit": "c4088fab8d0e7daf0af5fa6895a9f88b11adcf81",
+    "artifact_id": 11960534932,
+    "artifact_name": "asr-aar-strict-c4088fab8d0e7daf0af5fa6895a9f88b11adcf81-1",
+    "zip_size_bytes": 21153522,
+    "zip_sha256": "1aa5aca91348cb103c3b6fbd05370ba0c0d6bf951312aca9724c09c5fae9775b",
+    "aar_member": "candidate/sherpa-onnx-1.13.8-asr-no-tts.aar",
+    "aar_size_bytes": 59632871,
+    "aar_sha256": "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+    "upstream_version": "1.13.8",
+    "runtime_identity": "1.13.8-asr-no-tts-sha256-6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+    "expires_at": "2026-10-29T09:31:42Z",
+    "review": "docs/benchmarks/sherpa-source-aar-2026-10-15/REPORT.md",
+    "release_approved": false
+  },
+  "imported_aar_sha256": "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+  "artifact_entries_verified": 30,
+  "android_runtime_tested": false,
+  "downloaded_metadata": {
+    "id": 11960534932,
+    "name": "asr-aar-strict-c4088fab8d0e7daf0af5fa6895a9f88b11adcf81-1",
+    "size_in_bytes": 21153522,
+    "digest": "sha256:1aa5aca91348cb103c3b6fbd05370ba0c0d6bf951312aca9724c09c5fae9775b",
+    "expired": false,
+    "created_at": "2026-10-15T09:31:44Z",
+    "expires_at": "2026-10-29T09:31:42Z",
+    "workflow_run": {
+      "id": 38713363406,
+      "repository_id": 1343982636,
+      "head_repository_id": 1343982636,
+      "head_branch": "experiment/FN-74-asr-only-recipe",
+      "head_sha": "c4088fab8d0e7daf0af5fa6895a9f88b11adcf81"
+    }
+  }
+}
