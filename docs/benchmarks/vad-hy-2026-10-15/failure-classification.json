@@ -1,0 +1,293 @@
+{
+  "definition": "Manual text-level diagnosis; flags overlap and are observations, not proven isolated causal effects. No full human listening audit. Zero-based segment indices.",
+  "counts": {
+    "asr_damage": 9,
+    "clear_mt_error": 3,
+    "boundary_or_discourse_failure": 11
+  },
+  "outcomes": {
+    "substantially_faithful": 8,
+    "minor_scope_warning": 1,
+    "fail_or_incomplete": 16
+  },
+  "pure_complete_clean_source_mt_failure": {
+    "count": 1,
+    "ids": [
+      "emoji:4"
+    ]
+  },
+  "other_clear_local_mt_failure": {
+    "count": 2,
+    "ids": [
+      "emoji:7",
+      "emoji:11"
+    ],
+    "note": "7 is grammatical fragment with mixed-language output;11 has clean dog/icon relations but ASR damage elsewhere, so not wholly clean-source controls."
+  },
+  "rows": [
+    {
+      "clip": "emoji",
+      "index": 0,
+      "source": "このイラストの意味わかりますか？",
+      "translation": "明白这个插图的含义吗？",
+      "flags": [],
+      "outcome": "substantially_faithful",
+      "note": "基本忠实；首个完整问题。"
+    },
+    {
+      "clip": "emoji",
+      "index": 1,
+      "source": "今、世界 中 で 使 われ て いる の は 何語 でしょ うか 英語、スペイン 語、中国語、それ は ビジネス 文章 で は 使 わ れ ない 言葉 です。",
+      "translation": "现在，世界上使用的语言究竟是什么？是英语、西班牙语还是汉语呢？这些语言在商务文书中并不被使用。",
+      "flags": [
+        "boundary_or_discourse_failure"
+      ],
+      "outcome": "fail_or_incomplete",
+      "note": "失败：问题/候选语言保留，但错误地把英语、西班牙语、汉语指为商务文书不使用的语言；指代关系仍错。"
+    },
+    {
+      "clip": "emoji",
+      "index": 2,
+      "source": "正解は 絵文字。",
+      "translation": "正确答案是表情符号。",
+      "flags": [],
+      "outcome": "substantially_faithful",
+      "note": "基本忠实；正确答案与表情符号均保留。"
+    },
+    {
+      "clip": "emoji",
+      "index": 3,
+      "source": "絵文字はインターネット上のコミュニケーションで使われ、特に若い世代に人気です 絵文字の映画がハリウッドで作られるほど。",
+      "translation": "表情符号在互联网交流中被广泛使用，尤其受到年轻一代的喜爱——甚至还有以表情符号为题材的电影在好莱坞制作。",
+      "flags": [],
+      "outcome": "substantially_faithful",
+      "note": "明显改善：流行程度与好莱坞电影关系保留，不再接成日本起源/表达方式诞生的因果。"
+    },
+    {
+      "clip": "emoji",
+      "index": 4,
+      "source": "絵文字は日本発祥。",
+      "translation": "涂鸦是日本起源。",
+      "flags": [
+        "clear_mt_error"
+      ],
+      "outcome": "fail_or_incomplete",
+      "note": "失败：絵文字变为涂鸦，核心对象错。"
+    },
+    {
+      "clip": "emoji",
+      "index": 5,
+      "source": "絵を文字のように使う新しい表現スタイルです。",
+      "translation": "这是一种将图像像文字一样使用的新型表达方式。",
+      "flags": [],
+      "outcome": "substantially_faithful",
+      "note": "基本忠实；像文字一样使用图像，未变成图片转换文字。"
+    },
+    {
+      "clip": "emoji",
+      "index": 6,
+      "source": "有名なものといえ ば、スマイル、コマり顔、握り拳、パートなど。",
+      "translation": "可以说有代表性的有：微笑、苦相、握拳、部分等。",
+      "flags": [
+        "asr_damage"
+      ],
+      "outcome": "fail_or_incomplete",
+      "note": "失败：源パート损坏导致部分；脸部表情亦不够准确。不能当作正确完整清单。"
+    },
+    {
+      "clip": "emoji",
+      "index": 7,
+      "source": "意味深なピザやナスも。",
+      "translation": "意味深なる披萨和茄子也。",
+      "flags": [
+        "clear_mt_error",
+        "boundary_or_discourse_failure"
+      ],
+      "outcome": "fail_or_incomplete",
+      "note": "失败：留下日语なる，中日混合；本身也是名词碎段。"
+    },
+    {
+      "clip": "emoji",
+      "index": 8,
+      "source": "絵文字が若者に使われる理由は、驚きや喜びなどの感情を長い文章よりシンプルに伝えられるから、 絵文字は昔から使われてきました 古代エジプトでも原始時代でも。",
+      "translation": "表情符号被年轻人使用的原因在于，它们能更简洁地表达惊讶、喜悦等情感，比长文更容易传达这些情感，因此自古代埃及到原始时代，表情符号一直被使用着。",
+      "flags": [
+        "boundary_or_discourse_failure"
+      ],
+      "outcome": "fail_or_incomplete",
+      "note": "失败：新增因此，把简洁表达情感和古代使用强行连成因果；古埃及到原始时代时序也不当。"
+    },
+    {
+      "clip": "emoji",
+      "index": 9,
+      "source": "絵は、言葉の壁を越えます。",
+      "translation": "艺术能够突破语言的障碍。",
+      "flags": [],
+      "outcome": "minor_scope_warning",
+      "note": "轻度泛化：絵图画变成艺术，跨语言意思保留，但范围扩大。"
+    },
+    {
+      "clip": "emoji",
+      "index": 10,
+      "source": "瞬時に 脳 が 認識 できる の です。",
+      "translation": "瞬间大脑就能识别出来。",
+      "flags": [],
+      "outcome": "substantially_faithful",
+      "note": "基本忠实；识别关系保留，但指代仍依赖前段。"
+    },
+    {
+      "clip": "emoji",
+      "index": 11,
+      "source": "例えば円の中に斜め線、そして犬のマークがあれば、犬は禁止だとわかります あるいはフロッピーデスクのアイコンを見れば、文書の保存だと理解できます 実物を知らなくても大丈夫？",
+      "translation": "比如，如果圆内有斜线以及狗的标记，就可知禁止养狗；或者从软盘上的图标就能明白这是文件保存功能。即使不知道实物是什么也没问题吧？",
+      "flags": [
+        "asr_damage",
+        "clear_mt_error"
+      ],
+      "outcome": "fail_or_incomplete",
+      "note": "失败：禁止狗变成禁止养狗；软盘图标变成软盘上的图标；末句问号源自ASR。"
+    },
+    {
+      "clip": "emoji",
+      "index": 12,
+      "source": "絵文字の影響で増えるのは怠け者か人生の楽しみかはわかりませんが、いずれにせよオックスフォード辞書が選んだ2015年の言葉は手しなき」そう、絵文字なんです。",
+      "translation": "不知道是因为表情符号的影响导致懒人增多，还是因为生活乐趣增加，但无论如何，牛津词典选出的2015年单词就是“手しなき”——没错，就是表情符号带来的影响。",
+      "flags": [
+        "asr_damage"
+      ],
+      "outcome": "fail_or_incomplete",
+      "note": "失败：手しなき错误日文原样残留；末尾增加表情符号带来的影响，不能表示具体年度表情。"
+    },
+    {
+      "clip": "kishida",
+      "index": 0,
+      "source": "はい、あの、まず昨日の事件については。",
+      "translation": "是的，关于昨天的事件，首先……",
+      "flags": [
+        "boundary_or_discourse_failure"
+      ],
+      "outcome": "fail_or_incomplete",
+      "note": "忠实保留未完成的关于事件话题；不是可独立验收完整句。"
+    },
+    {
+      "clip": "kishida",
+      "index": 1,
+      "source": "？",
+      "translation": "？",
+      "flags": [
+        "boundary_or_discourse_failure"
+      ],
+      "outcome": "fail_or_incomplete",
+      "note": "只有问号，不构成识别或翻译成功；仍照原段运行以免挑选。"
+    },
+    {
+      "clip": "kishida",
+      "index": 2,
+      "source": "容疑者が態度をされ、そして検察において捜査中です。また私の方からえのご心配をおかけし、そしてご迷惑をおかけした地元の皆さんをや。",
+      "translation": "嫌疑人态度可疑，目前正在检察机关接受调查。同时，我也给当地民众带来了困扰和麻烦。",
+      "flags": [
+        "asr_damage"
+      ],
+      "outcome": "fail_or_incomplete",
+      "note": "失败：损坏的逮捕源文被补成嫌疑人态度可疑；警察变检察；有事实新增/丢失。"
+    },
+    {
+      "clip": "kishida",
+      "index": 3,
+      "source": "漁業組合の方々ですとかあるいは容疑者確去にご協力ていただいた方に対し、直接この電話を入れさせていただきましたのその他にも国国内また国外からもさま々なご心配やお見いの声をいただいたこと。",
+      "translation": "对于渔业协会的成员，或是那些协助确认嫌疑人身份的人士，我们直接通过电话与你们联系。此外，也收到了来自国内及国外的各种担忧和关心。",
+      "flags": [
+        "asr_damage",
+        "boundary_or_discourse_failure"
+      ],
+      "outcome": "fail_or_incomplete",
+      "note": "失败：协助控制嫌疑人变成确认身份，致谢电话意义损坏；句尾感激被切到下一段。"
+    },
+    {
+      "clip": "kishida",
+      "index": 4,
+      "source": "を感謝申し上げております。そして民主義の根幹をなく選挙においてこうした暴力的な行為が行われたこのことは絶対許すことはできないと考えていますそして大切なことは。",
+      "translation": "对此表示感谢。我认为，民主制度的根本被摧毁了，在选举中出现这种暴力行为，是绝对不能容忍的。而重要的是……",
+      "flags": [
+        "asr_damage",
+        "boundary_or_discourse_failure"
+      ],
+      "outcome": "fail_or_incomplete",
+      "note": "失败：民主主义根基被摧毁这一重大错误仍在；开始和结尾都是跨段残句。"
+    },
+    {
+      "clip": "kishida",
+      "index": 5,
+      "source": "この？",
+      "translation": "这个？",
+      "flags": [
+        "boundary_or_discourse_failure"
+      ],
+      "outcome": "fail_or_incomplete",
+      "note": "这个？碎段；未获得可翻译完整命题。"
+    },
+    {
+      "clip": "kishida",
+      "index": 6,
+      "source": "大切な選挙を最後までやり通すことであると思っています有権者の皆さんの声をしっかり選挙を通じて示してもらうこと、これは我が国にとってもまた我が国の民主主義にとってもこれは大切なことであります。",
+      "translation": "我认为重要的是要圆满完成重要的选举工作，让选民们通过选举表达出自己的声音，这对我国以及我国的民主主义来说都是非常重要的事情。",
+      "flags": [],
+      "outcome": "substantially_faithful",
+      "note": "主体意义基本忠实：完成选举、让选民表达声音、对民主重要；前段这个被孤立，非理想分句。"
+    },
+    {
+      "clip": "kishida",
+      "index": 7,
+      "source": "そういった思いで国民の皆さんと共もにの大切な選挙を最後までやり通していきたいと考えています そして各党のこうした選挙運動が妨られることがないよう 警察においては警備安全について万全を期してもらいたいと考えています。",
+      "translation": "抱着这样的想法，我希望与各位国民一起，坚持完成这重要的选举活动直到最后。同时，也希望警方能确保各政党开展选举活动的过程中不受任何干扰，充分保障安保安全。",
+      "flags": [],
+      "outcome": "substantially_faithful",
+      "note": "基本忠实；坚持选举和警方确保各党竞选安全关系保留。"
+    },
+    {
+      "clip": "kishida",
+      "index": 8,
+      "source": "総理、朝日新聞です。あの、これから広島サミットもありますけれども、警察の昨日の警備体制は十分だったというふうにお考えでしょうか。",
+      "translation": "首相，这里是朝日新闻。那么，虽然接下来还有广岛峰会，您认为昨天的警方安保措施是否足够呢？",
+      "flags": [],
+      "outcome": "substantially_faithful",
+      "note": "明显改善：朝日新闻、广岛峰会和安保是否足够的提问正确，原长窗损坏已改善。"
+    },
+    {
+      "clip": "kishida",
+      "index": 9,
+      "source": "あ警備についてはやっぱ今後今回の事件の捜査が進むと同時に検証も行われるものだと思っているます。いずれですよサミットをはじめ、世界各国から要人が集われ。",
+      "translation": "关于安保问题，我认为随着此次事件的调查继续推进，也会进行验证。将来，以峰会为例，各国重要人物都会聚集在一起。",
+      "flags": [
+        "asr_damage",
+        "boundary_or_discourse_failure"
+      ],
+      "outcome": "fail_or_incomplete",
+      "note": "部分改善：各国要人聚集恢复，不再被救出；但いずれ…源损坏变将来，句尾仍被截断。"
+    },
+    {
+      "clip": "kishida",
+      "index": 10,
+      "source": "こうした日程日本いては、日本全体として最大限警備安全に努めていかなければならないと思っています、ぜひ国民の皆さんと共にこうした外交日程においても安全を確保できるよう。",
+      "translation": "我认为，面对这样的日程安排，全日本必须尽最大努力确保安全与秩序。请与各位民众共同努力，确保这些外交活动也能安全进行。",
+      "flags": [
+        "asr_damage",
+        "boundary_or_discourse_failure"
+      ],
+      "outcome": "fail_or_incomplete",
+      "note": "失败：原承诺与下一段尽力被拆开，译文转成向民众的请共同努力指令，主体/语气改变。"
+    },
+    {
+      "clip": "kishida",
+      "index": 11,
+      "source": "力を尽くしていきたいと思って、います、い。",
+      "translation": "我想全力以赴，正在努力。",
+      "flags": [
+        "asr_damage",
+        "boundary_or_discourse_failure"
+      ],
+      "outcome": "fail_or_incomplete",
+      "note": "部分失败：保持想尽力但新增正在努力；与上一外交安全句分离。"
+    }
+  ]
+}
