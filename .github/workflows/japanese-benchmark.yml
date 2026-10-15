@@ -23,9 +23,9 @@ jobs:
     # Heavy runtime validation is explicit after the approved one-run experiment.
     # A skipped PR job is not runtime acceptance evidence.
     if: github.run_number == 11 && github.run_attempt == 1
-    name: Real PCM · SenseVoice · ML Kit · Room · overlay selection
+    name: Real PCM · SenseVoice · ML Kit + Hy · overlay
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx3g
     steps:
@@ -41,7 +41,7 @@ jobs:
           accept-android-sdk-licenses: false
       - name: Install only SDK packages covered by existing runner licenses
         run: |
-          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' emulator 'system-images;android-35;google_apis;x86_64' < /dev/null
+          sdkmanager --install 'platforms;android-36' 'build-tools;36.0.0' emulator 'system-images;android-35;google_apis;x86_64' 'ndk;28.2.13676358' 'cmake;3.22.1' < /dev/null
           test -f "$ANDROID_HOME/platforms/android-36/android.jar"
           test -x "$ANDROID_HOME/build-tools/36.0.0/aapt2"
           test -x "$ANDROID_HOME/emulator/emulator"
@@ -71,7 +71,9 @@ jobs:
         run: python3 scripts/prepare-japanese-benchmark.py
       - name: Build app and test APKs
         run: |
-          ./gradlew assembleDebug assembleDebugAndroidTest --stacktrace
+          ./gradlew -PhyMtNative=true assembleDebug assembleDebugAndroidTest --stacktrace
+          python3 scripts/check_hy_native_apk.py app/build/outputs/apk/debug/app-universal-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 app/build/outputs/apk/debug/app-universal-debug.apk
           ./gradlew --stop
       - name: Start isolated emulator without accepting new licenses or changing host permissions
         timeout-minutes: 12
@@ -87,7 +89,7 @@ jobs:
           if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then ACCEL=on; fi
           printf 'acceleration=%s\n' "$ACCEL" > benchmark-results/environment.txt
           "$ANDROID_HOME/emulator/emulator" -version >> benchmark-results/environment.txt 2>&1
-          "$ANDROID_HOME/emulator/emulator" -avd japanese-benchmark -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel "$ACCEL" -memory 3072 -cores 2 > benchmark-results/emulator.log 2>&1 &
+          "$ANDROID_HOME/emulator/emulator" -avd japanese-benchmark -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel "$ACCEL" -memory 4096 -cores 2 > benchmark-results/emulator.log 2>&1 &
           EMULATOR_PID=$!
           export EMULATOR_PID
           timeout 600 bash -c 'until adb shell getprop sys.boot_completed 2>/dev/null | grep -q 1; do kill -0 "$EMULATOR_PID" || { cat benchmark-results/emulator.log; exit 1; }; sleep 5; done'
@@ -119,11 +121,44 @@ jobs:
           assert p.get('functional_acceptance_passed') is True
           assert len(p['runs']) == 2 and all(r.get('passed') is True for r in p['runs'])
           PY
+      - name: Verify bounded overlay on phone and tablet configurations
+        timeout-minutes: 5
+        run: |
+          set -o pipefail
+          timeout 240 adb shell am instrument -w -r \
+            -e class com.framenest.feature.listen_translate.ListenTranslateOverlayTest \
+            com.framenest.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee benchmark-results/overlay.txt
+          grep -Eq '^OK \(10 tests\)' benchmark-results/overlay.txt
+      - name: Verify real Hy JNI controls and recorded-file production path
+        timeout-minutes: 40
+        run: |
+          set -o pipefail
+          timeout 2250 adb shell am instrument -w -r \
+            -e class com.framenest.feature.listen_translate.mt.HyMtNativeAcceptanceTest \
+            -e runHyMtBenchmark true \
+            -e hyMtAllowMeteredDownloads true \
+            com.framenest.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee benchmark-results/hy-instrumentation.txt
+          grep -Eq '^OK \(2 tests\)' benchmark-results/hy-instrumentation.txt
+          for name in hy-mt-native-acceptance hy-mt-recorded-fixture-acceptance; do
+            adb exec-out run-as com.framenest cat "files/$name.json" > "benchmark-results/$name.json"
+          done
+          python3 - <<'PYTEST'
+          import json
+          for name in ('hy-mt-native-acceptance', 'hy-mt-recorded-fixture-acceptance'):
+              p = json.load(open('benchmark-results/' + name + '.json'))
+              assert p.get('functional_acceptance_passed') is True, name
+          # Semantic and device-speed acceptance require review of these actual outputs.
+          PYTEST
       - name: Collect bounded metrics and public-fixture review only
         if: always()
         run: |
           mkdir -p benchmark-results
           adb exec-out run-as com.framenest cat files/japanese-benchmark.json > benchmark-results/japanese-benchmark.partial.json 2>/dev/null || true
+          for name in hy-mt-native-acceptance hy-mt-recorded-fixture-acceptance; do
+            adb exec-out run-as com.framenest cat "files/$name.json" > "benchmark-results/$name.partial.json" 2>/dev/null || true
+          done
           cp app/src/androidTest/assets/japanese-benchmark/manifest.json benchmark-results/fixture-license.json
           adb exec-out run-as com.framenest cat files/japanese-fixture-review.json > benchmark-results/japanese-fixture-review.json 2>/dev/null || true
           adb exec-out run-as com.framenest cat files/japanese-benchmark-phase.txt > benchmark-results/phase.txt 2>/dev/null || true
