@@ -88,6 +88,15 @@ jobs:
       - name: Compile optional quality engine and instrumented tests
         run: ./gradlew -PhyMtNative=true assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug --stacktrace
 
+      - name: Audit actual optimized native Debug commands
+        run: |
+          python3 -m unittest discover -s app/src/main/cpp/tests -p 'test_check_build_flags.py' -v
+          for abi in arm64-v8a x86_64; do
+            commands=$(find app/.cxx/Debug -path "*/$abi/compile_commands.json" -print -quit)
+            test -n "$commands"
+            python3 app/src/main/cpp/tests/check_build_flags.py "$commands" --debug
+          done
+
       - name: Check optional native ELF alignment
         run: |
           python3 scripts/check_hy_native_apk.py app/build/outputs/apk/debug/app-universal-debug.apk

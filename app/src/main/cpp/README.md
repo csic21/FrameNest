@@ -22,6 +22,40 @@ must require an explicit model choice and preserve its failure fallback.
   host-specific AVX/BMI2 instructions. Android linking requests 16 KiB pages.
 - The MIT notice ships as `assets/listen_models/llama.cpp-LICENSE.txt`.
 
+### Inference optimization and auditable builds
+
+`HY_MT_OPTIMIZE=ON` (the CMake default) appends `-O3` to all five inference
+targets: `ggml-base`, `ggml-cpu`, `ggml`, `llama`, and `framenest_hymt`.
+This includes debuggable APKs. Optimizing only the JNI wrapper would leave the
+expensive kernels unoptimized. Debug symbols, assertions, and any sanitizer
+flags remain in place; Java/Kotlin debugging is unchanged. Native step-debugging
+or an O0 comparison can explicitly configure CMake with `-DHY_MT_OPTIMIZE=OFF`;
+that configuration must not be used for performance acceptance.
+
+This does not enable AVX, AMX, `-march=native`, or newer ARM extensions. SSE4.2
+remains enabled for the Android x86_64 baseline. GGUF/prompt/sampling, token
+limits and native cancellation are unchanged.
+
+Do not infer the effective optimization from the APK variant name. AGP 9.2.1
+maps `debug` to CMake `Debug`, and `release` to `RelWithDebInfo`. The original
+upstream-default configurations were unoptimized Debug, `-O2` RelWithDebInfo,
+and `-O3` CMake Release. The explicit target option now makes all three `-O3`.
+The generated `compile_commands.json` is always exported. CI must verify the
+actual commands for both ABIs, rather than just the CMake option:
+
+```
+python3 -m unittest discover -s app/src/main/cpp/tests -p 'test_check_build_flags.py' -v
+python3 app/src/main/cpp/tests/check_build_flags.py app/.cxx/Debug/<hash>/<abi>/compile_commands.json --debug
+python3 app/src/main/cpp/tests/check_build_flags.py app/.cxx/RelWithDebInfo/<hash>/<abi>/compile_commands.json
+```
+
+The checker requires every inference target, checks the last effective `-O`
+option, rejects non-baseline ISA flags, and optionally checks debug symbols,
+assertions and sanitizer flags. Its JSON includes the command-file SHA-256.
+The Android run21 failure and the host O0/O3 investigation are documented in
+`docs/benchmarks/hy-mt-native-build-2026-10-15/README.md`; host results do not
+establish optimized Android performance or release readiness.
+
 On a CI runner whose stable Android SDK terms are already accepted:
 
 ```
@@ -108,6 +142,17 @@ on the classpath, then run with the JNI library directory in `java.library.path`
 and the already verified model path as its sole argument. Host JNI headers can
 be supplied to CMake through `HY_MT_JNI_INCLUDE` and
 `HY_MT_JNI_PLATFORM_INCLUDE`; those options do not override the source pin.
+
+`scripts/experimental/run-hy-native-host-probe.sh` compiles these production
+Kotlin classes against local Kotlin/coroutines jars and checks the pinned model
+hash before invoking the real JNI bridge. `perf` runs the same authored sentence
+twice with CPU2 and reports separate load/resident inference times; `smoke`
+executes the existing cancellation/reuse/close checks. Example:
+
+```
+scripts/experimental/run-hy-native-host-probe.sh /absolute/native-build /absolute/Hy-MT2-1.8B-Q4_K_M.gguf /absolute/kotlin-jars perf
+scripts/experimental/run-hy-native-host-probe.sh /absolute/native-build /absolute/Hy-MT2-1.8B-Q4_K_M.gguf /absolute/kotlin-jars smoke
+```
 
 The local full Gradle attempt could not bootstrap its uncached 9.6.1 wrapper
 (`Network is unreachable`) and no Android SDK/NDK is installed. Android compile,

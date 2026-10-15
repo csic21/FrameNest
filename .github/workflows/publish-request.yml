@@ -101,6 +101,11 @@ jobs:
           # Package the large native ABI splits one at a time. Parallel zipflinger
           # buffers exhausted the heap in FN-67 even after compilation succeeded.
           ./gradlew -PhyMtNative=true assembleRelease --no-daemon --no-configuration-cache --max-workers=1 --no-parallel '-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8' --stacktrace
+          for abi in arm64-v8a x86_64; do
+            commands=$(find app/.cxx -type f \( -path "*/Release/*/$abi/compile_commands.json" -o -path "*/RelWithDebInfo/*/$abi/compile_commands.json" \) -print -quit)
+            test -n "$commands"
+            python3 app/src/main/cpp/tests/check_build_flags.py "$commands"
+          done
           python3 scripts/check_hy_native_apk.py app/build/outputs/apk/release/app-universal-release.apk
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 app/build/outputs/apk/release/app-universal-release.apk
           python3 scripts/release.py package --build-tools "$ANDROID_HOME/build-tools/36.0.0"

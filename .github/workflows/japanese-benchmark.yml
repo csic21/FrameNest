@@ -74,6 +74,12 @@ jobs:
           ./gradlew -PhyMtNative=true assembleDebug assembleDebugAndroidTest --stacktrace
           python3 scripts/check_hy_native_apk.py app/build/outputs/apk/debug/app-universal-debug.apk
           "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 app/build/outputs/apk/debug/app-universal-debug.apk
+          mkdir -p benchmark-results
+          for abi in arm64-v8a x86_64; do
+            commands=$(find app/.cxx/Debug -path "*/$abi/compile_commands.json" -print -quit)
+            test -n "$commands"
+            python3 app/src/main/cpp/tests/check_build_flags.py "$commands" --debug | tee "benchmark-results/native-build-flags-$abi.json"
+          done
           ./gradlew --stop
       - name: Start isolated emulator without accepting new licenses or changing host permissions
         timeout-minutes: 12
@@ -130,27 +136,39 @@ jobs:
             com.framenest.test/androidx.test.runner.AndroidJUnitRunner \
             | tee benchmark-results/overlay.txt
           grep -Eq '^OK \(10 tests\)' benchmark-results/overlay.txt
-      - name: Verify real Hy JNI controls and recorded-file production path
-        timeout-minutes: 40
+      # Fail fast on the native controls: a slow/broken engine must not spend
+      # another 30 minutes in the recorded producer before preserving diagnostics.
+      - name: Verify real Hy JNI controls cancellation reuse and close
+        timeout-minutes: 32
         run: |
           set -o pipefail
-          timeout 2250 adb shell am instrument -w -r \
-            -e class com.framenest.feature.listen_translate.mt.HyMtNativeAcceptanceTest \
+          echo "HY_ACCEPTANCE_DEADLINE=$(( $(date +%s) + 2250 ))" >> "$GITHUB_ENV"
+          timeout 1860 adb shell am instrument -w -r \
+            -e class 'com.framenest.feature.listen_translate.mt.HyMtNativeAcceptanceTest#realNativeControlsCancellationReuseAndClose' \
             -e runHyMtBenchmark true \
             -e hyMtAllowMeteredDownloads true \
             com.framenest.test/androidx.test.runner.AndroidJUnitRunner \
-            | tee benchmark-results/hy-instrumentation.txt
-          grep -Eq '^OK \(2 tests\)' benchmark-results/hy-instrumentation.txt
-          for name in hy-mt-native-acceptance hy-mt-recorded-fixture-acceptance; do
-            adb exec-out run-as com.framenest cat "files/$name.json" > "benchmark-results/$name.json"
-          done
-          python3 - <<'PYTEST'
-          import json
-          for name in ('hy-mt-native-acceptance', 'hy-mt-recorded-fixture-acceptance'):
-              p = json.load(open('benchmark-results/' + name + '.json'))
-              assert p.get('functional_acceptance_passed') is True, name
-          # Semantic and device-speed acceptance require review of these actual outputs.
-          PYTEST
+            | tee benchmark-results/hy-controls-instrumentation.txt
+          grep -Eq '^OK \(1 test\)' benchmark-results/hy-controls-instrumentation.txt
+          adb exec-out run-as com.framenest cat files/hy-mt-native-acceptance.json > benchmark-results/hy-mt-native-acceptance.json
+          python3 -c "import json; assert json.load(open('benchmark-results/hy-mt-native-acceptance.json')).get('functional_acceptance_passed') is True"
+      - name: Verify real Hy recorded-file production path
+        timeout-minutes: 32
+        run: |
+          set -o pipefail
+          remaining=$(( HY_ACCEPTANCE_DEADLINE - $(date +%s) ))
+          test "$remaining" -gt 0
+          if [ "$remaining" -gt 1860 ]; then remaining=1860; fi
+          timeout "$remaining" adb shell am instrument -w -r \
+            -e class 'com.framenest.feature.listen_translate.mt.HyMtNativeAcceptanceTest#recordedProducerOnPinnedPublicJapaneseFixture' \
+            -e runHyMtBenchmark true \
+            -e hyMtAllowMeteredDownloads true \
+            com.framenest.test/androidx.test.runner.AndroidJUnitRunner \
+            | tee benchmark-results/hy-recorded-instrumentation.txt
+          grep -Eq '^OK \(1 test\)' benchmark-results/hy-recorded-instrumentation.txt
+          adb exec-out run-as com.framenest cat files/hy-mt-recorded-fixture-acceptance.json > benchmark-results/hy-mt-recorded-fixture-acceptance.json
+          python3 -c "import json; assert json.load(open('benchmark-results/hy-mt-recorded-fixture-acceptance.json')).get('functional_acceptance_passed') is True"
+          # Semantic and device-speed acceptance require review of actual outputs.
       - name: Collect bounded metrics and public-fixture review only
         if: always()
         run: |

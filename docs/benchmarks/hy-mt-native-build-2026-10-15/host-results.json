@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "date_utc": "2026-10-15",
+  "scope": "Linux host JNI O0/O3 reproduction; no optimized Android run",
+  "environment": {
+    "architecture": "x86_64",
+    "cpu": "AMD EPYC 9V74",
+    "compiler": "GNU C/C++ 14.2.0",
+    "cmake": "3.22.1",
+    "jni_headers": "OpenJDK jdk-21-ga",
+    "cpu_threads": 2,
+    "batch_threads": 2,
+    "portable_isa": "SSE4.2 baseline; AVX/AMX/FMA/F16C/BMI2 disabled",
+    "measurement_order": [
+      "o0",
+      "o3"
+    ],
+    "sample_count_each": 2,
+    "clock": "System.nanoTime",
+    "shared_host": true
+  },
+  "configuration": {
+    "llama_commit": "d81235049384534c167caea52b85a694f6103d14",
+    "llama_source_archive_sha256": "6b58785f0a82898f4c3442417ff962e2d4b231b1bee5d033902ad90b27901e14",
+    "model_revision": "a0c709d9fac510f2c807aa3af52872340dc37a4a",
+    "model_sha256": "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699",
+    "model_bytes": 1133080448,
+    "context_tokens": 1024,
+    "output_token_cap": 256,
+    "batch_tokens": 64,
+    "temperature": 0.7,
+    "top_p": 0.6,
+    "top_k": 20,
+    "min_p": 0.05,
+    "repeat_penalty": 1.05,
+    "repeat_last_n": 64,
+    "seed": 42,
+    "kv_cleared_between_calls": true
+  },
+  "comparison": {
+    "same_jni_source": true,
+    "jni_source_sha256": "c41a6ecb155bd8fa87f002a2524721513ad2eea8eee0145d5b12187a2acc8998",
+    "all_70_normalized_command_flags_identical_except_added_O3": true,
+    "inference_mean_speedup": 7.951206157028564
+  },
+  "measurements": [
+    {
+      "build": "o0",
+      "load_ms": 914,
+      "source": "日本語で質問してもいいですか。",
+      "inference_ms": [
+        130512,
+        130868
+      ],
+      "target": [
+        "可以用日语提问吗？",
+        "可以用日语提问吗？"
+      ],
+      "native_library_sha256": "b8e76aec7131a7f2a8eb506eaea50b1b448e0371289a20ab365a672543032fa0",
+      "flags": {
+        "effective_optimization": "-O0",
+        "debug_checks": true,
+        "required_flags": [],
+        "commands_per_target": {
+          "framenest_hymt": 1,
+          "ggml": 2,
+          "ggml-base": 9,
+          "ggml-cpu": 16,
+          "llama": 42
+        },
+        "portable_isa_check_passed": true,
+        "compile_commands_sha256": "380296350e1340ed3e3dcab5155ac7870bb8aabd01cccf56aea6af2a8e64cf3e"
+      }
+    },
+    {
+      "build": "o3",
+      "load_ms": 220,
+      "source": "日本語で質問してもいいですか。",
+      "inference_ms": [
+        16355,
+        16518
+      ],
+      "target": [
+        "可以用日语提问吗？",
+        "可以用日语提问吗？"
+      ],
+      "native_library_sha256": "e81b4ab8929e79117e0825b4b103d936a141423ffa7a3ccabb8bc9bf2880c1e9",
+      "flags": {
+        "effective_optimization": "-O3",
+        "debug_checks": true,
+        "required_flags": [],
+        "commands_per_target": {
+          "framenest_hymt": 1,
+          "ggml": 2,
+          "ggml-base": 9,
+          "ggml-cpu": 16,
+          "llama": 42
+        },
+        "portable_isa_check_passed": true,
+        "compile_commands_sha256": "2ec38c9f3cb079df3d9f13d114635f06533fb586d9d07566b00ed231b5471b9b"
+      }
+    }
+  ],
+  "configuration_only_checks": {
+    "original_cmake_release": {
+      "effective_optimization": "-O3",
+      "debug_checks": false,
+      "required_flags": [],
+      "commands_per_target": {
+        "framenest_hymt": 1,
+        "ggml": 2,
+        "ggml-base": 9,
+        "ggml-cpu": 16,
+        "llama": 42
+      },
+      "portable_isa_check_passed": true,
+      "compile_commands_sha256": "d5749d15c6c63eb66b24268c3e74cecce64280a32e2bb381ae46675079e42bb7"
+    },
+    "original_agp_release_like_relwithdebinfo": {
+      "effective_optimization": "-O2",
+      "debug_checks": false,
+      "required_flags": [],
+      "commands_per_target": {
+        "framenest_hymt": 1,
+        "ggml": 2,
+        "ggml-base": 9,
+        "ggml-cpu": 16,
+        "llama": 42
+      },
+      "portable_isa_check_passed": true,
+      "compile_commands_sha256": "844987104ce2490b0a18fa61da701aca67bbbd55ad1ccd03a2011e599dc4a142"
+    },
+    "optimized_debug_preserves_asan": {
+      "effective_optimization": "-O3",
+      "debug_checks": true,
+      "required_flags": [
+        "-fsanitize=address"
+      ],
+      "commands_per_target": {
+        "framenest_hymt": 1,
+        "ggml": 2,
+        "ggml-base": 9,
+        "ggml-cpu": 16,
+        "llama": 42
+      },
+      "portable_isa_check_passed": true,
+      "compile_commands_sha256": "8e07e81f612362cd9c1a72d8580e0016f41618aa1ed7598bf1e11eecc3c88d44"
+    },
+    "explicit_optimization_off": {
+      "effective_optimization": "-O0",
+      "debug_checks": true,
+      "required_flags": [],
+      "commands_per_target": {
+        "framenest_hymt": 1,
+        "ggml": 2,
+        "ggml-base": 9,
+        "ggml-cpu": 16,
+        "llama": 42
+      },
+      "portable_isa_check_passed": true,
+      "compile_commands_sha256": "08ad4710d0c2e033b7a348b27ec14d8ab9d23e6f39200f8ed2483240a6d12bde"
+    }
+  },
+  "optimized_host_smoke": {
+    "passed": true,
+    "checks": [
+      "real model load",
+      "real translation",
+      "coroutine cancellation with no publication",
+      "context reuse",
+      "oversized prompt rejection",
+      "recovery",
+      "close during generation",
+      "idempotent close"
+    ],
+    "cancel_and_join_ms": 17,
+    "load_ms": 225,
+    "measurement_not_android": true
+  },
+  "other_checks": {
+    "build_auditor_unit_tests_passed": 7,
+    "official_template_parity_cases_passed": 7,
+    "bash_syntax_passed": true
+  },
+  "limits": [
+    "Hash verification warmed filesystem cache; initialization is not cold-device load.",
+    "Small sequential shared-host sample, not a statistical benchmark.",
+    "Run21 actual compile commands unavailable: O0 on Android is inferred from configuration, not measured here.",
+    "No Android build or emulator execution in this audit.",
+    "Sanitizer flags configured and checked, sanitizer binary not executed.",
+    "No physical-phone memory, latency, thermal, NAS or full-video semantic acceptance."
+  ],
+  "optimized_android_acceptance_passed": false,
+  "release_ready": false
+}
