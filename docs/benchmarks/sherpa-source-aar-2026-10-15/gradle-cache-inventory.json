@@ -1,0 +1,2022 @@
+[
+  {
+    "cache_path": "androidx.databinding/databinding-common/8.4.0/2be3530b78477835e69dce953b17adc1dbc5c6fa/databinding-common-8.4.0.jar",
+    "sha256": "66cab82639dac0f6c2433464c093b074d608c4bb887ec38a9b8bc4ac98126732",
+    "size_bytes": 16827
+  },
+  {
+    "cache_path": "androidx.databinding/databinding-common/8.4.0/535b04775940a68842dc2e1e86dff4be532b2e96/databinding-common-8.4.0.pom",
+    "sha256": "2e2b47e2ba181a5acbeada61c3bc55ac296a26e339f94e35c5f83840a4639b6f",
+    "size_bytes": 931
+  },
+  {
+    "cache_path": "androidx.databinding/databinding-compiler-common/8.4.0/b61a126333fdfced78679a5151f9118e765ef310/databinding-compiler-common-8.4.0.pom",
+    "sha256": "2ea6a045636900b2ae91f416bdd4e57359a5f2990496c09f0ca0d04c1328d72c",
+    "size_bytes": 3034
+  },
+  {
+    "cache_path": "androidx.databinding/databinding-compiler-common/8.4.0/e86fdbcf76bd759987679928b50b9b442315e509/databinding-compiler-common-8.4.0.jar",
+    "sha256": "b814e97669db30386502d75a78de52d8654c67ec386997f6e12adbcc6802ed9d",
+    "size_bytes": 839094
+  },
+  {
+    "cache_path": "com.android/signflinger/8.4.0/13f035dd8e7e470ff8f3216a0b46333187f26df5/signflinger-8.4.0.jar",
+    "sha256": "c1dca2c683634ee1a294298f9c7179578af6a86e080bdc40f961915bc5c8142f",
+    "size_bytes": 15339
+  },
+  {
+    "cache_path": "com.android/signflinger/8.4.0/7f97e6cc87f78e5556fa1e0619bd7a457bbf7ca/signflinger-8.4.0.pom",
+    "sha256": "ffc6a780163756af31cd965e590dba4e26c26edef591e6563ea8f868f3bd2bcb",
+    "size_bytes": 1437
+  },
+  {
+    "cache_path": "com.android/zipflinger/8.4.0/de8e3267995699af356740cf562cbedb485f5763/zipflinger-8.4.0.jar",
+    "sha256": "81dd485618a509a3235929b9eb13091d884452661de6ce5a45cc38b1c555421c",
+    "size_bytes": 66853
+  },
+  {
+    "cache_path": "com.android/zipflinger/8.4.0/fcdf25d05a9842d9ce4daa74bd09c06f0c69f0fa/zipflinger-8.4.0.pom",
+    "sha256": "911268f3efb66993da29c83c41bf246692ce834e1ccd23dbafbd905eecc45919",
+    "size_bytes": 1110
+  },
+  {
+    "cache_path": "com.android.databinding/baseLibrary/8.4.0/7e7399239e52d4069896277615e005add7ae8e5a/baseLibrary-8.4.0.jar",
+    "sha256": "794113709dab21b06c262b3795e73cb708fbacae61715f34361e1af6237a1870",
+    "size_bytes": 16749
+  },
+  {
+    "cache_path": "com.android.databinding/baseLibrary/8.4.0/c1db612dfb76b39f6fb21aef64deed34e925265d/baseLibrary-8.4.0.pom",
+    "sha256": "10dbf3234e673e31ebe6548ee850c20280fc293ec21c20c0c67a905454128d08",
+    "size_bytes": 923
+  },
+  {
+    "cache_path": "com.android.library/com.android.library.gradle.plugin/8.4.0/5e5018714a3fe26ed92d2986fda5dc279cc632bb/com.android.library.gradle.plugin-8.4.0.pom",
+    "sha256": "86be0ae0867f8f477a640ab5a3356eb3409bb9a7186c7b72253c7cd08e8e913a",
+    "size_bytes": 1320
+  },
+  {
+    "cache_path": "com.android.tools/annotations/31.4.0/7f3cdb30f22d5cf7878c1c4b0e40dbcc71112331/annotations-31.4.0.jar",
+    "sha256": "25e8825547de7146d08fa18f04ef934ee1e6aec52e4c97ffa510a8f0f44b07a0",
+    "size_bytes": 11045
+  },
+  {
+    "cache_path": "com.android.tools/annotations/31.4.0/86c14f6e00be90a631eeb82fff08f702f6201d74/annotations-31.4.0.pom",
+    "sha256": "e9f398305f59f8e623dc9bf60ecb13fac438e395d20c7db859c3d82cb18636da",
+    "size_bytes": 822
+  },
+  {
+    "cache_path": "com.android.tools/common/31.4.0/b26bbba5cae63eb14426ceef78f4bed8837d9231/common-31.4.0.jar",
+    "sha256": "d7ce03f7ae4a8b7ad17d5fb61a3beac15c73aff818eac51dedf8e35c204162f3",
+    "size_bytes": 576756
+  },
+  {
+    "cache_path": "com.android.tools/common/31.4.0/cae1a281fbec3cbf6fc1cd5f8dfc2c3460557778/common-31.4.0.pom",
+    "sha256": "2607dbd584e534047d42ed3d8bdfafa81f5d987814605e24fc02f5d950964119",
+    "size_bytes": 1664
+  },
+  {
+    "cache_path": "com.android.tools/dvlib/31.4.0/4a640f3e66a0aa81ea193cb4a2e8fb10b4df3c9/dvlib-31.4.0.jar",
+    "sha256": "bf962bea906e1dc8a3273b8129999eaea3bb16fcb2b9deea1450dc6fb2ef9073",
+    "size_bytes": 61082
+  },
+  {
+    "cache_path": "com.android.tools/dvlib/31.4.0/ba626f3b52be1e810127b0ba13e902dc4d93631f/dvlib-31.4.0.pom",
+    "sha256": "f43e7c39b075017f2ee57073f77f930e660b6837ecc17a20facc1e9397cf7163",
+    "size_bytes": 1110
+  },
+  {
+    "cache_path": "com.android.tools/play-sdk-proto/31.4.0/d583eea2c86a5b3be36b197a5fec3668b6a3c244/play-sdk-proto-31.4.0.pom",
+    "sha256": "c8cade26e02c55051e8373b6f59990171ece56bfec11150504c87bc99ef9456c",
+    "size_bytes": 1128
+  },
+  {
+    "cache_path": "com.android.tools/play-sdk-proto/31.4.0/e7eef96784f78cdb2e4c5276e1007e973ef6c709/play-sdk-proto-31.4.0.jar",
+    "sha256": "68840b9dc064724dbe12844e0c59e325ac4dfaa818bf3262635bd5254010a29c",
+    "size_bytes": 136558
+  },
+  {
+    "cache_path": "com.android.tools/repository/31.4.0/cffa4ceda5250b50a4e81076d5ac3b8aef682c1d/repository-31.4.0.pom",
+    "sha256": "2afacccd61667af262c2ebae4a965f8d95d9768f94910c1ff64815f9142d339d",
+    "size_bytes": 2236
+  },
+  {
+    "cache_path": "com.android.tools/repository/31.4.0/f9d998909029644e8f7cf78cd850138ecf7cfcfd/repository-31.4.0.jar",
+    "sha256": "df2533e154b736a0a95e4804893aa59099552842bf9635cda3751be9e894a0e2",
+    "size_bytes": 240563
+  },
+  {
+    "cache_path": "com.android.tools/sdk-common/31.4.0/79015ec2efa0f1db58beafa7860f7cbf88434107/sdk-common-31.4.0.pom",
+    "sha256": "91135e7aebb70a26d43f652d93ac78c1bb118cf8e8aa42977b8ad031fbefa9b0",
+    "size_bytes": 4069
+  },
+  {
+    "cache_path": "com.android.tools/sdk-common/31.4.0/97562d4d24cf4d5dfa9b8a8dbb6d398cb58ba12e/sdk-common-31.4.0.jar",
+    "sha256": "f38eba4bbfb6d541dc8c2be38c31e7389d0acdc354b234f258b6ee89e8ddce6d",
+    "size_bytes": 1483335
+  },
+  {
+    "cache_path": "com.android.tools/sdklib/31.4.0/a46cf34c0e396e335af15e2b6a2e907c69df7353/sdklib-31.4.0.jar",
+    "sha256": "7d05caeddb635d87d04b4de70f9ee78a247514665ab57f25c07d2ba4e7af0f5b",
+    "size_bytes": 1600226
+  },
+  {
+    "cache_path": "com.android.tools/sdklib/31.4.0/c58e4ad14cc0f5af9541c610d9c712516899ebac/sdklib-31.4.0.pom",
+    "sha256": "67aa84e4b5d2e0127c205b4f1a4a75734f14ffc5f349123ed7bb32f98f518bcf",
+    "size_bytes": 2573
+  },
+  {
+    "cache_path": "com.android.tools.analytics-library/crash/31.4.0/669e0dbea9c0612c1752365738497bea9627a6b9/crash-31.4.0.jar",
+    "sha256": "2c5c26420967675c074bc7140831fe3bff5bbabc7fbbc08ba29fdc3eadcc9510",
+    "size_bytes": 14812
+  },
+  {
+    "cache_path": "com.android.tools.analytics-library/crash/31.4.0/e850456ba25aeeb0f6621e26668866a7852fdece/crash-31.4.0.pom",
+    "sha256": "7e1a15bb6db2af801c25907ae1a18ca40c9f2526719f455a3e7315c11c2c2caf",
+    "size_bytes": 1873
+  },
+  {
+    "cache_path": "com.android.tools.analytics-library/protos/31.4.0/4d9390bf76e306bb6560ac7ac5589969281124db/protos-31.4.0.jar",
+    "sha256": "c2bb6199304d595cb9b60f282d1bb5016c838809b33c90bf8aaf9a769a58115b",
+    "size_bytes": 7697450
+  },
+  {
+    "cache_path": "com.android.tools.analytics-library/protos/31.4.0/d2c39b009fcc16748c5f2977f62a7dcb0aa18927/protos-31.4.0.pom",
+    "sha256": "0f2f1a654416efd5badee091e4a8e569e280802f02d13a2a5e5d74bd0fd59aa1",
+    "size_bytes": 1139
+  },
+  {
+    "cache_path": "com.android.tools.analytics-library/shared/31.4.0/58d6b88d63a1a3cb245ff761a36825864d037e56/shared-31.4.0.jar",
+    "sha256": "971e224c62bb2f05ca8f4f37ed29ac8f91914b39eb8ac620ba92a2e0ea38bc7d",
+    "size_bytes": 127240
+  },
+  {
+    "cache_path": "com.android.tools.analytics-library/shared/31.4.0/f11f275d6f0118ec8dd2346803199eb3bc60faac/shared-31.4.0.pom",
+    "sha256": "8e0244fc54720cbb6fa84ee9515752d6e168193f2ff12d0db2037c892be0cf6c",
+    "size_bytes": 2237
+  },
+  {
+    "cache_path": "com.android.tools.analytics-library/tracker/31.4.0/369d37e578f8468b035ae74190aee44c9c05622c/tracker-31.4.0.jar",
+    "sha256": "542c6c0070a7df6254050532f2a14aa9db5553a0fc2cb203fdba7b721523e716",
+    "size_bytes": 41801
+  },
+  {
+    "cache_path": "com.android.tools.analytics-library/tracker/31.4.0/89aee6be8506fb5612a38e349df86292db1e738b/tracker-31.4.0.pom",
+    "sha256": "687c909cafc790be64e9d3fe247076793d7169db91818b446a63a022b38fe293",
+    "size_bytes": 2246
+  },
+  {
+    "cache_path": "com.android.tools.build/aapt2/8.4.0-11315950/1d3ccd82b17e27dd7b7cd568a19c49d46cfec862/aapt2-8.4.0-11315950-linux.jar",
+    "sha256": "5638a5b151f9c50ba2a9e5291edfc9227aec3fedc3ee8f8a8583fa54cd1dd9ca",
+    "size_bytes": 2174058
+  },
+  {
+    "cache_path": "com.android.tools.build/aapt2/8.4.0-11315950/c1d62806313573d5dd629178808094571bbcb17d/aapt2-8.4.0-11315950.pom",
+    "sha256": "438500be20c6e8ae2dbd6154433718d4c2d5e200272d9cd2c6ccd108e559a7fe",
+    "size_bytes": 1096
+  },
+  {
+    "cache_path": "com.android.tools.build/aapt2-proto/8.4.0-11315950/7f5e9eb5fb434ca72d072b0824f4eecae4aa3779/aapt2-proto-8.4.0-11315950.module",
+    "sha256": "15c5e990f6404c9ec52ed3561c1dc454175089ae5ad14037f2759af14f994959",
+    "size_bytes": 3766
+  },
+  {
+    "cache_path": "com.android.tools.build/aapt2-proto/8.4.0-11315950/81a401e1a44af4dd40882b5ad2cf74852ce7cdc4/aapt2-proto-8.4.0-11315950.pom",
+    "sha256": "14ad63d75605b55eea2acbb7f0892183dc718d18e12dc282354cf873046c68dd",
+    "size_bytes": 1685
+  },
+  {
+    "cache_path": "com.android.tools.build/aapt2-proto/8.4.0-11315950/d0b137e4b167fa759062c4dd72f9d7f26c3470a1/aapt2-proto-8.4.0-11315950.jar",
+    "sha256": "f2832942e1de78a4544d671850d35e4b6e9b0342c1dc216c081707fb98b0dfbe",
+    "size_bytes": 712652
+  },
+  {
+    "cache_path": "com.android.tools.build/aaptcompiler/8.4.0/5f732fe633f7f425930f1f187fd343813698fb0a/aaptcompiler-8.4.0.jar",
+    "sha256": "bef2f718a07a2bf5affcf54bccd94dc7a8fdd4042772cd89719b377a2972e189",
+    "size_bytes": 499315
+  },
+  {
+    "cache_path": "com.android.tools.build/aaptcompiler/8.4.0/613d005633fed30e0377cd9be8acdbcb3714415a/aaptcompiler-8.4.0.pom",
+    "sha256": "cb94261f9224e812eea4d7abbe49f805483e4c64e177619208badf096cad9f60",
+    "size_bytes": 2615
+  },
+  {
+    "cache_path": "com.android.tools.build/aaptcompiler/8.4.0/8124dcd3c24da9d0c9d197c079d4177fddd3720f/aaptcompiler-8.4.0.module",
+    "sha256": "ce588080d6fc63d15a24d77aec6e0c995d67d01c3a981c523f318270c1376cda",
+    "size_bytes": 4754
+  },
+  {
+    "cache_path": "com.android.tools.build/apksig/8.4.0/3a072fb4ea86f0a1416108ff87ade8b4560cdc41/apksig-8.4.0.pom",
+    "sha256": "d9af0657e1801a89af58abfbf5e3d89e038afe31fd629558f73ff4c641af6785",
+    "size_bytes": 932
+  },
+  {
+    "cache_path": "com.android.tools.build/apksig/8.4.0/d51ecbc4a5b7a2c7832586a4dde18f61d92810a4/apksig-8.4.0.jar",
+    "sha256": "c4f6fdf2148490296f422a7eb37647ea11d1c3b02f1f2349c33ce257f3c29b1f",
+    "size_bytes": 496313
+  },
+  {
+    "cache_path": "com.android.tools.build/apkzlib/8.4.0/c69a4f6107b9f316a2916a5b54af81c09b7a1ed2/apkzlib-8.4.0.pom",
+    "sha256": "1f45948a930004826e86572a47ee73345e04ffef0e1436b24c06868fd29e00ef",
+    "size_bytes": 1847
+  },
+  {
+    "cache_path": "com.android.tools.build/apkzlib/8.4.0/d656b52facbb301b8bdc1e40a5ae008bcf335fe9/apkzlib-8.4.0.jar",
+    "sha256": "1c1a67d6f4f186427ac166ebaa0dd867f595d5144fc925252b05ffb9d1a156b7",
+    "size_bytes": 210573
+  },
+  {
+    "cache_path": "com.android.tools.build/builder/8.4.0/42c3905c66b23002900e3ce5d256d31e45138dae/builder-8.4.0.module",
+    "sha256": "76bb2d6d162b7bc3c058a7c064290d3a85ce15d96aedc848b1a6fec8a5af424c",
+    "size_bytes": 8012
+  },
+  {
+    "cache_path": "com.android.tools.build/builder/8.4.0/64de9b93459a7d4fbd6e9849af9b2170338ed4e1/builder-8.4.0.pom",
+    "sha256": "c5fbc89f3dc9186a61aa97f2b5508c2fb603c467c2d09b962673bcdd66faaac9",
+    "size_bytes": 5311
+  },
+  {
+    "cache_path": "com.android.tools.build/builder/8.4.0/8aaa522e739c616e216e211d0b82c4c05ed08397/builder-8.4.0.jar",
+    "sha256": "0171bb226224709aa8d0ab4f3bf3163647ed232ade3a851319dd2126c8934119",
+    "size_bytes": 13424139
+  },
+  {
+    "cache_path": "com.android.tools.build/builder-model/8.4.0/2ce5cd3c4157436ca795b20b26580bf6d932758d/builder-model-8.4.0.jar",
+    "sha256": "0ad5a52ef979140c3ddeab546c0c7e5abf02b8fbf5f8a2fbffeee54ef3eac39d",
+    "size_bytes": 122814
+  },
+  {
+    "cache_path": "com.android.tools.build/builder-model/8.4.0/6386382468039a497fac628c98cb2220d625fdb4/builder-model-8.4.0.pom",
+    "sha256": "3b3c83ef6e4ee8fe98635a5267ed2f520da918ff72d57e78aab6af1953abb461",
+    "size_bytes": 1845
+  },
+  {
+    "cache_path": "com.android.tools.build/builder-model/8.4.0/f456b3aefb4af3d17095f79fc788e7830d8abb3d/builder-model-8.4.0.module",
+    "sha256": "aa3ed4955f7b03e78db970ea8cd5bc0bf975644f41215a7b489c8bbd8a20ef25",
+    "size_bytes": 4086
+  },
+  {
+    "cache_path": "com.android.tools.build/builder-test-api/8.4.0/cbf2c372972c4123da88b62af35406fb7073f783/builder-test-api-8.4.0.pom",
+    "sha256": "5d23c47db25f548d1d1b34677eaa873c99def7e7f14a97756393be1ec80dc48e",
+    "size_bytes": 2223
+  },
+  {
+    "cache_path": "com.android.tools.build/builder-test-api/8.4.0/e49d832c8f2d4a769c19df8016572d30c756dd9c/builder-test-api-8.4.0.jar",
+    "sha256": "ab6c1db019eb72dc626a21fae555f44b2da7c0622ae730cd93846810cc1f532d",
+    "size_bytes": 15329
+  },
+  {
+    "cache_path": "com.android.tools.build/builder-test-api/8.4.0/f880a60ecbfd5ae3d3c04f51ad1c95f3b193ce43/builder-test-api-8.4.0.module",
+    "sha256": "09f960e284da53f9993e1bef82ad330eaa8b08342705a881ed04cdcd33c3e68e",
+    "size_bytes": 4206
+  },
+  {
+    "cache_path": "com.android.tools.build/bundletool/1.15.6/47ed87e7558ac16fdc182a83be13a0aac4d6b217/bundletool-1.15.6.pom",
+    "sha256": "745894f1d15599871b1c3a6cc09f0da03268f1373ce937ce35942b933d6518e6",
+    "size_bytes": 2671
+  },
+  {
+    "cache_path": "com.android.tools.build/bundletool/1.15.6/d804e9cf5387426500061a8e0eb5602d50a49e56/bundletool-1.15.6.jar",
+    "sha256": "f66992e537adb12ffa6d181cdc536d564b1c4b4b4c5972b4891706c6533a4641",
+    "size_bytes": 13019963
+  },
+  {
+    "cache_path": "com.android.tools.build/gradle/8.4.0/6b3c15b079fad374d2018bc9a49029fe8e339bb1/gradle-8.4.0.module",
+    "sha256": "38b2ea3d54270f92ef35210438cfd3d6e1d50536ea2d18db034e282aafbe8453",
+    "size_bytes": 13727
+  },
+  {
+    "cache_path": "com.android.tools.build/gradle/8.4.0/85459720b54002fcb15993afc5cc82572a3d5cd0/gradle-8.4.0.pom",
+    "sha256": "e82278cbbcc428bd181a445e947c3dd61b1b23ce4356ded49894e6aacf416da7",
+    "size_bytes": 11963
+  },
+  {
+    "cache_path": "com.android.tools.build/gradle/8.4.0/bdb2cec5d8f62c2d4689d860c6e5de1eb7ac9fa3/gradle-8.4.0.jar",
+    "sha256": "d825d48ed34302f0ce7f4fdfae17b8ee1c345694e1a30dd1e86dad718de2600f",
+    "size_bytes": 12031087
+  },
+  {
+    "cache_path": "com.android.tools.build/gradle-api/8.4.0/715a2e42e17d2a0d3a7260fd6a988e6cf9574bf4/gradle-api-8.4.0.jar",
+    "sha256": "e445fb24c9da08d8a622626263f1e4d973fad9223fe054d9631e4f9b6a8d79fc",
+    "size_bytes": 335488
+  },
+  {
+    "cache_path": "com.android.tools.build/gradle-api/8.4.0/d71efb4a6cd091d90d413d03beb7c3f98fb26757/gradle-api-8.4.0.pom",
+    "sha256": "7dd189ed3e3d2da92170c4dd126aaedf3057c7795168ede9c45c025f3bd764aa",
+    "size_bytes": 2202
+  },
+  {
+    "cache_path": "com.android.tools.build/gradle-api/8.4.0/fddf8b4b9538a25d9dcc5a78d6e7572787842875/gradle-api-8.4.0.module",
+    "sha256": "0fca77a2c2801208a2573e4b2ada6d19173ec8ab88d594199f7ab12b2258a81a",
+    "size_bytes": 4556
+  },
+  {
+    "cache_path": "com.android.tools.build/gradle-settings-api/8.4.0/2e95d4817e1a2982dd77123fccc76ff257674ad0/gradle-settings-api-8.4.0.jar",
+    "sha256": "d9f43bf45b8e642803997216012236baa076574cafb89cd95a315ac7c38ea8e6",
+    "size_bytes": 9856
+  },
+  {
+    "cache_path": "com.android.tools.build/gradle-settings-api/8.4.0/3978b3585550ce2536cc102cc0b457f1e59051eb/gradle-settings-api-8.4.0.module",
+    "sha256": "ce2fd5d85d6c09b1e5fade21e5716f416c69a9d5da25656a7356d7f76dc3b930",
+    "size_bytes": 3967
+  },
+  {
+    "cache_path": "com.android.tools.build/gradle-settings-api/8.4.0/b0bb313fd04f964af7c887dcab5ba12e0c338a46/gradle-settings-api-8.4.0.pom",
+    "sha256": "d2a336bfff0eca954e5fd7a4043d3a34d971a596725c724b731762b12c820c9e",
+    "size_bytes": 1695
+  },
+  {
+    "cache_path": "com.android.tools.build/manifest-merger/31.4.0/33b4fa8249e6fa97ea3420485ed5c1e07b48b427/manifest-merger-31.4.0.module",
+    "sha256": "16c01f544b86e9df7fdaae7ab1c736079b265f24a0c6263bc42bccf585e633ba",
+    "size_bytes": 4741
+  },
+  {
+    "cache_path": "com.android.tools.build/manifest-merger/31.4.0/c9b06c6a8b1dee31c38f723f572c8e2d40e29ac2/manifest-merger-31.4.0.jar",
+    "sha256": "3439ddad91cf62aa5617af1c3ac2849e35878b487e972dfda26f07236a07e031",
+    "size_bytes": 246091
+  },
+  {
+    "cache_path": "com.android.tools.build/manifest-merger/31.4.0/dd09c0ea8856c5b97675f654f23c753a849f0fa8/manifest-merger-31.4.0.pom",
+    "sha256": "9ff2f41cb98f72de2bc5a61c7896d0a67a7ebb5648ef2c9aae09e2fc7b2f5412",
+    "size_bytes": 2557
+  },
+  {
+    "cache_path": "com.android.tools.build/transform-api/2.0.0-deprecated-use-gradle-api/47f6c56527c42425742fa9b56ffd3fd80763fe03/transform-api-2.0.0-deprecated-use-gradle-api.jar",
+    "sha256": "4de4a3d05e1c534c2db9e4588bf34082bb2bd232d8abb9727c430290ce225740",
+    "size_bytes": 261
+  },
+  {
+    "cache_path": "com.android.tools.build/transform-api/2.0.0-deprecated-use-gradle-api/7d636f89a401a7603740ef05ac87f5a1e2811efe/transform-api-2.0.0-deprecated-use-gradle-api.pom",
+    "sha256": "7c62f3856e8abca1d79257925f26c12668693f5d95904056bbac88605cfd8575",
+    "size_bytes": 1108
+  },
+  {
+    "cache_path": "com.android.tools.build.jetifier/jetifier-core/1.0.0-beta10/6e621022a9c95af12a7004d6b55805bbd1126837/jetifier-core-1.0.0-beta10.jar",
+    "sha256": "26abb4a13927d9062169c504c9e94fe80e9ae3a4f7b5ab8875ab007536a91f5e",
+    "size_bytes": 128988
+  },
+  {
+    "cache_path": "com.android.tools.build.jetifier/jetifier-core/1.0.0-beta10/a05601d691cb5b3175469dad16d7b507e122161f/jetifier-core-1.0.0-beta10.pom",
+    "sha256": "5c9d42e6b7e35d4d8d02e0a322cf26693b3ec3642b107c8f0be5a721d45a0c6d",
+    "size_bytes": 1943
+  },
+  {
+    "cache_path": "com.android.tools.build.jetifier/jetifier-core/1.0.0-beta10/df2cc641b26756fd3daf9dd8f69ff81a886b2610/jetifier-core-1.0.0-beta10.module",
+    "sha256": "f0917589a42d276163f10040ab5842e91883dcbdb1d48bfd1f1fcaa72c1ca7b7",
+    "size_bytes": 3734
+  },
+  {
+    "cache_path": "com.android.tools.build.jetifier/jetifier-processor/1.0.0-beta10/946c39eb0c052ff4f60a8939648a8b99af20d604/jetifier-processor-1.0.0-beta10.jar",
+    "sha256": "c5067a7b928237a1271a5e9cb5710e9f80b4973293945bc51e3a4c864ea4bfed",
+    "size_bytes": 175068
+  },
+  {
+    "cache_path": "com.android.tools.build.jetifier/jetifier-processor/1.0.0-beta10/e2bc65203be6634db858f565b4318d5eb2798e64/jetifier-processor-1.0.0-beta10.module",
+    "sha256": "36c25576b19993df360170528cc62b7246c37776d6158154a67cdf8fc2d58e13",
+    "size_bytes": 5041
+  },
+  {
+    "cache_path": "com.android.tools.build.jetifier/jetifier-processor/1.0.0-beta10/ef909fba0e8e31b04e88b96ac2a01b46c395c9f/jetifier-processor-1.0.0-beta10.pom",
+    "sha256": "33b17f396989404a49174748569bc8edf4e39a62a42a35ce93dca5c0e4ba0842",
+    "size_bytes": 2666
+  },
+  {
+    "cache_path": "com.android.tools.ddms/ddmlib/31.4.0/6c96b44709bdf9508c10df193b9499a276bb8f79/ddmlib-31.4.0.pom",
+    "sha256": "4f0d8379af0ccdb214573b80754fbbe6c2c312c27dfb513a5e733f81ed289ea7",
+    "size_bytes": 1637
+  },
+  {
+    "cache_path": "com.android.tools.ddms/ddmlib/31.4.0/91475e4672ba7fb06db00eb6638125611caa781c/ddmlib-31.4.0.jar",
+    "sha256": "f98b88cfe0fe729d755f0bf6d5fc21e20f89aea9e630860dc0f75dcbec6fec0b",
+    "size_bytes": 671190
+  },
+  {
+    "cache_path": "com.android.tools.external.com-intellij/intellij-core/31.4.0/8d02d2b6c71cdcbb2a52cce74612d2ad2db5e859/intellij-core-31.4.0.jar",
+    "sha256": "025e5a282d9fb83a4e6073ff4ccd5a28e38f8a322a856d4aa29e4ad00bd377f4",
+    "size_bytes": 33517745
+  },
+  {
+    "cache_path": "com.android.tools.external.com-intellij/intellij-core/31.4.0/eccb2e3920383183f827b8224a93e85ac0da0745/intellij-core-31.4.0.pom",
+    "sha256": "b456a93837c0dbd4a95ab7361403d917d6af104d02409d37f5abb76b10ce108e",
+    "size_bytes": 1147
+  },
+  {
+    "cache_path": "com.android.tools.external.com-intellij/kotlin-compiler/31.4.0/35cf8ccda73b0e4a88bed7f6cdf4660ef9e0c3f4/kotlin-compiler-31.4.0.jar",
+    "sha256": "fd45a1e4a45c51b46920445586f71c92a8801cb0880bcc0f485144ffbfbc284f",
+    "size_bytes": 55290779
+  },
+  {
+    "cache_path": "com.android.tools.external.com-intellij/kotlin-compiler/31.4.0/46b2ae8f7aba916f16c961492d2cff3adfbf41fc/kotlin-compiler-31.4.0.pom",
+    "sha256": "2af52dd13175b4e4d921363e8787a00307f90b7c8d9b8e606ad30b5863332c14",
+    "size_bytes": 919
+  },
+  {
+    "cache_path": "com.android.tools.external.org-jetbrains/uast/31.4.0/29fda3ce0ed504f0f8bebc83782dd79172319449/uast-31.4.0.jar",
+    "sha256": "0df6547b37453f5ad2006179cd65b0ab7109b8f67b837d739509b2ff4f8310b3",
+    "size_bytes": 1930198
+  },
+  {
+    "cache_path": "com.android.tools.external.org-jetbrains/uast/31.4.0/d8e9d0b0e2feb0dd30cea8d1eec8127d03302008/uast-31.4.0.pom",
+    "sha256": "9f691ba1f7b45ba72e88cc5a6c8966b9591c4721a639c39b33b7283ebd715646",
+    "size_bytes": 895
+  },
+  {
+    "cache_path": "com.android.tools.layoutlib/layoutlib-api/31.4.0/3067a6d13de91d987d002d39cf4fb94e466269bb/layoutlib-api-31.4.0.pom",
+    "sha256": "90c7c64f43d831e763c4b8a422067211e005756183aa7c65672a0586209ba296",
+    "size_bytes": 1670
+  },
+  {
+    "cache_path": "com.android.tools.layoutlib/layoutlib-api/31.4.0/5b4270989aafbce80f83599e345afd927cf6ba26/layoutlib-api-31.4.0.jar",
+    "sha256": "3c9064c3c3ab0e73f3a5953d1c11c57dbf57a3297957c1d7d460c92e14cf34b2",
+    "size_bytes": 122058
+  },
+  {
+    "cache_path": "com.android.tools.lint/lint/31.4.0/17c98eb889a3f10a496ac576e1c5b6d1ded3b3ea/lint-31.4.0.pom",
+    "sha256": "e8a9326808773e7648528ab913337f94e53fe5631ad01b7b4e7fd931a326a6d6",
+    "size_bytes": 4187
+  },
+  {
+    "cache_path": "com.android.tools.lint/lint/31.4.0/cb26f3acbb056f7463e4fb39e9b1c917c1ceae3a/lint-31.4.0.jar",
+    "sha256": "4c8bbdfaa4fcddd5e8b8f3e9606057a1e5dd6ed8013a7bbc9ae2d4a7d950152c",
+    "size_bytes": 663094
+  },
+  {
+    "cache_path": "com.android.tools.lint/lint-api/31.4.0/91cba344bbed2918ff948ecf0cc643404b952f3b/lint-api-31.4.0.pom",
+    "sha256": "58b47b2f0b82be0861def98aa83ef9017b79c643f8585a6ff2d2acfc4f9898bd",
+    "size_bytes": 4060
+  },
+  {
+    "cache_path": "com.android.tools.lint/lint-api/31.4.0/be12c7b8423d29ba632e91d94bc0ff9de3bec4e9/lint-api-31.4.0.jar",
+    "sha256": "03046cddd2df9b0d25ae1f5260102922b9efc8118ad1c2566443a04e3008ee55",
+    "size_bytes": 1383572
+  },
+  {
+    "cache_path": "com.android.tools.lint/lint-checks/31.4.0/8965d17ca405e9f83c06c221f4e22cc7702505f6/lint-checks-31.4.0.pom",
+    "sha256": "38f0def6d4c49294564cefe3f5d97df288ce8f474fa4e4d7332b10de436756cd",
+    "size_bytes": 3716
+  },
+  {
+    "cache_path": "com.android.tools.lint/lint-checks/31.4.0/fe0461894b4d5916278bc684bd9423bfcd0349e5/lint-checks-31.4.0.jar",
+    "sha256": "51ad2a41dcf521ad7bb0de716ab7f13a065e3cafe69e9d94c95b54f8589992c6",
+    "size_bytes": 5952298
+  },
+  {
+    "cache_path": "com.android.tools.lint/lint-gradle/31.4.0/1344716f97ca372e9d60774f5fb2d551d3203faf/lint-gradle-31.4.0.pom",
+    "sha256": "297b9f004c263a35efbaff26f7acd60819dc59dd5d6362510df285a4c1b740c4",
+    "size_bytes": 2276
+  },
+  {
+    "cache_path": "com.android.tools.lint/lint-gradle/31.4.0/8109951cff039eee3968acf6462bb7a6c4b73ede/lint-gradle-31.4.0.jar",
+    "sha256": "ec188c62447a6c7cd781072577b04470d7a8c321de926a95f5c7f92342060fbe",
+    "size_bytes": 67064
+  },
+  {
+    "cache_path": "com.android.tools.lint/lint-model/31.4.0/9e5a5fdecfe4f1a457e00009441232089cce237f/lint-model-31.4.0.jar",
+    "sha256": "ae5b38460f3a59c0725930d779dbbb3372f08031a1a41faa59d9f8500b3e4641",
+    "size_bytes": 174746
+  },
+  {
+    "cache_path": "com.android.tools.lint/lint-model/31.4.0/ea19febf872cd4510c970b5b0bb33e28aa1d11af/lint-model-31.4.0.pom",
+    "sha256": "8b9c49042ec6668dd1dec7e9478cc334e0bc9da5f6aa566fa4600099548468c8",
+    "size_bytes": 1826
+  },
+  {
+    "cache_path": "com.android.tools.lint/lint-typedef-remover/31.4.0/3a0697023e1a3213c38b89d1d6d7e9aaed415707/lint-typedef-remover-31.4.0.pom",
+    "sha256": "d8090b1335a2a022a9652a800d7f989f5e8a6c431068328ea2ab237e18a077c6",
+    "size_bytes": 1491
+  },
+  {
+    "cache_path": "com.android.tools.lint/lint-typedef-remover/31.4.0/644ab9b8a697ba83702c4e32eaaf95c504e1a522/lint-typedef-remover-31.4.0.jar",
+    "sha256": "5b4f485215ca4d86ef2319fc398b5f2251e62f5446bc5fd0e00653648ddde318",
+    "size_bytes": 9550
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-device-provider-ddmlib-proto/31.4.0/69a08b3adc6e364339531bf61ac598d42c471813/android-device-provider-ddmlib-proto-31.4.0.pom",
+    "sha256": "6434b6cf339155b651a5f96995189d7d02ad6e03b30fe8ae65a6d34aac708e0a",
+    "size_bytes": 1210
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-device-provider-ddmlib-proto/31.4.0/732647a1df2d9405dbbc944ccb1a9153d7dc3e3a/android-device-provider-ddmlib-proto-31.4.0.jar",
+    "sha256": "da9f3f3dae26544c90668549584765d5854a87c425d2cfe577cd34d3600ea097",
+    "size_bytes": 18705
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-device-provider-gradle-proto/31.4.0/8b92e7161509385dae96282b5d57c8ed1535abe5/android-device-provider-gradle-proto-31.4.0.pom",
+    "sha256": "6c0da6eeedee2cb72a68933067001ebf471521ee0bf7a33427a43507cd9b0b64",
+    "size_bytes": 1223
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-device-provider-gradle-proto/31.4.0/9f4923a6c0e213f00c1cc31720d1535f2d8517fe/android-device-provider-gradle-proto-31.4.0.jar",
+    "sha256": "ad2342bb1d6f95563400a322493ea1c229cb93df3944f1261b7399f718494049",
+    "size_bytes": 37250
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-test-plugin-host-additional-test-output-proto/31.4.0/818303ec5a6b24949f903710219c9e113df15cd2/android-test-plugin-host-additional-test-output-proto-31.4.0.pom",
+    "sha256": "5cabbb965c2dfd35ed3a24a26ade6436a01cca2a52706a5bf315abe2780f7b1e",
+    "size_bytes": 1239
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-test-plugin-host-additional-test-output-proto/31.4.0/c02332c53d95a3e0ccd7ad9d6d97f8fec5d1a469/android-test-plugin-host-additional-test-output-proto-31.4.0.jar",
+    "sha256": "38450694de6328c2c4cba696f9c04ecdd5ce6952355f68c3a22f9541d1d6546f",
+    "size_bytes": 18287
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-test-plugin-host-apk-installer-proto/31.4.0/eab0d04ab0181f625bd2c22a800ccc12d6e555c/android-test-plugin-host-apk-installer-proto-31.4.0.jar",
+    "sha256": "ced49aca4031aa2c57b51d3909ba815082e563c1d9a246bc23ede973782524f7",
+    "size_bytes": 51226
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-test-plugin-host-apk-installer-proto/31.4.0/efe9ec08b48c65b40e1a134dd4d5d7e40eca21b6/android-test-plugin-host-apk-installer-proto-31.4.0.pom",
+    "sha256": "e1aa41c34ae86a9c3439613f9111229309d8c0848790484fa9fbbbcf3c53ee7d",
+    "size_bytes": 1203
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-test-plugin-host-coverage-proto/31.4.0/290e5fb9ab643a473958efd249f85600e91a73ed/android-test-plugin-host-coverage-proto-31.4.0.pom",
+    "sha256": "c68cef6f4514d511e74d7f1ee1206a7feb7813242f34fde7dd0a3052a82e0f09",
+    "size_bytes": 1206
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-test-plugin-host-coverage-proto/31.4.0/c780344aab70a33c454ad697295e12278fed16db/android-test-plugin-host-coverage-proto-31.4.0.jar",
+    "sha256": "efb4d7014aaa7355246a07c2e437a2231fb252540ff1bce6872c88dc8da89d12",
+    "size_bytes": 23289
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-test-plugin-host-emulator-control-proto/31.4.0/14f2d498dff046873646a4ca6b09adde511d9e1c/android-test-plugin-host-emulator-control-proto-31.4.0.pom",
+    "sha256": "ce98da43b2b8268d67d57019e787e3391fce55f643ecda0c53f88be2e7d5675a",
+    "size_bytes": 1419
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-test-plugin-host-emulator-control-proto/31.4.0/faaddb0258a839e6ab89fe2acbe20ce29b403b43/android-test-plugin-host-emulator-control-proto-31.4.0.jar",
+    "sha256": "aedec5ec4627d898cccdf42d8038db20eba4495753c53d1b0b378734491caf5f",
+    "size_bytes": 22679
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-test-plugin-host-logcat-proto/31.4.0/89fe5c15ad8ea8c112cd24b9ad76b0987f17df53/android-test-plugin-host-logcat-proto-31.4.0.pom",
+    "sha256": "e3c2ef08a49b6244221998e68f36b04daa9bb53199a1985bf28b67d94c2074fe",
+    "size_bytes": 1201
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-test-plugin-host-logcat-proto/31.4.0/d8f873c14c5c65746b97801c2c6cae506d0b3d29/android-test-plugin-host-logcat-proto-31.4.0.jar",
+    "sha256": "9129024bd8e38353bca3eb26dfd8e3628e058d57d6e9d8451ffc35f016751e63",
+    "size_bytes": 13318
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-test-plugin-host-retention-proto/31.4.0/2b9c28c28a21e8bb09160189228893b31fb4aeda/android-test-plugin-host-retention-proto-31.4.0.pom",
+    "sha256": "a7f5e7e8ea8c3fae75be168522940c29dcd4a919c1f31bb39937c18412f9a45c",
+    "size_bytes": 1412
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-test-plugin-host-retention-proto/31.4.0/8ef946d4477f3b40b3bcb7d151131483b6d77d67/android-test-plugin-host-retention-proto-31.4.0.jar",
+    "sha256": "3db8ed38ef49b694caea466ae22e3b36cedc9557b3589d0e07c0cdd83294591c",
+    "size_bytes": 38499
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-test-plugin-result-listener-gradle-proto/31.4.0/2527596d2420caa8bf834c82401c5ba801405b73/android-test-plugin-result-listener-gradle-proto-31.4.0.pom",
+    "sha256": "e5cfb0f68384fc82f224d418ecedb647fb2e57a06740cbae7631f62dd4f97d5e",
+    "size_bytes": 2449
+  },
+  {
+    "cache_path": "com.android.tools.utp/android-test-plugin-result-listener-gradle-proto/31.4.0/f51d5e35aa252438265500d79fc2d314b7555b94/android-test-plugin-result-listener-gradle-proto-31.4.0.jar",
+    "sha256": "cbdf71bca60e14c30e7b2cf4b90f0f0a3e8c138f7cadd874b0d9c0ae082e0274",
+    "size_bytes": 107990
+  },
+  {
+    "cache_path": "com.google.android/annotations/4.1.1.4/a1678ba907bf92691d879fef34e1a187038f9259/annotations-4.1.1.4.jar",
+    "sha256": "ba734e1e84c09d615af6a09d33034b4f0442f8772dec120efb376d86a565ae15",
+    "size_bytes": 3120
+  },
+  {
+    "cache_path": "com.google.android/annotations/4.1.1.4/c5a23d7076f3c7fd4b8f39b59ff02b1e164edc28/annotations-4.1.1.4.pom",
+    "sha256": "e4bb54753c36a27a0e5d70154a5034fedd8feac4282295034bfd483d6c7aae78",
+    "size_bytes": 1842
+  },
+  {
+    "cache_path": "com.google.api.grpc/proto-google-common-protos/2.17.0/7edf1e3aa96dc3861f7a8f24556c714e9c5b292/proto-google-common-protos-2.17.0.jar",
+    "sha256": "4ef1fe0c327fc1521d1d753b0b1c4a875a54bd14ebded3afff0ca395320b6ea9",
+    "size_bytes": 1950990
+  },
+  {
+    "cache_path": "com.google.api.grpc/proto-google-common-protos/2.17.0/d6acd1cd2d6e49b52f414af6427744700e551cb3/proto-google-common-protos-2.17.0.pom",
+    "sha256": "3f028153a585c59f558b3e43a7c9809a601a8bb5e91061d6c658fffa24cb8e26",
+    "size_bytes": 2681
+  },
+  {
+    "cache_path": "com.google.auto/auto-parent/6/f29db646babbca0049636b6724613035bbcedff/auto-parent-6.pom",
+    "sha256": "05f740c6648165db00cf618dd56c200c4725e358e6d54f5853e0bec15734ea0a",
+    "size_bytes": 6307
+  },
+  {
+    "cache_path": "com.google.auto.value/auto-value-annotations/1.6.2/ae1ff98291be961d9e1b14eb26bedaf0b5ac9d15/auto-value-annotations-1.6.2.pom",
+    "sha256": "1c76cd462fc96e7aa96dc70ce82f0d54063d6df16db35c9c7d9cc0d1a99d3fff",
+    "size_bytes": 2505
+  },
+  {
+    "cache_path": "com.google.auto.value/auto-value-annotations/1.6.2/ed193d86e0af90cc2342aedbe73c5d86b03fa09b/auto-value-annotations-1.6.2.jar",
+    "sha256": "b48b04ddba40e8ac33bf036f06fc43995fc5084bd94bdaace807ce27d3bea3fb",
+    "size_bytes": 5889
+  },
+  {
+    "cache_path": "com.google.auto.value/auto-value-parent/1.6.2/5eb0685cabce285064a62a7b9c6c256343a58285/auto-value-parent-1.6.2.pom",
+    "sha256": "27b640c82179f5cff62009c0b72033d9bc60f60e9902a66802274b7fe37fc81c",
+    "size_bytes": 1689
+  },
+  {
+    "cache_path": "com.google.code.findbugs/jsr305/3.0.2/25ea2e8b0c338a877313bd4672d3fe056ea78f0d/jsr305-3.0.2.jar",
+    "sha256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7",
+    "size_bytes": 19936
+  },
+  {
+    "cache_path": "com.google.code.findbugs/jsr305/3.0.2/8d93cdf4d84d7e1de736df607945c6df0730a10f/jsr305-3.0.2.pom",
+    "sha256": "19889dbdf1b254b2601a5ee645b8147a974644882297684c798afe5d63d78dfe",
+    "size_bytes": 4286
+  },
+  {
+    "cache_path": "com.google.code.gson/gson/2.10.1/b3add478d4382b78ea20b1671390a858002feb6c/gson-2.10.1.jar",
+    "sha256": "4241c14a7727c34feea6507ec801318a3d4a90f070e4525681079fb94ee4c593",
+    "size_bytes": 283367
+  },
+  {
+    "cache_path": "com.google.code.gson/gson/2.10.1/ce159faf33c1e665e1f3a785a5d678a2b20151bc/gson-2.10.1.pom",
+    "sha256": "d2b115634f5c085db4b9c9ffc2658e89e231fdbfbe2242121a1cd95d4d948dd7",
+    "size_bytes": 9365
+  },
+  {
+    "cache_path": "com.google.code.gson/gson-parent/2.10.1/67ea6db077285dc50a9b0a627763764f0ef4a770/gson-parent-2.10.1.pom",
+    "sha256": "4248e0882426c615182385d6086c3ef3262e769957189e29306280b85482b833",
+    "size_bytes": 12522
+  },
+  {
+    "cache_path": "com.google.crypto.tink/tink/1.7.0/668b57f109d32349b2870448f06ae6f202713edc/tink-1.7.0.jar",
+    "sha256": "88970a456a08ba4c66b01b23e5846ca1095cc14e54cb48363e5d2e15a1307308",
+    "size_bytes": 1814861
+  },
+  {
+    "cache_path": "com.google.crypto.tink/tink/1.7.0/a8cba5b72a24f8adbd86d4e3172c01337ed0d4e0/tink-1.7.0.pom",
+    "sha256": "2aee3523715f8f2cd10b2603c8d19e561ac758310b7e2c9853946d2c5e7b4bf7",
+    "size_bytes": 3336
+  },
+  {
+    "cache_path": "com.google.dagger/dagger/2.28.3/10d83810ef9e19714116ed518896c90c6606d633/dagger-2.28.3.jar",
+    "sha256": "f1dd23f8ae34a8e91366723991ead0d6499d1a3e9163ce550c200b02d76a872b",
+    "size_bytes": 34413
+  },
+  {
+    "cache_path": "com.google.dagger/dagger/2.28.3/6a11b6b6db0c740dbd150e11f54c6f219fdc2891/dagger-2.28.3.pom",
+    "sha256": "265ba959a8e13c3a06133f04b539169c1018daffd4d33f53c453ab4cb386f570",
+    "size_bytes": 2320
+  },
+  {
+    "cache_path": "com.google.errorprone/error_prone_annotations/2.11.0/ced1afa200bbf344ccdef14b92aa84f7863f395c/error_prone_annotations-2.11.0.pom",
+    "sha256": "0261ca01f2d2e9ac2ae2ece75d42c56323b385fb294b6bc943f62ef4e92ddf08",
+    "size_bytes": 2163
+  },
+  {
+    "cache_path": "com.google.errorprone/error_prone_annotations/2.18.0/6d7bbfd3d7567e4c18e981a675ecda707e8a2db1/error_prone_annotations-2.18.0.pom",
+    "sha256": "920135797dcca5917b5a5c017642a58d340a4cd1bcd12f56f892a5663bd7bddc",
+    "size_bytes": 2159
+  },
+  {
+    "cache_path": "com.google.errorprone/error_prone_annotations/2.18.0/89b684257096f548fa39a7df9fdaa409d4d4df91/error_prone_annotations-2.18.0.jar",
+    "sha256": "9e6814cb71816988a4fd1b07a993a8f21bb7058d522c162b1de849e19bea54ae",
+    "size_bytes": 16017
+  },
+  {
+    "cache_path": "com.google.errorprone/error_prone_annotations/2.3.1/19c878e6870c8382864dcc459de1c6bfe7f36e54/error_prone_annotations-2.3.1.pom",
+    "sha256": "3edce6b711ba368efe16b9b7aacb0214fbd648414cb9b965953a2e7ed89a819a",
+    "size_bytes": 1784
+  },
+  {
+    "cache_path": "com.google.errorprone/error_prone_parent/2.11.0/bd585f378139da5b5e670840892c48e75d03cf7b/error_prone_parent-2.11.0.pom",
+    "sha256": "8283f0cb44c624a79d330b6fd80b8b8a715a68b3685c9a951c3de837d4540551",
+    "size_bytes": 10734
+  },
+  {
+    "cache_path": "com.google.errorprone/error_prone_parent/2.18.0/b1779a677965027cd2a3de91e61a80102086bb30/error_prone_parent-2.18.0.pom",
+    "sha256": "47f22e99c7bf466391def16f8377985e5d3ba6f5bbcf65853644805513e15fad",
+    "size_bytes": 11080
+  },
+  {
+    "cache_path": "com.google.errorprone/error_prone_parent/2.3.1/a32c199defa0dcf9c42a32c26fec4d1fbb408e58/error_prone_parent-2.3.1.pom",
+    "sha256": "767525d9a81129cd081968382980336327be4162b1e2251a182911daa733c123",
+    "size_bytes": 4952
+  },
+  {
+    "cache_path": "com.google.flatbuffers/flatbuffers-java/1.12.0/8201cc7b511177a37071249e891f2f2fea4b32e9/flatbuffers-java-1.12.0.jar",
+    "sha256": "3f8c088b4dd04a9858721f2e162508c94db0dd86f961e306ee63ef2eda871bf7",
+    "size_bytes": 64873
+  },
+  {
+    "cache_path": "com.google.flatbuffers/flatbuffers-java/1.12.0/f93bdcc0b38ffbec623e6610e0cddacae758cb54/flatbuffers-java-1.12.0.pom",
+    "sha256": "cb226baf546260770f21e8152a6aa88ba15230d739f750df480f2a668d43e0eb",
+    "size_bytes": 4568
+  },
+  {
+    "cache_path": "com.google.guava/failureaccess/1.0.1/1dcf1de382a0bf95a3d8b0849546c88bac1292c9/failureaccess-1.0.1.jar",
+    "sha256": "a171ee4c734dd2da837e4b16be9df4661afab72a41adaf31eb84dfdaf936ca26",
+    "size_bytes": 4617
+  },
+  {
+    "cache_path": "com.google.guava/failureaccess/1.0.1/e8160e78fdaaf7088621dc1649d9dd2dfcf8d0e8/failureaccess-1.0.1.pom",
+    "sha256": "e96042ce78fecba0da2be964522947c87b40a291b5fd3cd672a434924103c4b9",
+    "size_bytes": 2413
+  },
+  {
+    "cache_path": "com.google.guava/guava/32.0.1-jre/4b29ff9dfc268252e73839b0f7324ef705e07108/guava-32.0.1-jre.pom",
+    "sha256": "42c257f7f736d377b31afeeee978ab26d730cd70af60dde7662e182352e2482a",
+    "size_bytes": 11354
+  },
+  {
+    "cache_path": "com.google.guava/guava/32.0.1-jre/6e5d51a72d142f2d40a57dfb897188b36a95b489/guava-32.0.1-jre.jar",
+    "sha256": "bd7fa227591fb8509677d0d1122cf95158f3b8a9f45653f58281d879f6dc48c5",
+    "size_bytes": 3037368
+  },
+  {
+    "cache_path": "com.google.guava/guava-parent/26.0-android/a2c0df489614352b7e8e503e274bd1dee5c42a64/guava-parent-26.0-android.pom",
+    "sha256": "f8698ab46ca996ce889c1afc8ca4f25eb8ac6b034dc898d4583742360016cc04",
+    "size_bytes": 10180
+  },
+  {
+    "cache_path": "com.google.guava/guava-parent/32.0.1-jre/88c9e60e238868208ca8e375a475a23142e52ac6/guava-parent-32.0.1-jre.pom",
+    "sha256": "43ed0e36b353f41e5eb75cd756667c9e2df97cef06eb16066967158a1d034d2a",
+    "size_bytes": 20792
+  },
+  {
+    "cache_path": "com.google.guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/1b77ba79f9b2b7dfd4e15ea7bb0d568d5eb9cb8d/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.pom",
+    "sha256": "18d4b1db26153d4e55079ce1f76bb1fe05cdb862ef9954a88cbcc4ff38b8679b",
+    "size_bytes": 2278
+  },
+  {
+    "cache_path": "com.google.guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/b421526c5f297295adef1c886e5246c39d4ac629/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar",
+    "sha256": "b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99",
+    "size_bytes": 2199
+  },
+  {
+    "cache_path": "com.google.j2objc/j2objc-annotations/1.3/47e0dd93285dcc6b33181713bc7e8aed66742964/j2objc-annotations-1.3.pom",
+    "sha256": "5faca824ba115bee458730337dfdb2fcea46ba2fd774d4304edbf30fa6a3f055",
+    "size_bytes": 2762
+  },
+  {
+    "cache_path": "com.google.j2objc/j2objc-annotations/2.8/c85270e307e7b822f1086b93689124b89768e273/j2objc-annotations-2.8.jar",
+    "sha256": "f02a95fa1a5e95edb3ed859fd0fb7df709d121a35290eff8b74dce2ab7f4d6ed",
+    "size_bytes": 9301
+  },
+  {
+    "cache_path": "com.google.j2objc/j2objc-annotations/2.8/c8daacea97066c6826844e2175ec89857e598122/j2objc-annotations-2.8.pom",
+    "sha256": "37f87798b18385113c918bfa9e1276fe50735ef8fa849b5800c519d54dbf11f8",
+    "size_bytes": 2921
+  },
+  {
+    "cache_path": "com.google.jimfs/jimfs/1.1/380866e1e495f899631b6e1d437e4b0a69e4faa3/jimfs-1.1.pom",
+    "sha256": "efa86e5cd922f17b472fdfcae57234d8d4ac3e148b6250737dfce454af7a7a44",
+    "size_bytes": 4147
+  },
+  {
+    "cache_path": "com.google.jimfs/jimfs/1.1/8fbd0579dc68aba6186935cc1bee21d2f3e7ec1c/jimfs-1.1.jar",
+    "sha256": "c4828e28d7c0a930af9387510b3bada7daa5c04d7c25a75c7b8b081f1c257ddd",
+    "size_bytes": 206691
+  },
+  {
+    "cache_path": "com.google.jimfs/jimfs-parent/1.1/2283f99a6aa73205190a20cfd35078e9f7d6cec9/jimfs-parent-1.1.pom",
+    "sha256": "c71555751e57e0ef912870e8ac9625ae782502a6a5b9c19ccf83b2a97d8b26bd",
+    "size_bytes": 7282
+  },
+  {
+    "cache_path": "com.google.protobuf/protobuf-bom/3.22.3/8b84664286a47d748c83d82eced82d203e4a155c/protobuf-bom-3.22.3.pom",
+    "sha256": "13a32dfb9de6fc1c3c3f7af53e4d5c77fd77d2b476bae38b74b7581cdee2e655",
+    "size_bytes": 3547
+  },
+  {
+    "cache_path": "com.google.protobuf/protobuf-java/3.22.3/786c5a7c1c2e8bc3fad22ea7b243329bafc7aabe/protobuf-java-3.22.3.pom",
+    "sha256": "186ea794150f5b42aea7ec6041df373d1d8a8a831624f58a55debb6043ec7312",
+    "size_bytes": 1554
+  },
+  {
+    "cache_path": "com.google.protobuf/protobuf-java/3.22.3/fdee98b8f6abab73f146a4edb4c09e56f8278d03/protobuf-java-3.22.3.jar",
+    "sha256": "59d388ea6a2d2d76ae8efff7fd4d0c60c6f0f464c3d3ab9be8e5add092975708",
+    "size_bytes": 1676712
+  },
+  {
+    "cache_path": "com.google.protobuf/protobuf-java-util/3.22.3/484df25bb5d185518dcc2f0e81cae697eee0f0f5/protobuf-java-util-3.22.3.pom",
+    "sha256": "b44701b06a064865ec9b5614a93e9e28fadd7d4dfc4b460f21c819ef53dbe2d6",
+    "size_bytes": 2454
+  },
+  {
+    "cache_path": "com.google.protobuf/protobuf-java-util/3.22.3/749cd4fe8ab52f37bc186193802ba19f5b284647/protobuf-java-util-3.22.3.jar",
+    "sha256": "c615f76879dc5c303e4df5b94a6afa39534058c7545db2d483fd95d9f63c8bfe",
+    "size_bytes": 72117
+  },
+  {
+    "cache_path": "com.google.protobuf/protobuf-parent/3.22.3/1f6695a7969d66bb1714209a99828c6c9cd98100/protobuf-parent-3.22.3.pom",
+    "sha256": "399133d7f6f57934dd76c4b18e86348f424532108daf4a01c8f820b8665f0929",
+    "size_bytes": 9024
+  },
+  {
+    "cache_path": "com.google.testing.platform/core-proto/0.0.9-alpha02/1f94c3fbfb7368c7c1862fa91ae5351c757d1e28/core-proto-0.0.9-alpha02.pom",
+    "sha256": "27ce7959427a2ffee48d0feb45128a3f36cc417ed8a822afa22822c8f5a58b25",
+    "size_bytes": 1060
+  },
+  {
+    "cache_path": "com.google.testing.platform/core-proto/0.0.9-alpha02/ee54219cbb4a7fb83cdc528e9a85e0383f3ee726/core-proto-0.0.9-alpha02.jar",
+    "sha256": "6d8a8906774150f43a8fad08ca64e25c6070c39bd8a6fc13b2593f289242fe95",
+    "size_bytes": 1126123
+  },
+  {
+    "cache_path": "com.googlecode.juniversalchardet/juniversalchardet/1.0.3/be6da8320adedafc712d645ddaaad00357b55408/juniversalchardet-1.0.3.pom",
+    "sha256": "7846399b35c7cd642a9b3a000c3e2d62d04eb37a4547b6933cc8b18bcc2f086b",
+    "size_bytes": 1463
+  },
+  {
+    "cache_path": "com.googlecode.juniversalchardet/juniversalchardet/1.0.3/cd49678784c46aa8789c060538e0154013bb421b/juniversalchardet-1.0.3.jar",
+    "sha256": "757bfe906193b8b651e79dc26cd67d6b55d0770a2cdfb0381591504f779d4a76",
+    "size_bytes": 220813
+  },
+  {
+    "cache_path": "com.squareup/javapoet/1.10.0/111612d623e9d2047798f13324fcb29966f080e3/javapoet-1.10.0.pom",
+    "sha256": "1690340a222279f2cbadf373e88826fa20f7f3cc3ec0252f36818fed32701ab1",
+    "size_bytes": 4848
+  },
+  {
+    "cache_path": "com.squareup/javapoet/1.10.0/712c178d35185d8261295913c9f2a7d6867a6007/javapoet-1.10.0.jar",
+    "sha256": "20ef4b82e43ff7c652281a21313cf3b941092467add3fa73509c26f6969efdab",
+    "size_bytes": 97532
+  },
+  {
+    "cache_path": "com.squareup/javawriter/2.5.0/81241ff7078ef14f42ea2a8995fa09c096256e6b/javawriter-2.5.0.jar",
+    "sha256": "fcfb09fb0ea0aa97d3cfe7ea792398081348e468f126b3603cb3803f240197f0",
+    "size_bytes": 12781
+  },
+  {
+    "cache_path": "com.squareup/javawriter/2.5.0/d932f2476f65ecd95dcd6fd8c568b3f466f6a482/javawriter-2.5.0.pom",
+    "sha256": "e1abd7f1116cf5e0c59947693e2189208ec94296b2a3394c959e3511d399a7b0",
+    "size_bytes": 2881
+  },
+  {
+    "cache_path": "com.sun.activation/all/1.2.0/9b1023e38195ea19d1a0ac79192d486da1904f97/all-1.2.0.pom",
+    "sha256": "1d8518e3ac7532a104e4f7be77def37c982e530723c6bdb3d67708cce2b0c2c4",
+    "size_bytes": 17945
+  },
+  {
+    "cache_path": "com.sun.activation/all/1.2.1/efca912f55f71e63ab2eb82552519b66dd123f98/all-1.2.1.pom",
+    "sha256": "360883bf64486ecef161b8f282f6503536dd1a670d53a0a871c8fb20170e6795",
+    "size_bytes": 18095
+  },
+  {
+    "cache_path": "com.sun.activation/javax.activation/1.2.0/bdb776ae9b888b7ad8f9f424b9e67837eae916c5/javax.activation-1.2.0.pom",
+    "sha256": "f879b6e945854c6900b0dbee1c8384d7ab3de7e157fd7ac84937405c416d2a5e",
+    "size_bytes": 6515
+  },
+  {
+    "cache_path": "com.sun.activation/javax.activation/1.2.0/bf744c1e2776ed1de3c55c8dac1057ec331ef744/javax.activation-1.2.0.jar",
+    "sha256": "993302b16cd7056f21e779cc577d175a810bb4900ef73cd8fbf2b50f928ba9ce",
+    "size_bytes": 78030
+  },
+  {
+    "cache_path": "com.sun.istack/istack-commons/3.0.8/3835dae3b9e529039b70bce883a1c7438713c295/istack-commons-3.0.8.pom",
+    "sha256": "a0f0517e8512f0fbcc7b8295c12f6566a3d0c2d86d655639dc662ef8c0c7ebe5",
+    "size_bytes": 18639
+  },
+  {
+    "cache_path": "com.sun.istack/istack-commons-runtime/3.0.8/d6a97364045aa6b99bf2d3c566a3f98599c2d296/istack-commons-runtime-3.0.8.jar",
+    "sha256": "4ffabb06be454a05e4398e20c77fa2b6308d4b88dfbef7ca30a76b5b7d5505ef",
+    "size_bytes": 27156
+  },
+  {
+    "cache_path": "com.sun.istack/istack-commons-runtime/3.0.8/fd5dfcff9a1f1e7e4371c6a998b74ee0e52bdc4a/istack-commons-runtime-3.0.8.pom",
+    "sha256": "c2e014d34cb84ed287d064986c45c305a4124228a7337eccf6c421d14d708f1c",
+    "size_bytes": 3555
+  },
+  {
+    "cache_path": "com.sun.xml.bind/jaxb-bom-ext/2.3.2/7a92d12e31a67bae498f840c8f7c334a4fee0fbb/jaxb-bom-ext-2.3.2.pom",
+    "sha256": "1a7dec2b27e7e055744cdb8cf1b90def4fd473acd1b804eff098139358959bd7",
+    "size_bytes": 3144
+  },
+  {
+    "cache_path": "com.sun.xml.bind.mvn/jaxb-parent/2.3.2/5d96ada92105844d8a2eedfb63bf782a712cc0a/jaxb-parent-2.3.2.pom",
+    "sha256": "20dd6dc34ab7549ac40da1d82e92222ec4347ad0ec0cb118ef6c5703bed53a18",
+    "size_bytes": 29746
+  },
+  {
+    "cache_path": "com.sun.xml.bind.mvn/jaxb-runtime-parent/2.3.2/b9916bbbf37042807a649a2a7fcb6b97e193c28a/jaxb-runtime-parent-2.3.2.pom",
+    "sha256": "b24f8d51f184a68bc1b86d48c0e3cfefeb21a44ede1c5f7303c58ae0488533ec",
+    "size_bytes": 1133
+  },
+  {
+    "cache_path": "com.sun.xml.bind.mvn/jaxb-txw-parent/2.3.2/1f872b3cb7c49c35501651aab063659a9775f06a/jaxb-txw-parent-2.3.2.pom",
+    "sha256": "b55d3efa9b158f483a30e92c78ccb600f93314733d089eba9b74436f01b314a4",
+    "size_bytes": 1144
+  },
+  {
+    "cache_path": "com.sun.xml.fastinfoset/FastInfoset/1.2.16/4eb6a0adad553bf759ffe86927df6f3b848c8bea/FastInfoset-1.2.16.jar",
+    "sha256": "056f3a1e144409f21ed16afc26805f58e9a21f3fce1543c42d400719d250c511",
+    "size_bytes": 317195
+  },
+  {
+    "cache_path": "com.sun.xml.fastinfoset/FastInfoset/1.2.16/e4d2eed02e0e0a9f4c892e6d43bdf3dfdc1fa2ee/FastInfoset-1.2.16.pom",
+    "sha256": "e147d258ab6e6691f70599a952400e6e6c7558f8c9c028dbe1be23178308e830",
+    "size_bytes": 5262
+  },
+  {
+    "cache_path": "com.sun.xml.fastinfoset/fastinfoset-project/1.2.16/86113f7ee9a5d995429bf75294b57b31f0a17d29/fastinfoset-project-1.2.16.pom",
+    "sha256": "90582425adc1f40b41362dafb95173931225acaa5e79620d5e6bd52f646292ba",
+    "size_bytes": 15176
+  },
+  {
+    "cache_path": "commons-codec/commons-codec/1.10/44b9477418d2942d45550f7e7c66c16262062d0e/commons-codec-1.10.pom",
+    "sha256": "bdb8db7012d112a6e3ea8fdb7c510b300d99eff0819d27dddba9c43397ea4cfb",
+    "size_bytes": 11609
+  },
+  {
+    "cache_path": "commons-codec/commons-codec/1.10/4b95f4897fa13f2cd904aee711aeafc0c5295cd8/commons-codec-1.10.jar",
+    "sha256": "4241dfa94e711d435f29a4604a3e2de5c4aa3c165e23bd066be6fc1fc4309569",
+    "size_bytes": 284184
+  },
+  {
+    "cache_path": "commons-codec/commons-codec/1.11/3acb4705652e16236558f0f4f2192cc33c3bd189/commons-codec-1.11.jar",
+    "sha256": "e599d5318e97aa48f42136a2927e6dfa4e8881dff0e6c8e3109ddbbff51d7b7d",
+    "size_bytes": 335042
+  },
+  {
+    "cache_path": "commons-codec/commons-codec/1.11/93ee1760aba62d6896d578bd7d247d0fa52f0e7/commons-codec-1.11.pom",
+    "sha256": "c1e7140d1dea8fdf3528bc1e3c5444ac0b541297311f45f9806c213ec3ee9a10",
+    "size_bytes": 13966
+  },
+  {
+    "cache_path": "commons-io/commons-io/2.13.0/1da8a0360c9fa9b5c0553b032b54cfacf1d7182f/commons-io-2.13.0.pom",
+    "sha256": "db3fed64c2e1774ebfd6b1a749037732b149b9111dd7e6b985f08dda55470439",
+    "size_bytes": 20319
+  },
+  {
+    "cache_path": "commons-io/commons-io/2.13.0/8bb2bc9b4df17e2411533a0708a69f983bf5e83b/commons-io-2.13.0.jar",
+    "sha256": "671eaa39688dac2ffaa4645b3c9980ae2d0ea2471e4ae6a5da199cd15ae23666",
+    "size_bytes": 483954
+  },
+  {
+    "cache_path": "commons-logging/commons-logging/1.2/4bfc12adfe4842bf07b657f0369c4cb522955686/commons-logging-1.2.jar",
+    "sha256": "daddea1ea0be0f56978ab3006b8ac92834afeefbd9b7e4e6316fca57df0fa636",
+    "size_bytes": 61829
+  },
+  {
+    "cache_path": "commons-logging/commons-logging/1.2/75c03ba4b01932842a996ef8d3fc1ab61ddeac2/commons-logging-1.2.pom",
+    "sha256": "c91ab5aa570d86f6fd07cc158ec6bc2c50080402972ee9179fe24100739fbb20",
+    "size_bytes": 19206
+  },
+  {
+    "cache_path": "io.grpc/grpc-api/1.57.0/768ab3e583b213a3672ec776e70765b594e8bbe5/grpc-api-1.57.0.jar",
+    "sha256": "8d2c384299f84ee8aa7f670f00e7cb26b87e231cf3091474307b32b76910f71c",
+    "size_bytes": 292600
+  },
+  {
+    "cache_path": "io.grpc/grpc-api/1.57.0/80da637d6097a9b54ed1bf414f4d820995657737/grpc-api-1.57.0.pom",
+    "sha256": "c3f054a7c8861647d0a55825b0a949f44fcfc9c64f479083d96813814c502612",
+    "size_bytes": 1799
+  },
+  {
+    "cache_path": "io.grpc/grpc-context/1.57.0/311e0f150fb4db6696331bee424cbb91d8107421/grpc-context-1.57.0.pom",
+    "sha256": "ab264e82bfb6ab895f6016af8b3cc44495abc81e769c30fa5a9ae0ad16be6cc6",
+    "size_bytes": 1871
+  },
+  {
+    "cache_path": "io.grpc/grpc-context/1.57.0/8d8f26a9b0bed637ee4592e1df3ef134ed2c54fd/grpc-context-1.57.0.jar",
+    "sha256": "953fcacd82f531e69b76e3834f5830bad4c22ae84144e058d71dc80a7430275d",
+    "size_bytes": 293
+  },
+  {
+    "cache_path": "io.grpc/grpc-core/1.57.0/2b6ef5166f31315098fff9bb85f33ab5fed58f6b/grpc-core-1.57.0.jar",
+    "sha256": "3bee48c73bc4c5b55bed79be0e484adf26ba56bebbe5798ddbf34714ef1e1cea",
+    "size_bytes": 742649
+  },
+  {
+    "cache_path": "io.grpc/grpc-core/1.57.0/dc7257d526fe94ee3a6d0705ab3a8445ad596129/grpc-core-1.57.0.pom",
+    "sha256": "8184045f5791e00cf2cdbcf5e8846afd48f5cf7e5a4f38fb5b8303c7b2efe55b",
+    "size_bytes": 2695
+  },
+  {
+    "cache_path": "io.grpc/grpc-netty/1.57.0/99cc01516c2fd1d134bf2585c2b38fa400804986/grpc-netty-1.57.0.jar",
+    "sha256": "81d43f2d4ed18fa341bd840a3735f1403a70074a046e157e27f679b721b4c9ad",
+    "size_bytes": 284862
+  },
+  {
+    "cache_path": "io.grpc/grpc-netty/1.57.0/cd8de8e73fe3919ce56e7cb3032a92e079ca6f9e/grpc-netty-1.57.0.pom",
+    "sha256": "ed9dfdd7b1ed4356afb3c5d1407dedb634c8602fb410479b480ad8c1139ee17b",
+    "size_bytes": 2543
+  },
+  {
+    "cache_path": "io.grpc/grpc-protobuf/1.57.0/2fde58ea5390efbfd0eb87a8dca9fbb042814966/grpc-protobuf-1.57.0.pom",
+    "sha256": "c0dcb8c67fd01daa63256f0f8b68d3707ceb7ca85cdaab7a3c6c3ff460e13dd1",
+    "size_bytes": 2701
+  },
+  {
+    "cache_path": "io.grpc/grpc-protobuf/1.57.0/49986e40de6cbd14ba26247639b18ab0bac921c1/grpc-protobuf-1.57.0.jar",
+    "sha256": "49f986d4eab12610fdba4a6890fca52d5eb653598916fdb863a366d5e28eecf7",
+    "size_bytes": 5210
+  },
+  {
+    "cache_path": "io.grpc/grpc-protobuf-lite/1.57.0/806993ee12bd39a3f7d6c2183e98f1405a70527d/grpc-protobuf-lite-1.57.0.pom",
+    "sha256": "b023be7008849489f652eeff75fd0fe1aa9c905f671d344e16daafddf921819d",
+    "size_bytes": 1990
+  },
+  {
+    "cache_path": "io.grpc/grpc-protobuf-lite/1.57.0/ca0084219b71d29cd9bfc3b81780aca91a965753/grpc-protobuf-lite-1.57.0.jar",
+    "sha256": "2c507c02d981b84a21763d44e09af4f279881dd3e25be3080f6361258607f198",
+    "size_bytes": 7809
+  },
+  {
+    "cache_path": "io.grpc/grpc-stub/1.57.0/262e1469c080164d5e2459f4908394d66f4e8828/grpc-stub-1.57.0.jar",
+    "sha256": "6e6ee141539fa14d9fa479f7f511605544443c7e011e78e273cf9468aa183060",
+    "size_bytes": 50923
+  },
+  {
+    "cache_path": "io.grpc/grpc-stub/1.57.0/270604148c51103a51f66885ebb5465653029061/grpc-stub-1.57.0.pom",
+    "sha256": "6d4459487c621dff31510a88829063631e915d2dcc774d71928418116e59a88d",
+    "size_bytes": 1788
+  },
+  {
+    "cache_path": "io.netty/netty-buffer/4.1.93.Final/6079ad53a5f07ea9b4a22e7a8fa3f22fe5a2e25a/netty-buffer-4.1.93.Final.pom",
+    "sha256": "83fbc54e2b73b86d55b208f618d1a2a156910ec146f7ece57565007b750add78",
+    "size_bytes": 1580
+  },
+  {
+    "cache_path": "io.netty/netty-buffer/4.1.93.Final/87fac21f4ef95157866b07b48e3c707a2f13c581/netty-buffer-4.1.93.Final.jar",
+    "sha256": "007c7d9c378df02d390567d0d7ddf542ffddb021b7313dbf502392113ffabb08",
+    "size_bytes": 305449
+  },
+  {
+    "cache_path": "io.netty/netty-codec/4.1.93.Final/503badb458b6586632be8d1f81aa4e5ab99a80fc/netty-codec-4.1.93.Final.jar",
+    "sha256": "990c378168dc6364c6ff569701f4f2f122fffe8998b3e189eba4c4d868ed1084",
+    "size_bytes": 345166
+  },
+  {
+    "cache_path": "io.netty/netty-codec/4.1.93.Final/78f5c49a4f880a309c74cdbc7da1d5f86c405848/netty-codec-4.1.93.Final.pom",
+    "sha256": "19cded267a070dff1abc9d029b552fad262acc1aba5c6c67b2278fca113a26ab",
+    "size_bytes": 5301
+  },
+  {
+    "cache_path": "io.netty/netty-codec-http/4.1.93.Final/36acf0c94d03eb6ecef78a749a32cbb7dc0c57b4/netty-codec-http-4.1.93.Final.jar",
+    "sha256": "dacf78ce78ab2d29570325db4cd2451ea589639807de95881a0fa7155a9e6b55",
+    "size_bytes": 656555
+  },
+  {
+    "cache_path": "io.netty/netty-codec-http/4.1.93.Final/d51ecb8192bd8b1a373d8b370829629871e008fd/netty-codec-http-4.1.93.Final.pom",
+    "sha256": "a3dafff071b6d284e8063d96843de2bb83cf3b889eae0cc9e0adb64a57a31b82",
+    "size_bytes": 4199
+  },
+  {
+    "cache_path": "io.netty/netty-codec-http2/4.1.93.Final/1411e68f628370cffebcf164917d04a9768a9e3c/netty-codec-http2-4.1.93.Final.pom",
+    "sha256": "084433b42d541f7ac4b59287dd253285cfda3a3d65de72e7368bb7ec3d367271",
+    "size_bytes": 4993
+  },
+  {
+    "cache_path": "io.netty/netty-codec-http2/4.1.93.Final/f1625b43bde13ec057da0d2fe381ded2547a70e/netty-codec-http2-4.1.93.Final.jar",
+    "sha256": "d96cc09045a1341c6d47494352aa263b87b72fb1d2ea9eca161aa73820bfe8bb",
+    "size_bytes": 483282
+  },
+  {
+    "cache_path": "io.netty/netty-codec-socks/4.1.93.Final/81ca78969afc60073e47c3b7b361cc3839392c73/netty-codec-socks-4.1.93.Final.jar",
+    "sha256": "0ea47b5ba23ca1da8eb9146c8fc755c1271414633b1e2be2ce1df764ba0fff2a",
+    "size_bytes": 120708
+  },
+  {
+    "cache_path": "io.netty/netty-codec-socks/4.1.93.Final/b55e536b5be05c7ddf89cec051eb56a4d1a9059e/netty-codec-socks-4.1.93.Final.pom",
+    "sha256": "8cd816ed991a946041bab4cb24bd9c8e41ee0692512511f2d83cef538eb605d7",
+    "size_bytes": 2537
+  },
+  {
+    "cache_path": "io.netty/netty-common/4.1.93.Final/1cfc49b91b0d3ddb30c9f7d8467e5d02ae8babdf/netty-common-4.1.93.Final.jar",
+    "sha256": "443bb316599fb16e3baeba2fb58881814d7ff0b7af176fe76e38071a6e86f8c0",
+    "size_bytes": 659312
+  },
+  {
+    "cache_path": "io.netty/netty-common/4.1.93.Final/78ddda88aefd39b45f8adad57f11739f4ffb1d69/netty-common-4.1.93.Final.pom",
+    "sha256": "42d883b13eb38cabf549616462c5f331f5333bf0c8fc9215744f83c0180a4f6b",
+    "size_bytes": 11789
+  },
+  {
+    "cache_path": "io.netty/netty-handler/4.1.93.Final/10f7ed9d8e1bfcba416074c70e5388be96116bfc/netty-handler-4.1.93.Final.jar",
+    "sha256": "4e5f563ae14ed713381816d582f5fcfd0615aefb29203486cdfb782d8a00a02b",
+    "size_bytes": 554189
+  },
+  {
+    "cache_path": "io.netty/netty-handler/4.1.93.Final/a7f67c9bef5dd2f2ca760dbec545c18c535d9937/netty-handler-4.1.93.Final.pom",
+    "sha256": "84a1525cac0b4759efaef2997a47fe19b9b5642f9273fa0fd58a2e76c7a059fe",
+    "size_bytes": 4620
+  },
+  {
+    "cache_path": "io.netty/netty-handler-proxy/4.1.93.Final/8a43e9973a1fddb5ab96ada7b5e97ecc6644bdbd/netty-handler-proxy-4.1.93.Final.pom",
+    "sha256": "6dc50da0e67f597812874f81eaa45404f7d076b8199ea9088932a85c1b610245",
+    "size_bytes": 3550
+  },
+  {
+    "cache_path": "io.netty/netty-handler-proxy/4.1.93.Final/c165c1efe1b9c0cc22546a057b530611a088768b/netty-handler-proxy-4.1.93.Final.jar",
+    "sha256": "2ac5f7fbefa0b73ef783889069344d5515505a14b2303be693c5002c486df2b4",
+    "size_bytes": 25484
+  },
+  {
+    "cache_path": "io.netty/netty-parent/4.1.93.Final/87bceff7410ea432c5b156b47001672898b98b42/netty-parent-4.1.93.Final.pom",
+    "sha256": "b109cb76f375fedb8a9ef75ac58063170deb7ea2ddd024f466fef6dc65cdfcee",
+    "size_bytes": 83311
+  },
+  {
+    "cache_path": "io.netty/netty-resolver/4.1.93.Final/3860e99075f9e078364ed38f6d6fc8825b7a168a/netty-resolver-4.1.93.Final.jar",
+    "sha256": "e59770b66e81822e5d111ac4e544d7eb0c543e0a285f52628e53941acd8ed759",
+    "size_bytes": 37787
+  },
+  {
+    "cache_path": "io.netty/netty-resolver/4.1.93.Final/8804d195e660e499ef700307bce2d98947a8b8c8/netty-resolver-4.1.93.Final.pom",
+    "sha256": "5b350c3c91e9e55d29cbe68cfe4ef2116cc1f0328677ebf9f615bab7082c79f4",
+    "size_bytes": 1587
+  },
+  {
+    "cache_path": "io.netty/netty-transport/4.1.93.Final/1a0894915c8027ce83b4d6a811c4e765955efd15/netty-transport-4.1.93.Final.jar",
+    "sha256": "a5a78019bc1cd43dbc3c7b7cdd3801912ca26d1f498fb560514fee497864ba96",
+    "size_bytes": 488587
+  },
+  {
+    "cache_path": "io.netty/netty-transport/4.1.93.Final/4d785a8c99b478a5b36561688f6acbe4e8f8e221/netty-transport-4.1.93.Final.pom",
+    "sha256": "0dd62a0eb3cb1ea001a4d0426e4f5c08df1c70d9265675bffa5c583613422d43",
+    "size_bytes": 2163
+  },
+  {
+    "cache_path": "io.netty/netty-transport-native-unix-common/4.1.93.Final/d46081b528ad76d312a9430c4ed3680b35f2434e/netty-transport-native-unix-common-4.1.93.Final.pom",
+    "sha256": "15bc25b67ff0a49272b270ef2b8cffd620057ca16cb29dff7ad5661adca2ae12",
+    "size_bytes": 29415
+  },
+  {
+    "cache_path": "io.netty/netty-transport-native-unix-common/4.1.93.Final/f4fb8b4c8da539091f43abcbb9f0389e48807eea/netty-transport-native-unix-common-4.1.93.Final.jar",
+    "sha256": "774165a1c4dbaacb17f9c1ad666b3569a6a59715ae828e7c3d47703f479a53e7",
+    "size_bytes": 43894
+  },
+  {
+    "cache_path": "io.perfmark/perfmark-api/0.26.0/953bb3972d2834617a3155f4d4f121fa11658721/perfmark-api-0.26.0.module",
+    "sha256": "31d832332474ce48150f5bae003343319136f336afd1076a289029319e3ea97a",
+    "size_bytes": 1898
+  },
+  {
+    "cache_path": "io.perfmark/perfmark-api/0.26.0/9a44b3ed71075f2b06d387464f62d1e50a3c31ba/perfmark-api-0.26.0.pom",
+    "sha256": "7edee48616e17b61297eae3a82eb483a85e56d2567929378aa46f30a950322da",
+    "size_bytes": 1485
+  },
+  {
+    "cache_path": "io.perfmark/perfmark-api/0.26.0/ef65452adaf20bf7d12ef55913aba24037b82738/perfmark-api-0.26.0.jar",
+    "sha256": "b7d23e93a34537ce332708269a0d1404788a5b5e1949e82f5535fce51b3ea95b",
+    "size_bytes": 6816
+  },
+  {
+    "cache_path": "jakarta.activation/jakarta.activation-api/1.2.1/562a587face36ec7eff2db7f2fc95425c6602bc1/jakarta.activation-api-1.2.1.jar",
+    "sha256": "8b0a0f52fa8b05c5431921a063ed866efaa41dadf2e3a7ee3e1961f2b0d9645b",
+    "size_bytes": 44399
+  },
+  {
+    "cache_path": "jakarta.activation/jakarta.activation-api/1.2.1/b9c1b2502949970360efe8d75ec5268d87d38a82/jakarta.activation-api-1.2.1.pom",
+    "sha256": "42585cb07dda7f23aa04eb5e0940061944a246a67ad3d16942fbe569ff03cd31",
+    "size_bytes": 4572
+  },
+  {
+    "cache_path": "jakarta.xml.bind/jakarta.xml.bind-api/2.3.2/6142021e7186bf29f5f7639b968cfe250ce086dd/jakarta.xml.bind-api-2.3.2.pom",
+    "sha256": "b537b388dbab4cc0690b9d2fb0c74124d672531734567acf6e53130eab131ad6",
+    "size_bytes": 15997
+  },
+  {
+    "cache_path": "jakarta.xml.bind/jakarta.xml.bind-api/2.3.2/8d49996a4338670764d7ca4b85a1c4ccf7fe665d/jakarta.xml.bind-api-2.3.2.jar",
+    "sha256": "69156304079bdeed9fc0ae3b39389f19b3cc4ba4443bc80508995394ead742ea",
+    "size_bytes": 115498
+  },
+  {
+    "cache_path": "jakarta.xml.bind/jakarta.xml.bind-api-parent/2.3.2/7be72e8345e33f747d5d813e313abd8df25f259e/jakarta.xml.bind-api-parent-2.3.2.pom",
+    "sha256": "15a55b7d537c9f9970aead28d2af97c059f65ff6102f76bbd29f1247dd8a6dfb",
+    "size_bytes": 7659
+  },
+  {
+    "cache_path": "javax.annotation/javax.annotation-api/1.3.2/302fe96ef206b17f82893083b51b479541fa25ab/javax.annotation-api-1.3.2.pom",
+    "sha256": "46a4a251ca406e78e4853d7a2bae83282844a4992851439ee9a1f23716f06b97",
+    "size_bytes": 14478
+  },
+  {
+    "cache_path": "javax.annotation/javax.annotation-api/1.3.2/934c04d3cfef185a8008e7bf34331b79730a9d43/javax.annotation-api-1.3.2.jar",
+    "sha256": "e04ba5195bcd555dc95650f7cc614d151e4bcd52d29a10b8aa2197f3ab89ab9b",
+    "size_bytes": 26586
+  },
+  {
+    "cache_path": "javax.inject/javax.inject/1/6975da39a7040257bd51d21a231b76c915872d38/javax.inject-1.jar",
+    "sha256": "91c77044a50c481636c32d916fd89c9118a72195390452c81065080f957de7ff",
+    "size_bytes": 2497
+  },
+  {
+    "cache_path": "javax.inject/javax.inject/1/b8e00a8a0deb0ebef447570e37ff8146ccd92cbe/javax.inject-1.pom",
+    "sha256": "943e12b100627804638fa285805a0ab788a680266531e650921ebfe4621a8bfa",
+    "size_bytes": 612
+  },
+  {
+    "cache_path": "net.java/jvnet-parent/1/b55a1b046dbe82acdee8edde7476eebcba1e57d8/jvnet-parent-1.pom",
+    "sha256": "281440811268e65d9e266b3cc898297e214e04f09740d0386ceeb4a8923d63bf",
+    "size_bytes": 4711
+  },
+  {
+    "cache_path": "net.java/jvnet-parent/3/f8f3be3e980551a39b5679411e171aeb6931aaec/jvnet-parent-3.pom",
+    "sha256": "30f5789efa39ddbf96095aada3fc1260c4561faf2f714686717cb2dc5049475a",
+    "size_bytes": 4789
+  },
+  {
+    "cache_path": "net.java.dev.jna/jna/5.6.0/330f2244e9030119ab3030fc3fededc86713d9cc/jna-5.6.0.jar",
+    "sha256": "5557e235a8aa2f9766d5dc609d67948f2a8832c2d796cea9ef1d6cbe0b3b7eaf",
+    "size_bytes": 1509440
+  },
+  {
+    "cache_path": "net.java.dev.jna/jna/5.6.0/e542808a6326ec0302c0b09011cb4363e1ece380/jna-5.6.0.pom",
+    "sha256": "5fe81b0255978f24616d37b10608b79498a5f3073e1d9b2038d8736a831f2608",
+    "size_bytes": 1580
+  },
+  {
+    "cache_path": "net.java.dev.jna/jna-platform/5.6.0/d18424ffb8bbfd036d71bcaab9b546858f2ef986/jna-platform-5.6.0.jar",
+    "sha256": "9ecea8bf2b1b39963939d18b70464eef60c508fed8820f9dcaba0c35518eabf7",
+    "size_bytes": 2735878
+  },
+  {
+    "cache_path": "net.java.dev.jna/jna-platform/5.6.0/f86d5b088d311a7dee895e06cb2a08ccada7cbde/jna-platform-5.6.0.pom",
+    "sha256": "1beb35cb4184e6c906a7e32eaebd852dd3da0a263962e99134ab945832394e28",
+    "size_bytes": 1800
+  },
+  {
+    "cache_path": "net.sf.jopt-simple/jopt-simple/4.9/ea3cd0a93e4e8adc1cdadd544c9168bc5aa985a8/jopt-simple-4.9.pom",
+    "sha256": "7af7e2d8b24b4798f04c2b7da24c9fbd1b7557b4e017c2054481565916079092",
+    "size_bytes": 13963
+  },
+  {
+    "cache_path": "net.sf.jopt-simple/jopt-simple/4.9/ee9e9eaa0a35360dcfeac129ff4923215fd65904/jopt-simple-4.9.jar",
+    "sha256": "26c5856e954b5f864db76f13b86919b59c6eecf9fd930b96baa8884626baf2f5",
+    "size_bytes": 66469
+  },
+  {
+    "cache_path": "net.sf.kxml/kxml2/2.3.0/8efa75f9cdc57687076b2125b1a098e6f42e737d/kxml2-2.3.0.pom",
+    "sha256": "31ce606f4e9518936299bb0d27c978fa61e185fd1de7c9874fe959a53e34a685",
+    "size_bytes": 1490
+  },
+  {
+    "cache_path": "net.sf.kxml/kxml2/2.3.0/ccbc77a5fd907ef863c29f3596c6f54ffa4e9442/kxml2-2.3.0.jar",
+    "sha256": "f264dd9f79a1fde10ce5ecc53221eff24be4c9331c830b7d52f2f08a7b633de2",
+    "size_bytes": 43858
+  },
+  {
+    "cache_path": "org.apache/apache/13/15aff1faaec4963617f07dbe8e603f0adabc3a12/apache-13.pom",
+    "sha256": "ff513db0361fd41237bef4784968bc15aae478d4ec0a9496f811072ccaf3841d",
+    "size_bytes": 13974
+  },
+  {
+    "cache_path": "org.apache/apache/15/95c70374817194cabfeec410fe70c3a6b832bafe/apache-15.pom",
+    "sha256": "36c2f2f979ac67b450c0cb480e4e9baf6b40f3a681f22ba9692287d1139ad494",
+    "size_bytes": 15236
+  },
+  {
+    "cache_path": "org.apache/apache/18/bd408bbea3840f2c7f914b29403e39a90f84fd5f/apache-18.pom",
+    "sha256": "7831307285fd475bbc36b20ae38e7882f11c3153b1d5930f852d44eda8f33c17",
+    "size_bytes": 15667
+  },
+  {
+    "cache_path": "org.apache/apache/21/649b700a1b2b4a1d87e7ae8e3f47bfe101b2a4a5/apache-21.pom",
+    "sha256": "af10c108da014f17cafac7b52b2b4b5a3a1c18265fa2af97a325d9143537b380",
+    "size_bytes": 17107
+  },
+  {
+    "cache_path": "org.apache/apache/23/404949e96725e63a10a6d8f9d9b521948d170d5/apache-23.pom",
+    "sha256": "bc10624e0623f36577fac5639ca2936d3240ed152fb6d8d533ab4d270543491c",
+    "size_bytes": 18422
+  },
+  {
+    "cache_path": "org.apache/apache/29/57991491045c9a37a3113f24bf29a41a4ceb1459/apache-29.pom",
+    "sha256": "3e49037174820bbd0df63420a977255886398954c2a06291fa61f727ac35b377",
+    "size_bytes": 20721
+  },
+  {
+    "cache_path": "org.apache.commons/commons-compress/1.21/4ec95b60d4e86b5c95a0e919cb172a0af98011ef/commons-compress-1.21.jar",
+    "sha256": "6aecfd5459728a595601cfa07258d131972ffc39b492eb48bdd596577a2f244a",
+    "size_bytes": 1018316
+  },
+  {
+    "cache_path": "org.apache.commons/commons-compress/1.21/f9f4f26a1ea08778cc818c1555587741605bb4da/commons-compress-1.21.pom",
+    "sha256": "675bb023c9beedde3232949979b9742a5fea946280a55a1b462d4ca7801088cd",
+    "size_bytes": 19684
+  },
+  {
+    "cache_path": "org.apache.commons/commons-parent/34/1f6be162a806d8343e3cd238dd728558532473a5/commons-parent-34.pom",
+    "sha256": "3a2e69d06d641d1f3b293126dc9e2e4ea6563bf8c36c87e0ab6fa4292d04b79c",
+    "size_bytes": 55943
+  },
+  {
+    "cache_path": "org.apache.commons/commons-parent/35/d88c24ebb385e5404f34573f24362b17434e3f33/commons-parent-35.pom",
+    "sha256": "7098a1ab8336ecd4c9dc21cbbcac869f82c66f64b8ac4f7988d41b4fcb44e49a",
+    "size_bytes": 57772
+  },
+  {
+    "cache_path": "org.apache.commons/commons-parent/42/35d45eda74fe511d3d60b68e1dac29ed55043354/commons-parent-42.pom",
+    "sha256": "cd313494c670b483ec256972af1698b330e598f807002354eb765479f604b09c",
+    "size_bytes": 67956
+  },
+  {
+    "cache_path": "org.apache.commons/commons-parent/52/4ee86dedc66d0010ccdc29e5a4ce014c057854/commons-parent-52.pom",
+    "sha256": "75dbe8f34e98e4c3ff42daae4a2f9eb4cbcd3b5f1047d54460ace906dbb4502e",
+    "size_bytes": 79273
+  },
+  {
+    "cache_path": "org.apache.commons/commons-parent/58/26758faad5d4d692a3cee724c42605d2ee9d5284/commons-parent-58.pom",
+    "sha256": "2d4b12e18899063abd7c75278b5fa97a3729d80878ceecb6a40d946e9c0d5590",
+    "size_bytes": 82646
+  },
+  {
+    "cache_path": "org.apache.httpcomponents/httpclient/4.5.14/1194890e6f56ec29177673f2f12d0b8e627dec98/httpclient-4.5.14.jar",
+    "sha256": "c8bc7e1c51a6d4ce72f40d2ebbabf1c4b68bfe76e732104b04381b493478e9d6",
+    "size_bytes": 785639
+  },
+  {
+    "cache_path": "org.apache.httpcomponents/httpclient/4.5.14/f62c6a311407cc4b47d0ea9eec6cf97ed25b8cee/httpclient-4.5.14.pom",
+    "sha256": "f18355af4cf80a8a4ef04ebd742a47e90a7eaf080c725b2095dbc4fc5dbdefb7",
+    "size_bytes": 6623
+  },
+  {
+    "cache_path": "org.apache.httpcomponents/httpclient/4.5.6/1afe5621985efe90a92d0fbc9be86271efbe796f/httpclient-4.5.6.jar",
+    "sha256": "c03f813195e7a80e3608d0ddd8da80b21696a4c92a6a2298865bf149071551c7",
+    "size_bytes": 767140
+  },
+  {
+    "cache_path": "org.apache.httpcomponents/httpclient/4.5.6/db40edda8b95d880d2a810560fd5e46eb4fa6909/httpclient-4.5.6.pom",
+    "sha256": "7efc1241e73e7fbb268bfd33242d11ebd3ca07061d7d85f2962dc32a0f0b8855",
+    "size_bytes": 6639
+  },
+  {
+    "cache_path": "org.apache.httpcomponents/httpcomponents-client/4.5.14/e36b5c26d9012cce0ba214e06462596585475217/httpcomponents-client-4.5.14.pom",
+    "sha256": "5bad1de4f101447659f89d089868ccbad64a68cc503d2d65410b51f6904aa061",
+    "size_bytes": 15277
+  },
+  {
+    "cache_path": "org.apache.httpcomponents/httpcomponents-client/4.5.6/135a0a91d1ad2909b08196580ef2c363932bb87e/httpcomponents-client-4.5.6.pom",
+    "sha256": "b042b41f2391edb00d35f7f4e509aed2123648c1d246ce58d0f7b905c9fe1f73",
+    "size_bytes": 15489
+  },
+  {
+    "cache_path": "org.apache.httpcomponents/httpcomponents-core/4.4.16/e0cbfde0384168cdd90e2633c1f101416d799090/httpcomponents-core-4.4.16.pom",
+    "sha256": "f2d75a2c2d423ad18539bf21656d56f88a4091944a662fcaf159d5ae283db7f7",
+    "size_bytes": 11949
+  },
+  {
+    "cache_path": "org.apache.httpcomponents/httpcomponents-parent/10/1ba3c5940f24525444492ae12b6a1015df8a477b/httpcomponents-parent-10.pom",
+    "sha256": "caaf967d94afb21753f36082c6086206bd1f48825ff596932cceba72b65d39fa",
+    "size_bytes": 33654
+  },
+  {
+    "cache_path": "org.apache.httpcomponents/httpcomponents-parent/11/3ee7a841cc49326e8681089ea7ad6a3b81b88581/httpcomponents-parent-11.pom",
+    "sha256": "a901f87b115c55070c7ee43efff63e20e7b02d30af2443ae292bf1f4e532d3aa",
+    "size_bytes": 34695
+  },
+  {
+    "cache_path": "org.apache.httpcomponents/httpcore/4.4.16/51cf043c87253c9f58b539c9f7e44c8894223850/httpcore-4.4.16.jar",
+    "sha256": "6c9b3dd142a09dc468e23ad39aad6f75a0f2b85125104469f026e52a474e464f",
+    "size_bytes": 327891
+  },
+  {
+    "cache_path": "org.apache.httpcomponents/httpcore/4.4.16/fdcd45abd94151f990a359e1d367e325cfb50286/httpcore-4.4.16.pom",
+    "sha256": "3cbad849b35dacfe6cec31adada2c623c026c3261141b0d26eec7e399c6cd7fa",
+    "size_bytes": 4967
+  },
+  {
+    "cache_path": "org.apache.httpcomponents/httpmime/4.5.6/164343da11db817e81e24e0d9869527e069850c9/httpmime-4.5.6.jar",
+    "sha256": "0b2b1102c18d3c7e05a77214b9b7501a6f6056174ae5604e0e256776eda7553e",
+    "size_bytes": 41794
+  },
+  {
+    "cache_path": "org.apache.httpcomponents/httpmime/4.5.6/b9dcad423fba1978379049cf0cf3cf535c667af7/httpmime-4.5.6.pom",
+    "sha256": "dfbfd6ffe2a784ca9817c46365aa7f8a578320b805bde39d6f55a0b09d8aa8ca",
+    "size_bytes": 5236
+  },
+  {
+    "cache_path": "org.bitbucket.b_c/jose4j/0.7.0/478ee8518687f9b01f20912fc7edd9d7b46d06da/jose4j-0.7.0.jar",
+    "sha256": "eb14f69c0395d4a106c6c46fe6dff080c4608ccabc99b1f03933d374383d9bbe",
+    "size_bytes": 265685
+  },
+  {
+    "cache_path": "org.bitbucket.b_c/jose4j/0.7.0/75a113b082e019173123f818deb57e1b12c25c85/jose4j-0.7.0.pom",
+    "sha256": "13128ccf90fb31f18d8109b484516649d5db0e47284d860e71a4cf3148153ed8",
+    "size_bytes": 9155
+  },
+  {
+    "cache_path": "org.bouncycastle/bcpkix-jdk18on/1.77/665a47cc915b558c7ea8502611c6584a08fd6bd4/bcpkix-jdk18on-1.77.pom",
+    "sha256": "8fb0926f02e2c4b2dc52e47ebb093f92f1d3bb6f149c2a5cca5e2a648d2c498d",
+    "size_bytes": 1641
+  },
+  {
+    "cache_path": "org.bouncycastle/bcpkix-jdk18on/1.77/ed953791ba0229747dd0fd9911e3d76a462acfd3/bcpkix-jdk18on-1.77.jar",
+    "sha256": "1ac7fe8efd5b2f38cdc165be5a0675734fe44808dab92707201f03a535d6f1b8",
+    "size_bytes": 1113643
+  },
+  {
+    "cache_path": "org.bouncycastle/bcprov-jdk18on/1.77/2cc971b6c20949c1ff98d1a4bc741ee848a09523/bcprov-jdk18on-1.77.jar",
+    "sha256": "dabb98c24d72c9b9f585633d1df9c5cd58d9ad373d0cd681367e6a603a495d58",
+    "size_bytes": 8372360
+  },
+  {
+    "cache_path": "org.bouncycastle/bcprov-jdk18on/1.77/74bb7e46ca1ee431a3774ec6f437afd2e7707de3/bcprov-jdk18on-1.77.pom",
+    "sha256": "ad1382cfcd03bcdd8be13913c02f44fd469d0a76a53cf2caef5be180adc36b23",
+    "size_bytes": 1141
+  },
+  {
+    "cache_path": "org.bouncycastle/bcutil-jdk18on/1.77/512b4d85dae265e62fd1c9f2d8b4710de9e24cbf/bcutil-jdk18on-1.77.pom",
+    "sha256": "163dfa6632ffb928a705ca83722350cacea49ccd623ce73645a5cc3b0fa9e6e8",
+    "size_bytes": 1320
+  },
+  {
+    "cache_path": "org.bouncycastle/bcutil-jdk18on/1.77/de3eaef351545fe8562cf29ddff4a403a45b49b7/bcutil-jdk18on-1.77.jar",
+    "sha256": "947673bcbc5a8dde2d2fa688a5b7598d0ca6e2a74a7ea30cd93f04f6b3ad68f8",
+    "size_bytes": 681002
+  },
+  {
+    "cache_path": "org.checkerframework/checker-qual/2.5.8/5eb0c9262e891ee4dfa3410b9be611e47c79779f/checker-qual-2.5.8.pom",
+    "sha256": "33ac6a0f1341ae96647c7d4465f4aa3d24fe97d2697bcee2ceae6fc8b5ef2c3c",
+    "size_bytes": 2398
+  },
+  {
+    "cache_path": "org.checkerframework/checker-qual/3.33.0/6d43e2eacef053cffd73da56734e9a8a138b52be/checker-qual-3.33.0.pom",
+    "sha256": "f55a922027a78fdd8b3ea15a0d8bfe3fec6a5ceac30c86aa8afa4a5b9b0df603",
+    "size_bytes": 2096
+  },
+  {
+    "cache_path": "org.checkerframework/checker-qual/3.33.0/8bde6d6ac61111dd13bb39a2e3881444c58dfe90/checker-qual-3.33.0.module",
+    "sha256": "e8521d75625d41272c767d262a153ac163cc505b66644a2ef705fa8949ffb4e5",
+    "size_bytes": 3499
+  },
+  {
+    "cache_path": "org.checkerframework/checker-qual/3.33.0/de2b60b62da487644fc11f734e73c8b0b431238f/checker-qual-3.33.0.jar",
+    "sha256": "e316255bbfcd9fe50d165314b85abb2b33cb2a66a93c491db648e498a82c2de1",
+    "size_bytes": 223979
+  },
+  {
+    "cache_path": "org.codehaus.groovy/groovy/3.0.17/23a103e379f90f9271209c97129d5568676b2cda/groovy-3.0.17.jar",
+    "sha256": "9ed2a565a8592a9f63f410afed892d0ca6bec1ff96277ce4cc7f3e2e366e794f",
+    "size_bytes": 8038657
+  },
+  {
+    "cache_path": "org.codehaus.groovy/groovy/3.0.17/5fc8c8f7b55ef44a71b72d9f118c3fea42df09fc/groovy-3.0.17.pom",
+    "sha256": "207afde880172806c0a3b20f122d9679f175f22d15b05e87f589f7255dd38362",
+    "size_bytes": 23680
+  },
+  {
+    "cache_path": "org.codehaus.mojo/animal-sniffer-annotations/1.23/3c0daebd5f0e1ce72cc50c818321ac957aeb5d70/animal-sniffer-annotations-1.23.jar",
+    "sha256": "9ffe526bf43a6348e9d8b33b9cd6f580a7f5eed0cf055913007eda263de974d0",
+    "size_bytes": 3109
+  },
+  {
+    "cache_path": "org.codehaus.mojo/animal-sniffer-annotations/1.23/f09f8a453e1b883f9876fbd5f3280d367ff90f2a/animal-sniffer-annotations-1.23.pom",
+    "sha256": "5610db06b733641acbc7a0c48a80c40069db627bad043f8c7c8d7afb4f6a3d27",
+    "size_bytes": 1656
+  },
+  {
+    "cache_path": "org.codehaus.mojo/animal-sniffer-parent/1.23/1b4cb41a44448b41c20c9c2de022a0ad40bf195c/animal-sniffer-parent-1.23.pom",
+    "sha256": "6b7f054ab86a87f8e2599f35808b0989922e86b6cab13988021cd12640a4b404",
+    "size_bytes": 5948
+  },
+  {
+    "cache_path": "org.codehaus.mojo/mojo-parent/74/2ef0a93fea172659305d787e51dfd4af9247334c/mojo-parent-74.pom",
+    "sha256": "1472325a16f0b1bdabed21fa4839372964944610294ce2681b2059edc654f2b3",
+    "size_bytes": 35653
+  },
+  {
+    "cache_path": "org.eclipse.ee4j/project/1.0.2/5730bedee1faaeeb62b0afc4ed1c4571f87a8eb4/project-1.0.2.pom",
+    "sha256": "7495a07a797e88e43c3bc1a87421bd8b1fc55e32291fa18e4e32d8031ddc873f",
+    "size_bytes": 11603
+  },
+  {
+    "cache_path": "org.eclipse.ee4j/project/1.0.5/d391c5ed15d8fb1dadba9c5d1017006d56c50332/project-1.0.5.pom",
+    "sha256": "916b4794d8d8220a59a3fdf6a64dbe794aeb23395e888b81ae36a9b5a2c591a6",
+    "size_bytes": 13168
+  },
+  {
+    "cache_path": "org.glassfish.jaxb/jaxb-bom/2.3.2/c7cd28b5d3871feba8cebf6d4587043fb0d6fd0a/jaxb-bom-2.3.2.pom",
+    "sha256": "a1018bb54678ed9f5acb2f7a4084e385ff510201f4e9dbf5f75dc6a675f66be7",
+    "size_bytes": 8018
+  },
+  {
+    "cache_path": "org.glassfish.jaxb/jaxb-runtime/2.3.2/5528bc882ea499a09d720b42af11785c4fc6be2a/jaxb-runtime-2.3.2.jar",
+    "sha256": "e6e0a1e89fb6ff786279e6a0082d5cef52dc2ebe67053d041800737652b4fd1b",
+    "size_bytes": 1013367
+  },
+  {
+    "cache_path": "org.glassfish.jaxb/jaxb-runtime/2.3.2/f46a0f023205138c366f0b0c9316f8663bb32a4f/jaxb-runtime-2.3.2.pom",
+    "sha256": "9448a5ad7fa68a6083dfbe4f42c8c83e082b9202a105401fc68e944c26548b34",
+    "size_bytes": 5573
+  },
+  {
+    "cache_path": "org.glassfish.jaxb/txw2/2.3.2/22d24b523eb02a955e8bfa7af6572207a3490482/txw2-2.3.2.pom",
+    "sha256": "a79dd002fb038183ff286a2635be2e68c103b87e0e64717d8d44bfd017fd33ea",
+    "size_bytes": 2766
+  },
+  {
+    "cache_path": "org.glassfish.jaxb/txw2/2.3.2/ce5be7da2e442c25ec14c766cb60cb802741727b/txw2-2.3.2.jar",
+    "sha256": "4a6a9f483388d461b81aa9a28c685b8b74c0597993bf1884b04eddbca95f48fe",
+    "size_bytes": 72080
+  },
+  {
+    "cache_path": "org.jdom/jdom2/2.0.6/11e250d112bc9f2a0e1a595a5f6ecd2802af2691/jdom2-2.0.6.pom",
+    "sha256": "47b23a79fe336b741b82434c6e049d68165256e405e75c10921fd72fa8a65d8d",
+    "size_bytes": 4598
+  },
+  {
+    "cache_path": "org.jdom/jdom2/2.0.6/6f14738ec2e9dd0011e343717fa624a10f8aab64/jdom2-2.0.6.jar",
+    "sha256": "1345f11ba606d15603d6740551a8c21947c0215640770ec67271fe78bea97cf5",
+    "size_bytes": 304924
+  },
+  {
+    "cache_path": "org.jetbrains/annotations/13.0/919f0dfe192fb4e063e7dacadee7f8bb9a2672a9/annotations-13.0.jar",
+    "sha256": "ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478",
+    "size_bytes": 17536
+  },
+  {
+    "cache_path": "org.jetbrains/annotations/13.0/fa7d3d07cc80547e2d15bf4839d3267c637c642f/annotations-13.0.pom",
+    "sha256": "965aeb2bedff369819bdde1bf7a0b3b89b8247dd69c88b86375d76163bb8c397",
+    "size_bytes": 4930
+  },
+  {
+    "cache_path": "org.jetbrains/annotations/23.0.0/8cc20c07506ec18e0834947b84a864bfc094484e/annotations-23.0.0.jar",
+    "sha256": "7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05",
+    "size_bytes": 29371
+  },
+  {
+    "cache_path": "org.jetbrains/annotations/23.0.0/deb853be3c9e05ed99fbbf83e49d349d08a6d10e/annotations-23.0.0.pom",
+    "sha256": "c9490f655132328df2cfbcfdf743f53fc3916d6c1d10437175a6ca6e3a67771c",
+    "size_bytes": 1354
+  },
+  {
+    "cache_path": "org.jetbrains.intellij.deps/trove4j/1.0.20200330/3afb14d5f9ceb459d724e907a21145e8ff394f02/trove4j-1.0.20200330.jar",
+    "sha256": "c5fd725bffab51846bf3c77db1383c60aaaebfe1b7fe2f00d23fe1b7df0a439d",
+    "size_bytes": 572985
+  },
+  {
+    "cache_path": "org.jetbrains.intellij.deps/trove4j/1.0.20200330/c1f38f72d4dfc6efd773b0448a7aae08f8d5025f/trove4j-1.0.20200330.pom",
+    "sha256": "87721cbaa65a3c97d8b1ba9d207840f164c9fe38759fc9ea10ffe26565f8d3e9",
+    "size_bytes": 1322
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-android-extensions/1.7.20/644b486d050201ba77dcb4c5b34c88d98a3889e6/kotlin-android-extensions-1.7.20.pom",
+    "sha256": "cced369639daee814671c2ff1b9d0f8acfbf598ce905487cb86feba54c9e8df1",
+    "size_bytes": 1411
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-android-extensions/1.7.20/af6872dd3ef582956d8cf477e68ef63b0428dd3c/kotlin-android-extensions-1.7.20.jar",
+    "sha256": "3551f0a8387356dcd1869db71afebd87077982d62f22735fe2d3b80c70a5d15c",
+    "size_bytes": 490920
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-annotation-processing-gradle/1.7.20/4e90a1c7777430f1dc9a9cb84173690d44af2ad0/kotlin-annotation-processing-gradle-1.7.20.pom",
+    "sha256": "8a9b6efd82e8269628f90872c5601fd2df704258d005df008e2950abb827f324",
+    "size_bytes": 1623
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-annotation-processing-gradle/1.7.20/e35259bb0659543102a3af44640567634abea257/kotlin-annotation-processing-gradle-1.7.20.jar",
+    "sha256": "9579df2eb4d5a3f045a8b65eadf7198c08af3243a3c92a4736bc3cd0b92e7b6b",
+    "size_bytes": 466483
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-build-common/1.7.20/4e3f5a47c901edb21953ede295b97319b494823d/kotlin-build-common-1.7.20.pom",
+    "sha256": "868b8cbacbc4f1f5e773f07d32aa5769f0af1b87a2c164d970d9dd60abc4c318",
+    "size_bytes": 1149
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-build-common/1.7.20/edf73ec21410f29ef755f346bb9f8dbca8f04263/kotlin-build-common-1.7.20.jar",
+    "sha256": "95d2fbfd7e987ed607fdc9e6d09d4d87a9782a71dceb91c3200ef4f113f2fb04",
+    "size_bytes": 514581
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-compiler-embeddable/1.7.20/8db18559a581dd2c36ddfd5046af145650f5b126/kotlin-compiler-embeddable-1.7.20.jar",
+    "sha256": "5ec2be1872dc47b9dcb466f1781eded6c59d9eee18657d4b0f1148e619caea36",
+    "size_bytes": 53395419
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-compiler-embeddable/1.7.20/d493a2fd1c0514a84744ba6abcf0325c23353c44/kotlin-compiler-embeddable-1.7.20.pom",
+    "sha256": "c4bef20a00f2a62e8f26a88746c5d271c3f05e7f5c3f25c84795d4f254537149",
+    "size_bytes": 2341
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-compiler-runner/1.7.20/13e2e19c406d4b20d29011740fdf720a4c542636/kotlin-compiler-runner-1.7.20.jar",
+    "sha256": "e1331fab199208d115f157cb06d14a568c30dcaedfb3f7bdeeda16d1861b0f67",
+    "size_bytes": 19527
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-compiler-runner/1.7.20/fa32748b5e248c0e486517b3136dfd05150b083d/kotlin-compiler-runner-1.7.20.pom",
+    "sha256": "df5de8f3037dbd150b91fc7d11d9bd0a7f5bb38a0b22803c4012500ca0d027b8",
+    "size_bytes": 2138
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-daemon-client/1.7.20/15d93f39cb060c1976b02e9e99d215c5765ecad/kotlin-daemon-client-1.7.20.jar",
+    "sha256": "c9ba3a944b00ae636634ec346239371c9a049727d9a02a8e2125cd231430b878",
+    "size_bytes": 676273
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-daemon-client/1.7.20/d3b9115c9d8e90b9dbac5b1c66d106b9f95aedcd/kotlin-daemon-client-1.7.20.pom",
+    "sha256": "5ab023b4c7f6a572c96f6706770d3d321b34a88151ff93397253cc480ed5165b",
+    "size_bytes": 1724
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-daemon-embeddable/1.7.20/1e24355adad8d529d75d5b19eab55484057431ba/kotlin-daemon-embeddable-1.7.20.jar",
+    "sha256": "e669ab8d2677d00f799fc86018551fbd9bd6b3c1d09fdb3f0eec8c4f44f62e63",
+    "size_bytes": 729190
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-daemon-embeddable/1.7.20/c3b3000b5ddc66e38c3d6bc8ed9b45092efe21ad/kotlin-daemon-embeddable-1.7.20.pom",
+    "sha256": "7b85fa03ac7f43d7429d7bcb35c68f38f2cf7baf0685e1492d2d0063729636d3",
+    "size_bytes": 1194
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-gradle-plugin/1.7.20/105cc232869ede370152da64b7769e06b046b596/kotlin-gradle-plugin-1.7.20.module",
+    "sha256": "43942e46e63dfe87a31728411d20639d2888454632a33970b3c0e70005310b50",
+    "size_bytes": 66076
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-gradle-plugin/1.7.20/55d17b4954f1d1cceee192d1adb608ad7f565121/kotlin-gradle-plugin-1.7.20.pom",
+    "sha256": "d572743a5c0f04c15d10b1138f3411a223e694e8ab79706bc56d76d24dd95532",
+    "size_bytes": 19292
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-gradle-plugin/1.7.20/d08f039d97cd489e3fbf19e5f855deee35297bd4/kotlin-gradle-plugin-1.7.20-gradle71.jar",
+    "sha256": "cc4a90e893b4a3ccff108411c26d8e1b60b9993c811b376e922d4ba9a7e2a13e",
+    "size_bytes": 12572186
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-gradle-plugin-api/1.7.20/5ca03571b036efb6a7f05e9d368f512193017965/kotlin-gradle-plugin-api-1.7.20.pom",
+    "sha256": "b7555d31207535be03ea81363c8857af22520d3fdc2ed2cd8e6227dab148c006",
+    "size_bytes": 4851
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-gradle-plugin-api/1.7.20/8159de6c79ac1c91fe2ecc488c30b27b2a8f5f1c/kotlin-gradle-plugin-api-1.7.20-gradle71.jar",
+    "sha256": "489c48c8fad1ff6e20b4cb01d4fd7d48408e1a4930479ed7f95217e59dac0571",
+    "size_bytes": 175658
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-gradle-plugin-api/1.7.20/8159de6c79ac1c91fe2ecc488c30b27b2a8f5f1c/kotlin-gradle-plugin-api-1.7.20.jar",
+    "sha256": "489c48c8fad1ff6e20b4cb01d4fd7d48408e1a4930479ed7f95217e59dac0571",
+    "size_bytes": 175658
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-gradle-plugin-api/1.7.20/f8a6438d0a269337bb19b9b1556983cacb30a92d/kotlin-gradle-plugin-api-1.7.20.module",
+    "sha256": "1de4b4b0be21bde6a20df99626a462448306604b5110f8c6e0ddce902827fbd1",
+    "size_bytes": 26797
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-gradle-plugin-idea/1.7.20/47cde176ecd0fcf5a8ef2a5d0a020372bf69bb93/kotlin-gradle-plugin-idea-1.7.20.jar",
+    "sha256": "d11bb085408a0b9c6ec1265ebc069fb771c494f0904fb641fcf02354bcd56b1d",
+    "size_bytes": 109678
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-gradle-plugin-idea/1.7.20/6b205fa5abbb70f6f68a6b1e9e7b342d1464e7d3/kotlin-gradle-plugin-idea-1.7.20.module",
+    "sha256": "78303498eaee46e115a0916a2fdc92862849f51987c93f33b94d87091a701a3c",
+    "size_bytes": 7165
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-gradle-plugin-idea/1.7.20/9ba0677ef6f47b8965be8d50a0158db48e425d19/kotlin-gradle-plugin-idea-1.7.20.pom",
+    "sha256": "594aad0791f2dca36fd39435d2ac2a90194521894f8b52465602dc76c88aab93",
+    "size_bytes": 2399
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-gradle-plugin-idea-proto/1.7.20/8af2b6cab9bc0babdb32d4c88a4439b68ef7760/kotlin-gradle-plugin-idea-proto-1.7.20.jar",
+    "sha256": "00081214394ac3a6de47dfb8dde0b299be233c16a2d1e67601959bb037fa8af0",
+    "size_bytes": 2646534
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-gradle-plugin-idea-proto/1.7.20/d97dde047434d5bc4edb8a22beb92499cb16c7a0/kotlin-gradle-plugin-idea-proto-1.7.20.pom",
+    "sha256": "205395396112f6aa31a592c66af2893bca6a7f6eb5c738f95bde0243e28c0da7",
+    "size_bytes": 1419
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-gradle-plugin-model/1.7.20/6c74f09c5b4d836a82693c0a99525be19a03f687/kotlin-gradle-plugin-model-1.7.20.module",
+    "sha256": "2201f4fe9f4a2a655c40c7f72994718006e465fd3736131da822728764433d42",
+    "size_bytes": 19213
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-gradle-plugin-model/1.7.20/b7cadb43292187a0bc97381a1a4a731638bc188c/kotlin-gradle-plugin-model-1.7.20.pom",
+    "sha256": "d0a13ae4e5e449771c6a61c7e1174c7ad11c3c5137e7572b40644cd97ae71873",
+    "size_bytes": 4935
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-gradle-plugin-model/1.7.20/ee10b25667d827bc6c2f2520fa43e1a5079ed151/kotlin-gradle-plugin-model-1.7.20.jar",
+    "sha256": "d982f3e631631875dd340e0413e814ff31066d75172c91c4d4c9afabaeaaaf43",
+    "size_bytes": 12104
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-klib-commonizer-api/1.7.20/2a03bdd0a6b57420008738af9195f67fb6427571/kotlin-klib-commonizer-api-1.7.20.pom",
+    "sha256": "0460f392da0e2c1888c7d9b0e297a149e4d1d57127dccbd0dc8ad77ecfd69cbc",
+    "size_bytes": 1593
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-klib-commonizer-api/1.7.20/85639b70c215235da621fe4b25855c246373eddc/kotlin-klib-commonizer-api-1.7.20.jar",
+    "sha256": "ed3e06676c608a828d516f19658b8a03bc31cf1dbbdd3c6095d29eb3da64cca8",
+    "size_bytes": 79905
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-native-utils/1.7.20/49c85bdfa26ac677359bfceee3bc8f09ff1a3dde/kotlin-native-utils-1.7.20.pom",
+    "sha256": "470d4d0badde58da624747a9ea16432bffa8ac8de81effea7a1408ec74902705",
+    "size_bytes": 1372
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-native-utils/1.7.20/8e64e54cf3fb0c275b3f2f5a9276110fbb329f8f/kotlin-native-utils-1.7.20.jar",
+    "sha256": "8da7e56a0bf0eadd2b08846c2a276f4fae19b4f379d64d8eee4b4447bb54234d",
+    "size_bytes": 98458
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-project-model/1.7.20/6cfebc40ca34f0128fdb65f35bfb15a3c8312d21/kotlin-project-model-1.7.20.pom",
+    "sha256": "75a25759c7b356ffaa45a555d49e0824214631de3df9fae5e16ff2d492a24290",
+    "size_bytes": 1567
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-project-model/1.7.20/8db9bd1b28e2fefd67727adecb96462f7d454a39/kotlin-project-model-1.7.20.jar",
+    "sha256": "67a2665d697e9e9416a29a4b6083e355a287920f337694995fbe880a664c2bff",
+    "size_bytes": 64844
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-reflect/1.7.20/12b2501e33bb6373e8e347c86d85481863629381/kotlin-reflect-1.7.20.jar",
+    "sha256": "afe70b6faf6c23f6fedcb0cf88b07cb1778139f4b744ae13b23eb8bbc4ee09f8",
+    "size_bytes": 3135706
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-reflect/1.7.20/72d9d2527339e41ebff2444281c0d8f170747df7/kotlin-reflect-1.7.20.pom",
+    "sha256": "6a66cbc792a085eb03e61f3f056d7b61ee0adf85322b1e673a333a1b7f09c4ba",
+    "size_bytes": 1376
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-reflect/1.9.20/34eeb4eed5f493cdbb760ef50a5653ec414006bf/kotlin-reflect-1.9.20.jar",
+    "sha256": "49b66f9a89d50fd2954c2e8aeac80e4f488b0a09322a25efad6261576713dc0f",
+    "size_bytes": 3222056
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-reflect/1.9.20/476ae7a409377d13b2bd1def9ad51afddbaef0c2/kotlin-reflect-1.9.20.pom",
+    "sha256": "942b5e8602d317ec13652f1c0222052bb90817f28cf6fe9d47112f09b3e8e67d",
+    "size_bytes": 1376
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-script-runtime/1.7.20/bcd1cc6f865e632550357fcc59f5ffd532615a8/kotlin-script-runtime-1.7.20.jar",
+    "sha256": "696f56daac19b75a20fdffa899f0a40750ba7cdf910dd198af7f05692d31e015",
+    "size_bytes": 42178
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-script-runtime/1.7.20/ed8d8046df4ceb97e022df6c5a95e50e1509052f/kotlin-script-runtime-1.7.20.pom",
+    "sha256": "0bb70a7bf5f9b31010c7de7879cb671fb5a640d9d19fdf5705f8abd73f38ed67",
+    "size_bytes": 1155
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-scripting-common/1.7.20/88ed4f0a92a48e12d2d4596f26967400e390648c/kotlin-scripting-common-1.7.20.jar",
+    "sha256": "33850570129d7f6cb5a2f2bc20d3d02263e3d963486a37891383d8ae7486debc",
+    "size_bytes": 224836
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-scripting-common/1.7.20/b70f23e62f968dde5ddb6ff79147e7468a246257/kotlin-scripting-common-1.7.20.pom",
+    "sha256": "4494dccdccdcb50d01429c60777d9f3417f53d9c072ca8344770d833b2433152",
+    "size_bytes": 1383
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-scripting-compiler-embeddable/1.7.20/914115ed0e791339d37185828895e958a98a84ea/kotlin-scripting-compiler-embeddable-1.7.20.pom",
+    "sha256": "57c80086478934cee0e57d4525f32d005035998c2bc41f954f11d9ea2b792008",
+    "size_bytes": 1661
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-scripting-compiler-embeddable/1.7.20/a7f1cf58156c0e066411f4f7fd26cb8c63e11aca/kotlin-scripting-compiler-embeddable-1.7.20.jar",
+    "sha256": "1a7533623d1cc10a3a209d7f01c58b4cf65b510ddf88e64f85c2180e7dac4293",
+    "size_bytes": 374948
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-scripting-compiler-impl-embeddable/1.7.20/65ffddd9ccb77cfb079e6c8cfc0c61f4851435e/kotlin-scripting-compiler-impl-embeddable-1.7.20.pom",
+    "sha256": "633c566124db90fb760f8d2efb00596d0c0b583f2fb1989cd896d08f6aa5d2b7",
+    "size_bytes": 1859
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-scripting-compiler-impl-embeddable/1.7.20/9a40e21c6710aca281217963ef137c7df945e1bc/kotlin-scripting-compiler-impl-embeddable-1.7.20.jar",
+    "sha256": "3e117702b33e61f3c2351243c750a9739164d85e8976e36a255e01afc9787184",
+    "size_bytes": 313983
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-scripting-jvm/1.7.20/224cb3bc59483d53f731d95aa1961242adc3363f/kotlin-scripting-jvm-1.7.20.pom",
+    "sha256": "c4a52af83defea8cf941a1b070c5e8b651b9eb7589d52b4f3a5e97ddc5c8fbf2",
+    "size_bytes": 1766
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-scripting-jvm/1.7.20/c79de17329ea8f7c7d200063145d5694ca3f6786/kotlin-scripting-jvm-1.7.20.jar",
+    "sha256": "f941e4c94f73146a3e5a8996bc3841daa873890561de003545fec1616b031f97",
+    "size_bytes": 198585
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-stdlib/1.7.20/726594ea9ba2beb2ee113647fefa9a10f9fabe52/kotlin-stdlib-1.7.20.jar",
+    "sha256": "7779ec96b9acbf92ca023858ac04543f9d2c3bdf1722425fff42f25ff3acfc9b",
+    "size_bytes": 1537347
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-stdlib/1.7.20/c8f833a98ea71e3074adca09e355fa8ac0feac4d/kotlin-stdlib-1.7.20.pom",
+    "sha256": "8b4815fc3fc9b1c1524932e8cb80f890723052fbf52e720c9b834df545f5f059",
+    "size_bytes": 1554
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-stdlib/1.9.20/3eccbf1caf5170544beef2ea9b3085625320f6f2/kotlin-stdlib-1.9.20.module",
+    "sha256": "dccaa5d315470fab3920502886bbb85f2da6c86102c65d9c04410544eedb2019",
+    "size_bytes": 14078
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-stdlib/1.9.20/3f738a2bb6623e58335de00d020e5055dc8dbc89/kotlin-stdlib-1.9.20.pom",
+    "sha256": "e37216a732c8e81a9fd05b4dd892c30cac0cad7b4e3fda2f9663f48e880741c0",
+    "size_bytes": 2847
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-stdlib/1.9.20/e58b4816ac517e9cc5df1db051120c63d4cde669/kotlin-stdlib-1.9.20.jar",
+    "sha256": "28a35bcdff46d864f80f346a617e486284b208d17378c41900dfb1de95a90e6c",
+    "size_bytes": 1718949
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-stdlib-common/1.7.20/7e8d057fa81dd48b0c815b17630c9a136462b258/kotlin-stdlib-common-1.7.20.pom",
+    "sha256": "1862fe818a7e7bb8d0a7c031aea238b59d549453b10859ce07638c9f96ff4885",
+    "size_bytes": 1162
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-stdlib-common/1.7.20/e15351bdaf9fa06f009be5da7a202e4184f00ae3/kotlin-stdlib-common-1.7.20.jar",
+    "sha256": "e0e91962bc0007338bf5b1739f62927ac32d14ba3d827fa608ab4e5351729d5d",
+    "size_bytes": 212210
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-stdlib-jdk7/1.9.20/4ecc926f594a40a6fe3793b118d624600d0a95ad/kotlin-stdlib-jdk7-1.9.20.pom",
+    "sha256": "012e1c55ed6ade417bcb824112ebea682ad625dfbee16085c379ccfa14faf033",
+    "size_bytes": 1389
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-stdlib-jdk7/1.9.20/8b4b73f4e08efaae93fc01d8c6eaab58a72d2ab3/kotlin-stdlib-jdk7-1.9.20.jar",
+    "sha256": "c5451d67a27f33afd09913c67e1ceba3897ae70884b24ef0ff71157e55b60865",
+    "size_bytes": 966
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-stdlib-jdk8/1.9.20/4d1d45eee1908adc2ee53cd0bb23af956e5e8ee4/kotlin-stdlib-jdk8-1.9.20.pom",
+    "sha256": "a3b07deb091f2aed59d6559884f44f99cff5df9b9fa35a24bcd6b8b069cff48d",
+    "size_bytes": 1581
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-stdlib-jdk8/1.9.20/e2b4d1f475ae0606d063a84fce4dccdb45c7e12a/kotlin-stdlib-jdk8-1.9.20.jar",
+    "sha256": "f833fcc94f0bb1c31b9e78bd4bda7ea23f579ff3408ae1a94e2eb5747086a2ab",
+    "size_bytes": 972
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-tooling-core/1.7.20/19c84dd609449479dd647cfb8b885f6430501a21/kotlin-tooling-core-1.7.20.jar",
+    "sha256": "3797f1835342fbc12ec9c1d4f98332ba028291a33251a907c9227d8fd94aee48",
+    "size_bytes": 43655
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-tooling-core/1.7.20/847e64e698ca7323153072086b669844dfddc700/kotlin-tooling-core-1.7.20.pom",
+    "sha256": "c4cc3139700e81a945e2f339e82545af5ce0d7173935e026c4d5a77efe26665c",
+    "size_bytes": 1371
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-util-io/1.7.20/6e11b33883defb7ca4b8bff8c5fe81e463803bc7/kotlin-util-io-1.7.20.jar",
+    "sha256": "aede08b11a141706f6a75d64dad2d704637d8f4435eac11b212c7b546c600c62",
+    "size_bytes": 53050
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-util-io/1.7.20/bf528d886b90dca60ff8dc2427cb262090ebecb/kotlin-util-io-1.7.20.pom",
+    "sha256": "fc6c1d536f4623878ca875538f3a7ca30df9df15dd8419de14181c0c42d4f62f",
+    "size_bytes": 1356
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-util-klib/1.7.20/82ab0f9bf068ac00335ca913ad253443738444d7/kotlin-util-klib-1.7.20.pom",
+    "sha256": "52ca1fa8057c0a4c75f8da27c31f37cef43c64e9a7045a1b00ad081df089a5ea",
+    "size_bytes": 1563
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin/kotlin-util-klib/1.7.20/9df574f921e0339d4b8ef925e11e34a111a571b1/kotlin-util-klib-1.7.20.jar",
+    "sha256": "8534ac8eb04876be0ef0ba1c2e31f76916869a4253ddbdfcff48cec979886030",
+    "size_bytes": 269371
+  },
+  {
+    "cache_path": "org.jetbrains.kotlin.android/org.jetbrains.kotlin.android.gradle.plugin/1.7.20/8b1c4e2fee2a4098cc87d6586ecfd6cce628bd6b/org.jetbrains.kotlin.android.gradle.plugin-1.7.20.pom",
+    "sha256": "0e60f7d805a5fac3292d722bb0077b1e1a976e50f07a3238347af7a688eb4279",
+    "size_bytes": 1413
+  },
+  {
+    "cache_path": "org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/1.5.0/49d762d8bf90e3eb7d5593eb554aa7e582a5af3f/kotlinx-coroutines-core-jvm-1.5.0.module",
+    "sha256": "c885dd0281076c5843826de317e3cbcdc3d8859dbeef53ae1cfacd1b9c60f96e",
+    "size_bytes": 2740
+  },
+  {
+    "cache_path": "org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/1.5.0/8b1169a630a788212949fe4c74043cc18be763fe/kotlinx-coroutines-core-jvm-1.5.0.pom",
+    "sha256": "53622e03778df8440fc012201a35bb4bdfe40164efec612bbefcdeecb2ffc2ab",
+    "size_bytes": 1892
+  },
+  {
+    "cache_path": "org.jetbrains.kotlinx/kotlinx-coroutines-core-jvm/1.5.0/d8cebccdcddd029022aa8646a5a953ff88b13ac8/kotlinx-coroutines-core-jvm-1.5.0.jar",
+    "sha256": "78d6cc7135f84d692ff3752fcfd1fa1bbe0940d7df70652e4f1eaeec0c78afbb",
+    "size_bytes": 1482528
+  },
+  {
+    "cache_path": "org.junit/junit-bom/5.9.2/645a08cbe455cad14d8bfb25a35d7f594c53cafd/junit-bom-5.9.2.pom",
+    "sha256": "2ed07d65845131f5336a86476c9a4056b59d0b58b9815ab3679bb0f36f35f705",
+    "size_bytes": 5630
+  },
+  {
+    "cache_path": "org.junit/junit-bom/5.9.2/911eb82319eec8e880e4d32ab4da7323837dfc00/junit-bom-5.9.2.module",
+    "sha256": "ab137ba5a8e32c9b066bf9126a1c76dd5614b724ba5c0b02549772b5e9f4cf1f",
+    "size_bytes": 6956
+  },
+  {
+    "cache_path": "org.junit/junit-bom/5.9.3/b1874b6a66656e4f5e4b492ab321249bcb749dc7/junit-bom-5.9.3.pom",
+    "sha256": "4d0329cd9e72f2420e5ca15724cbfe6ffa6e5fd2888361516271190fdc342ed7",
+    "size_bytes": 5630
+  },
+  {
+    "cache_path": "org.junit/junit-bom/5.9.3/d70d3d9a503c573e648ef70fb2e211fbe44aa63e/junit-bom-5.9.3.module",
+    "sha256": "b401fd25901e582a524aa5343c4b39e28bc56e24961c1069bf2b4bbfcee46b93",
+    "size_bytes": 6956
+  },
+  {
+    "cache_path": "org.jvnet.staxex/stax-ex/1.8.1/78011e483a21102fb4858f3e8f269a677e50aa23/stax-ex-1.8.1.jar",
+    "sha256": "20522549056e9e50aa35ef0b445a2e47a53d06be0b0a9467d704e2483ffb049a",
+    "size_bytes": 38099
+  },
+  {
+    "cache_path": "org.jvnet.staxex/stax-ex/1.8.1/93132b1ebaf1c419ad3d2216924af39c68f43b51/stax-ex-1.8.1.pom",
+    "sha256": "8fc84f36ce6da6ce8c893b6538199a7f69a69a0706d9b17a3ee6a3a09452eed6",
+    "size_bytes": 15152
+  },
+  {
+    "cache_path": "org.ow2/ow2/1.5.1/bda66fa5f1b68fa7d2de3d569bdc8508b2af82d4/ow2-1.5.1.pom",
+    "sha256": "321ddbb7ee6fe4f53dea6b4cd6db74154d6bfa42391c1f763b361b9f485acf05",
+    "size_bytes": 11290
+  },
+  {
+    "cache_path": "org.ow2.asm/asm/9.6/aa205cf0a06dbd8e04ece91c0b37c3f5d567546a/asm-9.6.jar",
+    "sha256": "3c6fac2424db3d4a853b669f4e3d1d9c3c552235e19a319673f887083c2303a1",
+    "size_bytes": 123598
+  },
+  {
+    "cache_path": "org.ow2.asm/asm/9.6/d18179bac08cecb6a4901e36d32ab057e460bd35/asm-9.6.pom",
+    "sha256": "92eee24bc3c843e4881d46c1dd6505471ee3142facfb466b428cfea5a56c6b60",
+    "size_bytes": 2370
+  },
+  {
+    "cache_path": "org.ow2.asm/asm-analysis/9.6/6d72da882f75491c24ba711c50c345703a0bb8c0/asm-analysis-9.6.pom",
+    "sha256": "fa3f995021cff4f4139306e6cffeeea07539106440d29b19cc06a7a636a13850",
+    "size_bytes": 2621
+  },
+  {
+    "cache_path": "org.ow2.asm/asm-analysis/9.6/9ce6c7b174bd997fc2552dff47964546bd7a5ec3/asm-analysis-9.6.jar",
+    "sha256": "d92832d7c37edc07c60e2559ac6118b31d642e337a6671edcb7ba9fae68edbbb",
+    "size_bytes": 34041
+  },
+  {
+    "cache_path": "org.ow2.asm/asm-commons/9.6/f1a9e5508eff490744144565c47326c8648be309/asm-commons-9.6.jar",
+    "sha256": "7aefd0d5c0901701c69f7513feda765fb6be33af2ce7aa17c5781fc87657c511",
+    "size_bytes": 72194
+  },
+  {
+    "cache_path": "org.ow2.asm/asm-commons/9.6/fb17682f6b9f1a62cb1870336ccc167363a657bf/asm-commons-9.6.pom",
+    "sha256": "a98ae4895334baf8ff86bd66516210dbd9a03f1a6e15e47dda82afcf6b53d77c",
+    "size_bytes": 2788
+  },
+  {
+    "cache_path": "org.ow2.asm/asm-tree/9.6/8871f9681c20388b2212e2db082f4d9b608a6944/asm-tree-9.6.pom",
+    "sha256": "1bcb481d7fc16b955bb60ca07c8cfa2424bcee78bdc405bba31c7d6f5dc2d113",
+    "size_bytes": 2592
+  },
+  {
+    "cache_path": "org.ow2.asm/asm-tree/9.6/c0cdda9d211e965d2a4448aa3fd86110f2f8c2de/asm-tree-9.6.jar",
+    "sha256": "c43ecf17b539c777e15da7b5b86553b377e2d39a683de6285567d5283888e7ef",
+    "size_bytes": 51935
+  },
+  {
+    "cache_path": "org.ow2.asm/asm-util/9.6/baf106bdef43eca497ce057d6feacde7a4a67e85/asm-util-9.6.pom",
+    "sha256": "52c5c1d357404779d1a99b49a85bf9d3a085025b8516cb73dbef77c8ae34005e",
+    "size_bytes": 2938
+  },
+  {
+    "cache_path": "org.ow2.asm/asm-util/9.6/f77caf84eb93786a749b2baa40865b9613e3eaee/asm-util-9.6.jar",
+    "sha256": "c635a7402f4aa9bf66b2f4230cea62025a0fe1cd63e8729adefc9b1994fac4c3",
+    "size_bytes": 91131
+  },
+  {
+    "cache_path": "org.slf4j/slf4j-api/1.7.30/2013960e5ee7f712d8fa6f2e618a6ff2e8d98a9/slf4j-api-1.7.30.pom",
+    "sha256": "7e0747751e9b67e19dcb5206f04ea22cc03d250c422426402eadd03513f2c314",
+    "size_bytes": 3835
+  },
+  {
+    "cache_path": "org.slf4j/slf4j-api/1.7.30/b5a4b6d16ab13e34a88fae84c35cd5d68cac922c/slf4j-api-1.7.30.jar",
+    "sha256": "cdba07964d1bb40a0761485c6b1e8c2f8fd9eb1d19c53928ac0d7f9510105c57",
+    "size_bytes": 41472
+  },
+  {
+    "cache_path": "org.slf4j/slf4j-parent/1.7.30/d3cf0e0cdb58d3c6f8a08c21e55894422fd725b9/slf4j-parent-1.7.30.pom",
+    "sha256": "11647956e48a0c5bfb3ac33f6da7e83f341002b6857efd335a505b687be34b75",
+    "size_bytes": 13806
+  },
+  {
+    "cache_path": "org.sonatype.oss/oss-parent/7/46b8a785b60a2767095b8611613b58577e96d4c9/oss-parent-7.pom",
+    "sha256": "b51f8867c92b6a722499557fc3a1fdea77bdf9ef574722fe90ce436a29559454",
+    "size_bytes": 4824
+  },
+  {
+    "cache_path": "org.sonatype.oss/oss-parent/9/e5cdc4d23b86d79c436f16fed20853284e868f65/oss-parent-9.pom",
+    "sha256": "fb40265f982548212ff82e362e59732b2187ec6f0d80182885c14ef1f982827a",
+    "size_bytes": 6569
+  },
+  {
+    "cache_path": "org.tensorflow/tensorflow-lite-metadata/0.1.0-rc2/43e457c5e30bb8f08f5e3823fdd172d238b7cfab/tensorflow-lite-metadata-0.1.0-rc2.pom",
+    "sha256": "9a4f5e5674366c156c90391662f03ed7c5971d6aa63832df74a271da6ff82e96",
+    "size_bytes": 1375
+  },
+  {
+    "cache_path": "org.tensorflow/tensorflow-lite-metadata/0.1.0-rc2/7aa9b3e16d85c2aae5eff741265315a37c9f731a/tensorflow-lite-metadata-0.1.0-rc2.jar",
+    "sha256": "2c2a264f842498c36d34d2a7b91342490d9a962862c85baac1acd54ec2fca6d9",
+    "size_bytes": 348389
+  }
+]

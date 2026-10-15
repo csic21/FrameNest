@@ -1,0 +1,427 @@
+{
+  "status": "candidate-not-android-accepted",
+  "gradle_cache_audit": {
+    "status": "all-actual-cache-files-match-reviewed-lock",
+    "actual_files": 404,
+    "reviewed_files": 460,
+    "unused_reviewed_artifacts": [
+      [
+        "com.android.tools.emulator",
+        "proto",
+        "31.4.0",
+        "proto-31.4.0.jar"
+      ],
+      [
+        "com.android.tools.emulator",
+        "proto",
+        "31.4.0",
+        "proto-31.4.0.pom"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-device-provider-ddmlib",
+        "31.4.0",
+        "android-device-provider-ddmlib-31.4.0.jar"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-device-provider-ddmlib",
+        "31.4.0",
+        "android-device-provider-ddmlib-31.4.0.module"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-device-provider-ddmlib",
+        "31.4.0",
+        "android-device-provider-ddmlib-31.4.0.pom"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-device-provider-gradle",
+        "31.4.0",
+        "android-device-provider-gradle-31.4.0.jar"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-device-provider-gradle",
+        "31.4.0",
+        "android-device-provider-gradle-31.4.0.module"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-device-provider-gradle",
+        "31.4.0",
+        "android-device-provider-gradle-31.4.0.pom"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-additional-test-output",
+        "31.4.0",
+        "android-test-plugin-host-additional-test-output-31.4.0.jar"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-additional-test-output",
+        "31.4.0",
+        "android-test-plugin-host-additional-test-output-31.4.0.module"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-additional-test-output",
+        "31.4.0",
+        "android-test-plugin-host-additional-test-output-31.4.0.pom"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-apk-installer",
+        "31.4.0",
+        "android-test-plugin-host-apk-installer-31.4.0.jar"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-apk-installer",
+        "31.4.0",
+        "android-test-plugin-host-apk-installer-31.4.0.module"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-apk-installer",
+        "31.4.0",
+        "android-test-plugin-host-apk-installer-31.4.0.pom"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-coverage",
+        "31.4.0",
+        "android-test-plugin-host-coverage-31.4.0.jar"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-coverage",
+        "31.4.0",
+        "android-test-plugin-host-coverage-31.4.0.module"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-coverage",
+        "31.4.0",
+        "android-test-plugin-host-coverage-31.4.0.pom"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-device-info",
+        "31.4.0",
+        "android-test-plugin-host-device-info-31.4.0.jar"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-device-info",
+        "31.4.0",
+        "android-test-plugin-host-device-info-31.4.0.module"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-device-info",
+        "31.4.0",
+        "android-test-plugin-host-device-info-31.4.0.pom"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-device-info-proto",
+        "31.4.0",
+        "android-test-plugin-host-device-info-proto-31.4.0.jar"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-device-info-proto",
+        "31.4.0",
+        "android-test-plugin-host-device-info-proto-31.4.0.pom"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-emulator-control",
+        "31.4.0",
+        "android-test-plugin-host-emulator-control-31.4.0.jar"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-emulator-control",
+        "31.4.0",
+        "android-test-plugin-host-emulator-control-31.4.0.module"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-emulator-control",
+        "31.4.0",
+        "android-test-plugin-host-emulator-control-31.4.0.pom"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-logcat",
+        "31.4.0",
+        "android-test-plugin-host-logcat-31.4.0.jar"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-logcat",
+        "31.4.0",
+        "android-test-plugin-host-logcat-31.4.0.module"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-logcat",
+        "31.4.0",
+        "android-test-plugin-host-logcat-31.4.0.pom"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-retention",
+        "31.4.0",
+        "android-test-plugin-host-retention-31.4.0.jar"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-retention",
+        "31.4.0",
+        "android-test-plugin-host-retention-31.4.0.module"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-host-retention",
+        "31.4.0",
+        "android-test-plugin-host-retention-31.4.0.pom"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-result-listener-gradle",
+        "31.4.0",
+        "android-test-plugin-result-listener-gradle-31.4.0.jar"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-result-listener-gradle",
+        "31.4.0",
+        "android-test-plugin-result-listener-gradle-31.4.0.module"
+      ],
+      [
+        "com.android.tools.utp",
+        "android-test-plugin-result-listener-gradle",
+        "31.4.0",
+        "android-test-plugin-result-listener-gradle-31.4.0.pom"
+      ],
+      [
+        "com.android.tools.utp",
+        "utp-common",
+        "31.4.0",
+        "utp-common-31.4.0.jar"
+      ],
+      [
+        "com.android.tools.utp",
+        "utp-common",
+        "31.4.0",
+        "utp-common-31.4.0.pom"
+      ],
+      [
+        "com.google.testing.platform",
+        "android-device-provider-local",
+        "0.0.9-alpha02",
+        "android-device-provider-local-0.0.9-alpha02.jar"
+      ],
+      [
+        "com.google.testing.platform",
+        "android-device-provider-local",
+        "0.0.9-alpha02",
+        "android-device-provider-local-0.0.9-alpha02.pom"
+      ],
+      [
+        "com.google.testing.platform",
+        "android-driver-instrumentation",
+        "0.0.9-alpha02",
+        "android-driver-instrumentation-0.0.9-alpha02.jar"
+      ],
+      [
+        "com.google.testing.platform",
+        "android-driver-instrumentation",
+        "0.0.9-alpha02",
+        "android-driver-instrumentation-0.0.9-alpha02.pom"
+      ],
+      [
+        "com.google.testing.platform",
+        "android-test-plugin",
+        "0.0.9-alpha02",
+        "android-test-plugin-0.0.9-alpha02.jar"
+      ],
+      [
+        "com.google.testing.platform",
+        "android-test-plugin",
+        "0.0.9-alpha02",
+        "android-test-plugin-0.0.9-alpha02.pom"
+      ],
+      [
+        "com.google.testing.platform",
+        "core",
+        "0.0.9-alpha02",
+        "core-0.0.9-alpha02.jar"
+      ],
+      [
+        "com.google.testing.platform",
+        "core",
+        "0.0.9-alpha02",
+        "core-0.0.9-alpha02.pom"
+      ],
+      [
+        "com.google.testing.platform",
+        "launcher",
+        "0.0.9-alpha02",
+        "launcher-0.0.9-alpha02.jar"
+      ],
+      [
+        "com.google.testing.platform",
+        "launcher",
+        "0.0.9-alpha02",
+        "launcher-0.0.9-alpha02.pom"
+      ],
+      [
+        "org.jetbrains.kotlin",
+        "kotlin-klib-commonizer-embeddable",
+        "1.7.20",
+        "kotlin-klib-commonizer-embeddable-1.7.20.jar"
+      ],
+      [
+        "org.jetbrains.kotlin",
+        "kotlin-klib-commonizer-embeddable",
+        "1.7.20",
+        "kotlin-klib-commonizer-embeddable-1.7.20.pom"
+      ],
+      [
+        "org.jetbrains.kotlin",
+        "kotlin-stdlib-common",
+        "1.9.20",
+        "kotlin-stdlib-common-1.9.20.module"
+      ],
+      [
+        "org.jetbrains.kotlin",
+        "kotlin-stdlib-common",
+        "1.9.20",
+        "kotlin-stdlib-common-1.9.20.pom"
+      ],
+      [
+        "org.jetbrains.kotlinx",
+        "kotlinx-coroutines-bom",
+        "1.6.4",
+        "kotlinx-coroutines-bom-1.6.4.pom"
+      ],
+      [
+        "org.jetbrains.kotlinx",
+        "kotlinx-coroutines-core",
+        "1.6.4",
+        "kotlinx-coroutines-core-1.6.4.module"
+      ],
+      [
+        "org.jetbrains.kotlinx",
+        "kotlinx-coroutines-core",
+        "1.6.4",
+        "kotlinx-coroutines-core-1.6.4.pom"
+      ],
+      [
+        "org.jetbrains.kotlinx",
+        "kotlinx-coroutines-core-jvm",
+        "1.6.4",
+        "kotlinx-coroutines-core-jvm-1.6.4.jar"
+      ],
+      [
+        "org.jetbrains.kotlinx",
+        "kotlinx-coroutines-core-jvm",
+        "1.6.4",
+        "kotlinx-coroutines-core-jvm-1.6.4.module"
+      ],
+      [
+        "org.jetbrains.kotlinx",
+        "kotlinx-coroutines-core-jvm",
+        "1.6.4",
+        "kotlinx-coroutines-core-jvm-1.6.4.pom"
+      ]
+    ]
+  },
+  "sha256": "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503",
+  "size_bytes": 59632871,
+  "gradle_verification_sha256": "754b38d7f15102bd67807fa9a02f7c4f31382feb419bbab93ea921b7f4cbbf1d",
+  "host_image_digest": null,
+  "host_provenance": {
+    "kind": "github-hosted-exploratory",
+    "reproducible": false,
+    "release_gate": "closed",
+    "immutable_host_image_digest": null,
+    "runner_image_os": "ubuntu24",
+    "runner_image_version": "20261012.334.1",
+    "runner_image_release_url": "https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334",
+    "runner_image_manifest_url": "https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md",
+    "installed_image_metadata": [
+      {
+        "group": "Operating System",
+        "detail": "Ubuntu\n24.04.5\nLTS"
+      },
+      {
+        "group": "Runner Image",
+        "detail": "Image: ubuntu-24.04\nVersion: 20261012.334.1\nIncluded Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md\nImage Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334"
+      }
+    ],
+    "github": {
+      "GITHUB_REPOSITORY": "csic21/FrameNest",
+      "GITHUB_SHA": "c4088fab8d0e7daf0af5fa6895a9f88b11adcf81",
+      "GITHUB_RUN_ID": "38713363406",
+      "GITHUB_RUN_ATTEMPT": "1",
+      "GITHUB_WORKFLOW": "ASR source AAR audit"
+    },
+    "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+    "python_version": "3.12.3",
+    "installed_tools": {
+      "cmake": {
+        "path": "/usr/local/bin/cmake",
+        "version_output": "cmake version 3.31.6\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake)."
+      },
+      "ninja": {
+        "path": "/usr/local/bin/ninja",
+        "version_output": "1.13.2"
+      }
+    },
+    "installed_ndk_revisions": [
+      {
+        "directory": "27.3.13750724",
+        "source_properties": "Pkg.Desc = Android NDK\nPkg.Revision = 27.3.13750724\nPkg.BaseRevision = 27.3.13750724\nPkg.ReleaseName = r27d\n"
+      },
+      {
+        "directory": "29.0.14206865",
+        "source_properties": "Pkg.Desc = Android NDK\nPkg.Revision = 29.0.14206865\nPkg.BaseRevision = 29.0.14206865\nPkg.ReleaseName = r29\n"
+      },
+      {
+        "directory": "30.0.16248370",
+        "source_properties": "Pkg.Desc = Android NDK\nPkg.Revision = 30.0.16248370\nPkg.BaseRevision = 30.0.16248370\nPkg.ReleaseName = r30\n"
+      }
+    ]
+  },
+  "reproducibility_proven": false,
+  "release_gate": "closed",
+  "gradle_review_sha256": "0253d456fdda5cb69a1dd3ded28716c96a5d282f3614ceb373c07d3101f30d0a",
+  "java_version": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode, sharing)\n",
+  "android_jar_sha256": "6cea1df3efb77103ac3e2beb9bf4718964b0e0869ab16d39d29d5cbae1c147ad",
+  "sdk_aapt2_sha256": "760aa057e89e3940c3e944e6bec61eda864ade42fd9c0a3113735e329657705f",
+  "reviewed_maven_aapt2_artifacts": [
+    {
+      "group": "com.android.tools.build",
+      "name": "aapt2",
+      "version": "8.4.0-11315950",
+      "artifact": "aapt2-8.4.0-11315950-linux.jar",
+      "sha256": "5638a5b151f9c50ba2a9e5291edfc9227aec3fedc3ee8f8a8583fa54cd1dd9ca"
+    },
+    {
+      "group": "com.android.tools.build",
+      "name": "aapt2",
+      "version": "8.4.0-11315950",
+      "artifact": "aapt2-8.4.0-11315950.pom",
+      "sha256": "438500be20c6e8ae2dbd6154433718d4c2d5e200272d9cd2c6ccd108e559a7fe"
+    }
+  ],
+  "aapt2_execution_verified": false,
+  "source_manifest_sha256": "d14fad69f55ba8adaa2405eddc21f97b46f820f4f9ff99de7036a485c2ed7740"
+}

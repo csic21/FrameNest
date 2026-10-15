@@ -1,0 +1,154 @@
+{
+  "status": "exploratory-packaging-evidence-not-a-release",
+  "aar_built": true,
+  "android_runtime_tested": false,
+  "reproducibility_proven": false,
+  "legal_clearance": false,
+  "files": [
+    {
+      "path": "packaging/aar-build.log",
+      "size_bytes": 2087,
+      "sha256": "6d8da9b79cd0eeff183073a1484c6d9dfb12b1a8bc4a04ba308db3fb92466bf5"
+    },
+    {
+      "path": "packaging/gradle/verification-metadata.xml",
+      "size_bytes": 120663,
+      "sha256": "754b38d7f15102bd67807fa9a02f7c4f31382feb419bbab93ea921b7f4cbbf1d"
+    },
+    {
+      "path": "packaging/gradle-cache-inventory.json",
+      "size_bytes": 100019,
+      "sha256": "42ffc990b0b52e5215f4399017f6c481118bc2d7438a62126cff9aefd2ba0534"
+    },
+    {
+      "path": "packaging/gradle-cache-audit.json",
+      "size_bytes": 8689,
+      "sha256": "e5574b47f8cee93738030d618911207ef73e9d9afbbabeba025a2911bce808af"
+    },
+    {
+      "path": "packaging/recipe-project.json",
+      "size_bytes": 11807,
+      "sha256": "ef76a5ffe96cfee374ec32eb0a9a700b833d21b11b73a8f955c68830e133495b"
+    },
+    {
+      "path": "packaging/packaging-environment.json",
+      "size_bytes": 2920,
+      "sha256": "0af92a24206e205bf5ee09ff49d7b65178123562bcd355e036de79cc7417f4ca"
+    },
+    {
+      "path": "packaging/settings.gradle.kts",
+      "size_bytes": 260,
+      "sha256": "ba43a22a80c1678a6b27256586f0e0a0f3eb32d0225dcc915a44bb07fa88edc2"
+    },
+    {
+      "path": "packaging/build.gradle.kts",
+      "size_bytes": 138,
+      "sha256": "fa36c48751b7bbbeb73d9ed44006a86ddbfcf2f49ec6c94c5a56027acc58b60c"
+    },
+    {
+      "path": "packaging/asr/build.gradle.kts",
+      "size_bytes": 983,
+      "sha256": "10bc76b08ab389ce2e332a0609e76de8a5f092feed6a7d0412efad78945d0b2c"
+    },
+    {
+      "path": "packaging/gradle.properties",
+      "size_bytes": 145,
+      "sha256": "aa9f3eeb212dce6683f6d5dda53175c13f498042f600268d93b962225beadba2"
+    },
+    {
+      "path": "packaging/prepackage-native-audit.json",
+      "size_bytes": 5552,
+      "sha256": "16c4d51f64d69c655db8e002b28e39723f31ba17506bede4ba4f84c291b160c9"
+    },
+    {
+      "path": "native/native-output-manifest.json",
+      "size_bytes": 1020,
+      "sha256": "ccaff2c36e900b4cec182724f9463bce30593229db9f37b5b333a20ddd02287c"
+    },
+    {
+      "path": "native/native-output-manifest.prestrip.json",
+      "size_bytes": 928,
+      "sha256": "ef99b2cab4fb43a71abcb000ee970ac2f258b7b51de816da190c4ce90ab628ce"
+    },
+    {
+      "path": "native/native-audit.json",
+      "size_bytes": 5552,
+      "sha256": "16c4d51f64d69c655db8e002b28e39723f31ba17506bede4ba4f84c291b160c9"
+    },
+    {
+      "path": "native/strip-evidence.json",
+      "size_bytes": 11220,
+      "sha256": "c12c57214652da053757634c44357b51a6be6672649a87c6ca9018f1bc7fc8e1"
+    },
+    {
+      "path": "native/imported-native-artifact.json",
+      "size_bytes": 835,
+      "sha256": "8f2ab8a5604489b65c21ddf8293356a512fce7aae9fece84f34efaa43bdfb687"
+    },
+    {
+      "path": "evidence/host-provenance.json",
+      "size_bytes": 2143,
+      "sha256": "ed4d0570f7a3c2af2e6d27baac951e90f8d5fcba73684d2dadb9d513de9c9aa9"
+    },
+    {
+      "path": "evidence/toolchain-provenance.json",
+      "size_bytes": 2162,
+      "sha256": "e9fcb68ac67f01774b85fea614bfb19fccb0cc732688b978849dd05bf14e278c"
+    },
+    {
+      "path": "evidence/native-download.json",
+      "size_bytes": 1806,
+      "sha256": "63ca96faab9fa8610491a84c1b6a3c0fc38ac6ed1e4f482feed286cd7cb84bbc"
+    },
+    {
+      "path": "evidence/tests.log",
+      "size_bytes": 7112,
+      "sha256": "63a8145d5472ed80faf1fb3f0e543a96f86679e1d1715e48df8fe03214e491d0"
+    },
+    {
+      "path": "recipe/manifest.json",
+      "size_bytes": 10694,
+      "sha256": "d14fad69f55ba8adaa2405eddc21f97b46f820f4f9ff99de7036a485c2ed7740"
+    },
+    {
+      "path": "recipe/toolchain-lock.json",
+      "size_bytes": 3863,
+      "sha256": "f53878027cd615c8d793a6d171d8b30e3f48155734d3e0cd57c2761a88311632"
+    },
+    {
+      "path": "recipe/native-artifact-lock.json",
+      "size_bytes": 835,
+      "sha256": "8f2ab8a5604489b65c21ddf8293356a512fce7aae9fece84f34efaa43bdfb687"
+    },
+    {
+      "path": "recipe/gradle-lock/approved-lock.json",
+      "size_bytes": 987,
+      "sha256": "9da10673dcb8b6d410f272a15103505c4bbd069657686d3ba8f472ad708984e1"
+    },
+    {
+      "path": "recipe/gradle-lock/verification-metadata.xml",
+      "size_bytes": 120663,
+      "sha256": "754b38d7f15102bd67807fa9a02f7c4f31382feb419bbab93ea921b7f4cbbf1d"
+    },
+    {
+      "path": "recipe/gradle-lock/independent-review.json",
+      "size_bytes": 730560,
+      "sha256": "0253d456fdda5cb69a1dd3ded28716c96a5d282f3614ceb373c07d3101f30d0a"
+    },
+    {
+      "path": "candidate/output-manifest.json",
+      "size_bytes": 13187,
+      "sha256": "71ba2b4c1d8bb5eae87c71c324e5f199fa6b692cff094f72f72a54ae156c104f"
+    },
+    {
+      "path": "candidate/sherpa-onnx-1.13.8-asr-no-tts.aar",
+      "size_bytes": 59632871,
+      "sha256": "6a243d2da9a1f521a85ceeb30b51e00a660e2a1bfb05b79f6b591361af7c7503"
+    },
+    {
+      "path": "candidate/static-audit.json",
+      "size_bytes": 16720,
+      "sha256": "bd58546ea9ea3953094dd0716d040969dea9804af4a36701ab79164251fe72e5"
+    }
+  ]
+}
