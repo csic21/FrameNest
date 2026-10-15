@@ -4,16 +4,37 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// Optional native experiment: ordinary builds retain the ML Kit-only artifact.
+val hyMtNative = providers.gradleProperty("hyMtNative").map(String::toBooleanStrict).getOrElse(false)
+
 android {
     namespace = "com.framenest"
     compileSdk = 36
+    if (hyMtNative) {
+        ndkVersion = "28.2.13676358"
+        externalNativeBuild {
+            cmake {
+                path = file("src/main/cpp/CMakeLists.txt")
+                version = "3.22.1"
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.framenest"
         minSdk = 26
         targetSdk = 36
-        versionCode = 19
-        versionName = "0.6.8-internal"
+        versionCode = 20
+        versionName = "0.6.9-internal"
+        buildConfigField("boolean", "HY_MT_NATIVE", hyMtNative.toString())
+        if (hyMtNative) {
+            externalNativeBuild {
+                cmake {
+                    arguments += "-DANDROID_STL=c++_static"
+                    targets += "framenest_hymt"
+                }
+            }
+        }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
@@ -91,6 +112,9 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "META-INF/versions/9/previous-compilation-data.bin"
+            // Kuromoji core/IPADIC carry identical upstream notices. Merge notices
+            // instead of dropping legal attribution or applying a broad pickFirst.
+            merges += setOf("META-INF/CONTRIBUTORS.md", "META-INF/LICENSE.md")
         }
     }
 
@@ -194,6 +218,9 @@ dependencies {
     }
     implementation(libs.mlkit.translate)
     implementation(libs.kotlinx.coroutines.play.services)
+
+    // Japanese caption units use the local dictionary only; no network service.
+    implementation("com.atilika.kuromoji:kuromoji-ipadic:0.9.0")
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

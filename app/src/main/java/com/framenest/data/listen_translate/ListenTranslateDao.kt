@@ -178,6 +178,7 @@ interface ListenTranslateDao {
           AND source_lang = :sourceLang AND target_lang = :targetLang
           AND start_ms <= :timeMs AND end_ms > :timeMs
         ORDER BY CASE WHEN trim(text_src) != '' OR trim(text_tgt) != '' THEN 1 ELSE 0 END DESC,
+                 CASE WHEN rev = $LISTEN_PROVISIONAL_SOURCE_REV THEN 0 ELSE 1 END DESC,
                  start_ms DESC, rev DESC, end_ms DESC, id DESC
         LIMIT 1
         """,
@@ -207,6 +208,26 @@ interface ListenTranslateDao {
         targetLang: String,
         startMs: Long,
         endMs: Long,
+    )
+
+    /** Delete progress only, never final speech or completed coverage. */
+    @Query(
+        """
+        DELETE FROM listen_translate_cue
+        WHERE server_id = :serverId AND share = :share AND path = :path
+          AND source_lang = :sourceLang AND target_lang = :targetLang
+          AND rev = $LISTEN_PROVISIONAL_SOURCE_REV
+          AND start_ms >= :ownedStartMs AND start_ms < :processedThroughMs
+        """,
+    )
+    suspend fun deleteSupersededProvisionalCues(
+        serverId: String,
+        share: String,
+        path: String,
+        sourceLang: String,
+        targetLang: String,
+        ownedStartMs: Long,
+        processedThroughMs: Long,
     )
 
     @Query("SELECT COUNT(*) FROM listen_translate_cue")
@@ -239,6 +260,7 @@ interface ListenTranslateDao {
     suspend fun replaceCueForExistingJob(
         entity: ListenTranslateCueEntity,
         updatedAtEpochMs: Long,
+        provisionalCleanup: ListenProvisionalCleanup? = null,
     ): Long? {
         val touched = touchJob(
             serverId = entity.serverId,
@@ -249,6 +271,7 @@ interface ListenTranslateDao {
             updatedAtEpochMs = updatedAtEpochMs,
         )
         if (touched != 1) return null
+        deleteSupersededProvisionalCues(entity, provisionalCleanup)
         return replaceCueAtRange(entity)
     }
 
@@ -260,6 +283,7 @@ interface ListenTranslateDao {
         status: String,
         durationMs: Long?,
         updatedAtEpochMs: Long,
+        provisionalCleanup: ListenProvisionalCleanup? = null,
     ): Long? {
         val updated = updateJobProgress(
             serverId = entity.serverId,
@@ -274,6 +298,16 @@ interface ListenTranslateDao {
             updatedAtEpochMs = updatedAtEpochMs,
         )
         if (updated != 1) return null
+        deleteSupersededProvisionalCues(entity, provisionalCleanup)
         return replaceCueAtRange(entity)
+    }
+
+    private suspend fun deleteSupersededProvisionalCues(
+        entity: ListenTranslateCueEntity,
+        cleanup: ListenProvisionalCleanup?,
+    ) {
+        if (cleanup == null) return
+        deleteSupersededProvisionalCues(entity.serverId, entity.share, entity.path,
+            entity.sourceLang, entity.targetLang, cleanup.ownedStartMs, cleanup.processedThroughMs)
     }
 }

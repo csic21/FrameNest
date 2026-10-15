@@ -180,6 +180,7 @@ fun PlayerScreen(
     val scrubFailed by vm.scrubPreviewFailed.collectAsStateWithLifecycle()
     var showSubtitles by remember(vm) { mutableStateOf(false) }
     var showListenTranslate by remember(vm) { mutableStateOf(false) }
+    var captionExpansionEpoch by remember(vm) { mutableStateOf(0L) }
     var showAudioTracks by remember(vm) { mutableStateOf(false) }
     var chromeVisible by remember(vm) { mutableStateOf(true) }
     var controlsLocked by rememberSaveable(vm) { mutableStateOf(false) }
@@ -442,13 +443,14 @@ fun PlayerScreen(
                 controller = vm.controller,
                 state = state,
                 listenUi = listenUi,
+                captionExpansionEpoch = captionExpansionEpoch,
                 chromeVisible = showChrome,
                 controlsLocked = controlsLocked,
                 hideSeekingOverlay = userSeeking,
                 onToggleChrome = onToggleChrome,
-                onSkipBy = { vm.skipBy(it) },
+                onSkipBy = { captionExpansionEpoch++; vm.skipBy(it) },
                 onPreviewSeek = { vm.previewSeekTo(it) },
-                onCommitSeek = { vm.seekTo(it) },
+                onCommitSeek = { captionExpansionEpoch++; vm.seekTo(it) },
                 scrubFrames = scrubFrames,
                 scrubFailed = scrubFailed,
                 onPlay = { vm.play() },
@@ -494,7 +496,7 @@ fun PlayerScreen(
                     onPlay = { vm.play() },
                     onPause = { vm.pause() },
                     onPreviewSeek = { vm.previewSeekTo(it) },
-                    onSeek = { vm.seekTo(it) },
+                    onSeek = { captionExpansionEpoch++; vm.seekTo(it) },
                     scrubFrames = scrubFrames,
                     scrubFailed = scrubFailed,
                     onCycleVideoScale = { vm.cycleVideoScaleMode() },
@@ -569,6 +571,7 @@ fun PlayerScreen(
                     onDisplayMode = { vm.setListenDisplayMode(it) },
                     onExperimentalSilenceGate = { vm.setListenExperimentalSilenceGate(it) },
                     onPrepareSubtitles = { vm.prepareListenSubtitles() },
+                    onHighQualityJapaneseChange = { vm.setHighQualityJapanese(it) },
                     onSelectOff = { vm.selectSubtitleOff() },
                     onSelectEmbedded = { vm.selectEmbeddedSubtitle(it) },
                     onSelectExternal = { vm.selectExternalSubtitle(it) },
@@ -783,6 +786,7 @@ private fun PlayerSurfaceStack(
     controller: PlayerController,
     state: PlayerState,
     listenUi: ListenTranslateUiState,
+    captionExpansionEpoch: Long,
     chromeVisible: Boolean,
     controlsLocked: Boolean,
     hideSeekingOverlay: Boolean,
@@ -1022,11 +1026,16 @@ private fun PlayerSurfaceStack(
             )
         }
 
-        if (listenUi.enabled && listenUi.overlayText.isNotBlank() &&
-            state.phase != PlayerState.Phase.Error
-        ) {
+        if (listenUi.enabled && state.phase != PlayerState.Phase.Error) {
             ListenTranslateOverlay(
-                text = listenUi.overlayText,
+                cue = listenUi.activeCue,
+                displayMode = listenUi.displayMode,
+                currentCaptionUnconfirmed = listenUi.currentCaptionUnconfirmed,
+                expansionResetKey = listOf(
+                    controller, state.selectedAudioTrackId, listenUi.sourceLang, listenUi.targetLang,
+                    listenUi.displayMode, captionExpansionEpoch, state.phase == PlayerState.Phase.Preparing,
+                ),
+                expansionEnabled = !controlsLocked && !hideSeekingOverlay && !state.isSeeking,
                 modifier = Modifier.align(Alignment.BottomCenter),
                 bottomPadding = listenCaptionBottom,
             )
@@ -1143,6 +1152,7 @@ private fun PlayerBottomPanels(
     onDisplayMode: (ListenDisplayMode) -> Unit,
     onExperimentalSilenceGate: (Boolean) -> Unit,
     onPrepareSubtitles: () -> Unit,
+    onHighQualityJapaneseChange: (Boolean) -> Unit,
     onSelectOff: () -> Unit,
     onSelectEmbedded: (Int) -> Unit,
     onSelectExternal: (ExternalSubtitleOption) -> Unit,
@@ -1165,6 +1175,7 @@ private fun PlayerBottomPanels(
             onDisplayMode = onDisplayMode,
             onExperimentalSilenceGate = onExperimentalSilenceGate,
             onPrepareSubtitles = onPrepareSubtitles,
+            onHighQualityJapaneseChange = onHighQualityJapaneseChange,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(260.dp)

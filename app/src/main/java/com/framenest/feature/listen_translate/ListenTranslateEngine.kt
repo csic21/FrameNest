@@ -9,6 +9,16 @@ interface ListenTranslateEngine {
     val mtModelId: String
 
     /**
+     * Opt-in sentence-span requests, capped by the session at 12 seconds. Null keeps
+     * the legacy fixed-window scheduler. The engine must include its segmentation
+     * policy/version in [asrModelId] so incompatible cached boundaries are retired.
+     */
+    val adaptiveMaxSpanMs: Long? get() = null
+
+    /** Engines may limit an experiment to explicitly supported source languages. */
+    fun adaptiveMaxSpanMsFor(sourceLang: String): Long? = adaptiveMaxSpanMs
+
+    /**
      * Produce source (ASR) and target (MT) text for [startMs, endMs).
      * Implementations must not require network for cached models.
      */
@@ -45,6 +55,15 @@ data class ListenWindowResult(
     val blankReason: ListenBlankReason? = null,
     /** Local measurements only; never persisted with subtitle content. */
     val stageTimings: ListenStageTimings? = null,
+    /**
+     * Exclusive end of audio actually consumed for this unit, not decoded read-ahead.
+     * Null preserves the legacy requested end. Must be in (request start, request end],
+     * and identical in the stable source callback and final result for that unit.
+     * A shorter-than-requested span requires the engine's adaptive scheduling opt-in.
+     */
+    val processedThroughMs: Long? = null,
+    /** Bounded, content-free experimental cut classification; never persisted. */
+    val segmentBoundaryReason: String? = null,
 )
 
 enum class ListenBlankReason {

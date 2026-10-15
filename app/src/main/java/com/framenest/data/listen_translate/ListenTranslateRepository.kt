@@ -2,6 +2,8 @@ package com.framenest.data.listen_translate
 
 import com.framenest.core.model.PlaybackIdentity
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.Flow
@@ -218,13 +220,17 @@ class ListenTranslateRepository(
         asrModel: String = "",
         mtModel: String = "",
         lease: CacheLease? = null,
+        provisionalCleanup: ListenProvisionalCleanup? = null,
+        isCurrentGeneration: () -> Boolean = { true },
     ): ListenTranslateCue = writeMutex.withLock {
+        currentCoroutineContext().ensureActive()
+        if (!isCurrentGeneration()) throw CancellationException("stale listen cue commit")
         checkLease(lease, identity, languages)
         require(endMs >= startMs) { "endMs >= startMs" }
         val path = identity.normalizedPath()
         val lang = languages.normalized()
         val entity = cueEntity(identity, lang, path, startMs, endMs, textSrc, textTgt, rev)
-        var id = dao.replaceCueForExistingJob(entity, timeSource())
+        var id = dao.replaceCueForExistingJob(entity, timeSource(), provisionalCleanup)
         return@withLock entity.copy(id = (id ?: throw CancellationException("listen cache was cleared"))).toModel()
     }
 
@@ -243,7 +249,11 @@ class ListenTranslateRepository(
         asrModel: String = "",
         mtModel: String = "",
         lease: CacheLease? = null,
+        provisionalCleanup: ListenProvisionalCleanup? = null,
+        isCurrentGeneration: () -> Boolean = { true },
     ): ListenTranslateCue = writeMutex.withLock {
+        currentCoroutineContext().ensureActive()
+        if (!isCurrentGeneration()) throw CancellationException("stale listen cue commit")
         checkLease(lease, identity, languages)
         require(endMs >= startMs) { "endMs >= startMs" }
         val path = identity.normalizedPath()
@@ -255,6 +265,7 @@ class ListenTranslateRepository(
             status = ListenTranslateJobStatus.Partial.name,
             durationMs = durationMs?.coerceAtLeast(0L),
             updatedAtEpochMs = timeSource(),
+            provisionalCleanup = provisionalCleanup,
         )
         return@withLock entity.copy(id = (id ?: throw CancellationException("listen cache was cleared"))).toModel()
     }

@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "scope": "Real recorded-file producer on pinned public fixture; no Room\/UI\/NAS\/physical-rendering claim",
+  "started_at_epoch_ms": 1792036643527,
+  "api": 35,
+  "abis": [
+    "x86_64",
+    "arm64-v8a"
+  ],
+  "available_processors": 2,
+  "model_revision": "a0c709d9fac510f2c807aa3af52872340dc37a4a",
+  "model_sha256": "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699",
+  "model_bytes": 1133080448,
+  "runtime": "llama-b11429-d812350-ctx1024-out256-official-prompt-v1",
+  "cpu_threads": 2,
+  "context_tokens": 1024,
+  "output_token_cap": 256,
+  "hardware_performance_accepted": false,
+  "memory_definition": "Android Debug snapshots in KiB; native allocated heap in bytes. These are not peak RSS or a memory-budget acceptance.",
+  "cues": [
+    {
+      "source_ja": "この イラスト の 意味 わかり ま すか",
+      "translation_zh": "",
+      "is_final": false,
+      "reason": "MORPHOLOGY_AND_PCM_QUIET",
+      "display_start_ms": 2879,
+      "display_end_ms": 5410,
+      "coverage_start_ms": null,
+      "coverage_end_ms": null,
+      "decoded_through_ms": 15000,
+      "ready_since_producer_start_ms": 2514,
+      "ready_since_test_start_ms": 10636,
+      "pcm_ms": 664,
+      "asr_ms": 1348,
+      "mt_ms": null
+    },
+    {
+      "source_ja": " 今、世界 中 で 使 われ て いる の は 何語 でしょ うか",
+      "translation_zh": "",
+      "is_final": false,
+      "reason": "MORPHOLOGY_AND_PCM_QUIET",
+      "display_start_ms": 6299,
+      "display_end_ms": 9650,
+      "coverage_start_ms": null,
+      "coverage_end_ms": null,
+      "decoded_through_ms": 15000,
+      "ready_since_producer_start_ms": 2516,
+      "ready_since_test_start_ms": 10638,
+      "pcm_ms": 664,
+      "asr_ms": 1348,
+      "mt_ms": null
+    },
+    {
+      "source_ja": "この イラスト の 意味 わかり ま すか",
+      "translation_zh": "明白这个插图的含义吗？",
+      "is_final": true,
+      "reason": "MORPHOLOGY_AND_PCM_QUIET",
+      "display_start_ms": 2879,
+      "display_end_ms": 5410,
+      "coverage_start_ms": 0,
+      "coverage_end_ms": 5410,
+      "decoded_through_ms": 15000,
+      "ready_since_producer_start_ms": 271391,
+      "ready_since_test_start_ms": 279513,
+      "pcm_ms": null,
+      "asr_ms": null,
+      "mt_ms": 268871
+    },
+    {
+      "source_ja": " 今、世界 中 で 使 われ て いる の は 何語 でしょ うか",
+      "translation_zh": "现在世界上使用的语言是什么呢？",
+      "is_final": true,
+      "reason": "MORPHOLOGY_AND_PCM_QUIET",
+      "display_start_ms": 6299,
+      "display_end_ms": 9650,
+      "coverage_start_ms": 5410,
+      "coverage_end_ms": 9650,
+      "decoded_through_ms": 15000,
+      "ready_since_producer_start_ms": 617163,
+      "ready_since_test_start_ms": 625285,
+      "pcm_ms": null,
+      "asr_ms": null,
+      "mt_ms": 345764
+    },
+    {
+      "source_ja": " 英語、スペイン語、中国語、それ はビジネス 文章では使われない言葉です 正解は絵文字 絵文字はインターネット上のコミュニケーションで使われ、特に若い世代に人気です",
+      "translation_zh": "",
+      "is_final": false,
+      "reason": "MORPHOLOGY_AND_PCM_QUIET",
+      "display_start_ms": 10080,
+      "display_end_ms": 28300,
+      "coverage_start_ms": null,
+      "coverage_end_ms": null,
+      "decoded_through_ms": 33000,
+      "ready_since_producer_start_ms": 620767,
+      "ready_since_test_start_ms": 628889,
+      "pcm_ms": 469,
+      "asr_ms": 1285,
+      "mt_ms": null
+    },
+    {
+      "source_ja": " 英語、スペイン語、中国語、それ はビジネス 文章では使われない言葉です 正解は絵文字 絵文字はインターネット上のコミュニケーションで使われ、特に若い世代に人気です",
+      "translation_zh": "英语、西班牙语、汉语——这些都不是用于商务文本中的词汇。正确的表达方式就是使用表情符号。表情符号在互联网交流中被广泛使用，特别受年轻人群喜爱。",
+      "is_final": true,
+      "reason": "MORPHOLOGY_AND_PCM_QUIET",
+      "display_start_ms": 10080,
+      "display_end_ms": 28300,
+      "coverage_start_ms": 9650,
+      "coverage_end_ms": 28300,
+      "decoded_through_ms": 33000,
+      "ready_since_producer_start_ms": 1392074,
+      "ready_since_test_start_ms": 1400196,
+      "pcm_ms": null,
+      "asr_ms": null,
+      "mt_ms": 771303
+    },
+    {
+      "source_ja": " 絵文字の映画がハリウッドで作られるほど、絵文字は 日本発祥 絵を文字 のよ うに使う 新しい表現スタイルです",
+      "translation_zh": "",
+      "is_final": false,
+      "reason": "MORPHOLOGY_AND_PCM_QUIET",
+      "display_start_ms": 28740,
+      "display_end_ms": 42220,
+      "coverage_start_ms": null,
+      "coverage_end_ms": null,
+      "decoded_through_ms": 51000,
+      "ready_since_producer_start_ms": 1395823,
+      "ready_since_test_start_ms": 1403945,
+      "pcm_ms": 581,
+      "asr_ms": 1297,
+      "mt_ms": null
+    }
+  ],
+  "audio_windows": [
+    {
+      "start_ms": 0,
+      "end_ms": 15000
+    },
+    {
+      "start_ms": 9000,
+      "end_ms": 24000
+    },
+    {
+      "start_ms": 18000,
+      "end_ms": 33000
+    },
+    {
+      "start_ms": 27000,
+      "end_ms": 42000
+    },
+    {
+      "start_ms": 36000,
+      "end_ms": 51000
+    }
+  ],
+  "semantic_acceptance_passed": null,
+  "manual_semantic_review": "pending",
+  "startup_clock_definition": "Test entry through first finalized bilingual callback, including fixture copy, model installation\/verification\/loading and PCM\/ASR\/MT. Existing model files and OS caches may be warm from preceding tests; not a phone, NAS, Room or physical-render latency.",
+  "fixture_id": "emoji-simpleshow-japan",
+  "fixture_sha256": "ad3af093836cad823ef1793ff4d505139eed92dd7e7402de4c015a2ed50d5956",
+  "source": "https:\/\/commons.wikimedia.org\/wiki\/File:Emoji.webm",
+  "author": "Simpleshow Japan",
+  "license": "CC-BY-SA-4.0",
+  "license_url": "https:\/\/creativecommons.org\/licenses\/by-sa\/4.0\/",
+  "changes": "Machine-generated Japanese transcription and Chinese translation excerpts; may contain errors.",
+  "derived_text_license": "CC-BY-SA-4.0",
+  "initial_sha256_verification_ms": 2894,
+  "verified_model_present_before_test": true,
+  "download_and_install_verification_ms": 0,
+  "model_downloaded_this_test": false,
+  "native_mt_load_ms": 1418,
+  "asr_install_verify_and_load_ms": 3725,
+  "memory_after_both_models": {
+    "total_pss_kib": 1713149,
+    "native_pss_kib": 397223,
+    "dalvik_pss_kib": 2359,
+    "private_dirty_kib": 578112,
+    "native_heap_allocated_bytes": 483747376
+  },
+  "first_final_bilingual_from_test_start_ms": 279513,
+  "first_final_bilingual_from_prepared_producer_ms": 271391,
+  "functional_acceptance_passed": false,
+  "failure_type": "TimeoutCancellationException",
+  "memory_after_close": {
+    "total_pss_kib": 347329,
+    "native_pss_kib": 76021,
+    "dalvik_pss_kib": 53868,
+    "private_dirty_kib": 308640,
+    "native_heap_allocated_bytes": 16187216
+  }
+}

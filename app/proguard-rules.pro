@@ -58,3 +58,8 @@
 # Kotlin
 -dontwarn kotlin.**
 -keepclassmembers class **$WhenMappings { <fields>; }
+
+# Kuromoji 0.9.0 resolves its bundled dictionary relative to Tokenizer classes
+# (SimpleResourceResolver uses clazz.getResourceAsStream). Preserve package/class
+# identity across R8 rather than relocating classes away from those resources.
+-keep class com.atilika.kuromoji.** { *; }

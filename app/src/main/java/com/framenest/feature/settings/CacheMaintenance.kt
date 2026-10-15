@@ -9,6 +9,7 @@ import com.framenest.feature.listen_translate.asr.SherpaModelInstaller
 import com.framenest.feature.player.ScrubPreviewPlan
 import com.framenest.feature.listen_translate.asr.VoskModelInstaller
 import com.framenest.feature.listen_translate.mt.MlKitTranslationModelCleaner
+import com.framenest.feature.listen_translate.mt.HyMtModelInstaller
 import java.io.File
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +33,7 @@ class CacheMaintenance(
     private val mlKitTranslationModelCleaner: MlKitTranslationModelCleaner =
         MlKitTranslationModelCleaner(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val hyMtModelInstaller: HyMtModelInstaller? = null,
 ) {
     suspend fun usageSnapshot(): CacheUsageSnapshot = withContext(ioDispatcher) {
         CacheUsageSnapshot(
@@ -81,10 +83,12 @@ class CacheMaintenance(
         )
     }
 
-    /** Clear JSON/Vosk/SenseVoice packs and ML Kit translation models from app-private storage. */
+    /** Clear explicitly confirmed JSON/Vosk/SenseVoice/Hy-MT2 and ML Kit model packs. */
     suspend fun clearListenModels(): CacheClearResult = withContext(ioDispatcher) {
         check(CacheDomain.Models in CacheClearPolicy.domainsFor(CacheClearTarget.Models))
         val before = approximateListenModelBytesOnCurrentThread()
+        // Fail before clearing other domains when Hy-MT2 is still loading/used/closing.
+        hyMtModelInstaller?.deleteAll()
         listenModelManager?.deleteAll()
         voskModelInstaller?.deleteAll()
         sherpaModelInstaller?.deleteAll()
@@ -103,6 +107,7 @@ class CacheMaintenance(
         var total = listenModelManager?.approximateBytes() ?: 0L
         total += voskModelInstaller?.approximateBytes() ?: 0L
         total += sherpaModelInstaller?.approximateBytes() ?: 0L
+        total += hyMtModelInstaller?.approximateBytes() ?: 0L
         return total
     }
 

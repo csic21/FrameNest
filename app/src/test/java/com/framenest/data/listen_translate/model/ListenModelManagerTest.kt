@@ -1,5 +1,6 @@
 package com.framenest.data.listen_translate.model
 
+import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -66,5 +67,25 @@ class ListenModelManagerTest {
         val result = manager.install(ListenModelCatalog.ASR_TINY)
         assertTrue(result.isFailure)
         assertFalse(store.isInstalled(ListenModelCatalog.ASR_TINY))
+    }
+
+    @Test
+    fun sizeAndDeleteAllAreLimitedToCatalogWithoutTouchingNativeEngineStores() = runBlocking {
+        val root = tmp.newFolder("shared-model-root")
+        val store = ListenModelStore(rootOverride = root)
+        val bytes = "legacy fixture".toByteArray()
+        val spec = ListenModelCatalog.ASR_TINY.copy(sha256 = ListenModelStore.sha256Hex(bytes))
+        val manager = ListenModelManager(store = store, catalog = listOf(spec, spec), assetReader = { bytes })
+        assertTrue(manager.install(spec).isSuccess)
+        val legacyBytes = store.approximateBytes(spec)
+        val nativeFiles = listOf("vosk/model", "sherpa/model", "hymt/model", "hymt/.download.part").map { path ->
+            File(root, path).apply { parentFile!!.mkdirs(); writeBytes(ByteArray(128)) }
+        }
+        val otherVersion = File(root, "${spec.id}/v99/keep").apply { parentFile!!.mkdirs(); writeText("other version") }
+        assertEquals(legacyBytes, manager.approximateBytes()) // Duplicate catalog entry is counted once.
+        manager.deleteAll()
+        assertEquals(0L, manager.approximateBytes())
+        assertTrue(nativeFiles.all { it.length() == 128L })
+        assertEquals("other version", otherVersion.readText())
     }
 }

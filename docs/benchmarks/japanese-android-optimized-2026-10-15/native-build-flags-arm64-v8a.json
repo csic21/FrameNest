@@ -1,0 +1,1 @@
+{"commands_per_target": {"framenest_hymt": 1, "ggml": 2, "ggml-base": 9, "ggml-cpu": 16, "llama": 42}, "compile_commands_sha256": "e8e2a05ca347fb35afc0b5a8d4b6603f2296a465aa15c82d482704816aecea4e", "debug_checks": true, "effective_optimization": "-O3", "portable_isa_check_passed": true, "required_flags": []}

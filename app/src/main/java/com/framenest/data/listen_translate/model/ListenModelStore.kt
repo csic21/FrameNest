@@ -66,6 +66,10 @@ class ListenModelStore(
 
     fun approximateBytes(): Long = dirSize(rootDir)
 
+    /** Count one catalog entry without including sibling native-engine stores. */
+    fun approximateBytes(spec: ListenModelSpec): Long =
+        dirSize(File(rootDir, "${spec.id}/v${spec.version}"))
+
     fun markReady(spec: ListenModelSpec, fileBytes: ByteArray) {
         val dir = packDir(spec)
         val out = packFile(spec)

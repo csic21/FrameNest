@@ -1,0 +1,172 @@
+[
+  {
+    "elapsed_ms": 19.215588999941247,
+    "channel": "stderr",
+    "text": "0.00.011.965 I llama_completion: llama backend init\n0.00.011.988 I llama_completion: load the model and apply lora adapter, if any\n"
+  },
+  {
+    "elapsed_ms": 444.8350530001335,
+    "channel": "stderr",
+    "text": "0.00.437.598 W load: special_eos_id is not in special_eog_ids - the tokenizer config may be incorrect\n"
+  },
+  {
+    "elapsed_ms": 1179.9978919998466,
+    "channel": "stderr",
+    "text": "0.01.172.799 I cmn          init: llama threadpool init, n_threads = 2\n"
+  },
+  {
+    "elapsed_ms": 1258.8719630002743,
+    "channel": "stderr",
+    "text": "0.01.250.010 I llama_completion: chat template is available, enabling conversation mode (disable it with -no-cnv)\n0.01.250.031 W *** User-specified prompt will pre-start conversation, did you mean to set --system-prompt (-sys) instead?\n0.01.251.513 I llama_completion: chat template example:\n<｜hy_begin▁of▁sentence｜>You are a helpful assistant<｜hy_place▁holder▁no▁3｜><｜hy_User｜>Hello<｜hy_Assistant｜>Hi there<｜hy_place▁holder▁no▁2｜><｜hy_User｜>How are you?<｜hy_Assistant｜>\n0.01.251.513 I \n0.01.251.592 I system_info: n_threads = 2 (n_threads_batch = 2) / 9 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VBMI = 1 | AVX512_VNNI = 1 | AVX512_BF16 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | \n0.01.251.592 I \n"
+  },
+  {
+    "elapsed_ms": 1262.3760500000571,
+    "channel": "stderr",
+    "text": "0.01.255.233 I sampler seed: 42\n0.01.255.258 I sampler params: \n\trepeat_last_n = 64, repeat_penalty = 1.050, frequency_penalty = 0.000, presence_penalty = 0.000\n\tdry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 64\n\ttop_k = 20, top_p = 0.600, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.700\n\tmirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900\n0.01.255.267 I sampler chain: logits -> penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist \n0.01.255.268 I generate: n_ctx = 1024, n_batch = 2048, n_predict = 256, n_keep = 0\n0.01.255.268 I \n"
+  },
+  {
+    "elapsed_ms": 2686.450225000044,
+    "channel": "stdout",
+    "text": "如此"
+  },
+  {
+    "elapsed_ms": 2742.3672069999157,
+    "channel": "stdout",
+    "text": "受欢迎"
+  },
+  {
+    "elapsed_ms": 2798.8844569999856,
+    "channel": "stdout",
+    "text": "的表情"
+  },
+  {
+    "elapsed_ms": 2852.0454019999306,
+    "channel": "stdout",
+    "text": "符号"
+  },
+  {
+    "elapsed_ms": 2907.153393999579,
+    "channel": "stdout",
+    "text": "电影"
+  },
+  {
+    "elapsed_ms": 2954.1240290000133,
+    "channel": "stdout",
+    "text": "在"
+  },
+  {
+    "elapsed_ms": 3008.6671700000807,
+    "channel": "stdout",
+    "text": "好莱坞"
+  },
+  {
+    "elapsed_ms": 3063.4625209995647,
+    "channel": "stdout",
+    "text": "被"
+  },
+  {
+    "elapsed_ms": 3117.7938290002203,
+    "channel": "stdout",
+    "text": "制作"
+  },
+  {
+    "elapsed_ms": 3172.130255000411,
+    "channel": "stdout",
+    "text": "出来"
+  },
+  {
+    "elapsed_ms": 3225.0382230004107,
+    "channel": "stdout",
+    "text": "，"
+  },
+  {
+    "elapsed_ms": 3281.0008970000126,
+    "channel": "stdout",
+    "text": "说明"
+  },
+  {
+    "elapsed_ms": 3335.9436150003603,
+    "channel": "stdout",
+    "text": "表情"
+  },
+  {
+    "elapsed_ms": 3390.434844000083,
+    "channel": "stdout",
+    "text": "符号"
+  },
+  {
+    "elapsed_ms": 3439.268326000274,
+    "channel": "stdout",
+    "text": "是一种"
+  },
+  {
+    "elapsed_ms": 3486.0537089998616,
+    "channel": "stdout",
+    "text": "源自"
+  },
+  {
+    "elapsed_ms": 3540.94685400014,
+    "channel": "stdout",
+    "text": "日本的"
+  },
+  {
+    "elapsed_ms": 3595.7330119999824,
+    "channel": "stdout",
+    "text": "、"
+  },
+  {
+    "elapsed_ms": 3645.050070000252,
+    "channel": "stdout",
+    "text": "将"
+  },
+  {
+    "elapsed_ms": 3699.402559999726,
+    "channel": "stdout",
+    "text": "图像"
+  },
+  {
+    "elapsed_ms": 3754.2837669998335,
+    "channel": "stdout",
+    "text": "作为"
+  },
+  {
+    "elapsed_ms": 3808.544210999571,
+    "channel": "stdout",
+    "text": "文字"
+  },
+  {
+    "elapsed_ms": 3860.4829590003646,
+    "channel": "stdout",
+    "text": "使用的"
+  },
+  {
+    "elapsed_ms": 3901.34575600041,
+    "channel": "stdout",
+    "text": "新型"
+  },
+  {
+    "elapsed_ms": 3961.3133379998544,
+    "channel": "stdout",
+    "text": "表达"
+  },
+  {
+    "elapsed_ms": 4009.96072199996,
+    "channel": "stdout",
+    "text": "方式"
+  },
+  {
+    "elapsed_ms": 4052.840676999949,
+    "channel": "stdout",
+    "text": "。"
+  },
+  {
+    "elapsed_ms": 4094.510992999858,
+    "channel": "stdout",
+    "text": " [end of text]\n\n\n"
+  },
+  {
+    "elapsed_ms": 4094.5269359999656,
+    "channel": "stderr",
+    "text": "0.04.087.369 I common_perf_print:    sampling time =      19.55 ms\n0.04.087.381 I common_perf_print:    samplers time =      15.30 ms /   128 tokens\n0.04.087.394 I common_perf_print:        load time =     940.69 ms\n0.04.087.403 I common_perf_print: prompt eval time =    1421.98 ms /   100 tokens (   14.22 ms per token,    70.32 tokens per second)\n0.04.087.411 I common_perf_print:        eval time =    1387.75 ms /    27 runs   (   51.40 ms per token,    19.46 tokens per second)\n0.04.087.419 I common_perf_print:       total time =    2837.39 ms /   127 tokens\n0.04.087.427 I common_perf_print: unaccounted time =       8.12 ms /   0.3 %      (total - sampling - prompt eval - eval) / (total)\n0.04.087.434 I common_perf_print:    graphs reused =         26\n"
+  }
+]

@@ -21,7 +21,7 @@ jobs:
   build:
     name: Assemble · Unit tests · Lint
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g
 
@@ -57,8 +57,16 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
 
+      - name: Check official Maven availability before resolving dependencies
+        run: |
+          for path in org/jetbrains/annotations/13.0/annotations-13.0.pom com/google/code/gson/gson/2.11.0/gson-2.11.0.pom; do
+            curl --fail --silent --show-error --location --retry 2 --retry-all-errors --max-time 30 \
+              --output /dev/null --write-out 'Maven HTTP %{http_code}\n' "https://repo.maven.apache.org/maven2/$path"
+          done
       - name: Assemble debug
-        run: ./gradlew assembleDebug --stacktrace
+        # Do not preserve transient repository not-found responses across runner caches.
+        # Pinned dependency verification remains mandatory.
+        run: ./gradlew assembleDebug --refresh-dependencies --stacktrace
 
       - name: Unit tests
         run: ./gradlew testDebugUnitTest --stacktrace
@@ -68,6 +76,31 @@ jobs:
 
       - name: Lint
         run: ./gradlew lintDebug --stacktrace
+
+      # Compile the explicitly opt-in engine without enabling downloads in the app.
+      # This job uses no emulator/KVM device and creates no signing credentials.
+      - name: Install pinned native build tools
+        run: |
+          sdkmanager --install "ndk;28.2.13676358" "cmake;3.22.1" < /dev/null
+          test -f "$ANDROID_HOME/ndk/28.2.13676358/source.properties"
+          test -x "$ANDROID_HOME/cmake/3.22.1/bin/cmake"
+
+      - name: Compile optional quality engine and instrumented tests
+        run: ./gradlew -PhyMtNative=true assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug --stacktrace
+
+      - name: Audit actual optimized native Debug commands
+        run: |
+          python3 -m unittest discover -s app/src/main/cpp/tests -p 'test_check_build_flags.py' -v
+          for abi in arm64-v8a x86_64; do
+            commands=$(find app/.cxx/Debug -path "*/$abi/compile_commands.json" -print -quit)
+            test -n "$commands"
+            python3 app/src/main/cpp/tests/check_build_flags.py "$commands" --debug
+          done
+
+      - name: Check optional native ELF alignment
+        run: |
+          python3 scripts/check_hy_native_apk.py app/build/outputs/apk/debug/app-universal-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 app/build/outputs/apk/debug/app-universal-debug.apk
 
       - name: Upload debug APKs
         if: success()

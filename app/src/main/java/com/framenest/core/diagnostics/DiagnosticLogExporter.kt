@@ -23,7 +23,7 @@ class DiagnosticLogExporter(
         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
         val out = File(dir, "framenest-diag-$stamp.txt")
         val body = buildString {
-            appendLine("FrameNest diagnostic export")
+            appendLine("映舟诊断导出")
             appendLine("generated=${SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.US).format(Date())}")
             appendLine("versionName=${BuildConfig.VERSION_NAME}")
             appendLine("versionCode=${BuildConfig.VERSION_CODE}")

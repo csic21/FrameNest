@@ -1,0 +1,268 @@
+[
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "role": "assistant",
+          "content": null
+        }
+      }
+    ],
+    "created": 1791989947,
+    "id": "chatcmpl-5G2GmlT8f2XzE23vJIGn4J6yy2FKvZTq",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "首相"
+        }
+      }
+    ],
+    "created": 1791989947,
+    "id": "chatcmpl-5G2GmlT8f2XzE23vJIGn4J6yy2FKvZTq",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "在"
+        }
+      }
+    ],
+    "created": 1791989947,
+    "id": "chatcmpl-5G2GmlT8f2XzE23vJIGn4J6yy2FKvZTq",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "官"
+        }
+      }
+    ],
+    "created": 1791989947,
+    "id": "chatcmpl-5G2GmlT8f2XzE23vJIGn4J6yy2FKvZTq",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "邸"
+        }
+      }
+    ],
+    "created": 1791989947,
+    "id": "chatcmpl-5G2GmlT8f2XzE23vJIGn4J6yy2FKvZTq",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "召开"
+        }
+      }
+    ],
+    "created": 1791989947,
+    "id": "chatcmpl-5G2GmlT8f2XzE23vJIGn4J6yy2FKvZTq",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "记者"
+        }
+      }
+    ],
+    "created": 1791989947,
+    "id": "chatcmpl-5G2GmlT8f2XzE23vJIGn4J6yy2FKvZTq",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "会"
+        }
+      }
+    ],
+    "created": 1791989947,
+    "id": "chatcmpl-5G2GmlT8f2XzE23vJIGn4J6yy2FKvZTq",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "，"
+        }
+      }
+    ],
+    "created": 1791989947,
+    "id": "chatcmpl-5G2GmlT8f2XzE23vJIGn4J6yy2FKvZTq",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "说明了"
+        }
+      }
+    ],
+    "created": 1791989947,
+    "id": "chatcmpl-5G2GmlT8f2XzE23vJIGn4J6yy2FKvZTq",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "今天的"
+        }
+      }
+    ],
+    "created": 1791989947,
+    "id": "chatcmpl-5G2GmlT8f2XzE23vJIGn4J6yy2FKvZTq",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "会议"
+        }
+      }
+    ],
+    "created": 1791989947,
+    "id": "chatcmpl-5G2GmlT8f2XzE23vJIGn4J6yy2FKvZTq",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "内容"
+        }
+      }
+    ],
+    "created": 1791989947,
+    "id": "chatcmpl-5G2GmlT8f2XzE23vJIGn4J6yy2FKvZTq",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "。"
+        }
+      }
+    ],
+    "created": 1791989947,
+    "id": "chatcmpl-5G2GmlT8f2XzE23vJIGn4J6yy2FKvZTq",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "delta": {}
+      }
+    ],
+    "created": 1791989947,
+    "id": "chatcmpl-5G2GmlT8f2XzE23vJIGn4J6yy2FKvZTq",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [],
+    "created": 1791989947,
+    "id": "chatcmpl-5G2GmlT8f2XzE23vJIGn4J6yy2FKvZTq",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk",
+    "usage": {
+      "completion_tokens": 14,
+      "prompt_tokens": 46,
+      "total_tokens": 60,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    "timings": {
+      "cache_n": 0,
+      "prompt_n": 46,
+      "prompt_ms": 785.136,
+      "prompt_per_token_ms": 17.068173913043477,
+      "prompt_per_second": 58.588575737197125,
+      "predicted_n": 14,
+      "predicted_ms": 568.032,
+      "predicted_per_token_ms": 43.69476923076923,
+      "predicted_per_second": 22.886034589600584
+    }
+  }
+]

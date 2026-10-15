@@ -114,9 +114,9 @@ class SherpaAsrEngine(
         const val SAMPLE_RATE_HZ = 16_000
 
         /**
-         * Two threads balance RK3588-class throughput (~0.1 RTF at 1 thread on
-         * A76) against battery/thermal on sustained subtitle prefetch.
-         * Measured on-device before raising.
+         * Conservative CPU budget shared with video playback and on-device MT.
+         * This is a configuration choice, not a measured target-phone RTF.
+         * Benchmark cold/warm subtitle latency and sustained thermals before raising.
          */
         const val DEFAULT_NUM_THREADS = 2
 
@@ -146,35 +146,6 @@ class SherpaAsrEngine(
         internal fun mapTokensToWords(
             tokens: Array<String>?,
             timestamps: FloatArray?,
-        ): List<AsrWord> {
-            if (tokens == null || timestamps == null) return emptyList()
-            val starts = mutableListOf<Pair<String, Long>>()
-            var pendingSpace = false
-            tokens.forEachIndexed { index, token ->
-                val piece = token.replace('▁', ' ')
-                if (piece.isBlank()) {
-                    pendingSpace = true
-                    return@forEachIndexed
-                }
-                val startSec = timestamps.getOrNull(index) ?: return@forEachIndexed
-                if (!startSec.isFinite() || startSec < 0f) return@forEachIndexed
-                val text = (if (pendingSpace && !piece.startsWith(' ')) " " else "") + piece
-                pendingSpace = false
-                val previous = starts.lastOrNull()
-                // Preserve whole Latin words when a window cuts through BPE pieces.
-                fun String.isLatinPiece() = isNotEmpty() && all {
-                    it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it == '\'' || it == '-'
-                }
-                if (previous != null && text.isLatinPiece() && previous.first.trim().isLatinPiece()) {
-                    starts[starts.lastIndex] = previous.first + text to previous.second
-                } else {
-                    starts += text to (startSec * 1000f).toLong().coerceAtLeast(0L)
-                }
-            }
-            return starts.mapIndexed { index, (text, startMs) ->
-                val endMs = starts.getOrNull(index + 1)?.second ?: startMs
-                AsrWord(text = text, startMs = startMs, endMs = endMs)
-            }
-        }
+        ): List<AsrWord> = sherpaTokensToWords(tokens, timestamps)
     }
 }

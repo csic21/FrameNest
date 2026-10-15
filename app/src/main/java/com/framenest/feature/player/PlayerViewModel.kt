@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.framenest.BuildConfig
 import com.framenest.FrameNestApplication
 import com.framenest.core.model.PlaybackDataSource
 import com.framenest.core.model.PlaybackRequest
@@ -24,7 +25,9 @@ import com.framenest.feature.listen_translate.ListenTranslateSession
 import com.framenest.feature.listen_translate.ListenTranslateUiState
 import com.framenest.feature.listen_translate.ListenWindowResult
 import com.framenest.feature.listen_translate.ModelsNotReadyException
+import com.framenest.feature.listen_translate.OwnedListenTranslateEngine
 import com.framenest.feature.listen_translate.RealListenTranslateEngine
+import com.framenest.feature.listen_translate.RecordedFileListenTranslateEngine
 import com.framenest.feature.listen_translate.asr.AsrEngine
 import com.framenest.feature.listen_translate.asr.AsrModelSupport
 import com.framenest.feature.listen_translate.asr.SherpaAsrEngine
@@ -35,6 +38,9 @@ import com.framenest.feature.listen_translate.asr.VoskAsrModelSupport
 import com.framenest.feature.listen_translate.asr.VoskModelInstaller
 import com.framenest.feature.listen_translate.audio.ListenAudioSource
 import com.framenest.feature.listen_translate.audio.ListenAudioSources
+import com.framenest.feature.listen_translate.mt.HyMtEngine
+import com.framenest.feature.listen_translate.mt.HyMtModelInstaller
+import com.framenest.feature.listen_translate.mt.ListenMtEngine
 import com.framenest.feature.listen_translate.mt.MlKitMtEngine
 import com.framenest.feature.subtitle.ExternalSubtitleLoader
 import com.framenest.feature.subtitle.ExternalSubtitleOption
@@ -209,8 +215,9 @@ class PlayerViewModel(
 
     private val voskInstaller = VoskModelInstaller(application)
     private val sherpaInstaller = SherpaModelInstaller(application)
+    private val hyMtInstaller = HyMtModelInstaller(application)
     private val userPreferences = UserPreferences(application)
-    private var realListenEngine: RealListenTranslateEngine? = null
+    private var realListenEngine: OwnedListenTranslateEngine? = null
     private var listenTransports = SmbTransportOwner()
     private var listenPrepareJob: Job? = null
     @Volatile
@@ -226,7 +233,12 @@ class PlayerViewModel(
         scope = sessionScope,
         identity = request.identity,
         contentKey = ListenCacheVariant.contentKey(listenBaseContentKey, null),
-    )
+    ).also {
+        it.setHighQualityJapaneseChoice(
+            enabled = userPreferences.highQualityJapanese(),
+            available = highQualityJapaneseAvailable(),
+        )
+    }
     val listenTranslateUiState: StateFlow<ListenTranslateUiState> = listenSession.uiState
 
     private val audioFocus = PlayerAudioFocus(
@@ -375,6 +387,7 @@ class PlayerViewModel(
             return
         }
         listenRestartPendingAfterSourceChange = false
+        refreshHighQualityJapaneseChoice()
         restartListenPreparation()
     }
 
@@ -383,6 +396,7 @@ class PlayerViewModel(
         val restart = listenSession.uiState.value.let { it.enabled || it.isInstallingModels }
         if (restart) listenSession.setEnabled(false)
         listenSession.setSourceLang(code)
+        refreshHighQualityJapaneseChoice()
         if (restart) restartListenPreparation()
     }
 
@@ -391,7 +405,42 @@ class PlayerViewModel(
         val restart = listenSession.uiState.value.let { it.enabled || it.isInstallingModels }
         if (restart) listenSession.setEnabled(false)
         listenSession.setTargetLang(code)
+        refreshHighQualityJapaneseChoice()
         if (restart) restartListenPreparation()
+    }
+
+    /** An explicit opt-in only; installing a model requires a separate enable action. */
+    fun setHighQualityJapanese(enabled: Boolean) {
+        if (playbackLifecycle.closed) return
+        val current = listenSession.uiState.value
+        if (current.enabled || current.isInstallingModels) return
+        refreshHighQualityJapaneseChoice()
+        // A saved choice may always be removed, including in a native-disabled build.
+        if (enabled && !highQualityJapaneseSupported(current)) return
+        if (enabled == userPreferences.highQualityJapanese()) return
+        userPreferences.setHighQualityJapanese(enabled)
+        refreshHighQualityJapaneseChoice()
+        listenSession.setModelsReady(false)
+    }
+
+    private fun highQualityJapaneseAvailable(): Boolean =
+        BuildConfig.HY_MT_NATIVE && userPreferences.asrEngine() == AsrEngineChoice.SHERPA
+
+    /** Runtime eligibility is enforced independently of Compose's disabled controls. */
+    private fun highQualityJapaneseSupported(state: ListenTranslateUiState): Boolean =
+        highQualityJapaneseAvailable() &&
+            state.sourceLang.trim().equals("ja", ignoreCase = true) &&
+            state.targetLang.trim().equals("zh", ignoreCase = true) &&
+            state.displayMode != ListenDisplayMode.SourceOnly
+
+    private fun usesHighQualityJapanese(state: ListenTranslateUiState): Boolean =
+        state.highQualityJapanese && highQualityJapaneseSupported(state)
+
+    private fun refreshHighQualityJapaneseChoice() {
+        listenSession.setHighQualityJapaneseChoice(
+            enabled = userPreferences.highQualityJapanese(),
+            available = highQualityJapaneseAvailable(),
+        )
     }
 
     fun setListenExperimentalSilenceGate(enabled: Boolean) {
@@ -415,7 +464,14 @@ class PlayerViewModel(
 
     fun setListenDisplayMode(mode: ListenDisplayMode) {
         if (playbackLifecycle.closed) return
+        val previous = listenSession.uiState.value
+        val changesEngine = usesHighQualityJapanese(previous) !=
+            usesHighQualityJapanese(previous.copy(displayMode = mode))
+        val restart = changesEngine && (previous.enabled || previous.isInstallingModels)
+        if (restart) listenSession.setEnabled(false)
         listenSession.setDisplayMode(mode)
+        refreshHighQualityJapaneseChoice()
+        if (restart) restartListenPreparation()
     }
 
     private fun restartListenPreparation() {
@@ -430,6 +486,7 @@ class PlayerViewModel(
         }
         val sourceLang = listenSession.uiState.value.sourceLang
         val targetLang = listenSession.uiState.value.targetLang
+        val startupToken = listenSession.beginStartupTiming()
         val generation = ++listenPrepareGeneration
         listenPrepareJob?.cancel()
         retireListenTransports()
@@ -440,7 +497,7 @@ class PlayerViewModel(
             error = null,
         )
         listenPrepareJob = sessionScope.launch {
-            enableRealListenTranslate(generation, sourceLang, targetLang, transports)
+            enableRealListenTranslate(generation, sourceLang, targetLang, transports, startupToken)
         }
     }
 
@@ -457,13 +514,17 @@ class PlayerViewModel(
         sourceLang: String,
         targetLang: String,
         transports: SmbTransportOwner,
+        startupToken: Long,
     ) = listenPrepareMutex.withLock {
         currentCoroutineContext().ensureActive()
         if (generation != listenPrepareGeneration) return@withLock
         val experimentalSilenceGate = listenSession.uiState.value.experimentalSilenceGate
+        val useHighQualityJapanese = usesHighQualityJapanese(listenSession.uiState.value)
         val previous = realListenEngine
         realListenEngine = null
         closeListenPreparationResources(listOf({ previous?.close() }))
+        currentCoroutineContext().ensureActive()
+        if (generation != listenPrepareGeneration) return@withLock
         val asrSupport: AsrModelSupport = when (userPreferences.asrEngine()) {
             AsrEngineChoice.VOSK -> VoskAsrModelSupport(voskInstaller)
             AsrEngineChoice.SHERPA -> SherpaAsrModelSupport(sherpaInstaller)
@@ -481,7 +542,7 @@ class PlayerViewModel(
         )
         var pendingAudio: ListenAudioSource? = null
         var pendingAsr: AsrEngine? = null
-        var pendingMt: MlKitMtEngine? = null
+        var pendingMt: ListenMtEngine? = null
         suspend fun closePendingResources() {
             closeListenPreparationResources(
                 listOf(
@@ -494,6 +555,7 @@ class PlayerViewModel(
             pendingAsr = null
             pendingMt = null
         }
+        var asrPreparationMs: Long? = null
         val prepared = try {
             val engine = withContext(Dispatchers.IO) {
                 ensureSmbConnectedForListen(transports)
@@ -506,40 +568,87 @@ class PlayerViewModel(
                     AsrEngineChoice.VOSK -> "Vosk($sourceLang)"
                     AsrEngineChoice.SHERPA -> "SenseVoice"
                 }
-                asrSupport.ensureInstalled(
-                    langTag = sourceLang,
-                    allowMeteredDownloads = allowMeteredDownloads,
-                ) { p ->
-                    if (generation != listenPrepareGeneration) return@ensureInstalled
-                    val percent = (p * 100f).toInt().coerceIn(0, 100)
-                    if (percent != lastProgressPercent) {
-                        lastProgressPercent = percent
-                        reportListenPreparation(generation, "正在准备 $installingEngineLabel：$percent%")
+                val asrPreparationStartedAt = System.nanoTime()
+                try {
+                    asrSupport.ensureInstalled(
+                        langTag = sourceLang,
+                        allowMeteredDownloads = allowMeteredDownloads,
+                    ) { p ->
+                        if (generation != listenPrepareGeneration) return@ensureInstalled
+                        val percent = (p * 100f).toInt().coerceIn(0, 100)
+                        if (percent != lastProgressPercent) {
+                            lastProgressPercent = percent
+                            reportListenPreparation(generation, "正在准备 $installingEngineLabel：$percent%")
+                        }
+                    }
+                    currentCoroutineContext().ensureActive()
+                    val asr: AsrEngine = when (asrSupport.engineChoice()) {
+                        AsrEngineChoice.VOSK -> VoskAsrEngine()
+                        AsrEngineChoice.SHERPA -> SherpaAsrEngine()
+                    }
+                    pendingAsr = asr
+                    reportListenPreparation(generation, "正在载入本机 ASR 模型 $sourceLang…")
+                    val modelDir = asrSupport.modelDir(sourceLang)
+                        ?: error(asrSupport.incompleteModelMessage(sourceLang))
+                    asr.ensureModel(modelDir, sourceLang)
+                } finally {
+                    asrPreparationMs = ((System.nanoTime() - asrPreparationStartedAt) / 1_000_000L)
+                        .coerceAtLeast(0L)
+                }
+                currentCoroutineContext().ensureActive()
+                if (generation != listenPrepareGeneration) {
+                    throw CancellationException("stale listen-translate preparation")
+                }
+                pendingMt = if (useHighQualityJapanese) {
+                    var lastMtProgressPercent = -1
+                    hyMtInstaller.ensureInstalled(allowMeteredDownloads = allowMeteredDownloads) { p ->
+                        if (generation != listenPrepareGeneration) return@ensureInstalled
+                        val percent = (p * 100f).toInt().coerceIn(0, 100)
+                        if (percent != lastMtProgressPercent) {
+                            lastMtProgressPercent = percent
+                            reportListenPreparation(generation, "正在准备 Hy-MT2 Q4：$percent%")
+                        }
+                    }
+                    currentCoroutineContext().ensureActive()
+                    HyMtEngine(verifiedModelPath = {
+                        hyMtInstaller.verifiedModelFile()?.absolutePath
+                            ?: error("Hy-MT2 模型缺失或完整性校验失败，请重新开启听译安装")
+                    })
+                } else {
+                    MlKitMtEngine(allowMeteredDownloads = allowMeteredDownloads)
+                }
+                val onPcmReady: (Long) -> Unit = { eventAtMs ->
+                    val eventToken = listenSession.startupTimingToken
+                    sessionScope.launch {
+                        if (generation == listenPrepareGeneration && !playbackLifecycle.closed) {
+                            listenSession.recordFirstPcmTiming(eventToken, eventAtMs)
+                        }
                     }
                 }
-                currentCoroutineContext().ensureActive()
-                val asr: AsrEngine = when (asrSupport.engineChoice()) {
-                    AsrEngineChoice.VOSK -> VoskAsrEngine()
-                    AsrEngineChoice.SHERPA -> SherpaAsrEngine()
+                val engine: OwnedListenTranslateEngine = if (useHighQualityJapanese) {
+                    RecordedFileListenTranslateEngine(
+                        audio = audio,
+                        asr = checkNotNull(pendingAsr),
+                        mt = checkNotNull(pendingMt),
+                        asrModels = asrSupport,
+                        selectedAudioTrackOrdinal = { selectedAudioTrackOrdinal() },
+                        asrModelLabel = { asrSupport.modelLabel(sourceLang) },
+                        mtModelLabel = { "${HyMtModelInstaller.MODEL_VERSION}|${HyMtEngine.RUNTIME_VERSION}" },
+                        onPcmReady = onPcmReady,
+                    )
+                } else {
+                    RealListenTranslateEngine(
+                        audio = audio,
+                        asr = checkNotNull(pendingAsr),
+                        mt = checkNotNull(pendingMt),
+                        asrModels = asrSupport,
+                        selectedAudioTrackOrdinal = { selectedAudioTrackOrdinal() },
+                        asrModelLabel = { asrSupport.modelLabel(sourceLang) },
+                        mtModelLabel = { "mlkit-v1-$sourceLang-$targetLang" },
+                        experimentalSilenceGate = experimentalSilenceGate,
+                        onPcmReady = onPcmReady,
+                    )
                 }
-                val mt = MlKitMtEngine(allowMeteredDownloads = allowMeteredDownloads)
-                pendingAsr = asr
-                pendingMt = mt
-                reportListenPreparation(generation, "正在载入本机 ASR 模型 $sourceLang…")
-                val modelDir = asrSupport.modelDir(sourceLang)
-                    ?: error(asrSupport.incompleteModelMessage(sourceLang))
-                asr.ensureModel(modelDir, sourceLang)
-                currentCoroutineContext().ensureActive()
-                val engine = RealListenTranslateEngine(
-                    audio = audio,
-                    asr = asr,
-                    mt = mt,
-                    asrModels = asrSupport,
-                    selectedAudioTrackOrdinal = { selectedAudioTrackOrdinal() },
-                    asrModelLabel = { asrSupport.modelLabel(sourceLang) },
-                    mtModelLabel = { "mlkit-v1-$sourceLang-$targetLang" },
-                    experimentalSilenceGate = experimentalSilenceGate,
-                )
                 if (generation != listenPrepareGeneration) {
                     throw CancellationException("stale listen-translate preparation")
                 }
@@ -549,6 +658,7 @@ class PlayerViewModel(
             if (generation != listenPrepareGeneration || playbackLifecycle.closed) {
                 throw CancellationException("stale listen-translate preparation")
             }
+            asrPreparationMs?.let { listenSession.recordAsrPreparationTiming(startupToken, it) }
             realListenEngine = engine
             listenSession.setEngine(engine)
             pendingAudio = null
@@ -578,7 +688,11 @@ class PlayerViewModel(
         listenSession.setModelsReady(true)
         listenSession.setInstallingModels(
             installing = false,
-            message = asrSupport.readyMessage(sourceLang),
+            message = if (useHighQualityJapanese) {
+                "本机听译已就绪：SenseVoice(日语) + Hy-MT2 Q4(日语→中文)"
+            } else {
+                asrSupport.readyMessage(sourceLang)
+            },
             error = null,
         )
         listenSession.setEnabled(true)

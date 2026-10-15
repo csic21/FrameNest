@@ -1,0 +1,540 @@
+[
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "role": "assistant",
+          "content": null
+        }
+      }
+    ],
+    "created": 1791989948,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "你能"
+        }
+      }
+    ],
+    "created": 1791989948,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "理解"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "这个"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "插"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "图的"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "含义"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "吗"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "？"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "现在"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "全世界"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "使用的是"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "哪种"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "语言"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "呢"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "？"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "是"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "英语"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "、"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "西班牙语"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "还是"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "中文"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "？"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "在"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "商务"
+        }
+      }
+    ],
+    "created": 1791989949,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "文书"
+        }
+      }
+    ],
+    "created": 1791989950,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "中"
+        }
+      }
+    ],
+    "created": 1791989950,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "则"
+        }
+      }
+    ],
+    "created": 1791989950,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "常用"
+        }
+      }
+    ],
+    "created": 1791989950,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "英语"
+        }
+      }
+    ],
+    "created": 1791989950,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": null,
+        "index": 0,
+        "delta": {
+          "content": "。"
+        }
+      }
+    ],
+    "created": 1791989950,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "delta": {}
+      }
+    ],
+    "created": 1791989950,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk"
+  },
+  {
+    "choices": [],
+    "created": 1791989950,
+    "id": "chatcmpl-LrMuzVIalt6GARmJdxWo2sahDthmBuvX",
+    "model": "$BENCHMARK_ROOT/models/Hy-MT2-1.8B-Q4_K_M.gguf",
+    "system_fingerprint": "b11429-d81235049",
+    "object": "chat.completion.chunk",
+    "usage": {
+      "completion_tokens": 31,
+      "prompt_tokens": 92,
+      "total_tokens": 123,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      }
+    },
+    "timings": {
+      "cache_n": 0,
+      "prompt_n": 92,
+      "prompt_ms": 1319.372,
+      "prompt_per_token_ms": 14.341000000000001,
+      "prompt_per_second": 69.73014434139878,
+      "predicted_n": 31,
+      "predicted_ms": 1322.502,
+      "predicted_per_token_ms": 44.0834,
+      "predicted_per_second": 22.684275713760734
+    }
+  }
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "file": "results.json",
+    "sha256": "2e254ad949d4e315c018dea779aa3af02b44bb06c86d56df7df26c4a8cf0669c",
+    "bytes": 27037
+  },
+  {
+    "file": "experiment.py",
+    "sha256": "38e579bfcbd177427d7a9fa4b89e60a0547ee08268d072a1e82c1056801cd25f",
+    "bytes": 5342
+  },
+  {
+    "file": "REPORT.md",
+    "sha256": "4bf1a71b578fb550f1baaf45ed7654720c4530ec2c78e69d01a5cac9925429e4",
+    "bytes": 7613
+  },
+  {
+    "file": "energy.csv",
+    "sha256": "36e005306110f6694eeb30d631d7f137e052a872e9ecb2deb2426ced3b1c73e7",
+    "bytes": 202915
+  }
+]

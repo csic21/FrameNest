@@ -1,0 +1,28 @@
+## FN-70 交接：显式日语高质量字幕选择
+
+- 状态：UI/偏好实现完成；Android 编译与手机/平板验收受环境阻塞，运行时由集成负责人接线。
+- 分支与提交：`agent/FN-70-bilingual-latency`；此文件随 `Add explicit Japanese caption quality preference and controls` 提交。
+- 改动路径：`ListenTranslateUiModels.kt`、`ListenTranslateControls.kt`、`PlayerScreen.kt`、`UserPreferences.kt`、听译字符串、定向 JVM/Compose/偏好测试与其独立 JVM 执行脚本。
+- 验收结果：
+  - 新装/升级都默认为 ML Kit；高质量偏好默认 false，选择只保存偏好。
+  - 日语→中文、非原文显示且 runtime 明确报告可用时，才能选中 Hy-MT2 Q4。native/ASR 不支持或语言对不支持时显示原因及默认方案；已保存的不可用选择仍可关闭。
+  - 听译开启或模型安装中不能切换。关闭听译后选择，再开启听译，才进入原有模型安装/计量网络策略。
+  - 说明约 1.06 GiB 模型下载，运行建议另预留约 2 GiB 内存，并明确手机实际占用待验证。没有将云端测量描述为手机内存测量。
+  - “当前句段待确认”独立显示；音频读取进度明确标注不代表字幕确认。错误和已确认覆盖照常显示，不把音频读到或临时句段当成完成。
+  - 共用播放器底部面板接通 callback，不增加另一套手机/平板分支。
+- 执行过的命令及结果：
+  - `bash scripts/experimental/run-quality-choice-unit-tests.sh`：Kotlin 2.1.20 + JUnit 4.13.2，6 个测试通过；使用真实纯 Kotlin 依赖，没有替换生产类的 stub。
+  - `git diff --check`：通过。
+  - Python XML/resource ID、callback 接线静态检查：通过。
+  - `GRADLE_USER_HOME=/workspace/scratch/46a1f16e529d/framenest-gradle-home ./gradlew testDebugUnitTest --tests com.framenest.feature.listen_translate.ListenTranslateQualityChoiceTest lintDebug assembleDebugAndroidTest --no-daemon`：Gradle 9.6.1 下载即报 `java.net.SocketException: Network is unreachable`，任务没有执行。不能据此宣称 Android 构建、Lint 或仪器测试编译通过。
+- 决策记录：可选翻译引擎的整体决策由本轮集成负责人记录；本子任务不切换默认 ASR/MT，不改变已有原文模式、网络授权、应用 ID、签名或数据库 schema。
+- 未解决问题：新增 Compose 回归覆盖 360/840dp 面板，但未在设备上执行；两项隔离 SharedPreferences 仪器测试也未执行。没有实际手机速度、内存或 UI 截图证据。
+- 集成 Agent 需要做的共享文件改动：
+  - 实现 `PlayerViewModel.setHighQualityJapanese(enabled: Boolean)`；状态改变仅保存偏好，启动/下载仍由显式听译 enable 负责。不能仅依赖 UI 进行许可/语言检查。
+  - 初始化 `highQualityJapanese` 为持久化值；`highQualityAvailable` 仅表示 native 可用且选择的是 SenseVoice。语言/显示模式由 UI 和 runtime 分别检查。
+  - 运行时设置 `currentCaptionUnconfirmed` 和 `recordedReadThroughMs`，正确清理代次并保持覆盖语义。
+- 后续任务可依赖的接口/行为：
+  - `UserPreferences.highQualityJapanese(): Boolean`、`setHighQualityJapanese(enabled: Boolean)`，key `high_quality_japanese`，默认 false。
+  - `ListenTranslateUiState.highQualityJapanese: Boolean = false`、`highQualityAvailable: Boolean = false`、`currentCaptionUnconfirmed: Boolean = false`、`recordedReadThroughMs: Long = 0L`。
+  - UI-only computed properties `canSelectHighQualityJapanese` 和 `canChangeHighQualityJapanese`，不依赖 BuildConfig 或 Android API。
+  - `ListenTranslateControls.onHighQualityJapaneseChange: (Boolean) -> Unit = {}` 经 PlayerScreen 接到 ViewModel。

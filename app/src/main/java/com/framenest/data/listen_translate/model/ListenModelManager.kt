@@ -45,7 +45,7 @@ class ListenModelManager(
         return store.isInstalled(asr) && store.isInstalled(mt)
     }
 
-    fun approximateBytes(): Long = store.approximateBytes()
+    fun approximateBytes(): Long = catalog.distinctBy { it.id to it.version }.sumOf(store::approximateBytes)
 
     fun loadMtPhraseTable(): Map<String, Map<String, String>> {
         val mt = catalog.find { it.kind == ListenModelKind.Mt } ?: ListenModelCatalog.mt()
@@ -109,15 +109,21 @@ class ListenModelManager(
     }
 
     suspend fun delete(spec: ListenModelSpec) = withContext(Dispatchers.IO) {
-        store.deletePack(spec)
-        progress.remove(spec.id)
-        refresh()
+        installMutex.withLock {
+            store.deletePack(spec)
+            progress.remove(spec.id)
+            refresh()
+        }
     }
 
     suspend fun deleteAll() = withContext(Dispatchers.IO) {
-        store.deleteAll()
-        progress.clear()
-        refresh()
+        installMutex.withLock {
+            // The legacy JSON store shares listen_models with native-engine directories. Never
+            // delete that shared root or bypass the native installers' lifetime/install guards.
+            catalog.distinctBy { it.id to it.version }.forEach(store::deletePack)
+            progress.clear()
+            refresh()
+        }
     }
 
     private fun snapshot(): List<ListenModelUiStatus> =

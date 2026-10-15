@@ -1,0 +1,72 @@
+{
+  "same_pcm": true,
+  "same_source": true,
+  "samples_per_mode": 4,
+  "groups": {
+    "serial_control": {
+      "total_ms": {
+        "min": 715,
+        "median": 729.5,
+        "max": 745
+      },
+      "pcm_ms": {
+        "min": 187,
+        "median": 217.0,
+        "max": 240
+      },
+      "asr_ms": {
+        "min": 404,
+        "median": 415.5,
+        "max": 432
+      },
+      "mt_prepare_ms": {
+        "min": 14,
+        "median": 16.0,
+        "max": 24
+      },
+      "mt_prepare_exposed_wait_ms": {
+        "min": 14,
+        "median": 16.0,
+        "max": 24
+      },
+      "mt_ms": {
+        "min": 72,
+        "median": 75.0,
+        "max": 76
+      }
+    },
+    "overlap": {
+      "total_ms": {
+        "min": 688,
+        "median": 729.0,
+        "max": 841
+      },
+      "pcm_ms": {
+        "min": 184,
+        "median": 189.0,
+        "max": 238
+      },
+      "asr_ms": {
+        "min": 422,
+        "median": 460.0,
+        "max": 526
+      },
+      "mt_prepare_ms": {
+        "min": 16,
+        "median": 23.5,
+        "max": 78
+      },
+      "mt_prepare_exposed_wait_ms": {
+        "min": 0,
+        "median": 0.0,
+        "max": 0
+      },
+      "mt_ms": {
+        "min": 70,
+        "median": 72.5,
+        "max": 74
+      }
+    }
+  },
+  "scope": "Exploratory emulator schedule control with already downloaded models and loaded ASR. No old APK, phone, NAS, cold download, or rendered subtitle speed claim."
+}

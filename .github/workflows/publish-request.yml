@@ -45,7 +45,7 @@ jobs:
     name: Check source and build signed APKs
     needs: request
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       RELEASE_TAG: ${{ needs.request.outputs.tag }}
       RELEASE_SOURCE_SHA: ${{ needs.request.outputs.source_sha }}
@@ -84,7 +84,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$RELEASE_SOURCE_SHA"
           python3 -m unittest discover -s scripts/tests -v
       - name: Unit tests, lint and instrumentation compilation
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebugAndroidTest --no-daemon --no-configuration-cache --stacktrace
+        run: ./gradlew -PhyMtNative=false testDebugUnitTest lintDebug assembleDebugAndroidTest --no-daemon --no-configuration-cache --stacktrace
       - name: Verify owner-confirmed signing key, build and verify release APKs
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -100,7 +100,16 @@ jobs:
           unset ANDROID_KEYSTORE_BASE64
           # Package the large native ABI splits one at a time. Parallel zipflinger
           # buffers exhausted the heap in FN-67 even after compilation succeeded.
-          ./gradlew assembleRelease --no-daemon --no-configuration-cache --max-workers=1 --no-parallel '-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8' --stacktrace
+          ./gradlew -PhyMtNative=false assembleRelease --no-daemon --no-configuration-cache --max-workers=1 --no-parallel '-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8' --stacktrace
+          # The unaccepted whole-segment engine is not included in this release.
+          python3 - <<'PYAPK'
+          import zipfile
+          from pathlib import Path
+          for apk in Path('app/build/outputs/apk/release').glob('*.apk'):
+              with zipfile.ZipFile(apk) as archive:
+                  assert not any(n.endswith('/libframenest_hymt.so') or n.lower().endswith('.gguf') for n in archive.namelist()), apk
+          PYAPK
+          "$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 app/build/outputs/apk/release/app-universal-release.apk
           python3 scripts/release.py package --build-tools "$ANDROID_HOME/build-tools/36.0.0"
       - name: Remove temporary signing material
         if: always()
