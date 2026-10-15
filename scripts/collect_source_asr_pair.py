@@ -35,6 +35,15 @@ def verify_build_config(generated_root):
         require(values == [value], 'Generated BuildConfig profile mismatch: ' + name)
 
 
+def fixture_asset_specs(manifest):
+    specs = [(m['asset'], m['bytes'], m['sha256']) for m in manifest['models']]
+    for fixture in manifest['fixtures']:
+        pcm = fixture['pcm']
+        require(pcm['bytes'] == pcm['samples'] * 4, 'Frozen PCM byte/sample size mismatch')
+        specs.append((pcm['asset'], pcm['bytes'], pcm['sha256']))
+    return specs
+
+
 def verify_test_assets(apk_path):
     manifest_bytes = (ASSETS / 'manifest.json').read_bytes()
     require(hashlib.sha256(manifest_bytes).hexdigest() == FROZEN_MANIFEST, 'Frozen fixture manifest changed')
@@ -43,9 +52,7 @@ def verify_test_assets(apk_path):
     prepared_name = 'assets/runtime-comparison/generated/prepared.json'
     expected_names = {'assets/runtime-comparison/manifest.json',
                       'assets/runtime-comparison/source-profile.json', prepared_name}
-    specs = [(m['asset'], m['bytes'], m['sha256']) for m in manifest['models']]
-    specs += [(f['pcm']['asset'], f['pcm']['samples'] * 4, f['pcm']['f32le_sha256'])
-              for f in manifest['fixtures']]
+    specs = fixture_asset_specs(manifest)
     expected_names.update('assets/' + name for name, _, _ in specs)
     with SafeZip(apk_path) as apk:
         actual_names = {n for n in apk.entries if n.startswith('assets/runtime-comparison/')}

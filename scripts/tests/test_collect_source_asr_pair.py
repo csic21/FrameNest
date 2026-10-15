@@ -34,13 +34,28 @@ class PairManifestTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 target.verify_build_config(root)
 
+    def test_real_frozen_manifest_uses_pcm_sha256_and_exact_byte_lengths(self):
+        raw = (target.ASSETS / 'manifest.json').read_bytes()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), target.FROZEN_MANIFEST)
+        manifest = json.loads(raw)
+        specs = target.fixture_asset_specs(manifest)
+        self.assertEqual(len(specs), 4)
+        for fixture in manifest['fixtures']:
+            pcm = fixture['pcm']
+            self.assertNotIn('f32le_sha256', pcm)
+            self.assertIn((pcm['asset'], pcm['bytes'], pcm['sha256']), specs)
+            self.assertEqual(pcm['bytes'], pcm['samples'] * 4)
+        manifest['fixtures'][0]['pcm']['bytes'] += 1
+        with self.assertRaisesRegex(ValueError, 'byte/sample'):
+            target.fixture_asset_specs(manifest)
+
     def fixture(self, root, mutate=None):
         assets = root / 'assets'; assets.mkdir()
         model, pcm = b'test-model', b'\x00' * 16
         manifest = {'models': [{'asset': 'runtime-comparison/generated/model.onnx', 'bytes': len(model),
                                'sha256': hashlib.sha256(model).hexdigest()}],
-                    'fixtures': [{'pcm': {'asset': 'runtime-comparison/generated/audio.f32le', 'samples': 4,
-                                          'f32le_sha256': hashlib.sha256(pcm).hexdigest()}}]}
+                    'fixtures': [{'pcm': {'asset': 'runtime-comparison/generated/audio.f32le', 'samples': 4, 'bytes': len(pcm),
+                                          'sha256': hashlib.sha256(pcm).hexdigest()}}]}
         raw = json.dumps(manifest).encode(); sha = hashlib.sha256(raw).hexdigest()
         (assets / 'manifest.json').write_bytes(raw)
         (assets / 'source-profile.json').write_bytes(b'{"profile":"fixture"}')
