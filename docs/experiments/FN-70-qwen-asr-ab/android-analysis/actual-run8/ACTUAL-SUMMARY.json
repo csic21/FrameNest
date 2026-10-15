@@ -1,0 +1,1488 @@
+{
+  "workflow_run": 38718249045,
+  "job": 116366132840,
+  "artifact_id": 11964549455,
+  "artifact_zip_sha256": "e858a2ccb5c805e6437229defb81e8d0a53c2706556156bb49545ad0c3743617",
+  "workflow_head": "de5377661893b74e1f4c3d42188d87ddaae78bec",
+  "tested_checkout": "6c1bdb29f2dbfe890963560985155ae0baf8dc22",
+  "checkout_note": "Engineering owner verified merge checkout differs from workflow head only in .github/release-request.json; app/test/script/workflow identical.",
+  "target": {
+    "api": 35,
+    "abi": "x86_64",
+    "device_model": "sdk_gphone64_x86_64",
+    "device_manufacturer": "Google"
+  },
+  "source_reports": [
+    {
+      "file": "1-baseline.json",
+      "sha256": "a6bbf25a1b9c04b5324057aeb5516864581e8d6fc5f2fd1f2624197ff140643a"
+    },
+    {
+      "file": "2-candidate.json",
+      "sha256": "e2fa3cbad011e816e30cd22df19a9061f20437d985f557d1e66a372721009281"
+    },
+    {
+      "file": "3-candidate.json",
+      "sha256": "768cb4dd978039acc9659e6775b691e7b97a46e41bda2a338db6a6992029ecc9"
+    },
+    {
+      "file": "4-baseline.json",
+      "sha256": "297eeb3e5b4a9e36ffe50c7bc0d268d189b9a7dc904cc6b1d89ffeb3fdfce00d"
+    }
+  ],
+  "reports": [
+    {
+      "runtime_actual_native": "1.12.32",
+      "apk_sha256": "df71c33921ed6b324c361f20df55836dfc99185a180880e4a048e1e3075c636c",
+      "native_git_sha1": "5f3dcc1d",
+      "fixture_manifest_sha256": "9231712ec85ec7a16b31000f3cb960f2a15b7e3ccc28758515452a2351f66f77",
+      "raw_full_config": "OfflineRecognizerConfig(featConfig=FeatureConfig(sampleRate=16000, featureDim=80, dither=0.0), modelConfig=OfflineModelConfig(transducer=OfflineTransducerModelConfig(encoder=, decoder=, joiner=), paraformer=OfflineParaformerModelConfig(model=, qnnConfig=QnnConfig(backendLib=, contextBinary=, systemLib=)), whisper=OfflineWhisperModelConfig(encoder=, decoder=, language=en, task=transcribe, tailPaddings=1000, enableTokenTimestamps=false, enableSegmentTimestamps=false), fireRedAsr=OfflineFireRedAsrModelConfig(encoder=, decoder=), moonshine=OfflineMoonshineModelConfig(preprocessor=, encoder=, uncachedDecoder=, cachedDecoder=, mergedDecoder=), nemo=OfflineNemoEncDecCtcModelConfig(model=), senseVoice=OfflineSenseVoiceModelConfig(model=/data/user/0/com.framenest/cache/sensevoice-runtime-comparison-model/model.int8.onnx, language=ja, useInverseTextNormalization=true, qnnConfig=QnnConfig(backendLib=, contextBinary=, systemLib=)), dolphin=OfflineDolphinModelConfig(model=), zipformerCtc=OfflineZipformerCtcModelConfig(model=, qnnConfig=QnnConfig(backendLib=, contextBinary=, systemLib=)), wenetCtc=OfflineWenetCtcModelConfig(model=), omnilingual=OfflineOmnilingualAsrCtcModelConfig(model=), medasr=OfflineMedAsrCtcModelConfig(model=), funasrNano=OfflineFunAsrNanoModelConfig(encoderAdaptor=, llm=, embedding=, tokenizer=, systemPrompt=You are a helpful assistant., userPrompt=语音转写：, maxNewTokens=512, temperature=1.0E-6, topP=0.8, seed=42, language=, itn=true, hotwords=), fireRedAsrCtc=OfflineFireRedAsrCtcModelConfig(model=), canary=OfflineCanaryModelConfig(encoder=, decoder=, srcLang=en, tgtLang=en, usePnc=true), teleSpeech=, numThreads=2, debug=false, provider=cpu, modelType=, tokens=/data/user/0/com.framenest/cache/sensevoice-runtime-comparison-model/tokens.txt, modelingUnit=, bpeVocab=), hr=HomophoneReplacerConfig(dictDir=, lexicon=, ruleFsts=), decodingMethod=greedy_search, maxActivePaths=4, hotwordsFile=, hotwordsScore=1.5, ruleFsts=, ruleFars=, blankPenalty=0.0)",
+      "production_config": "SherpaAsrEngine(numThreads=2), ensureModel(verified modelDir, ja); production defaults: ITN true, CPU, greedy_search, maxActivePaths 4",
+      "report_index": 0,
+      "timestamp_findings": [],
+      "preparation": {
+        "model_asset_copy_and_verification_ms": 3763.838843,
+        "raw_native_preparation_ms": 2383.294345,
+        "production_preparation_ms_including_pack_verification": 1921.898192,
+        "production_same_model_warm_ensure_ms": 0.511506,
+        "production_reload_preparation_ms": 1829.221555
+      },
+      "lifecycle": {
+        "raw_recognizer_created": 1,
+        "raw_recognizer_released": 1,
+        "raw_stream_created": 99,
+        "raw_stream_released": 99,
+        "production_ensure_calls": 3,
+        "production_recognize_calls": 102,
+        "production_close_calls": 3,
+        "production_native_allocations_observable": false
+      },
+      "cancellation_probe": {
+        "pre_dispatch_cancel_skipped_body": true,
+        "requested_after_call_entry": true,
+        "completed_before_cancel": false,
+        "cancellation_took_effect": true,
+        "cancellation_observed_by_caller": true,
+        "result_publication_suppressed": true,
+        "cancel_join_ms": 2285.676669,
+        "native_decode_interrupted_proven": false,
+        "scope": "Coroutine publication and reuse only. Entry precedes Dispatchers.IO; no native-start hook. JNI decode may finish before cancellation is observed; no seek/player lifecycle or bounded native cancellation claim."
+      },
+      "summaries": {
+        "raw_native_f32le": {
+          "emoji": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.08728974115917867,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": null,
+                "decode_ms": 10892.61676,
+                "rtf_full_extent": 0.09558280765180767,
+                "rtf_selected_speech": 0.11441824327731093,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 271.641342,
+                "first_nonempty_vad_ready_seconds": 5.28
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": null,
+                "decode_ms": 10764.115572,
+                "rtf_full_extent": 0.09445520859950862,
+                "rtf_selected_speech": 0.11306844088235295,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 696.135779,
+                "first_nonempty_vad_ready_seconds": 5.28
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": null,
+                "decode_ms": 9130.962233,
+                "rtf_full_extent": 0.08012427371884873,
+                "rtf_selected_speech": 0.09591346883403361,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 243.919766,
+                "first_nonempty_vad_ready_seconds": 5.28
+              }
+            ]
+          },
+          "kishida": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.09237723584443788,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": null,
+                "decode_ms": 31701.511546,
+                "rtf_full_extent": 0.1803407982529963,
+                "rtf_selected_speech": 0.18765841608457845,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 383.182924,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": null,
+                "decode_ms": 17277.143519,
+                "rtf_full_extent": 0.09828470952329654,
+                "rtf_selected_speech": 0.10227276962919994,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 338.11299,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": null,
+                "decode_ms": 15200.23306,
+                "rtf_full_extent": 0.08646976216557924,
+                "rtf_selected_speech": 0.08997841178699123,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 329.032444,
+                "first_nonempty_vad_ready_seconds": 5.088
+              }
+            ]
+          },
+          "kishida114": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.09894153712280701,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": 0.10779816513761468,
+                "decode_ms": 15968.373814999999,
+                "rtf_full_extent": 0.14007345451754386,
+                "rtf_selected_speech": 0.1443325302342818,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 1495.129423,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": 0.10779816513761468,
+                "decode_ms": 12771.20602,
+                "rtf_full_extent": 0.11202812298245614,
+                "rtf_selected_speech": 0.11543445189630862,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 402.800434,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": 0.10779816513761468,
+                "decode_ms": 9787.464444,
+                "rtf_full_extent": 0.08585495126315788,
+                "rtf_selected_speech": 0.08846545829567229,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 336.660292,
+                "first_nonempty_vad_ready_seconds": 5.088
+              }
+            ]
+          }
+        },
+        "production_sherpa_asr_engine": {
+          "emoji": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.07702473083538085,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": null,
+                "decode_ms": 8753.049394,
+                "rtf_full_extent": 0.07680808524043524,
+                "rtf_selected_speech": 0.09194379615546218,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 244.767112,
+                "first_nonempty_vad_ready_seconds": 5.28
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": null,
+                "decode_ms": 8787.492055,
+                "rtf_full_extent": 0.07711031989294491,
+                "rtf_selected_speech": 0.09230558881302522,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 222.907268,
+                "first_nonempty_vad_ready_seconds": 5.28
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": null,
+                "decode_ms": 8767.984597,
+                "rtf_full_extent": 0.07693914177781679,
+                "rtf_selected_speech": 0.09210067853991596,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 216.152596,
+                "first_nonempty_vad_ready_seconds": 5.28
+              }
+            ]
+          },
+          "kishida": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.08883707067408048,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": null,
+                "decode_ms": 15618.929896,
+                "rtf_full_extent": 0.08885160826527322,
+                "rtf_selected_speech": 0.09245690512158738,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 338.874815,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": null,
+                "decode_ms": 15597.738188,
+                "rtf_full_extent": 0.08873105472221837,
+                "rtf_selected_speech": 0.09233145992470343,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 354.486097,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": null,
+                "decode_ms": 15635.010574,
+                "rtf_full_extent": 0.0889430866259426,
+                "rtf_selected_speech": 0.09255209536381503,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 353.647228,
+                "first_nonempty_vad_ready_seconds": 5.088
+              }
+            ]
+          },
+          "kishida114": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.0901835325,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": 0.10779816513761468,
+                "decode_ms": 10374.32744,
+                "rtf_full_extent": 0.09100287228070174,
+                "rtf_selected_speech": 0.09376990708268555,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 374.646492,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": 0.10779816513761468,
+                "decode_ms": 10280.285239,
+                "rtf_full_extent": 0.09017794069298246,
+                "rtf_selected_speech": 0.09291989261180811,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 348.387893,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": 0.10779816513761468,
+                "decode_ms": 10281.560171,
+                "rtf_full_extent": 0.09018912430701753,
+                "rtf_selected_speech": 0.09293141627499187,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 358.197519,
+                "first_nonempty_vad_ready_seconds": 5.088
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "runtime_actual_native": "1.13.8",
+      "apk_sha256": "a7525ff6cbd7026e22ae8b2dcde85f5546234183f3f1b7a091eeafaec819ef8c",
+      "native_git_sha1": "11afbd00",
+      "fixture_manifest_sha256": "9231712ec85ec7a16b31000f3cb960f2a15b7e3ccc28758515452a2351f66f77",
+      "raw_full_config": "OfflineRecognizerConfig(featConfig=FeatureConfig(sampleRate=16000, featureDim=80, dither=0.0), modelConfig=OfflineModelConfig(transducer=OfflineTransducerModelConfig(encoder=, decoder=, joiner=, qnnConfig=QnnConfig(backendLib=, contextBinary=, systemLib=)), paraformer=OfflineParaformerModelConfig(model=, qnnConfig=QnnConfig(backendLib=, contextBinary=, systemLib=)), whisper=OfflineWhisperModelConfig(encoder=, decoder=, language=en, task=transcribe, tailPaddings=1000, enableTokenTimestamps=false, enableSegmentTimestamps=false), fireRedAsr=OfflineFireRedAsrModelConfig(encoder=, decoder=), moonshine=OfflineMoonshineModelConfig(preprocessor=, encoder=, uncachedDecoder=, cachedDecoder=, mergedDecoder=), nemo=OfflineNemoEncDecCtcModelConfig(model=), senseVoice=OfflineSenseVoiceModelConfig(model=/data/user/0/com.framenest/cache/sensevoice-runtime-comparison-model/model.int8.onnx, language=ja, useInverseTextNormalization=true, qnnConfig=QnnConfig(backendLib=, contextBinary=, systemLib=)), dolphin=OfflineDolphinModelConfig(model=), zipformerCtc=OfflineZipformerCtcModelConfig(model=, qnnConfig=QnnConfig(backendLib=, contextBinary=, systemLib=)), wenetCtc=OfflineWenetCtcModelConfig(model=), omnilingual=OfflineOmnilingualAsrCtcModelConfig(model=), medasr=OfflineMedAsrCtcModelConfig(model=), funasrNano=OfflineFunAsrNanoModelConfig(encoderAdaptor=, llm=, embedding=, tokenizer=, systemPrompt=You are a helpful assistant., userPrompt=语音转写：, maxNewTokens=512, temperature=1.0E-6, topP=0.8, seed=42, language=, itn=true, hotwords=), qwen3Asr=OfflineQwen3AsrModelConfig(convFrontend=, encoder=, decoder=, tokenizer=, maxTotalLen=512, maxNewTokens=128, temperature=1.0E-6, topP=0.8, seed=42, hotwords=), fireRedAsrCtc=OfflineFireRedAsrCtcModelConfig(model=), canary=OfflineCanaryModelConfig(encoder=, decoder=, srcLang=en, tgtLang=en, usePnc=true), cohereTranscribe=OfflineCohereTranscribeModelConfig(encoder=, decoder=, language=, usePunct=true, useItn=true), teleSpeech=, numThreads=2, debug=false, provider=cpu, modelType=, tokens=/data/user/0/com.framenest/cache/sensevoice-runtime-comparison-model/tokens.txt, modelingUnit=, bpeVocab=), hr=HomophoneReplacerConfig(dictDir=, lexicon=, ruleFsts=), decodingMethod=greedy_search, maxActivePaths=4, hotwordsFile=, hotwordsScore=1.5, ruleFsts=, ruleFars=, blankPenalty=0.0)",
+      "production_config": "SherpaAsrEngine(numThreads=2), ensureModel(verified modelDir, ja); production defaults: ITN true, CPU, greedy_search, maxActivePaths 4",
+      "report_index": 1,
+      "timestamp_findings": [],
+      "preparation": {
+        "model_asset_copy_and_verification_ms": 2040.747499,
+        "raw_native_preparation_ms": 956.434141,
+        "production_preparation_ms_including_pack_verification": 1563.561736,
+        "production_same_model_warm_ensure_ms": 0.49776,
+        "production_reload_preparation_ms": 1496.694761
+      },
+      "lifecycle": {
+        "raw_recognizer_created": 1,
+        "raw_recognizer_released": 1,
+        "raw_stream_created": 99,
+        "raw_stream_released": 99,
+        "production_ensure_calls": 3,
+        "production_recognize_calls": 102,
+        "production_close_calls": 3,
+        "production_native_allocations_observable": false
+      },
+      "cancellation_probe": {
+        "pre_dispatch_cancel_skipped_body": true,
+        "requested_after_call_entry": true,
+        "completed_before_cancel": false,
+        "cancellation_took_effect": true,
+        "cancellation_observed_by_caller": true,
+        "result_publication_suppressed": true,
+        "cancel_join_ms": 2332.984222,
+        "native_decode_interrupted_proven": false,
+        "scope": "Coroutine publication and reuse only. Entry precedes Dispatchers.IO; no native-start hook. JNI decode may finish before cancellation is observed; no seek/player lifecycle or bounded native cancellation claim."
+      },
+      "summaries": {
+        "raw_native_f32le": {
+          "emoji": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.07581092632941383,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": null,
+                "decode_ms": 9250.884386,
+                "rtf_full_extent": 0.08117659166374167,
+                "rtf_selected_speech": 0.09717315531512603,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 237.126974,
+                "first_nonempty_vad_ready_seconds": 5.28
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": null,
+                "decode_ms": 8614.083566,
+                "rtf_full_extent": 0.07558865888030888,
+                "rtf_selected_speech": 0.09048407107142857,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 216.720745,
+                "first_nonempty_vad_ready_seconds": 5.28
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": null,
+                "decode_ms": 8664.742763,
+                "rtf_full_extent": 0.07603319377851878,
+                "rtf_selected_speech": 0.09101620549369747,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 221.764527,
+                "first_nonempty_vad_ready_seconds": 5.28
+              }
+            ]
+          },
+          "kishida": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.08746352697783216,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": null,
+                "decode_ms": 16445.596516,
+                "rtf_full_extent": 0.09355427734537634,
+                "rtf_selected_speech": 0.09735039256032015,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 372.210831,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": null,
+                "decode_ms": 15426.465714,
+                "rtf_full_extent": 0.0877567347868706,
+                "rtf_selected_speech": 0.0913176053915185,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 340.43531,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": null,
+                "decode_ms": 15323.381655,
+                "rtf_full_extent": 0.08717031916879371,
+                "rtf_selected_speech": 0.09070739501692988,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 339.626501,
+                "first_nonempty_vad_ready_seconds": 5.088
+              }
+            ]
+          },
+          "kishida114": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.08811699070175438,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": 0.0871559633027523,
+                "decode_ms": 10181.593364,
+                "rtf_full_extent": 0.08931222249122808,
+                "rtf_selected_speech": 0.09202785136845151,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 340.267987,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": 0.0871559633027523,
+                "decode_ms": 10071.256583,
+                "rtf_full_extent": 0.08834435599122807,
+                "rtf_selected_speech": 0.0910305559040457,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 341.173355,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": 0.0871559633027523,
+                "decode_ms": 10019.417297,
+                "rtf_full_extent": 0.08788962541228071,
+                "rtf_selected_speech": 0.09056199877978235,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 341.167594,
+                "first_nonempty_vad_ready_seconds": 5.088
+              }
+            ]
+          }
+        },
+        "production_sherpa_asr_engine": {
+          "emoji": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.0794417475956476,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": null,
+                "decode_ms": 9171.666703,
+                "rtf_full_extent": 0.08048145580028082,
+                "rtf_selected_speech": 0.0963410367962185,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 241.238795,
+                "first_nonempty_vad_ready_seconds": 5.28
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": null,
+                "decode_ms": 9058.987724999999,
+                "rtf_full_extent": 0.07949269677957178,
+                "rtf_selected_speech": 0.09515743408613445,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 226.475469,
+                "first_nonempty_vad_ready_seconds": 5.28
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": null,
+                "decode_ms": 9047.375387,
+                "rtf_full_extent": 0.07939079841172342,
+                "rtf_selected_speech": 0.09503545574579832,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 232.10511,
+                "first_nonempty_vad_ready_seconds": 5.28
+              }
+            ]
+          },
+          "kishida": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.09146112037920962,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": null,
+                "decode_ms": 16128.404686,
+                "rtf_full_extent": 0.09174986408455987,
+                "rtf_selected_speech": 0.09547276233040514,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 358.053801,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": null,
+                "decode_ms": 16073.655758,
+                "rtf_full_extent": 0.09143841315059766,
+                "rtf_selected_speech": 0.09514867377406296,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 354.808261,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": null,
+                "decode_ms": 16081.639015,
+                "rtf_full_extent": 0.09148382760782156,
+                "rtf_selected_speech": 0.09519593099590369,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 352.978472,
+                "first_nonempty_vad_ready_seconds": 5.088
+              }
+            ]
+          },
+          "kishida114": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.09256847504824561,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": 0.0871559633027523,
+                "decode_ms": 10603.349863,
+                "rtf_full_extent": 0.09301184090350877,
+                "rtf_selected_speech": 0.09583996043783218,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 353.489613,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": 0.0871559633027523,
+                "decode_ms": 10568.922669,
+                "rtf_full_extent": 0.0927098479736842,
+                "rtf_selected_speech": 0.09552878510611373,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 355.820048,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": 0.0871559633027523,
+                "decode_ms": 10536.689642,
+                "rtf_full_extent": 0.09242710212280701,
+                "rtf_selected_speech": 0.09523744208033551,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 355.636646,
+                "first_nonempty_vad_ready_seconds": 5.088
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "runtime_actual_native": "1.13.8",
+      "apk_sha256": "a7525ff6cbd7026e22ae8b2dcde85f5546234183f3f1b7a091eeafaec819ef8c",
+      "native_git_sha1": "11afbd00",
+      "fixture_manifest_sha256": "9231712ec85ec7a16b31000f3cb960f2a15b7e3ccc28758515452a2351f66f77",
+      "raw_full_config": "OfflineRecognizerConfig(featConfig=FeatureConfig(sampleRate=16000, featureDim=80, dither=0.0), modelConfig=OfflineModelConfig(transducer=OfflineTransducerModelConfig(encoder=, decoder=, joiner=, qnnConfig=QnnConfig(backendLib=, contextBinary=, systemLib=)), paraformer=OfflineParaformerModelConfig(model=, qnnConfig=QnnConfig(backendLib=, contextBinary=, systemLib=)), whisper=OfflineWhisperModelConfig(encoder=, decoder=, language=en, task=transcribe, tailPaddings=1000, enableTokenTimestamps=false, enableSegmentTimestamps=false), fireRedAsr=OfflineFireRedAsrModelConfig(encoder=, decoder=), moonshine=OfflineMoonshineModelConfig(preprocessor=, encoder=, uncachedDecoder=, cachedDecoder=, mergedDecoder=), nemo=OfflineNemoEncDecCtcModelConfig(model=), senseVoice=OfflineSenseVoiceModelConfig(model=/data/user/0/com.framenest/cache/sensevoice-runtime-comparison-model/model.int8.onnx, language=ja, useInverseTextNormalization=true, qnnConfig=QnnConfig(backendLib=, contextBinary=, systemLib=)), dolphin=OfflineDolphinModelConfig(model=), zipformerCtc=OfflineZipformerCtcModelConfig(model=, qnnConfig=QnnConfig(backendLib=, contextBinary=, systemLib=)), wenetCtc=OfflineWenetCtcModelConfig(model=), omnilingual=OfflineOmnilingualAsrCtcModelConfig(model=), medasr=OfflineMedAsrCtcModelConfig(model=), funasrNano=OfflineFunAsrNanoModelConfig(encoderAdaptor=, llm=, embedding=, tokenizer=, systemPrompt=You are a helpful assistant., userPrompt=语音转写：, maxNewTokens=512, temperature=1.0E-6, topP=0.8, seed=42, language=, itn=true, hotwords=), qwen3Asr=OfflineQwen3AsrModelConfig(convFrontend=, encoder=, decoder=, tokenizer=, maxTotalLen=512, maxNewTokens=128, temperature=1.0E-6, topP=0.8, seed=42, hotwords=), fireRedAsrCtc=OfflineFireRedAsrCtcModelConfig(model=), canary=OfflineCanaryModelConfig(encoder=, decoder=, srcLang=en, tgtLang=en, usePnc=true), cohereTranscribe=OfflineCohereTranscribeModelConfig(encoder=, decoder=, language=, usePunct=true, useItn=true), teleSpeech=, numThreads=2, debug=false, provider=cpu, modelType=, tokens=/data/user/0/com.framenest/cache/sensevoice-runtime-comparison-model/tokens.txt, modelingUnit=, bpeVocab=), hr=HomophoneReplacerConfig(dictDir=, lexicon=, ruleFsts=), decodingMethod=greedy_search, maxActivePaths=4, hotwordsFile=, hotwordsScore=1.5, ruleFsts=, ruleFars=, blankPenalty=0.0)",
+      "production_config": "SherpaAsrEngine(numThreads=2), ensureModel(verified modelDir, ja); production defaults: ITN true, CPU, greedy_search, maxActivePaths 4",
+      "report_index": 2,
+      "timestamp_findings": [],
+      "preparation": {
+        "model_asset_copy_and_verification_ms": 1962.727474,
+        "raw_native_preparation_ms": 952.324527,
+        "production_preparation_ms_including_pack_verification": 1461.013261,
+        "production_same_model_warm_ensure_ms": 0.466559,
+        "production_reload_preparation_ms": 1493.817601
+      },
+      "lifecycle": {
+        "raw_recognizer_created": 1,
+        "raw_recognizer_released": 1,
+        "raw_stream_created": 99,
+        "raw_stream_released": 99,
+        "production_ensure_calls": 3,
+        "production_recognize_calls": 102,
+        "production_close_calls": 3,
+        "production_native_allocations_observable": false
+      },
+      "cancellation_probe": {
+        "pre_dispatch_cancel_skipped_body": true,
+        "requested_after_call_entry": true,
+        "completed_before_cancel": false,
+        "cancellation_took_effect": true,
+        "cancellation_observed_by_caller": true,
+        "result_publication_suppressed": true,
+        "cancel_join_ms": 2332.911473,
+        "native_decode_interrupted_proven": false,
+        "scope": "Coroutine publication and reuse only. Entry precedes Dispatchers.IO; no native-start hook. JNI decode may finish before cancellation is observed; no seek/player lifecycle or bounded native cancellation claim."
+      },
+      "summaries": {
+        "raw_native_f32le": {
+          "emoji": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.07885851273692523,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": null,
+                "decode_ms": 9123.688572000001,
+                "rtf_full_extent": 0.08006044727974729,
+                "rtf_selected_speech": 0.09583706483193277,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 247.667426,
+                "first_nonempty_vad_ready_seconds": 5.28
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": null,
+                "decode_ms": 9007.054998,
+                "rtf_full_extent": 0.07903698664443665,
+                "rtf_selected_speech": 0.09461192224789915,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 227.10383,
+                "first_nonempty_vad_ready_seconds": 5.28
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": null,
+                "decode_ms": 8966.377225,
+                "rtf_full_extent": 0.07868003882941384,
+                "rtf_selected_speech": 0.09418463471638655,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 222.33486,
+                "first_nonempty_vad_ready_seconds": 5.28
+              }
+            ]
+          },
+          "kishida": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.09071458037458041,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": null,
+                "decode_ms": 16011.695208,
+                "rtf_full_extent": 0.09108593736940404,
+                "rtf_selected_speech": 0.09478189572135534,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 359.794847,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": null,
+                "decode_ms": 16058.682086,
+                "rtf_full_extent": 0.09135323222926083,
+                "rtf_selected_speech": 0.09506003649989346,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 348.055945,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": null,
+                "decode_ms": 15834.149098,
+                "rtf_full_extent": 0.0900759285199,
+                "rtf_selected_speech": 0.09373090413894349,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 356.111742,
+                "first_nonempty_vad_ready_seconds": 5.088
+              }
+            ]
+          },
+          "kishida114": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.0918982629122807,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": 0.0871559633027523,
+                "decode_ms": 10536.472155,
+                "rtf_full_extent": 0.09242519434210526,
+                "rtf_selected_speech": 0.09523547629162299,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 350.227714,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": 0.0871559633027523,
+                "decode_ms": 10461.952763,
+                "rtf_full_extent": 0.09177151546491227,
+                "rtf_selected_speech": 0.09456192164394953,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 347.784829,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": 0.0871559633027523,
+                "decode_ms": 10490.851181,
+                "rtf_full_extent": 0.09202501035964912,
+                "rtf_selected_speech": 0.09482312430854334,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 348.64887,
+                "first_nonempty_vad_ready_seconds": 5.088
+              }
+            ]
+          }
+        },
+        "production_sherpa_asr_engine": {
+          "emoji": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.07929748080905581,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": null,
+                "decode_ms": 9101.17887,
+                "rtf_full_extent": 0.07986292444717445,
+                "rtf_selected_speech": 0.09560061838235294,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 238.259175,
+                "first_nonempty_vad_ready_seconds": 5.28
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": null,
+                "decode_ms": 9060.397668,
+                "rtf_full_extent": 0.07950506904176904,
+                "rtf_selected_speech": 0.09517224441176471,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 226.608878,
+                "first_nonempty_vad_ready_seconds": 5.28
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": null,
+                "decode_ms": 9013.084158,
+                "rtf_full_extent": 0.07908989257634258,
+                "rtf_selected_speech": 0.0946752537605042,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 229.438071,
+                "first_nonempty_vad_ready_seconds": 5.28
+              }
+            ]
+          },
+          "kishida": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.09147217471175115,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": null,
+                "decode_ms": 16226.443704,
+                "rtf_full_extent": 0.09230757991272802,
+                "rtf_selected_speech": 0.09605310837496743,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 371.512565,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": null,
+                "decode_ms": 16099.57142,
+                "rtf_full_extent": 0.0915858399117965,
+                "rtf_selected_speech": 0.09530208261312245,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 351.978947,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": null,
+                "decode_ms": 16059.609762,
+                "rtf_full_extent": 0.09135850951170578,
+                "rtf_selected_speech": 0.09506552791655816,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 352.227751,
+                "first_nonempty_vad_ready_seconds": 5.088
+              }
+            ]
+          },
+          "kishida114": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.09230014667105264,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": 0.0871559633027523,
+                "decode_ms": 10637.244764000001,
+                "rtf_full_extent": 0.09330916459649123,
+                "rtf_selected_speech": 0.09614632455981778,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 354.428684,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": 0.0871559633027523,
+                "decode_ms": 10503.123438,
+                "rtf_full_extent": 0.09213266173684212,
+                "rtf_selected_speech": 0.09493404893524714,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 351.15889,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": 0.0871559633027523,
+                "decode_ms": 10541.310003,
+                "rtf_full_extent": 0.09246763160526317,
+                "rtf_selected_speech": 0.09527920390288877,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 358.435653,
+                "first_nonempty_vad_ready_seconds": 5.088
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "runtime_actual_native": "1.12.32",
+      "apk_sha256": "df71c33921ed6b324c361f20df55836dfc99185a180880e4a048e1e3075c636c",
+      "native_git_sha1": "5f3dcc1d",
+      "fixture_manifest_sha256": "9231712ec85ec7a16b31000f3cb960f2a15b7e3ccc28758515452a2351f66f77",
+      "raw_full_config": "OfflineRecognizerConfig(featConfig=FeatureConfig(sampleRate=16000, featureDim=80, dither=0.0), modelConfig=OfflineModelConfig(transducer=OfflineTransducerModelConfig(encoder=, decoder=, joiner=), paraformer=OfflineParaformerModelConfig(model=, qnnConfig=QnnConfig(backendLib=, contextBinary=, systemLib=)), whisper=OfflineWhisperModelConfig(encoder=, decoder=, language=en, task=transcribe, tailPaddings=1000, enableTokenTimestamps=false, enableSegmentTimestamps=false), fireRedAsr=OfflineFireRedAsrModelConfig(encoder=, decoder=), moonshine=OfflineMoonshineModelConfig(preprocessor=, encoder=, uncachedDecoder=, cachedDecoder=, mergedDecoder=), nemo=OfflineNemoEncDecCtcModelConfig(model=), senseVoice=OfflineSenseVoiceModelConfig(model=/data/user/0/com.framenest/cache/sensevoice-runtime-comparison-model/model.int8.onnx, language=ja, useInverseTextNormalization=true, qnnConfig=QnnConfig(backendLib=, contextBinary=, systemLib=)), dolphin=OfflineDolphinModelConfig(model=), zipformerCtc=OfflineZipformerCtcModelConfig(model=, qnnConfig=QnnConfig(backendLib=, contextBinary=, systemLib=)), wenetCtc=OfflineWenetCtcModelConfig(model=), omnilingual=OfflineOmnilingualAsrCtcModelConfig(model=), medasr=OfflineMedAsrCtcModelConfig(model=), funasrNano=OfflineFunAsrNanoModelConfig(encoderAdaptor=, llm=, embedding=, tokenizer=, systemPrompt=You are a helpful assistant., userPrompt=语音转写：, maxNewTokens=512, temperature=1.0E-6, topP=0.8, seed=42, language=, itn=true, hotwords=), fireRedAsrCtc=OfflineFireRedAsrCtcModelConfig(model=), canary=OfflineCanaryModelConfig(encoder=, decoder=, srcLang=en, tgtLang=en, usePnc=true), teleSpeech=, numThreads=2, debug=false, provider=cpu, modelType=, tokens=/data/user/0/com.framenest/cache/sensevoice-runtime-comparison-model/tokens.txt, modelingUnit=, bpeVocab=), hr=HomophoneReplacerConfig(dictDir=, lexicon=, ruleFsts=), decodingMethod=greedy_search, maxActivePaths=4, hotwordsFile=, hotwordsScore=1.5, ruleFsts=, ruleFars=, blankPenalty=0.0)",
+      "production_config": "SherpaAsrEngine(numThreads=2), ensureModel(verified modelDir, ja); production defaults: ITN true, CPU, greedy_search, maxActivePaths 4",
+      "report_index": 3,
+      "timestamp_findings": [],
+      "preparation": {
+        "model_asset_copy_and_verification_ms": 2060.255063,
+        "raw_native_preparation_ms": 1085.208991,
+        "production_preparation_ms_including_pack_verification": 1624.821881,
+        "production_same_model_warm_ensure_ms": 0.525891,
+        "production_reload_preparation_ms": 1621.962098
+      },
+      "lifecycle": {
+        "raw_recognizer_created": 1,
+        "raw_recognizer_released": 1,
+        "raw_stream_created": 99,
+        "raw_stream_released": 99,
+        "production_ensure_calls": 3,
+        "production_recognize_calls": 102,
+        "production_close_calls": 3,
+        "production_native_allocations_observable": false
+      },
+      "cancellation_probe": {
+        "pre_dispatch_cancel_skipped_body": true,
+        "requested_after_call_entry": true,
+        "completed_before_cancel": false,
+        "cancellation_took_effect": true,
+        "cancellation_observed_by_caller": true,
+        "result_publication_suppressed": true,
+        "cancel_join_ms": 2248.559251,
+        "native_decode_interrupted_proven": false,
+        "scope": "Coroutine publication and reuse only. Entry precedes Dispatchers.IO; no native-start hook. JNI decode may finish before cancellation is observed; no seek/player lifecycle or bounded native cancellation claim."
+      },
+      "summaries": {
+        "raw_native_f32le": {
+          "emoji": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.07262321303088803,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": null,
+                "decode_ms": 8561.442825,
+                "rtf_full_extent": 0.07512673591611092,
+                "rtf_selected_speech": 0.08993112211134453,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 215.116421,
+                "first_nonempty_vad_ready_seconds": 5.28
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": null,
+                "decode_ms": 8259.709122,
+                "rtf_full_extent": 0.07247902002457003,
+                "rtf_selected_speech": 0.08676165044117647,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 207.165232,
+                "first_nonempty_vad_ready_seconds": 5.28
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": null,
+                "decode_ms": 8292.573592,
+                "rtf_full_extent": 0.07276740603720604,
+                "rtf_selected_speech": 0.08710686546218488,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 205.291182,
+                "first_nonempty_vad_ready_seconds": 5.28
+              }
+            ]
+          },
+          "kishida": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.08410629559192304,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": null,
+                "decode_ms": 14955.592417,
+                "rtf_full_extent": 0.08507807177946851,
+                "rtf_selected_speech": 0.08853025132597732,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 337.88195,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": null,
+                "decode_ms": 14812.255203,
+                "rtf_full_extent": 0.08426266751855144,
+                "rtf_selected_speech": 0.08768176072620938,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 322.34786,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": null,
+                "decode_ms": 14757.278997,
+                "rtf_full_extent": 0.08394992366529462,
+                "rtf_selected_speech": 0.08735632678829353,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 333.981058,
+                "first_nonempty_vad_ready_seconds": 5.088
+              }
+            ]
+          },
+          "kishida114": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.08483346510526316,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": 0.10779816513761468,
+                "decode_ms": 9698.399477,
+                "rtf_full_extent": 0.08507367962280703,
+                "rtf_selected_speech": 0.08766043129722695,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 327.657811,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": 0.10779816513761468,
+                "decode_ms": 9680.830596,
+                "rtf_full_extent": 0.08491956663157894,
+                "rtf_selected_speech": 0.08750163234390253,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 331.246708,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": 0.10779816513761468,
+                "decode_ms": 9661.199448,
+                "rtf_full_extent": 0.08474736357894737,
+                "rtf_selected_speech": 0.08732419328247587,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 322.660095,
+                "first_nonempty_vad_ready_seconds": 5.088
+              }
+            ]
+          }
+        },
+        "production_sherpa_asr_engine": {
+          "emoji": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.07646621326781328,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": null,
+                "decode_ms": 8761.678753,
+                "rtf_full_extent": 0.07688380794138294,
+                "rtf_selected_speech": 0.09203444068277311,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 226.781409,
+                "first_nonempty_vad_ready_seconds": 5.28
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": null,
+                "decode_ms": 8700.308677,
+                "rtf_full_extent": 0.07634528498596,
+                "rtf_selected_speech": 0.09138979702731093,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 215.59795,
+                "first_nonempty_vad_ready_seconds": 5.28
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": null,
+                "decode_ms": 8727.870651,
+                "rtf_full_extent": 0.07658714154966656,
+                "rtf_selected_speech": 0.09167931356092436,
+                "selected_seconds": 95.2,
+                "excluded_seconds": 18.75999999999999,
+                "first_nonempty_decode_ms": 216.672526,
+                "first_nonempty_vad_ready_seconds": 5.28
+              }
+            ]
+          },
+          "kishida": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.08844668874313932,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": null,
+                "decode_ms": 15563.422747,
+                "rtf_full_extent": 0.08853584402971357,
+                "rtf_selected_speech": 0.09212832824450076,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 343.744348,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": null,
+                "decode_ms": 15533.994337,
+                "rtf_full_extent": 0.08836843425358931,
+                "rtf_selected_speech": 0.0919541255475576,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 340.532167,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": null,
+                "decode_ms": 15561.506532,
+                "rtf_full_extent": 0.08852494323268933,
+                "rtf_selected_speech": 0.09211698513011153,
+                "selected_seconds": 168.932,
+                "excluded_seconds": 6.854687500000011,
+                "first_nonempty_decode_ms": 340.867886,
+                "first_nonempty_vad_ready_seconds": 5.088
+              }
+            ]
+          },
+          "kishida114": {
+            "text_stable_across_passes": true,
+            "warm_rtf_full_extent_median": 0.08933128864912282,
+            "passes": [
+              {
+                "pass_index": 0,
+                "cer_edited_reference": 0.10779816513761468,
+                "decode_ms": 10191.396918,
+                "rtf_full_extent": 0.08939821857894738,
+                "rtf_selected_speech": 0.09211646225460068,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 336.867058,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 1,
+                "cer_edited_reference": 0.10779816513761468,
+                "decode_ms": 10143.349782000001,
+                "rtf_full_extent": 0.08897675247368422,
+                "rtf_selected_speech": 0.09168218104414477,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 346.655024,
+                "first_nonempty_vad_ready_seconds": 5.088
+              },
+              {
+                "pass_index": 2,
+                "cer_edited_reference": 0.10779816513761468,
+                "decode_ms": 10224.18403,
+                "rtf_full_extent": 0.0896858248245614,
+                "rtf_selected_speech": 0.09241281346035649,
+                "selected_seconds": 110.636,
+                "excluded_seconds": 3.3640000000000043,
+                "first_nonempty_decode_ms": 338.992149,
+                "first_nonempty_vad_ready_seconds": 5.088
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "33 windows per pass are NOT 33 independent samples: Kishida114 overlaps full Kishida; report each sample separately.",
+    "Raw precedes production and staged model bytes warm filesystem cache. Compare same backend only; no disk-cold claim.",
+    "RTF is Android target wall time, not OPPO, streamed playback, or bilingual latency.",
+    "Edited Commons reference omits fillers; CER only Kishida114; no Emoji CER.",
+    "Lifecycle counts prove raw balance and API calls only; production native allocations unobserved.",
+    "Cancellation tests caller publication/reuse, not JNI interruption, seek, or player lifecycle.",
+    "VAD gaps remain excluded and unrecognized."
+  ],
+  "same_version_text_and_pts_stable": true,
+  "cross_runtime_token_onsets": {
+    "emoji": {
+      "method": "SequenceMatcher exact token matching within same window, autojunk=False; descriptive alignment only, not ground-truth timing error",
+      "matched_tokens": 479,
+      "minimum_delta_seconds": 0.0,
+      "median_delta_seconds": 0.05999949999999998,
+      "maximum_delta_seconds": 0.11999989999999983,
+      "median_absolute_delta_seconds": 0.05999949999999998
+    },
+    "kishida": {
+      "method": "SequenceMatcher exact token matching within same window, autojunk=False; descriptive alignment only, not ground-truth timing error",
+      "matched_tokens": 680,
+      "minimum_delta_seconds": -0.6599998,
+      "median_delta_seconds": 0.059999000000001246,
+      "maximum_delta_seconds": 0.35999990000000004,
+      "median_absolute_delta_seconds": 0.059999000000001246
+    },
+    "kishida114": {
+      "method": "SequenceMatcher exact token matching within same window, autojunk=False; descriptive alignment only, not ground-truth timing error",
+      "matched_tokens": 454,
+      "minimum_delta_seconds": -0.6599998,
+      "median_delta_seconds": 0.05999899999999947,
+      "maximum_delta_seconds": 0.35999990000000004,
+      "median_absolute_delta_seconds": 0.05999899999999947
+    }
+  },
+  "python_differences": {
+    "0": {
+      "emoji": [
+        {
+          "report_index": 0,
+          "backend": "raw_native_f32le",
+          "sample": "emoji",
+          "pass_index": 0,
+          "window_index": 0,
+          "android": "このイラストの意味分かりますか？",
+          "python": "このイラストの意味わかりますか？"
+        },
+        {
+          "report_index": 0,
+          "backend": "raw_native_f32le",
+          "sample": "emoji",
+          "pass_index": 0,
+          "window_index": 1,
+          "android": "今、世界中 で 使 われ て いる の は 何語 でしょ うか 英語、スペイン 語、中国語、それ は ビジネス 文章 で は 使 わ れ ない 言葉 です。",
+          "python": "今、世界 中 で 使 われ て いる の は 何語 でしょ うか 英語、スペイン 語、中国語、それ は ビジネス 文章 で は 使 わ れ ない 言葉 です。"
+        },
+        {
+          "report_index": 0,
+          "backend": "raw_native_f32le",
+          "sample": "emoji",
+          "pass_index": 0,
+          "window_index": 6,
+          "android": "有名なものといえば、スマイル、コマり顔、握り拳、パートなど。",
+          "python": "有名なものといえ ば、スマイル、コマり顔、握り拳、パートなど。"
+        },
+        {
+          "report_index": 0,
+          "backend": "raw_native_f32le",
+          "sample": "emoji",
+          "pass_index": 0,
+          "window_index": 11,
+          "android": "例えば円の中に斜め線、そして犬のマークがあれば、犬は禁止だとわかります あるいはフロッピーディスクのアイコンを見れば、文書の保存だと理解できます 実物を知らなくても大丈夫？",
+          "python": "例えば円の中に斜め線、そして犬のマークがあれば、犬は禁止だとわかります あるいはフロッピーデスクのアイコンを見れば、文書の保存だと理解できます 実物を知らなくても大丈夫？"
+        },
+        {
+          "report_index": 0,
+          "backend": "raw_native_f32le",
+          "sample": "emoji",
+          "pass_index": 0,
+          "window_index": 12,
+          "android": "絵文字の影響で増えるのは怠け者か人生の楽しみかはわかりませんが、いずれにせよオックスフォード辞書が選んだ2015年の言葉は手シなき」そう、絵文字なんです。",
+          "python": "絵文字の影響で増えるのは怠け者か人生の楽しみかはわかりませんが、いずれにせよオックスフォード辞書が選んだ2015年の言葉は手しなき」そう、絵文字なんです。"
+        }
+      ],
+      "kishida": [
+        {
+          "report_index": 0,
+          "backend": "raw_native_f32le",
+          "sample": "kishida",
+          "pass_index": 0,
+          "window_index": 2,
+          "android": "容疑者が態捕をされ、そして検察庁において捜査中です。また私の方から人のご心配をおかけし、そしてご迷惑をおかけした地元の皆さんをや。",
+          "python": "容疑者が態度をされ、そして検察において捜査中です。また私の方からえのご心配をおかけし、そしてご迷惑をおかけした地元の皆さんをや。"
+        },
+        {
+          "report_index": 0,
+          "backend": "raw_native_f32le",
+          "sample": "kishida",
+          "pass_index": 0,
+          "window_index": 3,
+          "android": "漁業組合の方々ですとか、、あるいは容疑者確去にご協力いただいた方に対し、直接こ例の電話を入げさせていただきましたあのその他にも国国内また国外からもさまざまなご心配やお見いの声をいただいたこと。",
+          "python": "漁業組合の方々ですとかあるいは容疑者確去にご協力ていただいた方に対し、直接この電話を入れさせていただきましたのその他にも国国内また国外からもさま々なご心配やお見いの声をいただいたこと。"
+        },
+        {
+          "report_index": 0,
+          "backend": "raw_native_f32le",
+          "sample": "kishida",
+          "pass_index": 0,
+          "window_index": 6,
+          "android": "大切な選挙を最後までやり通すことであると思っています、有権者の皆さんの声をしっかり選挙を通じて示してもらうこと、これは我が国にとってもまた我が国の民主主義にとってもこれは大切なことであります。",
+          "python": "大切な選挙を最後までやり通すことであると思っています有権者の皆さんの声をしっかり選挙を通じて示してもらうこと、これは我が国にとってもまた我が国の民主主義にとってもこれは大切なことであります。"
+        },
+        {
+          "report_index": 0,
+          "backend": "raw_native_f32le",
+          "sample": "kishida",
+          "pass_index": 0,
+          "window_index": 9,
+          "android": "あの警備についてはやぱ今後今回の事件の捜査が進むと同時に検証も行われるものだと思っているまけ。いずれですよサミットをはめ、世界各国から要人が集われ。",
+          "python": "あ警備についてはやっぱ今後今回の事件の捜査が進むと同時に検証も行われるものだと思っているます。いずれですよサミットをはじめ、世界各国から要人が集われ。"
+        },
+        {
+          "report_index": 0,
+          "backend": "raw_native_f32le",
+          "sample": "kishida",
+          "pass_index": 0,
+          "window_index": 10,
+          "android": "こうした日程、日本いては、日本全体として最大限警備安全に努めていかなければならないと思っています、ぜひ国民の皆さんと共にこうした外交日程においても安全を確保できるよう。",
+          "python": "こうした日程日本いては、日本全体として最大限警備安全に努めていかなければならないと思っています、ぜひ国民の皆さんと共にこうした外交日程においても安全を確保できるよう。"
+        }
+      ],
+      "kishida114": [
+        {
+          "report_index": 0,
+          "backend": "raw_native_f32le",
+          "sample": "kishida114",
+          "pass_index": 0,
+          "window_index": 2,
+          "android": "容疑者が態捕をされ、そして検察庁において捜査中です。また私の方から人のご心配をおかけし、そしてご迷惑をおかけした地元の皆さんをや。",
+          "python": "容疑者が態度をされ、そして検察において捜査中です。また私の方からえのご心配をおかけし、そしてご迷惑をおかけした地元の皆さんをや。"
+        },
+        {
+          "report_index": 0,
+          "backend": "raw_native_f32le",
+          "sample": "kishida114",
+          "pass_index": 0,
+          "window_index": 3,
+          "android": "漁業組合の方々ですとか、、あるいは容疑者確去にご協力いただいた方に対し、直接こ例の電話を入げさせていただきましたあのその他にも国国内また国外からもさまざまなご心配やお見いの声をいただいたこと。",
+          "python": "漁業組合の方々ですとかあるいは容疑者確去にご協力ていただいた方に対し、直接この電話を入れさせていただきましたのその他にも国国内また国外からもさま々なご心配やお見いの声をいただいたこと。"
+        },
+        {
+          "report_index": 0,
+          "backend": "raw_native_f32le",
+          "sample": "kishida114",
+          "pass_index": 0,
+          "window_index": 6,
+          "android": "大切な選挙を最後までやり通すことであると思っています、有権者の皆さんの声をしっかり選挙を通じて示してもらうこと、これは我が国にとってもまた我が国の民主主義にとってもこれは大切なことであります。",
+          "python": "大切な選挙を最後までやり通すことであると思っています有権者の皆さんの声をしっかり選挙を通じて示してもらうこと、これは我が国にとってもまた我が国の民主主義にとってもこれは大切なことであります。"
+        }
+      ]
+    },
+    "1": {
+      "emoji": [
+        {
+          "report_index": 1,
+          "backend": "raw_native_f32le",
+          "sample": "emoji",
+          "pass_index": 0,
+          "window_index": 1,
+          "android": "今、世界中で使われ ているのは何語でしょうか 英語、スペイン語、中国語、それはビジネス文章では使われない言葉です。",
+          "python": "今、世界中で使われ ている の は何語でしょ うか 英語、スペイン語、中国語、それはビジネス文章では使われない言葉です。"
+        },
+        {
+          "report_index": 1,
+          "backend": "raw_native_f32le",
+          "sample": "emoji",
+          "pass_index": 0,
+          "window_index": 6,
+          "android": "有名なものといえば、スマイル、小マり顔、握りこ、パートなど。",
+          "python": "有名なものといえ ば、スマイル、コマり顔、握りこ、パートなど。"
+        },
+        {
+          "report_index": 1,
+          "backend": "raw_native_f32le",
+          "sample": "emoji",
+          "pass_index": 0,
+          "window_index": 12,
+          "android": "絵文字の影響で増えるのは怠け者か人生の楽しみかはわかりませんが、いずれにせよオックスフォード辞書が選んだ2015年の言葉は手しなき」そう絵文字なんです。",
+          "python": "絵文字の影響で増えるのは怠け者か人生の楽しみかはわかりませんが、いずれにせよオックスフォード辞書が選んだ2015年の言葉は手しなき そう、絵文字なんです。"
+        }
+      ],
+      "kishida": [
+        {
+          "report_index": 1,
+          "backend": "raw_native_f32le",
+          "sample": "kishida",
+          "pass_index": 0,
+          "window_index": 2,
+          "android": "容疑者が逮捕され、そして検察庁において捜査中です。また、私の方からあの災のご心配をおかけし、そしてご迷惑をおかけした地元の皆さんをやあ。",
+          "python": "容疑者が介捕され、そして警察庁において捜査中です。また、私の方からあの会のご心配をおかけし、そしてご迷惑をおかけした地元の皆さんをや。"
+        },
+        {
+          "report_index": 1,
+          "backend": "raw_native_f32le",
+          "sample": "kishida",
+          "pass_index": 0,
+          "window_index": 3,
+          "android": "で漁業組合の方々ですとか、あるいは容疑者確去にご協力いただいた方に対し、直接おの電話を入げさせていただきましたその他にも国国内また国外からもさざなご心配やお見いの声をいただいたこと。",
+          "python": "で漁業組合の方々ですとか、あるいは容疑者確去にご協力いただいた方に対し直接おの電話を入げさせていただきましたその他にも国国内また国外からもさ々なご心配やお見いの声をいただいたこと。"
+        },
+        {
+          "report_index": 1,
+          "backend": "raw_native_f32le",
+          "sample": "kishida",
+          "pass_index": 0,
+          "window_index": 6,
+          "android": "大切な選挙を最後まででやり通すことであると思っています 有権者の皆さんの声をしっかり選挙を通じて示してもらうこと、これは我が国にとってもまた我が国の民主主義にとってもこれは大切なことであります。",
+          "python": "大切な選挙を最後まででやり通すことであると思っています、有権者の皆さんの声をしっかり選挙を通じて示してもらうこと、これは我が国にとってもまた我が国の民主主義にとってもこれは大切なことであります。"
+        },
+        {
+          "report_index": 1,
+          "backend": "raw_native_f32le",
+          "sample": "kishida",
+          "pass_index": 0,
+          "window_index": 7,
+          "android": "そういった思いで国民の皆さんと共もにこの大切な選挙を最後までやり通していきたいと考えています、 そして各党のこうした選挙運動が妨げられることがないよう 警察においては警備安全について万全を期してもらいたいと考えています。",
+          "python": "そういった思いで国民の皆さんと共にこの大切な選挙を最後までやり通していきたいと考えています、 そして各党のこうした選挙運動が妨げられることがないよう 警察においては警備安全について万全を期してもらいたいと考えています。"
+        },
+        {
+          "report_index": 1,
+          "backend": "raw_native_f32le",
+          "sample": "kishida",
+          "pass_index": 0,
+          "window_index": 8,
+          "android": "ござ総理朝日新聞です。あの、これから広島さともありますけれども、警察の昨日の警備体制は十分だったというふうにお考えでしょうか。",
+          "python": "ござ総理、朝日新聞です。は。あの、これから広島さにともありますけれども、警察の昨日の警備体制は十分だったというふうにお考えでしょうか。"
+        },
+        {
+          "report_index": 1,
+          "backend": "raw_native_f32le",
+          "sample": "kishida",
+          "pass_index": 0,
+          "window_index": 9,
+          "android": "警備については今後今回の事件の捜査が進むと同時に検証も行われるもとだと思っています、いずれでよサミットをはじめ、世界各国から要人が集われる。",
+          "python": "警備については今後今回の事件の捜査が進むと同時に検証も行われるもとだと思っています、いずれよサミトをはじめ、世界各国から要人が集われる。"
+        },
+        {
+          "report_index": 1,
+          "backend": "raw_native_f32le",
+          "sample": "kishida",
+          "pass_index": 0,
+          "window_index": 10,
+          "android": "こうした日程日本ては、日本全体として最大限警備安全に努めていかなければならないと思っていますぜひ国民の皆さんと共にこうした外交日程においても安全を確保できるよう。",
+          "python": "こうした日程日本ては、日本全体として最大限警備安全に努めていかなければならないと思っていますぜ非国民の皆さんと共にこうした外交日程においても安全を確保できるように。"
+        }
+      ],
+      "kishida114": [
+        {
+          "report_index": 1,
+          "backend": "raw_native_f32le",
+          "sample": "kishida114",
+          "pass_index": 0,
+          "window_index": 2,
+          "android": "容疑者が逮捕され、そして検察庁において捜査中です。また、私の方からあの災のご心配をおかけし、そしてご迷惑をおかけした地元の皆さんをやあ。",
+          "python": "容疑者が介捕され、そして警察庁において捜査中です。また、私の方からあの会のご心配をおかけし、そしてご迷惑をおかけした地元の皆さんをや。"
+        },
+        {
+          "report_index": 1,
+          "backend": "raw_native_f32le",
+          "sample": "kishida114",
+          "pass_index": 0,
+          "window_index": 3,
+          "android": "で漁業組合の方々ですとか、あるいは容疑者確去にご協力いただいた方に対し、直接おの電話を入げさせていただきましたその他にも国国内また国外からもさざなご心配やお見いの声をいただいたこと。",
+          "python": "で漁業組合の方々ですとか、あるいは容疑者確去にご協力いただいた方に対し直接おの電話を入げさせていただきましたその他にも国国内また国外からもさ々なご心配やお見いの声をいただいたこと。"
+        },
+        {
+          "report_index": 1,
+          "backend": "raw_native_f32le",
+          "sample": "kishida114",
+          "pass_index": 0,
+          "window_index": 6,
+          "android": "大切な選挙を最後まででやり通すことであると思っています 有権者の皆さんの声をしっかり選挙を通じて示してもらうこと、これは我が国にとってもまた我が国の民主主義にとってもこれは大切なことであります。",
+          "python": "大切な選挙を最後まででやり通すことであると思っています、有権者の皆さんの声をしっかり選挙を通じて示してもらうこと、これは我が国にとってもまた我が国の民主主義にとってもこれは大切なことであります。"
+        }
+      ]
+    }
+  },
+  "production_warm_rtf": {
+    "emoji": {
+      "baseline": {
+        "median": 0.07676314166374168,
+        "min": 0.07634528498596,
+        "max": 0.07711031989294491,
+        "count": 4,
+        "note": "4 warm passes, 2 runs; descriptive, not 4 independent devices"
+      },
+      "candidate": {
+        "median": 0.0794417475956476,
+        "min": 0.07908989257634258,
+        "max": 0.07950506904176904,
+        "count": 4,
+        "note": "4 warm passes, 2 runs; descriptive, not 4 independent devices"
+      },
+      "candidate_relative_change": 0.03489442815719368
+    },
+    "kishida": {
+      "baseline": {
+        "median": 0.08862799897745385,
+        "min": 0.08836843425358931,
+        "max": 0.0889430866259426,
+        "count": 4,
+        "note": "4 warm passes, 2 runs; descriptive, not 4 independent devices"
+      },
+      "candidate": {
+        "median": 0.09146112037920962,
+        "min": 0.09135850951170578,
+        "max": 0.0915858399117965,
+        "count": 4,
+        "note": "4 warm passes, 2 runs; descriptive, not 4 independent devices"
+      },
+      "candidate_relative_change": 0.03196643763193263
+    },
+    "kishida114": {
+      "baseline": {
+        "median": 0.08993188275877192,
+        "min": 0.08897675247368422,
+        "max": 0.09018912430701753,
+        "count": 4,
+        "note": "4 warm passes, 2 runs; descriptive, not 4 independent devices"
+      },
+      "candidate": {
+        "median": 0.0924473668640351,
+        "min": 0.09213266173684212,
+        "max": 0.0927098479736842,
+        "count": 4,
+        "note": "4 warm passes, 2 runs; descriptive, not 4 independent devices"
+      },
+      "candidate_relative_change": 0.027970993468585004
+    }
+  }
+}
