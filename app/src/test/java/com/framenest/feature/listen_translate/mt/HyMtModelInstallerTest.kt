@@ -145,13 +145,17 @@ class HyMtModelInstallerTest {
         try {
             val store = HyMtModelInstaller(root, spec, requireNetwork = {}, download = { _, staged, _, _ ->
                 File(staged.path + ".part").writeText("part")
-                throw IOException("https://cdn.hf.co/model?token=secret&signature=secret")
+                throw IOException("https://cdn.hf.co/model?token=secret&signature=secret",
+                    IOException("nested-secret")).also { it.addSuppressed(IOException("suppressed-secret")) }
             })
             val failure = runCatching { store.ensureInstalled(false) }.exceptionOrNull()
             assertTrue(failure is IOException)
-            assertFalse(failure.toString().contains("https://"))
-            assertFalse(failure.toString().contains("secret"))
-            assertNull(failure!!.cause)
+            assertEquals("Hy-MT2 模型下载失败，请检查网络和可用存储后重试", failure!!.message)
+            // Coroutine stacktrace recovery (-ea/debug in Gradle) may insert a safe copy as cause.
+            // Check all printable causes and suppressed errors, not whether a synthetic cause exists.
+            val diagnostics = failure.stackTraceToString()
+            assertFalse(diagnostics.contains("https://"))
+            assertFalse(diagnostics.contains("secret"))
             assertFalse(destination(root).exists())
             assertTrue(stages(root).isEmpty())
         } finally { root.deleteRecursively() }
