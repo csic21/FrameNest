@@ -1,0 +1,121 @@
+{
+  "host_image_digest": null,
+  "host_provenance": {
+    "kind": "github-hosted-exploratory",
+    "reproducible": false,
+    "release_gate": "closed",
+    "immutable_host_image_digest": null,
+    "runner_image_os": "ubuntu24",
+    "runner_image_version": "20261012.334.1",
+    "runner_image_release_url": "https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334",
+    "runner_image_manifest_url": "https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md",
+    "installed_image_metadata": [
+      {
+        "group": "Operating System",
+        "detail": "Ubuntu\n24.04.5\nLTS"
+      },
+      {
+        "group": "Runner Image",
+        "detail": "Image: ubuntu-24.04\nVersion: 20261012.334.1\nIncluded Software: https://github.com/actions/runner-images/blob/ubuntu24/20261012.334/images/ubuntu/Ubuntu2404-Readme.md\nImage Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261012.334"
+      }
+    ],
+    "github": {
+      "GITHUB_REPOSITORY": "csic21/FrameNest",
+      "GITHUB_SHA": "8fb54b09e405a9cb9d2a0211d83176ced0328af8",
+      "GITHUB_RUN_ID": "38706441953",
+      "GITHUB_RUN_ATTEMPT": "1",
+      "GITHUB_WORKFLOW": "ASR source native audit"
+    },
+    "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+    "python_version": "3.12.3",
+    "installed_tools": {
+      "cmake": {
+        "path": "/usr/local/bin/cmake",
+        "version_output": "cmake version 3.31.6\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake)."
+      },
+      "ninja": {
+        "path": "/usr/local/bin/ninja",
+        "version_output": "1.13.2"
+      }
+    },
+    "installed_ndk_revisions": [
+      {
+        "directory": "27.3.13750724",
+        "source_properties": "Pkg.Desc = Android NDK\nPkg.Revision = 27.3.13750724\nPkg.BaseRevision = 27.3.13750724\nPkg.ReleaseName = r27d\n"
+      },
+      {
+        "directory": "29.0.14206865",
+        "source_properties": "Pkg.Desc = Android NDK\nPkg.Revision = 29.0.14206865\nPkg.BaseRevision = 29.0.14206865\nPkg.ReleaseName = r29\n"
+      },
+      {
+        "directory": "30.0.16248370",
+        "source_properties": "Pkg.Desc = Android NDK\nPkg.Revision = 30.0.16248370\nPkg.BaseRevision = 30.0.16248370\nPkg.ReleaseName = r30\n"
+      }
+    ]
+  },
+  "official_toolchain_inputs": {
+    "status": "official-toolchains-prepared",
+    "toolchain_lock_sha256": "f53878027cd615c8d793a6d171d8b30e3f48155734d3e0cd57c2761a88311632",
+    "archives": [
+      {
+        "name": "ndk",
+        "url": "https://dl.google.com/android/repository/android-ndk-r28c-linux.zip",
+        "sha256": "dfb20d396df28ca02a8c708314b814a4d961dc9074f9a161932746f815aa552f",
+        "size_bytes": 722261334
+      },
+      {
+        "name": "cmake",
+        "url": "https://github.com/Kitware/CMake/releases/download/v3.31.6/cmake-3.31.6-linux-x86_64.tar.gz",
+        "sha256": "5a1133ff103c71eb5120e2cc3de922733e7d8a26a98ae716397e8676adb367bf",
+        "size_bytes": 55010959
+      },
+      {
+        "name": "ninja",
+        "url": "https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip",
+        "sha256": "6f98805688d19672bd699fbbfa2c2cf0fc054ac3df1f0e6a47664d963d530255",
+        "size_bytes": 123084
+      }
+    ],
+    "selected": {
+      "ndk": "/home/runner/work/_temp/asr-tools/ndk/android-ndk-r28c",
+      "cmake": "/home/runner/work/_temp/asr-tools/cmake/cmake-3.31.6-linux-x86_64",
+      "ninja": "/home/runner/work/_temp/asr-tools/ninja"
+    },
+    "existing_sdk_license_record_sha256": "c43fa37686457c3f18caa3607945f4ec52a9d1beaaad8117e50dc4e863270c85",
+    "license_acceptance_performed": false,
+    "ndk_notices": [
+      {
+        "path": "NOTICE",
+        "sha256": "faf0dc52cf6ce9ab09a04b0c074a378dd2565ee1ed9bc1179d83793bcdba012e",
+        "size_bytes": 516438
+      },
+      {
+        "path": "NOTICE.toolchain",
+        "sha256": "789714a9076571c580cf531bdcebec776a4d889c12c3c1108adafc6e4338710a",
+        "size_bytes": 799639
+      },
+      {
+        "path": "toolchains/llvm/prebuilt/linux-x86_64/NOTICE",
+        "sha256": "f96f763beb66a7ba7a667647fc64c0226ace875e590c831fdd9579ec1c1d91e1",
+        "size_bytes": 130424
+      },
+      {
+        "path": "toolchains/llvm/prebuilt/linux-x86_64/sysroot/NOTICE",
+        "sha256": "2905ac5c59628352af990c748a8f4c3675a04f36eca7914612e3068661d2c6a6",
+        "size_bytes": 494921
+      }
+    ],
+    "ndk_runtime_notices": "/home/runner/work/_temp/asr-tools/ndk-runtime-NOTICE.txt",
+    "ndk_runtime_notice_sha256": "e15e0bcaee943231836afe3a961b8a1d2ade12cb9e244c29d7d13a84cf71750f"
+  },
+  "release_gate": "closed",
+  "ndk_properties": "Pkg.Desc = Android NDK\nPkg.Revision = 28.2.13676358\nPkg.BaseRevision = 28.2.13676358\nPkg.ReleaseName = r28c\n",
+  "cmake_version": "cmake version 3.31.6",
+  "ninja_version": "1.12.1",
+  "cmake_sha256": "c4b3b237dc7a013590db9e90f70fca2dfdedde09521e920d3339569ea364230a",
+  "ninja_sha256": "cf10a35d13a384fed866bcd4989c7761e8556209d195cc6d2a7c0f11cc73804c",
+  "clang_version": "Android (13624864, +pgo, +bolt, +lto, +mlgo, based on r530567e) clang version 19.0.1 (https://android.googlesource.com/toolchain/llvm-project 97a699bf4812a18fb657c2779f5296a4ab2694d2)\nTarget: x86_64-unknown-linux-gnu\nThread model: posix\nInstalledDir: /home/runner/work/_temp/asr-tools/ndk/android-ndk-r28c/toolchains/llvm/prebuilt/linux-x86_64/bin\n",
+  "clang_sha256": "6156dd4e5e466333197a00b8d20bca72c292186643b749dcaaa3aa9164afb1de",
+  "ndk_runtime_notice_sha256": "e15e0bcaee943231836afe3a961b8a1d2ade12cb9e244c29d7d13a84cf71750f",
+  "source_manifest_sha256": "d14fad69f55ba8adaa2405eddc21f97b46f820f4f9ff99de7036a485c2ed7740"
+}

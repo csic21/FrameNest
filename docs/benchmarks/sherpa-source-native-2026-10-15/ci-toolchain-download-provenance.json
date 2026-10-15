@@ -1,0 +1,55 @@
+{
+  "status": "official-toolchains-prepared",
+  "toolchain_lock_sha256": "f53878027cd615c8d793a6d171d8b30e3f48155734d3e0cd57c2761a88311632",
+  "archives": [
+    {
+      "name": "ndk",
+      "url": "https://dl.google.com/android/repository/android-ndk-r28c-linux.zip",
+      "sha256": "dfb20d396df28ca02a8c708314b814a4d961dc9074f9a161932746f815aa552f",
+      "size_bytes": 722261334
+    },
+    {
+      "name": "cmake",
+      "url": "https://github.com/Kitware/CMake/releases/download/v3.31.6/cmake-3.31.6-linux-x86_64.tar.gz",
+      "sha256": "5a1133ff103c71eb5120e2cc3de922733e7d8a26a98ae716397e8676adb367bf",
+      "size_bytes": 55010959
+    },
+    {
+      "name": "ninja",
+      "url": "https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip",
+      "sha256": "6f98805688d19672bd699fbbfa2c2cf0fc054ac3df1f0e6a47664d963d530255",
+      "size_bytes": 123084
+    }
+  ],
+  "selected": {
+    "ndk": "/home/runner/work/_temp/asr-tools/ndk/android-ndk-r28c",
+    "cmake": "/home/runner/work/_temp/asr-tools/cmake/cmake-3.31.6-linux-x86_64",
+    "ninja": "/home/runner/work/_temp/asr-tools/ninja"
+  },
+  "existing_sdk_license_record_sha256": "c43fa37686457c3f18caa3607945f4ec52a9d1beaaad8117e50dc4e863270c85",
+  "license_acceptance_performed": false,
+  "ndk_notices": [
+    {
+      "path": "NOTICE",
+      "sha256": "faf0dc52cf6ce9ab09a04b0c074a378dd2565ee1ed9bc1179d83793bcdba012e",
+      "size_bytes": 516438
+    },
+    {
+      "path": "NOTICE.toolchain",
+      "sha256": "789714a9076571c580cf531bdcebec776a4d889c12c3c1108adafc6e4338710a",
+      "size_bytes": 799639
+    },
+    {
+      "path": "toolchains/llvm/prebuilt/linux-x86_64/NOTICE",
+      "sha256": "f96f763beb66a7ba7a667647fc64c0226ace875e590c831fdd9579ec1c1d91e1",
+      "size_bytes": 130424
+    },
+    {
+      "path": "toolchains/llvm/prebuilt/linux-x86_64/sysroot/NOTICE",
+      "sha256": "2905ac5c59628352af990c748a8f4c3675a04f36eca7914612e3068661d2c6a6",
+      "size_bytes": 494921
+    }
+  ],
+  "ndk_runtime_notices": "/home/runner/work/_temp/asr-tools/ndk-runtime-NOTICE.txt",
+  "ndk_runtime_notice_sha256": "e15e0bcaee943231836afe3a961b8a1d2ade12cb9e244c29d7d13a84cf71750f"
+}

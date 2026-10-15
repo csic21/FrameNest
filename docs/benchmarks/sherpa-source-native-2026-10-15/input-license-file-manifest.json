@@ -1,0 +1,272 @@
+[
+  {
+    "component": "sherpa-onnx",
+    "file": "licenses/sherpa-onnx/LICENSE",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/inputs/sherpa-onnx-11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf/LICENSE",
+    "source_url": "https://github.com/k2-fsa/sherpa-onnx/blob/11afbd009a7f8c08f4bcf2fc1b265d0df4670fbf/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "size_bytes": 11358,
+    "scope": "runtime notice bundle",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "kaldi-native-fbank",
+    "file": "licenses/kaldi-native-fbank/LICENSE",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/kaldi-native-fbank-1.22.3/LICENSE",
+    "source_url": "https://github.com/csukuangfj/kaldi-native-fbank/blob/v1.22.3/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "size_bytes": 11358,
+    "scope": "runtime notice bundle",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "kaldi-decoder",
+    "file": "licenses/kaldi-decoder/LICENSE",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/kaldi-decoder-0.3.0/LICENSE",
+    "source_url": "https://github.com/k2-fsa/kaldi-decoder/blob/v0.3.0/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "size_bytes": 11358,
+    "scope": "runtime notice bundle",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "kaldifst",
+    "file": "licenses/kaldifst/LICENSE",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/kaldifst-1.8.0/LICENSE",
+    "source_url": "https://github.com/k2-fsa/kaldifst/blob/v1.8.0/LICENSE",
+    "sha256": "a682d6efd1ee5dee08a8e405c233c2c198ea70ae0718129daa83ab58cfe31c5d",
+    "size_bytes": 11728,
+    "scope": "runtime notice bundle",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "simple-sentencepiece",
+    "file": "licenses/simple-sentencepiece/LICENSE",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/simple-sentencepiece-0.7/LICENSE",
+    "source_url": "https://github.com/pkufool/simple-sentencepiece/blob/v0.7/LICENSE",
+    "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "size_bytes": 11357,
+    "scope": "runtime notice bundle",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "openfst",
+    "file": "licenses/openfst/COPYING",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/openfst-1.8.5-2026-07-09/COPYING",
+    "source_url": "https://github.com/csukuangfj/openfst/blob/v1.8.5-2026-07-09/COPYING",
+    "sha256": "4300529197035fd3452350718a0b8cee984e9412c9932d7f35fcde849fc97a4b",
+    "size_bytes": 559,
+    "scope": "runtime notice bundle",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "kissfft",
+    "file": "licenses/kissfft/COPYING",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/kissfft-febd4caeed32e33ad8b2e0bb5ea77542c40f18ec/COPYING",
+    "source_url": "https://github.com/mborgerding/kissfft/blob/febd4caeed32e33ad8b2e0bb5ea77542c40f18ec/COPYING",
+    "sha256": "a2840585f8411be8e6826a31ef15ae65c950bd74a2437a73b013398a934ad0c6",
+    "size_bytes": 246,
+    "scope": "runtime notice bundle",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "kissfft",
+    "file": "licenses/kissfft/LICENSES/BSD-3-Clause",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/kissfft-febd4caeed32e33ad8b2e0bb5ea77542c40f18ec/LICENSES/BSD-3-Clause",
+    "source_url": "https://github.com/mborgerding/kissfft/blob/febd4caeed32e33ad8b2e0bb5ea77542c40f18ec/LICENSES/BSD-3-Clause",
+    "sha256": "4d6bcab46f27d6d0c878e8305d4bdcfe040d52bf6656b9771f04c9fb9902c0ed",
+    "size_bytes": 1830,
+    "scope": "runtime notice bundle",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "kissfft",
+    "file": "licenses/kissfft/LICENSES/Unlicense",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/kissfft-febd4caeed32e33ad8b2e0bb5ea77542c40f18ec/LICENSES/Unlicense",
+    "source_url": "https://github.com/mborgerding/kissfft/blob/febd4caeed32e33ad8b2e0bb5ea77542c40f18ec/LICENSES/Unlicense",
+    "sha256": "c543dab3c100d8741a83b02f397746b1e10fc0046f30b942f308191a68e99407",
+    "size_bytes": 1521,
+    "scope": "archive-only test source; KISSFFT_TEST=OFF",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "kissfft",
+    "file": "licenses/kissfft/BUILD-ONLY-JoinPaths.cmake",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/kissfft-febd4caeed32e33ad8b2e0bb5ea77542c40f18ec/cmake/JoinPaths.cmake",
+    "source_url": "https://github.com/mborgerding/kissfft/blob/febd4caeed32e33ad8b2e0bb5ea77542c40f18ec/cmake/JoinPaths.cmake",
+    "sha256": "794b0d8fa62a3b798c7df12d50114580d1a47a234bfb6b4d83092eb646a6ecc4",
+    "size_bytes": 817,
+    "scope": "archive-only build helper; KISSFFT_PKGCONFIG=OFF",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "eigen",
+    "file": "licenses/eigen/LICENSE",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/eigen-5.0.1/LICENSE",
+    "source_url": "https://gitlab.com/libeigen/eigen/-/blob/5.0.1/LICENSE",
+    "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
+    "size_bytes": 16725,
+    "scope": "runtime notice bundle",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "eigen",
+    "file": "licenses/eigen/COPYING.MPL2",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/eigen-5.0.1/COPYING.MPL2",
+    "source_url": "https://gitlab.com/libeigen/eigen/-/blob/5.0.1/COPYING.MPL2",
+    "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172",
+    "size_bytes": 16727,
+    "scope": "runtime notice bundle",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "eigen",
+    "file": "licenses/eigen/COPYING.README",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/eigen-5.0.1/COPYING.README",
+    "source_url": "https://gitlab.com/libeigen/eigen/-/blob/5.0.1/COPYING.README",
+    "sha256": "db640ff2bd90c6abd6a4d3fbb351e0ee4d555417cf840492054d1cbb2ea85644",
+    "size_bytes": 264,
+    "scope": "runtime notice bundle",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "eigen",
+    "file": "licenses/eigen/COPYING.BSD",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/eigen-5.0.1/COPYING.BSD",
+    "source_url": "https://gitlab.com/libeigen/eigen/-/blob/5.0.1/COPYING.BSD",
+    "sha256": "51928dce36213c5333ba3172e847d735d4c6e9b7ff2722a326c49067155b82eb",
+    "size_bytes": 1517,
+    "scope": "runtime notice bundle",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "eigen",
+    "file": "licenses/eigen/COPYING.APACHE",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/eigen-5.0.1/COPYING.APACHE",
+    "source_url": "https://gitlab.com/libeigen/eigen/-/blob/5.0.1/COPYING.APACHE",
+    "sha256": "03379001a7b12a2ec997a25554247d985270b353c10d5bafee9ac8d6519820b7",
+    "size_bytes": 11362,
+    "scope": "runtime notice bundle",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "eigen",
+    "file": "licenses/eigen/COPYING.MINPACK",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/eigen-5.0.1/COPYING.MINPACK",
+    "source_url": "https://gitlab.com/libeigen/eigen/-/blob/5.0.1/COPYING.MINPACK",
+    "sha256": "c87b7f8ee88f6195e91743820c00354833583aef091b72e2d4a49c8e28e798a0",
+    "size_bytes": 2193,
+    "scope": "runtime notice bundle",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "eigen",
+    "file": "licenses/eigen/EXCLUDED-bench-btl-COPYING",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/eigen-5.0.1/bench/btl/COPYING",
+    "source_url": "https://gitlab.com/libeigen/eigen/-/blob/5.0.1/bench/btl/COPYING",
+    "sha256": "b8d0e2bcbf36f6af3cdbf94055ad2ea675d5a19fc623eb0ec82febb2b08e719b",
+    "size_bytes": 18109,
+    "scope": "GPL-2.0 benchmark sources in full source archive, excluded by EIGEN_BUILD_BTL=OFF",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "simple-sentencepiece",
+    "file": "licenses/simple-sentencepiece/DARTS-BSD-2-Clause.txt",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/simple-sentencepiece-0.7/ssentencepiece/csrc/darts.h",
+    "source_url": "https://github.com/pkufool/simple-sentencepiece/blob/v0.7/ssentencepiece/csrc/darts.h",
+    "sha256": "30704ed1913ec07b4090a1eaeafd4aa37af4efe83eebbc3b5a85cedb238e0666",
+    "size_bytes": 1315,
+    "scope": "runtime notice bundle",
+    "copy_mode": "verbatim license/attribution excerpt"
+  },
+  {
+    "component": "simple-sentencepiece",
+    "file": "licenses/simple-sentencepiece/EXCLUDED-ANDROID-ThreadPool-Zlib.txt",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/simple-sentencepiece-0.7/ssentencepiece/csrc/threadpool.h",
+    "source_url": "https://github.com/pkufool/simple-sentencepiece/blob/v0.7/ssentencepiece/csrc/threadpool.h",
+    "sha256": "8afbc5160151ecc1fc27dce6cb03e4af8fb1033d59848107ce7561161242b0c7",
+    "size_bytes": 881,
+    "scope": "original source notice; upstream Android CMake replaces ThreadPool and removes use",
+    "copy_mode": "verbatim license/attribution excerpt"
+  },
+  {
+    "component": "json",
+    "file": "licenses/json/LICENSE.MIT",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/json-3.12.0/LICENSE.MIT",
+    "source_url": "https://github.com/nlohmann/json/blob/v3.12.0/LICENSE.MIT",
+    "sha256": "46a65cffd1ea955132d95a8dd921640714a8d6b537d2e4e482d31145ae95b603",
+    "size_bytes": 1076,
+    "scope": "runtime notice bundle",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "json",
+    "file": "licenses/json/UPSTREAM-license-documentation.md",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/json-3.12.0/docs/mkdocs/docs/home/license.md",
+    "source_url": "https://github.com/nlohmann/json/blob/v3.12.0/docs/mkdocs/docs/home/license.md",
+    "sha256": "d4b7ed0261c2c840e9ccc7d483b3b659bfddc8be797f3007da080f0c4a78d960",
+    "size_bytes": 1995,
+    "scope": "runtime notice bundle",
+    "copy_mode": "exact file copy"
+  },
+  {
+    "component": "json",
+    "file": "licenses/json/Hedley-header-attributions.txt",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/json-3.12.0/include/nlohmann/thirdparty/hedley/hedley.hpp",
+    "source_url": "https://github.com/nlohmann/json/blob/v3.12.0/include/nlohmann/thirdparty/hedley/hedley.hpp",
+    "sha256": "74e8901fb61d928cee338c5e49df2cd7bab47da4d0c6b5dff105da8cd77a0d02",
+    "size_bytes": 428,
+    "scope": "runtime notice bundle",
+    "copy_mode": "verbatim license/attribution excerpt"
+  },
+  {
+    "component": "json",
+    "file": "licenses/json/Grisu2-header-attributions.txt",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/json-3.12.0/include/nlohmann/detail/conversions/to_chars.hpp",
+    "source_url": "https://github.com/nlohmann/json/blob/v3.12.0/include/nlohmann/detail/conversions/to_chars.hpp",
+    "sha256": "38a9f09f91f221a9f1f84ce69be301f62ac9f8f323e0c13889fdd60b27d9dc55",
+    "size_bytes": 416,
+    "scope": "runtime notice bundle",
+    "copy_mode": "verbatim license/attribution excerpt"
+  },
+  {
+    "component": "json",
+    "file": "licenses/json/UTF8-header-attributions.txt",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/json-3.12.0/include/nlohmann/detail/output/serializer.hpp",
+    "source_url": "https://github.com/nlohmann/json/blob/v3.12.0/include/nlohmann/detail/output/serializer.hpp",
+    "sha256": "5be3ab2f312152cc864119f46c87cc8cebf6b8c95091679be1d19b31e2a44a68",
+    "size_bytes": 450,
+    "scope": "runtime notice bundle",
+    "copy_mode": "verbatim license/attribution excerpt"
+  },
+  {
+    "component": "json",
+    "file": "licenses/json/Abseil-CXX11-fallback-attributions.txt",
+    "source_file": "/workspace/scratch/46a1f16e529d/sherpa-asr-only-recipe/dependency-audit/sources/json-3.12.0/include/nlohmann/detail/meta/cpp_future.hpp",
+    "source_url": "https://github.com/nlohmann/json/blob/v3.12.0/include/nlohmann/detail/meta/cpp_future.hpp",
+    "sha256": "7aca6e84cbde6d057dcd6d15dd2071d7823c4eea7c023a10ca9f25375f6c6434",
+    "size_bytes": 1517,
+    "scope": "runtime notice bundle",
+    "copy_mode": "verbatim license/attribution excerpt"
+  },
+  {
+    "component": "onnxruntime",
+    "file": "licenses/onnxruntime/LICENSE",
+    "source_url": "https://raw.githubusercontent.com/microsoft/onnxruntime/33ca9628233dc8f002435e868d4c2e9f82766ca1/LICENSE",
+    "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c",
+    "size_bytes": 1073,
+    "verification": "official v1.28.2 tag resolved to commit with git ls-remote; notice bytes re-downloaded at commit and SHA256 matched; local SHA256 not vendor-attested",
+    "scope": "official upstream-source notices; exact vendor binary coverage is unverified",
+    "copy_mode": "exact official file bytes"
+  },
+  {
+    "component": "onnxruntime",
+    "file": "licenses/onnxruntime/ThirdPartyNotices.txt",
+    "source_url": "https://raw.githubusercontent.com/microsoft/onnxruntime/33ca9628233dc8f002435e868d4c2e9f82766ca1/ThirdPartyNotices.txt",
+    "sha256": "0e07b95f3a8d6230037707c5c4a2b554d12c4cb67369669ac255635528ffcee2",
+    "size_bytes": 325054,
+    "verification": "official v1.28.2 tag resolved to commit with git ls-remote; notice bytes re-downloaded at commit and SHA256 matched; local SHA256 not vendor-attested",
+    "scope": "official upstream-source notices; exact vendor binary coverage is unverified",
+    "copy_mode": "exact official file bytes"
+  }
+]
