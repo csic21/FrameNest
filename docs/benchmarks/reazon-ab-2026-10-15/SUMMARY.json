@@ -1,0 +1,110 @@
+[
+  {
+    "model": "sensevoice",
+    "profile": "fixed15",
+    "load_seconds": 1.1748538610008836,
+    "peak_rss_kib": 597468,
+    "fixtures": {
+      "emoji": {
+        "median_rtf": 0.02571902965952169,
+        "first_decode_seconds": 0.3742065520000324,
+        "cer_first114": null
+      },
+      "kishida": {
+        "median_rtf": 0.028730555190650146,
+        "first_decode_seconds": 0.5811332959983702,
+        "cer_first114": 0.1444954128440367
+      }
+    }
+  },
+  {
+    "model": "sensevoice",
+    "profile": "fixed3",
+    "load_seconds": 0.9787736750004115,
+    "peak_rss_kib": 595388,
+    "fixtures": {
+      "emoji": {
+        "median_rtf": 0.03177021551420305,
+        "first_decode_seconds": 0.07870671700038656,
+        "cer_first114": null
+      },
+      "kishida": {
+        "median_rtf": 0.030739211284127186,
+        "first_decode_seconds": 0.09491900299872214,
+        "cer_first114": 0.2018348623853211
+      }
+    }
+  },
+  {
+    "model": "sensevoice",
+    "profile": "oracle",
+    "load_seconds": 1.2092951710001216,
+    "peak_rss_kib": 594472,
+    "fixtures": {
+      "emoji": {
+        "median_rtf": 0.02936062434865467,
+        "first_decode_seconds": 0.22551519899934647,
+        "cer_first114": null
+      },
+      "kishida": {
+        "median_rtf": 0.02944148041228401,
+        "first_decode_seconds": 0.4563876770007482,
+        "cer_first114": 0.14908256880733944
+      }
+    }
+  },
+  {
+    "model": "reazon",
+    "profile": "fixed15",
+    "load_seconds": 1.4939371529999335,
+    "peak_rss_kib": 539820,
+    "fixtures": {
+      "emoji": {
+        "median_rtf": 0.027308482985263963,
+        "first_decode_seconds": 0.37650622199907957,
+        "cer_first114": null
+      },
+      "kishida": {
+        "median_rtf": 0.02645888383897248,
+        "first_decode_seconds": 0.37652089999937743,
+        "cer_first114": 0.26146788990825687
+      }
+    }
+  },
+  {
+    "model": "reazon",
+    "profile": "fixed3",
+    "load_seconds": 1.2170775970007526,
+    "peak_rss_kib": 421192,
+    "fixtures": {
+      "emoji": {
+        "median_rtf": 0.042260443690771796,
+        "first_decode_seconds": 0.12372711399984837,
+        "cer_first114": null
+      },
+      "kishida": {
+        "median_rtf": 0.0395080739660666,
+        "first_decode_seconds": 0.10451479100083816,
+        "cer_first114": 0.22935779816513763
+      }
+    }
+  },
+  {
+    "model": "reazon",
+    "profile": "oracle",
+    "load_seconds": 1.3689431109996804,
+    "peak_rss_kib": 697368,
+    "fixtures": {
+      "emoji": {
+        "median_rtf": 0.028762605518688596,
+        "first_decode_seconds": 0.1549747520002711,
+        "cer_first114": null
+      },
+      "kishida": {
+        "median_rtf": 0.02833461437720025,
+        "first_decode_seconds": 0.3078522060004616,
+        "cer_first114": 0.08486238532110092
+      }
+    }
+  }
+]
