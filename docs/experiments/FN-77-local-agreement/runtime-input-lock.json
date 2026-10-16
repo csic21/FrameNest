@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "status": "pinned-reviewed",
+  "repository": "csic21/FrameNest",
+  "run_id": 38855692260,
+  "run_attempt": 1,
+  "artifact_id": 12026918168,
+  "commit": "9f083b104ce1b300b4e72f786852f99ee9600494",
+  "artifact_name": "rolling-caption-diagnosis-apks-9f083b104ce1b300b4e72f786852f99ee9600494-1",
+  "zip_size_bytes": 259163919,
+  "zip_sha256": "05c2aa94f9cb81e8abf9cd8c9b81ade8dc24c08cf3590a091f8d23b426936a57",
+  "pair_manifest_sha256": "bd71d06b4f357efadf4ecbceedd13ab98af3a5ee95fcfa0971295fed2a2b2222",
+  "app_apk_sha256": "e529bd2e0979a593be0a990bd4f03ed547b357f23a6eef6e190ccbc4714aa841",
+  "test_apk_sha256": "a809b3a5086a8bfcb774e0cf42104a8084fe9f5ba480dac602c8205829b89bb7",
+  "input_lock_is_execution_authorization": false
+}
