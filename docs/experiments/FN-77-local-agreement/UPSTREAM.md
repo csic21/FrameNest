@@ -1,0 +1,14 @@
+# Upstream mechanism audit
+
+Read-only audit on 2026-10-16 of official WhisperLiveKit main commit `363e4f6d029694d9c81ae548beddd9d3c88a3637`, which is distinct from release v0.2.26/tag commit `aceed595a43e9eed5008c142d90a3f6e86747fbf`.
+
+- The [SenseVoice adapter](https://github.com/QuentinFuxa/WhisperLiveKit/blob/363e4f6d029694d9c81ae548beddd9d3c88a3637/whisperlivekit/funasr_backend.py) calls FunASR AutoModel.generate on all supplied PCM with a fresh cache, ITN and timestamps. Its online specialization is an empty subclass of the standard processor, not a persistent streaming SenseVoice encoder.
+- The [controller](https://github.com/QuentinFuxa/WhisperLiveKit/blob/363e4f6d029694d9c81ae548beddd9d3c88a3637/whisperlivekit/local_agreement/online_asr.py) appends audio at one origin until scrolling, then compares exact token-text prefixes across two hypotheses. Spaces and punctuation affect matching. There is no Japanese lexical segmentation or explicit hold-last-word rule.
+- Adapter projection makes timestamped pieces reconstruct the postprocessed text, but those pieces are not certified Japanese words. Its [integration tests](https://github.com/QuentinFuxa/WhisperLiveKit/blob/363e4f6d029694d9c81ae548beddd9d3c88a3637/tests/test_funasr_backend_integration.py) test multilingual timestamp contracts; progressive agreement checks are English and do not establish Japanese long-form quality.
+- Default segment trimming is triggered around 15 seconds. SenseVoice supplies one segment end, so trimming can fall back to the last committed token end. With prolonged no-progress it can reset and drop unresolved buffer content. These are **not adopted** here.
+- Upstream finish emits the last pending hypothesis without proving two-pass agreement; outer EOF processing first handles undecoded audio. EOF output therefore has a different evidence status from agreed text.
+- Two hypotheses is agreement depth, not a bound of two ASR calls per audio sample. Audio may be repeatedly decoded as the buffer grows. Its default queue/coalescing cadence is not copied into the phone player.
+
+The present script-only diagnostic deliberately compares exact Unicode code-point prefixes in full raw text, not upstream's FunASR timestamped-piece sequence. This distinction is explicit; it is neither a faithful binary port nor a claim of improved CJK lexical alignment. Stable character prefixes can end inside a Japanese word and must not become final MT units merely because they agree twice.
+
+Android SherpaTokenMapping estimates a token's end from the next start, with zero duration for the final token. Those times differ from FunASR's forced-alignment spans. No token timestamp is used here to cut/restart PCM. Confirmed-prefix contradictions are surfaced, and latest hypotheses/tails are retained at all budgets and EOF instead of discarded.
