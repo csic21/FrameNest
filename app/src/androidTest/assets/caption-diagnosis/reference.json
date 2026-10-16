@@ -1,0 +1,164 @@
+{
+  "reference_kind": "human_corrected_published_timed_text",
+  "provenance_status": "public_revision_history_verified",
+  "is_verbatim_gold": false,
+  "independently_audited_against_audio": false,
+  "source_language": "ja",
+  "source_offset_ms": 113460,
+  "duration_ms": 47720,
+  "source_revision": 711665459,
+  "source_creator": "CKibelka (WMF)",
+  "source_created_utc": "2022-11-08T21:44:00Z",
+  "corrector": "Syunsyunminmin",
+  "correction_revision": 711665194,
+  "correction_timestamp_utc": "2022-12-02T10:11:00Z",
+  "correction_summary": "明らかな間違いは修正",
+  "source_url": "https://commons.wikimedia.org/wiki/TimedText:MCDC_Onboarding_%22Ask_me_Anything%22_session_-_Japanese_language.webm.ja.srt",
+  "revision_url": "https://commons.wikimedia.org/w/index.php?title=TimedText:MCDC_Onboarding_%22Ask_me_Anything%22_session_-_Japanese_language.webm.ja.srt&oldid=711665459",
+  "history_url": "https://commons.wikimedia.org/w/index.php?title=TimedText%3AMCDC_Onboarding_%22Ask_me_Anything%22_session_-_Japanese_language.webm.ja.srt&action=history",
+  "cues": [
+    {
+      "id": 17,
+      "global_start_ms": 113460,
+      "global_end_ms": 118020,
+      "text": "通訳チャンネルについては\n画面に出ていると思うんですけれども",
+      "local_start_ms": 0,
+      "local_end_ms": 4560
+    },
+    {
+      "id": 18,
+      "global_start_ms": 118020,
+      "global_end_ms": 122399,
+      "text": "リスニングというツールバーの中の\n右の端に日本語というのがあります",
+      "local_start_ms": 4560,
+      "local_end_ms": 8939
+    },
+    {
+      "id": 19,
+      "global_start_ms": 122399,
+      "global_end_ms": 128700,
+      "text": "それからその左側に英語という\nものがありますのでそれを切り替えますと",
+      "local_start_ms": 8939,
+      "local_end_ms": 15240
+    },
+    {
+      "id": 20,
+      "global_start_ms": 128700,
+      "global_end_ms": 132360,
+      "text": "チャンネルが変わります",
+      "local_start_ms": 15240,
+      "local_end_ms": 18900
+    },
+    {
+      "id": 21,
+      "global_start_ms": 132360,
+      "global_end_ms": 137640,
+      "text": "日本語のチャンネルにしたまま\n質問をお話になりますと",
+      "local_start_ms": 18900,
+      "local_end_ms": 24180
+    },
+    {
+      "id": 22,
+      "global_start_ms": 137640,
+      "global_end_ms": 142680,
+      "text": "そうすると通訳者に",
+      "local_start_ms": 24180,
+      "local_end_ms": 29220
+    },
+    {
+      "id": 23,
+      "global_start_ms": 142680,
+      "global_end_ms": 149959,
+      "text": "皆さんの声が聞こえますそして\n通訳者の側でスイッチを変えて英語に変えて",
+      "local_start_ms": 29220,
+      "local_end_ms": 36499
+    },
+    {
+      "id": 24,
+      "global_start_ms": 151000,
+      "global_end_ms": 152500,
+      "text": "説明いたします",
+      "local_start_ms": 37540,
+      "local_end_ms": 39040
+    },
+    {
+      "id": 25,
+      "global_start_ms": 152500,
+      "global_end_ms": 157800,
+      "text": "もし英語で発言したい場合は\n日本語ではなくて",
+      "local_start_ms": 39040,
+      "local_end_ms": 44340
+    },
+    {
+      "id": 26,
+      "global_start_ms": 157800,
+      "global_end_ms": 161180,
+      "text": "反対のチャンネルをお使いください",
+      "local_start_ms": 44340,
+      "local_end_ms": 47720
+    }
+  ],
+  "units": [
+    {
+      "id": "u1",
+      "start_ms": 0,
+      "end_ms": 8939,
+      "cue_ids": [
+        17,
+        18
+      ],
+      "text": "通訳チャンネルについては画面に出ていると思うんですけれどもリスニングというツールバーの中の右の端に日本語というのがあります",
+      "unit_kind": "assistant_manually_grouped_published_caption_span",
+      "grouping_note": "Assistant manually grouped complete semantic statement(s) without seeing ASR output, retaining exact published wording; no inferred intra-cue timestamp splits.",
+      "independently_listened": false
+    },
+    {
+      "id": "u2",
+      "start_ms": 8939,
+      "end_ms": 18900,
+      "cue_ids": [
+        19,
+        20
+      ],
+      "text": "それからその左側に英語というものがありますのでそれを切り替えますとチャンネルが変わります",
+      "unit_kind": "assistant_manually_grouped_published_caption_span",
+      "grouping_note": "Assistant manually grouped complete semantic statement(s) without seeing ASR output, retaining exact published wording; no inferred intra-cue timestamp splits.",
+      "independently_listened": false
+    },
+    {
+      "id": "u3",
+      "start_ms": 18900,
+      "end_ms": 39040,
+      "cue_ids": [
+        21,
+        22,
+        23,
+        24
+      ],
+      "text": "日本語のチャンネルにしたまま質問をお話になりますとそうすると通訳者に皆さんの声が聞こえますそして通訳者の側でスイッチを変えて英語に変えて説明いたします",
+      "unit_kind": "assistant_manually_grouped_published_caption_span",
+      "grouping_note": "Assistant manually grouped complete semantic statement(s) without seeing ASR output, retaining exact published wording; no inferred intra-cue timestamp splits.",
+      "independently_listened": false
+    },
+    {
+      "id": "u4",
+      "start_ms": 39040,
+      "end_ms": 47720,
+      "cue_ids": [
+        25,
+        26
+      ],
+      "text": "もし英語で発言したい場合は日本語ではなくて反対のチャンネルをお使いください",
+      "unit_kind": "assistant_manually_grouped_published_caption_span",
+      "grouping_note": "Assistant manually grouped complete semantic statement(s) without seeing ASR output, retaining exact published wording; no inferred intra-cue timestamp splits.",
+      "independently_listened": false
+    }
+  ],
+  "caveats": [
+    "The initial caption generation method is not documented. Human correction of obvious errors is verified; complete human transcription or exhaustive correction is not.",
+    "The selected excerpt has not been independently listened to or verified word for word.",
+    "These are same-language Japanese captions of the Japanese interpretation channel. The underlying meeting includes interpretation; these captions describe the audible Japanese track, not a reference translation from an original non-Japanese speech.",
+    "Do not report a definitive ASR CER/WER against these captions or treat low character error as proof of semantic fidelity.",
+    "Reference-MT semantic acceptance remains null pending fluent human review."
+  ]
+}

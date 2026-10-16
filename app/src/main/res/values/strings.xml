@@ -214,6 +214,8 @@
     <string name="listen_translate_high_quality_unsupported_pair">仅支持 SenseVoice 日语→中文；当前语言对继续使用 ML Kit，不下载 Hy-MT 模型。</string>
     <string name="listen_translate_high_quality_source_only">原文模式不使用翻译，也不会下载 Hy-MT 模型。</string>
     <string name="listen_translate_caption_unconfirmed">当前句段待确认</string>
+    <string name="listen_translate_translation_missing">译文尚未就绪</string>
+    <string name="listen_translate_snapshot_translation_missing">打开时译文尚未就绪</string>
     <string name="listen_translate_expand_caption">展开完整字幕</string>
     <string name="listen_translate_full_caption_title">完整字幕</string>
     <string name="listen_translate_full_caption_hint">显示展开时的句段，可滚动查看或长按选择文字。</string>
@@ -221,7 +223,7 @@
     <string name="listen_translate_audio_read_through">音频已读到 %1$d 秒（不代表字幕已确认）</string>
     <string name="listen_translate_status">状态：%1$s</string>
     <string name="listen_translate_status_idle">未开始</string>
-    <string name="listen_translate_status_running">识别中</string>
+    <string name="listen_translate_status_running">处理中</string>
     <string name="listen_translate_status_partial">已扫描部分片段</string>
     <string name="listen_translate_status_complete">已完成</string>
     <string name="listen_translate_status_failed">失败</string>
@@ -229,7 +231,7 @@
     <string name="listen_translate_generated_count">已生成 %1$d 条字幕</string>
     <string name="listen_translate_blank_no_audio">当前音轨未读取到音频，请切换音轨或重新打开视频。</string>
     <string name="listen_translate_blank_silence">最近窗口接近静音，未生成字幕。</string>
-    <string name="listen_translate_blank_unrecognized">检测到声音，但 Vosk 未识别出可用对白，当前窗口会有界重试。</string>
+    <string name="listen_translate_blank_unrecognized">检测到声音，但未识别出可用对白，当前窗口会有界重试。</string>
     <string name="listen_translate_installing">正在安装本机模型…</string>
     <string name="listen_translate_models_ready">模型已就绪</string>
     <string name="listen_translate_prefetch">预生成未来 %1$d 秒</string>

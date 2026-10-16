@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +32,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.framenest.R
 import com.framenest.data.listen_translate.ListenTranslateCue
+import kotlinx.coroutines.delay
+
+/** Avoid briefly flashing a status line between fast source and target publications. */
+internal const val LISTEN_TRANSLATION_HINT_DELAY_MS = 600L
 
 /**
  * Bottom-centered listen-translate caption overlay (app-drawn, not libVLC SPU).
@@ -59,6 +64,20 @@ fun ListenTranslateOverlay(
     expansionResetKey: Any? = null,
     expansionEnabled: Boolean = true,
 ) {
+    val translationMissing = isListenCaptionTranslationMissing(cue, displayMode)
+    var showTranslationHint by remember(
+        cue?.identity, cue?.languages, cue?.startMs, cue?.endMs, cue?.textSrc, displayMode,
+        translationMissing, expansionResetKey,
+    ) { mutableStateOf(false) }
+    LaunchedEffect(cue?.identity, cue?.languages, cue?.startMs, cue?.endMs, cue?.textSrc, displayMode,
+        translationMissing, expansionResetKey) {
+        if (translationMissing && displayMode == ListenDisplayMode.Bilingual) {
+            delay(LISTEN_TRANSLATION_HINT_DELAY_MS)
+            showTranslationHint = true
+        }
+    }
+    val targetMissingHint = translationMissing && !currentCaptionUnconfirmed &&
+        (displayMode == ListenDisplayMode.TargetOnly || showTranslationHint)
     val source = cue?.textSrc?.takeIf {
         it.isNotBlank() && displayMode != ListenDisplayMode.TargetOnly
     }
@@ -66,13 +85,15 @@ fun ListenTranslateOverlay(
         it.isNotBlank() && displayMode != ListenDisplayMode.SourceOnly && it != source
     }
     CaptionOverlay(
-        caption = if (source != null || target != null) {
-            CaptionSnapshot(source = source, target = target, unconfirmed = currentCaptionUnconfirmed)
+        caption = if (source != null || target != null || targetMissingHint) {
+            CaptionSnapshot(source = source, target = target, unconfirmed = currentCaptionUnconfirmed,
+                translationMissing = translationMissing && !currentCaptionUnconfirmed)
         } else null,
         modifier = modifier,
         bottomPadding = bottomPadding,
         expansionResetKey = expansionResetKey,
         expansionEnabled = expansionEnabled,
+        translationHintVisible = targetMissingHint,
     )
 }
 
@@ -81,6 +102,7 @@ private data class CaptionSnapshot(
     val target: String? = null,
     val legacy: String? = null,
     val unconfirmed: Boolean = false,
+    val translationMissing: Boolean = false,
 )
 
 @Composable
@@ -90,6 +112,7 @@ private fun CaptionOverlay(
     bottomPadding: Dp,
     expansionResetKey: Any? = null,
     expansionEnabled: Boolean = true,
+    translationHintVisible: Boolean = false,
 ) {
     // Remember, rather than saveable: leaving this player must discard the snapshot.
     // Normal cue updates/gaps keep an open snapshot readable; explicit resets clear it.
@@ -126,6 +149,14 @@ private fun CaptionOverlay(
                 }
                 caption.target?.let {
                     LimitedCaptionText(it, 2, "listen_caption_target") { targetOverflow = it }
+                }
+                if (caption.translationMissing && translationHintVisible) {
+                    Text(
+                        stringResource(R.string.listen_translate_translation_missing),
+                        color = Color.White.copy(alpha = 0.75f),
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.testTag("listen_caption_translation_missing"),
+                    )
                 }
                 caption.legacy?.let {
                     // Compatibility callers provide one opaque string; never infer language by newline.
@@ -176,6 +207,13 @@ private fun CaptionOverlay(
                         snapshot.target?.let {
                             Text(stringResource(R.string.listen_translate_mode_tgt), style = MaterialTheme.typography.labelMedium)
                             Text(it, modifier = Modifier.testTag("listen_caption_full_target"))
+                        }
+                        if (snapshot.translationMissing) {
+                            Text(
+                                stringResource(R.string.listen_translate_snapshot_translation_missing),
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.testTag("listen_caption_full_translation_missing"),
+                            )
                         }
                         snapshot.legacy?.let {
                             Text(it, modifier = Modifier.testTag("listen_caption_full_legacy"))

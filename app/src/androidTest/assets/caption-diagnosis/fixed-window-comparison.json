@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "fn76-fixed-3s-6s-mcdc-emoji",
+  "window_ms": [
+    3000,
+    6000
+  ],
+  "context_padding_ms": 750,
+  "timeout_ms": 1200000,
+  "emoji": {
+    "id": "emoji",
+    "media_url": "https://upload.wikimedia.org/wikipedia/commons/a/a4/Emoji.webm",
+    "source_url": "https://commons.wikimedia.org/wiki/File:Emoji.webm",
+    "author": "Simpleshow Japan",
+    "license": "CC-BY-SA-4.0",
+    "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "duration_ms": 113960,
+    "original_media_start_ms": 0,
+    "media": {
+      "file": "emoji.webm",
+      "bytes": 9487128,
+      "sha256": "ad3af093836cad823ef1793ff4d505139eed92dd7e7402de4c015a2ed50d5956"
+    },
+    "pcm": {
+      "file": "emoji.s16le",
+      "samples": 1823360,
+      "bytes": 3646720,
+      "sha256": "e3e4e1de9395948bc3e03c0f88a93cb55bbbb0768280344bd7f4bd3f164700a6",
+      "sample_rate_hz": 16000,
+      "channels": 1,
+      "encoding": "s16le"
+    },
+    "reference_kind": "none_independent_reference_unavailable",
+    "reference_is_verbatim_gold": false,
+    "attribution": "Simpleshow Japan, Emoji, CC BY-SA 4.0. Full original audio decoded to mono 16 kHz PCM16; machine-derived Japanese/Chinese output may contain errors. No independent gold transcript or semantic acceptance."
+  }
+}
