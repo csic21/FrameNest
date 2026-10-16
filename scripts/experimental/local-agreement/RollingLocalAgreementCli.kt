@@ -27,7 +27,10 @@ private fun request(r: RollingLocalAgreement.Request?) = r?.let { mapOf(
     "startSample" to it.startSample, "endSample" to it.endSample, "numSamples" to it.numSamples) }
 private fun pending(p: RollingLocalAgreement.Pending?) = p?.let { mapOf(
     "contextStartSample" to it.contextStartSample, "observedEndSample" to it.observedEndSample,
-    "fullRaw" to it.fullRaw, "pendingRawStart" to it.pendingRawStart, "text" to it.text) }
+    "fullRaw" to it.fullRaw, "pendingRawStart" to it.pendingRawStart, "text" to it.text,
+    "retainedEligibilityRawStart" to it.retainedEligibilityRawStart,
+    "retainedEligibilityKeyStart" to it.retainedEligibilityKeyStart,
+    "retainedOriginSample" to it.retainedOriginSample) }
 private fun snapshot(s: RollingLocalAgreement.Snapshot?) = s?.let { mapOf(
     "generation" to it.generation, "sourceStartSample" to it.sourceStartSample,
     "sourceEndSample" to it.sourceEndSample, "acceptedHypothesisCount" to it.acceptedHypothesisCount,
@@ -45,6 +48,9 @@ private fun splice(a: RollingLocalAgreement.SpliceAudit?) = a?.let { mapOf(
     "generation" to it.generation,
     "oldContextStartSample" to it.oldContextStartSample, "oldObservedEndSample" to it.oldObservedEndSample,
     "oldPendingRawStart" to it.oldPendingRawStart, "oldStableKeyEndCodePoint" to it.oldStableKeyEndCodePoint,
+    "oldRetainedEligibilityRawStart" to it.oldRetainedEligibilityRawStart,
+    "oldRetainedEligibilityKeyStart" to it.oldRetainedEligibilityKeyStart,
+    "oldRetainedOriginSample" to it.oldRetainedOriginSample,
     "anchorKey" to it.anchorKey, "anchorLetterDigitCount" to it.anchorLetterDigitCount,
     "oldAnchorKeyStartCodePoint" to it.oldAnchorKeyStartCodePoint, "oldAnchorKeyEndCodePoint" to it.oldAnchorKeyEndCodePoint,
     "oldAnchorRawStart" to it.oldAnchorRawStart, "oldAnchorRawEnd" to it.oldAnchorRawEnd,
@@ -60,6 +66,12 @@ private fun splice(a: RollingLocalAgreement.SpliceAudit?) = a?.let { mapOf(
     "candidateFirstAnchorRawEnd" to it.candidateFirstAnchorRawEnd,
     "candidateSecondAnchorRawStart" to it.candidateSecondAnchorRawStart,
     "candidateSecondAnchorRawEnd" to it.candidateSecondAnchorRawEnd,
+    "candidateFirstRetainedEligibilityRawStart" to it.candidateFirstRetainedEligibilityRawStart,
+    "candidateFirstRetainedEligibilityKeyStart" to it.candidateFirstRetainedEligibilityKeyStart,
+    "candidateFirstRetainedOriginSample" to it.candidateFirstRetainedOriginSample,
+    "candidateSecondRetainedEligibilityRawStart" to it.candidateSecondRetainedEligibilityRawStart,
+    "candidateSecondRetainedEligibilityKeyStart" to it.candidateSecondRetainedEligibilityKeyStart,
+    "candidateSecondRetainedOriginSample" to it.candidateSecondRetainedOriginSample,
     "newOmittedPrefixRawStart" to it.newOmittedPrefixRawStart,
     "newOmittedPrefixRawEnd" to it.newOmittedPrefixRawEnd,
     "newOmittedPrefix" to it.newOmittedPrefix, "newPendingRawStart" to it.newPendingRawStart) }
@@ -77,6 +89,7 @@ private fun reset(a: RollingLocalAgreement.ResetAudit?) = a?.let { mapOf(
     "discardedRequestId" to it.discardedRequestId,
     "discardedSingleTranscriptAvailable" to it.discardedSingleTranscriptAvailable) }
 private fun output(r: RollingLocalAgreement.Result) = mapOf(
+    "protocolVersion" to 2,
     "status" to r.status, "error" to r.error, "request" to request(r.request),
     "snapshot" to snapshot(r.snapshot), "prefixDelta" to r.prefixDelta,
     "closedBlock" to closed(r.closedBlock), "spliceAudit" to splice(r.spliceAudit),
@@ -84,7 +97,7 @@ private fun output(r: RollingLocalAgreement.Result) = mapOf(
     "hardRestartAtSample" to r.hardRestartAtSample, "resetAudit" to reset(r.resetAudit),
     "textDisposition" to r.textDisposition, "mtUnit" to false, "finalCoverage" to false)
 
-/** One flushed JSON response per TSV command; no inference and no implicit EOF. */
+/** Explicit V2 commands require the eligibility cursor; no V1 fallback/default. */
 fun main() {
     val component = RollingLocalAgreement()
     var lineNumber = 0L
@@ -94,19 +107,19 @@ fun main() {
             require(line.length <= 32_768)
             val p = line.split('\t')
             val r = when (p[0]) {
-                "RESET" -> {
+                "RESET_V2" -> {
                     require(p.size == 4)
                     component.reset(p[1].toLong(), p[2].toLong(), p[3].toLong())
                 }
-                "H" -> {
-                    require(p.size == 7)
+                "H_V2" -> {
+                    require(p.size == 8)
                     val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                         .onUnmappableCharacter(CodingErrorAction.REPORT)
                         .decode(ByteBuffer.wrap(Base64.getDecoder().decode(p[6]))).toString()
                     component.observe(p[1].toLong(), p[2].toLong(), p[3].toLong(),
-                        p[4].toLong(), p[5].toLong(), text)
+                        p[4].toLong(), p[5].toLong(), text, p[7].toInt())
                 }
-                "EOF" -> { require(p.size == 2); component.finish(p[1].toLong()) }
+                "EOF_V2" -> { require(p.size == 2); component.finish(p[1].toLong()) }
                 else -> throw IllegalArgumentException("Unknown operation")
             }
             output(r)
@@ -121,6 +134,7 @@ fun main() {
 }
 
 private fun inputError(c: RollingLocalAgreement) = mapOf(
+    "protocolVersion" to 2,
     "status" to "INPUT_ERROR", "error" to "INVALID_TSV_OR_ENCODING",
     "request" to request(c.currentRequest()), "snapshot" to snapshot(c.snapshot()),
     "prefixDelta" to null, "closedBlock" to null, "spliceAudit" to null, "recoveryAudit" to null,

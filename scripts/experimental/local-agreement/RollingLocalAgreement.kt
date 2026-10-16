@@ -21,7 +21,7 @@ class RollingLocalAgreement {
     enum class Error {
         NOT_INITIALIZED, INVALID_GENERATION, STALE_GENERATION, GENERATION_MISMATCH,
         INVALID_SOURCE_RANGE, NO_REQUEST, REQUEST_ID_MISMATCH, REQUEST_SPAN_MISMATCH,
-        INVALID_SAMPLE_COUNT, TEXT_TOO_LONG, INVALID_UTF16, REQUEST_PENDING,
+        INVALID_SAMPLE_COUNT, TEXT_TOO_LONG, INVALID_UTF16, INVALID_ELIGIBILITY_CURSOR, REQUEST_PENDING,
     }
     enum class MatchFailure {
         INSUFFICIENT_STABLE_LETTERS, OLD_ANCHOR_NOT_UNIQUE,
@@ -34,7 +34,9 @@ class RollingLocalAgreement {
         val numSamples: Long get() = endSample - startSample
     }
     data class Pending(val contextStartSample: Long, val observedEndSample: Long,
-        val fullRaw: String, val pendingRawStart: Int) {
+        val fullRaw: String, val pendingRawStart: Int,
+        val retainedEligibilityRawStart: Int, val retainedEligibilityKeyStart: Int,
+        val retainedOriginSample: Long) {
         val text: String get() = fullRaw.substring(pendingRawStart)
     }
     data class Snapshot(val generation: Long, val sourceStartSample: Long, val sourceEndSample: Long,
@@ -52,6 +54,8 @@ class RollingLocalAgreement {
         val generation: Long,
         val oldContextStartSample: Long, val oldObservedEndSample: Long,
         val oldPendingRawStart: Int, val oldStableKeyEndCodePoint: Int,
+        val oldRetainedEligibilityRawStart: Int, val oldRetainedEligibilityKeyStart: Int,
+        val oldRetainedOriginSample: Long,
         val anchorKey: String, val anchorLetterDigitCount: Int,
         val oldAnchorKeyStartCodePoint: Int, val oldAnchorKeyEndCodePoint: Int,
         val oldAnchorRawStart: Int, val oldAnchorRawEnd: Int,
@@ -64,6 +68,10 @@ class RollingLocalAgreement {
         val candidateAnchorKeyStartCodePoint: Int, val candidateAnchorKeyEndCodePoint: Int,
         val candidateFirstAnchorRawStart: Int, val candidateFirstAnchorRawEnd: Int,
         val candidateSecondAnchorRawStart: Int, val candidateSecondAnchorRawEnd: Int,
+        val candidateFirstRetainedEligibilityRawStart: Int, val candidateFirstRetainedEligibilityKeyStart: Int,
+        val candidateFirstRetainedOriginSample: Long,
+        val candidateSecondRetainedEligibilityRawStart: Int, val candidateSecondRetainedEligibilityKeyStart: Int,
+        val candidateSecondRetainedOriginSample: Long,
         val newOmittedPrefixRawStart: Int, val newOmittedPrefixRawEnd: Int,
         val newOmittedPrefix: String, val newPendingRawStart: Int,
     )
@@ -86,8 +94,11 @@ class RollingLocalAgreement {
         val finalCoverage: Boolean get() = false
     }
 
-    private data class Hypothesis(val start: Long, val end: Long, val map: ReversibleAgreementKey) {
-        fun pending(cursor: Int = 0) = Pending(start, end, map.rawText, cursor)
+    private data class Hypothesis(val start: Long, val end: Long, val map: ReversibleAgreementKey,
+        val eligibilityRaw: Int, val eligibilityKey: Int) {
+        val retainedOrigin: Long get() = maxOf(start, end - RETAIN)
+        fun pending(cursor: Int = 0) = Pending(start, end, map.rawText, cursor,
+            eligibilityRaw, eligibilityKey, retainedOrigin)
     }
     private data class State(val generation: Long, val start: Long, val eof: Long,
         val accepted: Long = 0, val old: Hypothesis? = null, val candidate: Hypothesis? = null,
@@ -112,9 +123,18 @@ class RollingLocalAgreement {
         return result(if (initial.terminal) Status.FINISHED else Status.RESET, resetAudit = audit)
     }
 
-    /** All validation is atomic; an invalid reply leaves the same request in flight. */
+    /**
+     * All validation is atomic; an invalid reply leaves the same request in flight.
+     * retainedEligibilityRawStart is REQUIRED caller evidence, not an inferred cut.
+     * The caller must select the first original token of ANY kind with actual onset
+     * >= max(start,end-6s), mapping its start into raw UTF-16 after verifying that the
+     * original token concatenation is exactly fullRaw. No qualifying token means
+     * fullRaw.length. There is no lexical pre-filter or tolerance. This component
+     * validates only the cursor structure, not token provenance or onset accuracy.
+     * Token estimates qualify text anchors only; requested PCM is never token-cut.
+     */
     fun observe(generation: Long, requestId: Long, startSample: Long, endSample: Long,
-        numSamples: Long, fullRaw: String): Result {
+        numSamples: Long, fullRaw: String, retainedEligibilityRawStart: Int): Result {
         generationError(generation)?.let { return reject(it) }
         val s = checkNotNull(state)
         val r = s.request ?: return reject(Error.NO_REQUEST)
@@ -128,7 +148,13 @@ class RollingLocalAgreement {
             ReversibleAgreementKey.Error.TEXT_TOO_LONG -> Error.TEXT_TOO_LONG
             ReversibleAgreementKey.Error.INVALID_UTF16 -> Error.INVALID_UTF16
         })
-        val h = Hypothesis(startSample, endSample, checkNotNull(built.mapping))
+        if (retainedEligibilityRawStart !in 0..fullRaw.length ||
+            (retainedEligibilityRawStart < fullRaw.length && Character.isLowSurrogate(fullRaw[retainedEligibilityRawStart]))) {
+            return reject(Error.INVALID_ELIGIBILITY_CURSOR)
+        }
+        val mapping = checkNotNull(built.mapping)
+        val eligibilityKey = keyAtOrAfterRaw(mapping, retainedEligibilityRawStart)
+        val h = Hypothesis(startSample, endSample, mapping, retainedEligibilityRawStart, eligibilityKey)
         val accepted = s.copy(accepted = s.accepted + 1, request = null)
         return when (r.kind) {
             Kind.BOOTSTRAP -> bootstrap(accepted, h)
@@ -247,10 +273,9 @@ class RollingLocalAgreement {
     private fun match(s: State, first: Hypothesis, latest: Hypothesis, stable: Int): AnchorMatch {
         val old = checkNotNull(s.old)
         val oldMap = old.map
-        val pendingKeyStart = oldMap.spans.indexOfFirst { it.rawStartUtf16 >= s.cursor }
-            .let { if (it < 0) oldMap.spans.size else it }
+        val pendingKeyStart = keyAtOrAfterRaw(oldMap, s.cursor)
         val anchorEnd = s.stable
-        val anchorStart = maxOf(pendingKeyStart, anchorEnd - 32)
+        val anchorStart = maxOf(pendingKeyStart, anchorEnd - 32, old.eligibilityKey)
         if (anchorEnd <= anchorStart) return AnchorMatch(null, MatchFailure.INSUFFICIENT_STABLE_LETTERS)
         val letters = oldMap.spans.subList(anchorStart, anchorEnd).count { Character.isLetterOrDigit(it.codePoint) }
         if (letters < 8) return AnchorMatch(null, MatchFailure.INSUFFICIENT_STABLE_LETTERS)
@@ -275,10 +300,13 @@ class RollingLocalAgreement {
         val latestRawStart = latest.map.spans[keyStart].rawStartUtf16
         val latestRawEnd = latest.map.spans[keyEnd - 1].rawEndUtf16
         return AnchorMatch(SpliceAudit(s.generation, old.start, old.end, s.cursor, s.stable,
+            old.eligibilityRaw, old.eligibilityKey, old.retainedOrigin,
             anchor, letters, anchorStart, anchorEnd, oldRawStart, oldRawEnd,
             s.cursor, oldRawStart, oldRawStart, oldMap.rawText.length, oldMap.rawText.substring(oldRawStart),
             latest.start, first.end, latest.end, stable, keyStart, keyEnd,
             firstRawStart, firstRawEnd, latestRawStart, latestRawEnd,
+            first.eligibilityRaw, first.eligibilityKey, first.retainedOrigin,
+            latest.eligibilityRaw, latest.eligibilityKey, latest.retainedOrigin,
             0, latestRawStart, latest.map.rawText.substring(0, latestRawStart), latestRawStart), null)
     }
 
@@ -286,6 +314,10 @@ class RollingLocalAgreement {
         val index = text.indexOf(needle)
         return if (index >= 0 && text.indexOf(needle, index + 1) < 0) index else null
     }
+
+    private fun keyAtOrAfterRaw(map: ReversibleAgreementKey, rawCursor: Int): Int =
+        map.spans.indexOfFirst { it.rawStartUtf16 >= rawCursor }
+            .let { if (it < 0) map.spans.size else it }
 
     private fun prefixCodePoints(a: String, b: String): Int {
         var offset = 0

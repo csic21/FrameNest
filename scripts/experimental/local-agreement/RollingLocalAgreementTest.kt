@@ -11,9 +11,11 @@ class RollingLocalAgreementTest {
     private val stable = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn"
     private val anchor = stable.takeLast(32)
     private fun start(seconds: Long = 40) = RollingLocalAgreement().also { it.reset(1, 0, seconds * 16000) }
-    private fun feed(c: RollingLocalAgreement, raw: String): RollingLocalAgreement.Result {
+    // Default zero is an explicit synthetic eligibility contract, not measured onsets.
+    // Real replay must provide its independently verified token/onset cursor per reply.
+    private fun feed(c: RollingLocalAgreement, raw: String, eligibility: Int = 0): RollingLocalAgreement.Result {
         val r = checkNotNull(c.currentRequest())
-        return c.observe(r.generation, r.id, r.startSample, r.endSample, r.numSamples, raw)
+        return c.observe(r.generation, r.id, r.startSample, r.endSample, r.numSamples, raw, eligibility)
     }
     private fun bootstrap(c: RollingLocalAgreement, text: String = stable) {
         feed(c, "initial")
@@ -262,18 +264,18 @@ class RollingLocalAgreementTest {
     @Test fun malformedDuplicateStaleAndWrongSpanRepliesLeaveRequestAndStateUntouched() {
         val c = start()
         val r = c.currentRequest()!!
-        rejectAtomic(c, Error.REQUEST_ID_MISMATCH) { c.observe(1, 9, 0, 48000, 48000, "raw") }
-        rejectAtomic(c, Error.REQUEST_SPAN_MISMATCH) { c.observe(1, r.id, 1, 48001, 48000, "raw") }
-        rejectAtomic(c, Error.REQUEST_SPAN_MISMATCH) { c.observe(1, r.id, 0, 48000, 47999, "raw") }
-        rejectAtomic(c, Error.INVALID_SAMPLE_COUNT) { c.observe(1, r.id, 0, 0, 0, "raw") }
-        rejectAtomic(c, Error.INVALID_SAMPLE_COUNT) { c.observe(1, r.id, 0, 48000, 384001, "raw") }
+        rejectAtomic(c, Error.REQUEST_ID_MISMATCH) { c.observe(1, 9, 0, 48000, 48000, "raw", 0) }
+        rejectAtomic(c, Error.REQUEST_SPAN_MISMATCH) { c.observe(1, r.id, 1, 48001, 48000, "raw", 0) }
+        rejectAtomic(c, Error.REQUEST_SPAN_MISMATCH) { c.observe(1, r.id, 0, 48000, 47999, "raw", 0) }
+        rejectAtomic(c, Error.INVALID_SAMPLE_COUNT) { c.observe(1, r.id, 0, 0, 0, "raw", 0) }
+        rejectAtomic(c, Error.INVALID_SAMPLE_COUNT) { c.observe(1, r.id, 0, 48000, 384001, "raw", 0) }
         rejectAtomic(c, Error.INVALID_UTF16) { feed(c, "\uD83D") }
         rejectAtomic(c, Error.TEXT_TOO_LONG) { feed(c, "😀".repeat(4097)) }
         rejectAtomic(c, Error.REQUEST_PENDING) { c.finish(1) }
         feed(c, "first")
-        rejectAtomic(c, Error.REQUEST_ID_MISMATCH) { c.observe(1, r.id, 0, 48000, 48000, "duplicate") }
+        rejectAtomic(c, Error.REQUEST_ID_MISMATCH) { c.observe(1, r.id, 0, 48000, 48000, "duplicate", 0) }
         c.reset(2, 100, 100000)
-        rejectAtomic(c, Error.STALE_GENERATION) { c.observe(1, r.id, 0, 48000, 48000, "stale") }
+        rejectAtomic(c, Error.STALE_GENERATION) { c.observe(1, r.id, 0, 48000, 48000, "stale", 0) }
         rejectAtomic(c, Error.STALE_GENERATION) { c.finish(1) }
         rejectAtomic(c, Error.GENERATION_MISMATCH) { c.finish(3) }
     }
@@ -325,5 +327,133 @@ class RollingLocalAgreementTest {
         assertTrue(spans.contains(0L to 288000L))
         assertTrue(spans.contains(288000L to 576000L))
         assertTrue(c.snapshot()!!.terminal)
+    }
+
+    @Test fun fixedCrossRangeAnchorUsesOnlyTheEligibleStableSuffix() {
+        val c = start()
+        feed(c, "initial")
+        feed(c, "second")
+        val eligible = stable.length - 17
+        feed(c, stable + "X", eligible)
+        feed(c, stable + "Y", eligible)
+        val retained = stable.takeLast(17)
+        feed(c, "lead, " + retained + "tailA")
+        val r = feed(c, "lead " + retained + "tailB")
+        assertEquals(Status.HANDOVER, r.status)
+        assertEquals(stable.take(eligible), r.prefixDelta)
+        val a = r.spliceAudit!!
+        assertEquals(retained, a.anchorKey)
+        assertEquals(17, a.anchorLetterDigitCount)
+        assertEquals(eligible, a.oldAnchorKeyStartCodePoint)
+        assertEquals(eligible, a.oldRetainedEligibilityRawStart)
+        assertEquals(eligible, a.oldRetainedEligibilityKeyStart)
+        assertEquals(96000L, a.oldRetainedOriginSample)
+        assertEquals(5, a.newPendingRawStart)
+        assertEquals(96000L, r.snapshot!!.pending!!.contextStartSample)
+    }
+
+    @Test fun fullyExpiredStableAnchorDoesNotSearchEarlierTextOrUseTheTail() {
+        val c = start()
+        feed(c, "initial")
+        feed(c, "second")
+        feed(c, stable + "X", stable.length + 1)
+        feed(c, stable + "Y", stable.length + 1)
+        feed(c, stable + "X")
+        val r = feed(c, stable + "Y")
+        assertEquals(MatchFailure.INSUFFICIENT_STABLE_LETTERS, r.matchFailure)
+        assertNull(r.prefixDelta)
+        assertEquals(Kind.RECOVERY, r.request!!.kind)
+    }
+
+    @Test fun exactlyEightEligibleLettersAtBoundaryPassButSevenFail() {
+        for (remaining in listOf(8, 7)) {
+            val c = start()
+            feed(c, "initial")
+            feed(c, "second")
+            val eligibility = stable.length - remaining
+            feed(c, stable + "X", eligibility)
+            feed(c, stable + "Y", eligibility)
+            feed(c, stable.takeLast(remaining) + "X")
+            val r = feed(c, stable.takeLast(remaining) + "Y")
+            if (remaining == 8) {
+                assertEquals(Status.HANDOVER, r.status)
+                assertEquals(stable.takeLast(8), r.spliceAudit!!.anchorKey)
+                assertEquals(eligibility, r.spliceAudit!!.oldAnchorRawStart)
+            } else {
+                assertEquals(MatchFailure.INSUFFICIENT_STABLE_LETTERS, r.matchFailure)
+                assertNull(r.prefixDelta)
+            }
+        }
+    }
+
+    @Test fun eligibilityMapsRawUnicodeAndIgnoredGapsToKeyOffsetsWithoutPcmCuts() {
+        val c = start()
+        val prefix = "😀 ,"
+        val raw = prefix + stable
+        val eligible = prefix.length + stable.length - 17
+        feed(c, "initial")
+        feed(c, "second")
+        feed(c, raw + "X", eligible)
+        feed(c, raw + "Y", eligible)
+        feed(c, stable.takeLast(17) + "X")
+        val r = feed(c, stable.takeLast(17) + "Y")
+        val a = r.spliceAudit!!
+        assertEquals(eligible, a.oldRetainedEligibilityRawStart)
+        assertEquals(1 + stable.length - 17, a.oldRetainedEligibilityKeyStart)
+        assertEquals(prefix + stable.dropLast(17), r.prefixDelta)
+        assertEquals(96000L, a.candidateContextStartSample)
+        assertEquals(192000L, r.request!!.startSample)
+        assertEquals(336000L, r.request!!.endSample)
+    }
+
+    @Test fun eligibilityRangeAndSurrogateBoundaryValidationAreAtomic() {
+        val c = start()
+        rejectAtomic(c, Error.INVALID_ELIGIBILITY_CURSOR) { feed(c, "😀A", -1) }
+        rejectAtomic(c, Error.INVALID_ELIGIBILITY_CURSOR) { feed(c, "😀A", 4) }
+        rejectAtomic(c, Error.INVALID_ELIGIBILITY_CURSOR) { feed(c, "😀A", 1) }
+        val r = feed(c, "😀 ,A", 2)
+        assertEquals(2, r.snapshot!!.pending!!.retainedEligibilityRawStart)
+        assertEquals(1, r.snapshot!!.pending!!.retainedEligibilityKeyStart)
+        assertEquals(0L, r.snapshot!!.pending!!.retainedOriginSample)
+        val noEligible = feed(c, "😀 ,A", "😀 ,A".length)
+        assertEquals(2, noEligible.snapshot!!.pending!!.retainedEligibilityKeyStart)
+    }
+
+    @Test fun candidateEligibilityBecomesNextOldEligibilityWithoutChangingTheCurrentAnchor() {
+        val c = start()
+        bootstrap(c)
+        feed(c, "lead " + anchor + "first tail")
+        val futureEligibility = 5 + anchor.length - 4
+        val r = feed(c, "lead " + anchor + "second tail", futureEligibility)
+        assertEquals(Status.HANDOVER, r.status)
+        assertEquals(anchor, r.spliceAudit!!.anchorKey)
+        assertEquals(futureEligibility, r.snapshot!!.pending!!.retainedEligibilityRawStart)
+        assertEquals(futureEligibility, r.spliceAudit!!.candidateSecondRetainedEligibilityRawStart)
+        assertEquals(192000L, r.snapshot!!.pending!!.retainedOriginSample)
+        feed(c, anchor + "X")
+        val next = feed(c, anchor + "Y")
+        assertEquals(MatchFailure.INSUFFICIENT_STABLE_LETTERS, next.matchFailure)
+    }
+
+    @Test fun eligibilityAtNonIgnoredPunctuationDoesNotMoveForwardToFirstLetter() {
+        for (keepQuestion in listOf(true, false)) {
+            val c = start()
+            val expired = "EXPIREDPREFIX"
+            val retained = "?abcdefgh"
+            feed(c, "initial")
+            feed(c, "second")
+            feed(c, expired + retained + "X", expired.length)
+            feed(c, expired + retained + "Y", expired.length)
+            val candidate = if (keepQuestion) retained else retained.drop(1)
+            feed(c, candidate + "X")
+            val r = feed(c, candidate + "Y")
+            if (keepQuestion) {
+                assertEquals(Status.HANDOVER, r.status)
+                assertEquals(retained, r.spliceAudit!!.anchorKey)
+                assertEquals(8, r.spliceAudit!!.anchorLetterDigitCount)
+            } else {
+                assertEquals(MatchFailure.CANDIDATE_ANCHOR_ABSENT, r.matchFailure)
+            }
+        }
     }
 }
