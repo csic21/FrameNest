@@ -9,7 +9,9 @@ trap 'rm -rf "$BUILD"' EXIT
 java -cp "$K/*" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -no-stdlib -no-reflect \
   -classpath "$CP" -d "$BUILD/tests.jar" \
   "$HERE/BoundedLocalAgreement.kt" "$HERE/BoundedLocalAgreementTest.kt" \
-  "$HERE/ReversibleAgreementKey.kt" "$HERE/ReversibleAgreementKeyTest.kt"
+  "$HERE/ReversibleAgreementKey.kt" "$HERE/ReversibleAgreementKeyTest.kt" \
+  "$HERE/RollingLocalAgreement.kt" "$HERE/RollingLocalAgreementTest.kt"
 java -cp "$BUILD/tests.jar:$CP" org.junit.runner.JUnitCore \
   com.framenest.experiment.localagreement.BoundedLocalAgreementTest \
-  com.framenest.experiment.localagreement.ReversibleAgreementKeyTest
+  com.framenest.experiment.localagreement.ReversibleAgreementKeyTest \
+  com.framenest.experiment.localagreement.RollingLocalAgreementTest
