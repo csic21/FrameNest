@@ -1,6 +1,9 @@
-name: Retained rolling caption runtime diagnosis (disabled)
+name: Retained rolling caption runtime diagnosis (one approved run)
 
 on:
+  push:
+    branches: ['experiment/FN-77-local-agreement']
+    paths: ['.github/workflows/rolling-caption-diagnosis-runtime.yml']
   workflow_dispatch:
 
 permissions:
@@ -13,9 +16,9 @@ concurrency:
 
 jobs:
   retained-rolling-caption-runtime:
-    # Preparation is not execution approval. Root must approve this exact new
-    # retained APK pair/run and current-UID KVM grant before BOTH gates change.
-    if: ${{ false }}
+    # Approved 2026-10-16 for this retained pair, current UID only, exact ACL restoration.
+    # One run/attempt gate; subsequent runs cannot grant access.
+    if: ${{ github.run_number == 1 && github.run_attempt == 1 }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -27,7 +30,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Record disabled validator identity and check source guards
+      - name: Record validator identity and check source guards
         run: |
           set -euo pipefail
           mkdir -p "$FN77_RESULTS"
@@ -76,9 +79,9 @@ jobs:
           ldd "$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64" > "$FN77_RESULTS/emulator-libraries.txt"
           "$ANDROID_HOME/emulator/emulator" -version > "$FN77_RESULTS/emulator-version.txt" 2>&1
 
-      - name: Disabled current-UID one-run KVM access
-        # Requires new exact approval; prior FN-76 or source-runtime approval does not carry over.
-        if: ${{ false }}
+      - name: Approved current-UID one-run KVM access
+        # Current FN-77 approval only; no permanent or all-user permission change.
+        if: ${{ github.run_number == 1 && github.run_attempt == 1 }}
         timeout-minutes: 2
         run: |
           set -euo pipefail
