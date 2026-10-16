@@ -62,3 +62,7 @@ that the panel remains at scroll position zero after every state transition.
 There is no layout, scrolling, callback or caption behavior change. Syntax checks
 pass locally; the corrected selector and stricter assertions require a fresh
 Android phone/tablet execution before acceptance.
+
+## Corrected runtime acceptance, 2026-10-16
+
+Run 38841597151 on the retained source 0a15874d APK passed all 35 applicable tests on each API35 phone/tablet-sized viewport, with four explicit Hy-only skips per viewport. Both formerly failing feedback cases passed with the stricter assertions. The exact original KVM ACL was restored. This accepts the UI feedback change, not caption accuracy or real-phone/NAS performance.
