@@ -1,0 +1,110 @@
+name: Retained rolling caption runtime diagnosis (disabled)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: rolling-caption-diagnosis-runtime-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  retained-rolling-caption-runtime:
+    # Preparation is not execution approval. Root must approve this exact new
+    # retained APK pair/run and current-UID KVM grant before BOTH gates change.
+    if: ${{ false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      FN77_RESULTS: ${{ github.workspace }}/rolling-caption-runtime-results
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout validation code only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Record disabled validator identity and check source guards
+        run: |
+          set -euo pipefail
+          mkdir -p "$FN77_RESULTS"
+          git rev-parse HEAD > "$FN77_RESULTS/validator-commit.txt"
+          python3 -m unittest discover -s scripts/tests -p 'test_rolling_caption_runtime_glue.py' -v 2>&1 | tee "$FN77_RESULTS/validator-tests.log"
+          bash -n scripts/run_rolling_caption_runtime_session.sh
+          # The owner creates this only after a successful retained ordinary build.
+          # No placeholder hash or absent lock may authorize a runtime.
+          test -s docs/experiments/FN-77-local-agreement/runtime-input-lock.json
+          cp docs/experiments/FN-77-local-agreement/runtime-input-lock.json "$FN77_RESULTS/"
+
+      - name: Stage only the exact locked app and test APKs
+        timeout-minutes: 12
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 scripts/prepare_rolling_caption_runtime_pair.py --download \
+            --lock docs/experiments/FN-77-local-agreement/runtime-input-lock.json \
+            --archive "$RUNNER_TEMP/fn77-rolling-caption-runtime-input.zip" \
+            --destination "$FN77_RESULTS/input" \
+            --report "$FN77_RESULTS/input-verification.json"
+          # No rebuild, replacement APK, model change, or fixture regeneration.
+
+      - name: Set up existing Android SDK without accepting licenses
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+          accept-android-sdk-licenses: false
+
+      - name: Install the official API35 x86_64 image under previously accepted license
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          test -s "$ANDROID_HOME/licenses/android-sdk-license"
+          sdkmanager --install emulator 'system-images;android-35;google_apis;x86_64' < /dev/null
+          test -f "$ANDROID_HOME/system-images/android-35/google_apis/x86_64/system.img"
+          cp "$ANDROID_HOME/system-images/android-35/google_apis/x86_64/source.properties" "$FN77_RESULTS/system-image.properties"
+
+      - name: Install official emulator runtime libraries
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          sudo -n apt-get update
+          sudo -n apt-get install --no-install-recommends -y acl libpulse0 libnss3 libxkbcommon0 libxcomposite1 libxcursor1 libxi6 libxrandr2 libxtst6
+          ldd "$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64" > "$FN77_RESULTS/emulator-libraries.txt"
+          "$ANDROID_HOME/emulator/emulator" -version > "$FN77_RESULTS/emulator-version.txt" 2>&1
+
+      - name: Disabled current-UID one-run KVM access
+        # Requires new exact approval; prior FN-76 or source-runtime approval does not carry over.
+        if: ${{ false }}
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          test -c /dev/kvm
+          test ! -e "$FN77_RESULTS/kvm-original.acl"
+          getfacl -p /dev/kvm > "$FN77_RESULTS/kvm-original.acl"
+          sudo -n setfacl -m "u:$(id -u):rw" /dev/kvm
+          getfacl -p /dev/kvm > "$FN77_RESULTS/kvm-granted.acl"
+          test -r /dev/kvm && test -w /dev/kvm
+          "$ANDROID_HOME/emulator/emulator" -accel-check > "$FN77_RESULTS/acceleration-check.txt" 2>&1
+
+      - name: Run the single rolling versus three-second diagnostic method once
+        timeout-minutes: 55
+        run: bash scripts/run_rolling_caption_runtime_session.sh run
+
+      - name: Stop the owned emulator and restore the exact original KVM ACL
+        if: always()
+        timeout-minutes: 3
+        run: bash scripts/run_rolling_caption_runtime_session.sh cleanup
+
+      - name: Retain the exact pair and all collection or failure evidence
+        if: always()
+        timeout-minutes: 10
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rolling-caption-diagnosis-runtime-${{ github.sha }}-${{ github.run_attempt }}
+          path: rolling-caption-runtime-results/
+          retention-days: 14
+          if-no-files-found: warn
