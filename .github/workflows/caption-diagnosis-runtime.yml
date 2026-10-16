@@ -1,0 +1,114 @@
+name: Retained caption diagnosis runtime validation (disabled)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: caption-diagnosis-runtime-${{ github.ref }}
+  cancel-in-progress: false # Never cancel restoration of this job's saved ACL.
+
+jobs:
+  retained-caption-runtime:
+    # Preparation only. Owner must separately approve this exact new KVM run.
+    if: ${{ false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      FN76_RESULTS: ${{ github.workspace }}/caption-runtime-results
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout validation code only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Record validator identity and test fail-closed helpers
+        run: |
+          set -euo pipefail
+          mkdir -p "$FN76_RESULTS"
+          git rev-parse HEAD > "$FN76_RESULTS/validator-commit.txt"
+          cp docs/benchmarks/caption-diagnosis-2026-10-15/runtime-input-lock.json "$FN76_RESULTS/"
+          python3 -m unittest discover -s scripts/tests -p 'test_caption_runtime*.py' -v 2>&1 | tee "$FN76_RESULTS/validator-tests.log"
+          bash -n scripts/run_caption_runtime_sessions.sh
+          python3 - <<'PY'
+          import json, os, platform
+          from pathlib import Path
+          record = {'github': {k: os.environ.get(k) for k in ['GITHUB_REPOSITORY','GITHUB_SHA','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT']},
+                    'image': {k: os.environ.get(k) for k in ['ImageOS','ImageVersion']}, 'platform': platform.platform(),
+                    'scope': 'One retained APK pair; one API35 x86_64 AVD; phone/tablet-sized UI; one three-path diagnosis',
+                    'emulator_memory_mib': 4096, 'emulator_cores': 2,
+                    'diagnosis_instrumentation_limit_seconds': 1620, 'ui_instrumentation_limit_seconds': 600,
+                    'reference_rows_expected': 4, 'raw_span_rows_expected': 4, 'production_rows_expected': 16,
+                    'semantic_acceptance_passed': None, 'release_approved': False}
+          (Path(os.environ['FN76_RESULTS'])/'host.json').write_text(json.dumps(record,indent=2)+'\n')
+          PY
+
+      - name: Verify successful ordinary CI and the exact retained app/test pair
+        timeout-minutes: 12
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/prepare_caption_runtime_pair.py --download \
+            --archive "$RUNNER_TEMP/caption-runtime-input.zip" \
+            --destination "$FN76_RESULTS/input" \
+            --report "$FN76_RESULTS/input-verification.json"
+          # No Gradle, AAR rebuild, fixture regeneration, or replacement APKs.
+
+      - name: Set up existing Android SDK without accepting licenses
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+          accept-android-sdk-licenses: false
+
+      - name: Install the previously used official API35 x86_64 image only
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          test -s "$ANDROID_HOME/licenses/android-sdk-license"
+          sdkmanager --install emulator 'system-images;android-35;google_apis;x86_64' < /dev/null
+          test -f "$ANDROID_HOME/system-images/android-35/google_apis/x86_64/system.img"
+          cp "$ANDROID_HOME/system-images/android-35/google_apis/x86_64/source.properties" "$FN76_RESULTS/system-image.properties"
+
+      - name: Install official emulator runtime libraries before version probing
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          sudo -n apt-get update
+          sudo -n apt-get install --no-install-recommends -y acl libpulse0 libnss3 libxkbcommon0 libxcomposite1 libxcursor1 libxi6 libxrandr2 libxtst6
+          ldd "$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64" > "$FN76_RESULTS/emulator-libraries.txt"
+          "$ANDROID_HOME/emulator/emulator" -version > "$FN76_RESULTS/emulator-version.txt" 2>&1
+
+      - name: Disabled current-UID one-run KVM access step
+        # Input hashes and historical FN-74 permission are not new authorization.
+        if: ${{ false }}
+        run: |
+          set -euo pipefail
+          test -c /dev/kvm
+          test ! -e "$FN76_RESULTS/kvm-original.acl"
+          getfacl -p /dev/kvm > "$FN76_RESULTS/kvm-original.acl"
+          sudo -n setfacl -m "u:$(id -u):rw" /dev/kvm
+          getfacl -p /dev/kvm > "$FN76_RESULTS/kvm-granted.acl"
+          test -r /dev/kvm && test -w /dev/kvm
+          "$ANDROID_HOME/emulator/emulator" -accel-check > "$FN76_RESULTS/acceleration-check.txt" 2>&1
+
+      - name: Run phone/tablet-sized UI and one real three-path diagnosis
+        timeout-minutes: 80
+        run: bash scripts/run_caption_runtime_sessions.sh run
+
+      - name: Stop any remaining emulator and restore the original KVM ACL
+        if: always()
+        timeout-minutes: 3
+        run: bash scripts/run_caption_runtime_sessions.sh cleanup
+
+      - name: Retain exact input pair, all failures, UI screenshots, and runtime evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: caption-diagnosis-runtime-${{ github.sha }}-${{ github.run_attempt }}
+          path: caption-runtime-results/
+          retention-days: 14
+          if-no-files-found: warn

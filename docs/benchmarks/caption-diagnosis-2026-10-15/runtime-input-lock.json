@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "status": "pinned-reviewed",
+  "repository": "csic21/FrameNest",
+  "run_id": 38770936718,
+  "run_attempt": 1,
+  "commit": "54849318ccaaf8788f6cd3cd25d683407f3fec60",
+  "artifact_id": 11992840171,
+  "artifact_name": "caption-diagnosis-apks-54849318ccaaf8788f6cd3cd25d683407f3fec60-1",
+  "zip_size_bytes": 255985974,
+  "zip_sha256": "05151995a02a1c278234586b220ef80f9655a93f43c7c31ea4b47a75a5653793",
+  "pair_manifest_sha256": "426bb1fda120ba152ee1b00fde04a05693a76dcf52b1a452fa9acb392a59c979",
+  "app_apk_sha256": "d238812d873ea1771dc77fef174dcf5bfa9dace6d13019e94702f1cdccce07dc",
+  "test_apk_sha256": "5430821ca160c83b2e67d86ed4bd3fa0b3bb09f951c913db4ddd5451337f80db",
+  "input_lock_is_execution_authorization": false
+}
