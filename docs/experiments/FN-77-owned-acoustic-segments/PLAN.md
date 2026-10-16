@@ -1,7 +1,7 @@
 # FN-77: bounded acoustic ownership experiment
 
 Baseline: released `v0.6.11-internal`, source `ab6dfafdb010b62dffbceced79661e31c1d48e08`.
-Status: experiment only; no production switch, model, MT provider, release, or security permission changes.
+Status: candidate rejected after bounded real ASR replay; retained as an unused ownership/state prototype. No production switch, model, MT provider, release, or security permission changes.
 
 ## Problem and narrow hypothesis
 
@@ -36,3 +36,9 @@ Stage 1 is a pure bounded state machine plus reconstruction, arbitrary-chunk, si
 - Record cold model preparation separately, PCM/decode cost, actual ASR and MT costs, first usable bilingual time, and steady lag. Predecoded/cloud timing cannot establish OPPO/NAS performance.
 - Seek/exit/background must reject stale output and clear pending state. MT failure preserves source without falsely finalizing coverage.
 - If the single candidate does not show a useful quality/latency balance, retain 0.6.11 defaults and report the negative result. Do not release UI changes as a substitute for precision improvement.
+
+## First fixed candidate result (2026-10-16)
+
+The pure component passes 26 focused JVM tests and an independent 780-case conservation/chunking oracle. Real replay produced 14 MCDC and 16 Emoji spans, with complete sample reconstruction. Emoji required six forced-limit cuts. Those cuts still damaged a word that the baseline retained; quieter MCDC cuts also split related phrases. Some earlier word fragments improved, but this does not establish a reliable net quality gain. The energy policy is rejected without threshold/window search or ML Kit rollout.
+
+A direct-ASR zero-audio EOF artifact is not a new production finding: the existing production digital-zero gate was intentionally absent from this ASR-only replay. Low energy alone does not prove silence. No Android, MT, NAS, or phone-speed acceptance is claimed. Full local evidence and existing Actions baselines remain separate; no raw transcription/token report is uploaded here.
