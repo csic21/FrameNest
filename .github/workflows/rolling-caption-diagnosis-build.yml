@@ -85,6 +85,17 @@ jobs:
             assembleDebug testDebugUnitTest assembleDebugAndroidTest lintDebug \
             --no-daemon --stacktrace
           python3 scripts/check_android_test_signatures.py app/build --path-contains androidtest
+          PYTHONPATH=scripts python3 - <<'PYCODE'
+          from pathlib import Path
+          from check_source_asr_apk import SafeZip, dex_classes
+          required = {'Lcom/framenest/feature/listen_translate/RollingCaptionTranslationDiagnosisTest;',
+                      'Lcom/framenest/feature/listen_translate/RollingCaptionRequestPlanner;',
+                      'Lcom/framenest/experiment/localagreement/RollingLocalAgreement;'}
+          with SafeZip(Path('app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk')) as apk:
+              classes = set().union(*(dex_classes(apk.read(n)) for n in apk.entries if n.endswith('.dex')))
+          assert required <= classes, f'Opt-in diagnostic classes absent from final DEX: {required - classes}'
+          print('Required opt-in diagnostic classes are defined in the final test APK')
+          PYCODE
       - name: Verify native identity and retain exact APK hashes
         run: |
           set -euo pipefail

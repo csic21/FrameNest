@@ -197,9 +197,10 @@ android {
 
     sourceSets.getByName("androidTest").assets.directories.add("$projectDir/schemas")
     if (rollingCaptionDiagnosis) {
-        sourceSets.getByName("androidTest").java.srcDirs(
-            "$projectDir/src/rollingCaptionDiagnostic/java",
-            layout.buildDirectory.dir("generated/rollingCaptionDiagnosis/java").get().asFile,
+        // AGP built-in Kotlin does not compile .kt from additional java directories.
+        sourceSets.getByName("androidTest").kotlin.directories.add("$projectDir/src/rollingCaptionDiagnostic/java")
+        sourceSets.getByName("androidTest").kotlin.directories.add(
+            layout.buildDirectory.dir("generated/rollingCaptionDiagnosis/java").get().asFile.absolutePath,
         )
     }
     if (sherpaAsrSource) {
