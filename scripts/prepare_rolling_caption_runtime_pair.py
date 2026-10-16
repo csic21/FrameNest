@@ -150,7 +150,7 @@ def download(archive, lock):
         run = json.load(response)
     require(run['id'] == lock['run_id'] and run['head_sha'] == lock['commit'] and run['run_attempt'] == lock['run_attempt']
             and run['status'] == 'completed' and run['conclusion'] == 'success', 'Locked successful ordinary CI run mismatch')
-    require(run['path'] == '.github/workflows/caption-diagnosis-build.yml', 'Not the ordinary caption-diagnosis build workflow')
+    require(run['path'] == '.github/workflows/rolling-caption-diagnosis-build.yml', 'Not the ordinary caption-diagnosis build workflow')
     with api('/actions/artifacts/' + str(lock['artifact_id'])) as response:
         meta = json.load(response)
     require(meta['id'] == lock['artifact_id'] and not meta['expired'] and meta['name'] == lock['artifact_name']

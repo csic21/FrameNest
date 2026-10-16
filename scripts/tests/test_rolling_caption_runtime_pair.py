@@ -125,6 +125,12 @@ class RetainedCaptionPairTest(unittest.TestCase):
         self.assertEqual((self.destination / 'test.apk').read_bytes(), zipped(self.test_inputs))
         self.assertTrue((self.destination / 'APK-SHA256SUMS').is_file())
 
+    def test_download_accepts_only_exact_rolling_build_workflow(self):
+        import inspect
+        source = inspect.getsource(pair.download)
+        self.assertIn("run['path'] == '.github/workflows/rolling-caption-diagnosis-build.yml'", source)
+        self.assertNotIn("run['path'] == '.github/workflows/caption-diagnosis-build.yml'", source)
+
     def test_pending_lock_stops_before_any_network_or_staging(self):
         pending = dict(self.lock)
         pending['status'] = 'pending-successful-final-ordinary-ci'
