@@ -111,6 +111,16 @@ class RollingCaptionRuntimeResultTest(unittest.TestCase):
         self.reject(lambda r: r['fixtures'][0]['rolling']['asr_requests'][0].update(raw_tokens=['different']))
         self.reject(lambda r: r['fixtures'][0]['rolling']['asr_requests'][-1].update(controller_status='NEED_HYPOTHESIS'))
 
+    def test_empty_mt_collection_cannot_pass_with_zero_counts(self):
+        def remove_mt(r):
+            r['fixtures'][0]['rolling'].update(bounded_mt_units=[], bounded_mt_request_count=0,
+                                               preview_request_count=0, stable_sentence_request_count=0)
+        self.reject(remove_mt)
+        def remove_ceilings(r):
+            r['fixtures'][0]['rolling'].update(quality_ceiling_groups=[], quality_ceiling_group_count=0,
+                                               quality_ceiling_mt_request_count=0)
+        self.reject(remove_ceilings)
+
     def test_prefix_fragment_cannot_masquerade_as_preview(self):
         def fragment(r):
             unit = r['fixtures'][0]['rolling']['bounded_mt_units'][0]

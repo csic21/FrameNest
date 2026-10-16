@@ -125,6 +125,7 @@ def validate_report(report, expected_app_sha256, expected_test_sha256):
             previous_end, previous_id = end, request_id
         require(previous_end == duration * 16 and requests[-1]['controller_status'] == 'FINISHED', 'Final request did not reach real EOF')
         units = rolling['bounded_mt_units']
+        require(bool(units), 'No bounded real MT requests collected')
         check_count(rolling['bounded_mt_request_count'], len(units), 'bounded MT requests')
         check_mt(units, rolling['bounded_mt_failed_or_empty_count'], 'bounded MT')
         previews = 0
@@ -174,6 +175,7 @@ def validate_report(report, expected_app_sha256, expected_test_sha256):
         check_count(rolling['candidate_revision_count'], len(revisions), 'revisions')
         require(all(row['unit_id'] in unit_ids for row in revisions), 'Revision refers to a missing unit')
         ceilings = rolling['quality_ceiling_groups']
+        require(bool(ceilings), 'Missing closed-group quality-ceiling rows')
         check_count(rolling['quality_ceiling_group_count'], len(ceilings), 'quality ceiling groups')
         for group in ceilings:
             require(group['purpose'] == 'QUALITY_CEILING_ONLY' and group['bounded_latency_unit'] is False and group['final_coverage'] is False,
