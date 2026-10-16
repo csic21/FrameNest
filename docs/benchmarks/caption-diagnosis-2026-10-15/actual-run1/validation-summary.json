@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "status": "failed",
+  "semantic_acceptance_passed": null,
+  "checks": {
+    "phone": {
+      "status": "failed",
+      "failure_class": "ValueError",
+      "failure": "Instrumentation did not finish normally"
+    },
+    "tablet": {
+      "status": "failed",
+      "failure_class": "ValueError",
+      "failure": "Instrumentation did not finish normally"
+    },
+    "diagnosis": {
+      "status": "passed",
+      "tests_passed": 1,
+      "tests_skipped": 0
+    },
+    "three_path_evidence": {
+      "status": "collected",
+      "report_sha256": "e9495ce4a3168616b1cfb7a24db67d1f099b47a51dc8cac4ebd3204b1ddecbe1",
+      "rows": {
+        "reference": 4,
+        "raw_span": 4,
+        "production": 16
+      },
+      "mt_observations": {
+        "reference_to_mt:returned": 4,
+        "raw_span_asr_to_mt:returned": 4,
+        "production_returned": 16
+      },
+      "semantic_acceptance_passed": null,
+      "scope": "Completeness only. Retained real translations and failures require separate human review; no accuracy or speedup claim."
+    }
+  }
+}

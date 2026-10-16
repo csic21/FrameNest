@@ -1,6 +1,7 @@
 # 0037 — Honest feedback for default bilingual captions
 
-Status: implemented locally; Android build and phone/tablet execution pending.
+Status: implemented; first phone/tablet run completed, with a targeted test-selector
+correction awaiting Android rebuild and rerun.
 
 The default fixed-window path publishes source text before translation with revision
 1. Revision 3 means provisional source in other paths; it is not a general signal
@@ -36,3 +37,28 @@ locally; Gradle Android compilation, lint and actual Compose tests require the
 Android CI/device environment. The parameterized tests request 360dp/840dp widths;
 they must be executed on phone and tablet hosts because host constraints still
 apply. See the FN-75 handoff for results and remaining acceptance.
+
+## API 35 feedback visibility regression
+
+Runtime run `38837762864` exercised both phone and tablet hosts. Each host reported
+33 passes, 4 Hy-native skips and 2 failures: the 360dp/840dp instances of the
+feedback visibility test failed at the first enable-switch visibility assertion.
+All 20 overlay instances passed per host. Preparation screenshots are from another
+test state and are not evidence of the failing installation state.
+
+The enable Row owns `toggleable` semantics and merges descendants. Its decorative
+`Switch(onCheckedChange = null)` previously owned the test tag, which Compose does
+not propagate to the merged parent. `assertIsDisplayed` also returns false when
+the selector finds no node, so this failure alone does not establish clipping or
+automatic scrolling. This follows the AndroidX definitions of
+[`TestTag`](https://github.com/androidx/androidx/blob/androidx-main/compose/ui/ui/src/commonMain/kotlin/androidx/compose/ui/semantics/SemanticsProperties.kt)
+and [`isDisplayed`](https://github.com/androidx/androidx/blob/androidx-main/compose/ui/ui-test/src/commonMain/kotlin/androidx/compose/ui/test/Assertions.kt).
+
+The stable enable tag now belongs to the semantic Row. A separate indicator tag
+allows an unmerged-tree assertion that the actual switch glyph remains visible.
+The regression retains the small viewport and feedback visibility checks, checks
+disabled/on and enabled/off states on the real control, and additionally verifies
+that the panel remains at scroll position zero after every state transition.
+There is no layout, scrolling, callback or caption behavior change. Syntax checks
+pass locally; the corrected selector and stricter assertions require a fresh
+Android phone/tablet execution before acceptance.

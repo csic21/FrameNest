@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsOff
@@ -28,6 +29,7 @@ import java.io.File
 import org.junit.Assume.assumeTrue
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -214,12 +216,17 @@ class ListenTranslateDiagnosticsControlsTest(private val widthDp: Int) {
                 )
             }
         }
-        compose.onNodeWithTag("listen_translate_enable").assertIsDisplayed()
+        // The Row owns the merged toggleable semantics; the decorative Switch is checked separately.
+        compose.onNodeWithTag("listen_translate_enable").assertExists().assertIsDisplayed().assertIsOn().assertIsNotEnabled()
+        compose.onNodeWithTag("listen_translate_enable_indicator", useUnmergedTree = true).assertExists().assertIsDisplayed()
         compose.onNodeWithTag("listen_translate_installing").assertIsDisplayed().assertTextContains("正在准备模型")
+        assertFeedbackPanelHasNotScrolled()
         compose.runOnIdle {
             state.value = ListenTranslateUiState(enabled = true, isProcessing = true, status = ListenTranslateJobStatus.Running)
         }
         compose.onNodeWithTag("listen_translate_status").assertIsDisplayed().assertTextContains("处理中", substring = true)
+        compose.onNodeWithTag("listen_translate_enable").assertIsDisplayed().assertIsOn().assertIsEnabled()
+        assertFeedbackPanelHasNotScrolled()
         compose.runOnIdle {
             state.value = state.value.copy(
                 isProcessing = false, status = ListenTranslateJobStatus.Failed, errorMessage = "翻译失败，请稍后重试",
@@ -231,12 +238,23 @@ class ListenTranslateDiagnosticsControlsTest(private val widthDp: Int) {
         }
         compose.onNodeWithTag("listen_translation_missing").assertIsDisplayed().assertTextContains("译文尚未就绪")
         compose.onNodeWithTag("listen_translate_error").assertIsDisplayed().assertTextContains("翻译失败", substring = true)
-        val switchBounds = compose.onNodeWithTag("listen_translate_enable").fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithTag("listen_translate_enable_indicator", useUnmergedTree = true).assertIsDisplayed()
+        assertFeedbackPanelHasNotScrolled()
+        val switchBounds = compose.onNodeWithTag("listen_translate_enable_indicator", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
         val statusBounds = compose.onNodeWithTag("listen_translate_status").fetchSemanticsNode().boundsInRoot
         assertTrue(switchBounds.bottom <= statusBounds.top)
         compose.runOnIdle { state.value = state.value.copy(enabled = false, activeCue = null) }
         compose.onNodeWithTag("listen_translation_missing").assertDoesNotExist()
         compose.onNodeWithTag("listen_translate_error").assertIsDisplayed()
+        compose.onNodeWithTag("listen_translate_enable").assertIsDisplayed().assertIsOff().assertIsEnabled()
+        assertFeedbackPanelHasNotScrolled()
+    }
+
+    private fun assertFeedbackPanelHasNotScrolled() {
+        val scroll = compose.onNodeWithTag("listen_translate_controls").fetchSemanticsNode()
+            .config[SemanticsProperties.VerticalScrollAxisRange]
+        assertEquals("Feedback must remain visible at the initial scroll position", 0f, scroll.value(), 0f)
     }
 
     @Test

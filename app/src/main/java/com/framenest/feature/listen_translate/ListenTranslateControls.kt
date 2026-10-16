@@ -70,7 +70,9 @@ fun ListenTranslateControls(
                     enabled = !uiState.isInstallingModels,
                     role = Role.Switch,
                     onValueChange = onEnabledChange,
-                ),
+                )
+                // Tag the merged control that owns the switch semantics, not its decorative child.
+                .testTag("listen_translate_enable"),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
@@ -82,7 +84,7 @@ fun ListenTranslateControls(
                 checked = uiState.enabled || uiState.isInstallingModels,
                 onCheckedChange = null,
                 enabled = !uiState.isInstallingModels,
-                modifier = Modifier.testTag("listen_translate_enable"),
+                modifier = Modifier.testTag("listen_translate_enable_indicator"),
             )
         }
 

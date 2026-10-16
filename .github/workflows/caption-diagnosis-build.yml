@@ -9,6 +9,9 @@ on:
       - 'scripts/prepare-caption-diagnosis.py'
       - 'scripts/tests/test_caption_diagnosis.py'
       - 'scripts/caption_diagnosis_schema.py'
+      - 'scripts/prepare-fixed-caption-window-comparison.py'
+      - 'scripts/fixed_caption_window_schema.py'
+      - 'scripts/tests/test_fixed_caption_window_comparison.py'
       - 'docs/benchmarks/caption-diagnosis-2026-10-15/**'
   workflow_dispatch:
 
@@ -72,6 +75,8 @@ jobs:
           python3 scripts/prepare-caption-diagnosis.py --download \
             --input-dir "$RUNNER_TEMP/caption-inputs" \
             --model-dir "$RUNNER_TEMP/caption-models/sensevoice"
+          python3 scripts/prepare-fixed-caption-window-comparison.py --download \
+            --input-dir "$RUNNER_TEMP/caption-emoji-inputs"
       - name: Compile and test exact source profile without device execution
         run: |
           set -euo pipefail
