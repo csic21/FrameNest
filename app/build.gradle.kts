@@ -199,7 +199,7 @@ android {
     if (rollingCaptionDiagnosis) {
         sourceSets.getByName("androidTest").java.srcDirs(
             "$projectDir/src/rollingCaptionDiagnostic/java",
-            layout.buildDirectory.dir("generated/rollingCaptionDiagnosis/java"),
+            layout.buildDirectory.dir("generated/rollingCaptionDiagnosis/java").get().asFile,
         )
     }
     if (sherpaAsrSource) {

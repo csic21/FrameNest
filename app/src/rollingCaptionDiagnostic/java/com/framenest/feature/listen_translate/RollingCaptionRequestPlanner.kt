@@ -39,6 +39,11 @@ internal class RollingCaptionRequestPlanner {
     fun observe(h: Hypothesis): Decision {
         if (h == lastHypothesis) return Decision(emptyList(), emptyList(), 0, null, nextDeadline,
             "DUPLICATE_HYPOTHESIS_IGNORED", duplicate = true)
+        if (eofPreviewIssued) {
+            require(h.terminal && h.endSample == observedEnd)
+            return Decision(emptyList(), emptyList(), 0, null, nextDeadline,
+                "TERMINAL_HYPOTHESIS_IGNORED", duplicate = true)
+        }
         require(h.requestId > lastRequestId)
         require(h.startSample >= 0 && h.endSample > h.startSample && h.endSample >= observedEnd)
         require(h.endSample - h.startSample <= MAX_HYPOTHESIS)
@@ -78,7 +83,7 @@ internal class RollingCaptionRequestPlanner {
                 units += UnitRequest(id, Type.STABLE_SENTENCE_CANDIDATE, h.raw.substring(startRaw, endRaw),
                     h.requestId, h.startSample, h.endSample, startRaw, endRaw, stable, lexicalRight,
                     "STABLE_TERMINAL_WITH_STABLE_LEXICAL_RIGHT_CONTEXT",
-                    leftEdgeUnverified = sentenceStartKey == 0)
+                    latencySample = h.endSample > observedEnd, leftEdgeUnverified = sentenceStartKey == 0)
                 live += Candidate(id, prefix, h.raw.substring(0, endRaw))
             }
             sentenceStartKey = endKey
@@ -97,7 +102,7 @@ internal class RollingCaptionRequestPlanner {
             units += UnitRequest(id, Type.REVISABLE_PREVIEW, h.raw, h.requestId,
                 h.startSample, h.endSample, 0, h.raw.length, stable, 0,
                 when { correction -> "SAME_END_RECOVERY_CORRECTION"; eof -> "EOF_COMPLETE_HYPOTHESIS"; else -> "CLIP_DEADLINE_COMPLETE_HYPOTHESIS" },
-                supersedes = previewId, correction = correction, latencySample = !correction,
+                supersedes = previewId, correction = correction, latencySample = !correction && h.endSample > observedEnd,
                 leftEdgeUnverified = true)
             previewId = id
             previewEnd = h.endSample

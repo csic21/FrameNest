@@ -48,6 +48,23 @@ class RollingCaptionRequestPlannerTest {
         assertTrue(p.observe(h(2, 0, 18, "回復した全文", recovery = true, eof = true)).requests.isEmpty())
         assertTrue(p.observe(h(3, 0, 18, "回復した全文", recovery = true, eof = true)).requests.isEmpty())
     }
+    @Test fun newRequestIdAfterEofCannotPromoteSentenceOrRetranslate() {
+        val p = RollingCaptionRequestPlanner()
+        p.observe(h(1, 0, 3, "文。次", eof = true))
+        val repeated = p.observe(h(2, 0, 3, "文。次", eof = true))
+        assertTrue(repeated.requests.isEmpty())
+        assertTrue(repeated.duplicate)
+    }
+    @Test fun sameEndRecoverySentenceIsAdditionalComputeNotNewMediaSample() {
+        val p = RollingCaptionRequestPlanner()
+        p.observe(h(1, 0, 12, "文。次"))
+        val d = p.observe(h(2, 0, 12, "文。次", recovery = true))
+        assertFalse(sentences(d).single().latencySample)
+        val correction = previews(d).single()
+        assertTrue(correction.correction)
+        assertFalse(correction.latencySample)
+        assertNotNull(correction.supersedes)
+    }
     @Test fun earlyEofGetsFullPreviewEvenWithoutStableTail() {
         val p = RollingCaptionRequestPlanner()
         val d = p.observe(h(1, 0, 2, "まだ途中", eof = true))

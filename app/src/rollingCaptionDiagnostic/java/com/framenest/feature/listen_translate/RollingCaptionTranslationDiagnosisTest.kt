@@ -418,7 +418,9 @@ class RollingCaptionTranslationDiagnosisTest {
                 .put("same_end_correction_count", count(units) { it.getBoolean("is_same_end_correction") })
                 .put("candidate_revision_count", revisions.length()).put("quality_ceiling_group_count", ceilings.length())
                 .put("bounded_mt_failed_or_empty_count", count(units) { it.optString("mt_status") != "returned" })
-                .put("quality_ceiling_mt_failed_or_empty_count", count(ceilings) { it.optString("mt_status") != "returned" })
+                .put("quality_ceiling_mt_request_count", count(ceilings) { !it.isNull("input_text") })
+                .put("quality_ceiling_unavailable_count", count(ceilings) { it.isNull("input_text") })
+                .put("quality_ceiling_mt_failed_or_empty_count", count(ceilings) { !it.isNull("input_text") && it.optString("mt_status") != "returned" })
         } catch (failure: Throwable) {
             report.put("status", "failed").put("failure_class", failure.javaClass.name)
             throw failure
