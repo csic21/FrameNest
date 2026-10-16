@@ -10,6 +10,15 @@ plugins {
 // Optional native experiment: ordinary builds retain the ML Kit-only artifact.
 val hyMtNative = providers.gradleProperty("hyMtNative").map(String::toBooleanStrict).getOrElse(false)
 
+// FN-77: no experiment source is compiled into app/default/release source sets.
+val rollingCaptionDiagnosis = providers.gradleProperty("rollingCaptionDiagnosis").map(String::toBooleanStrict).getOrElse(false)
+val rollingCaptionSources = if (rollingCaptionDiagnosis) tasks.register<Sync>("prepareRollingCaptionDiagnosisSources") {
+    from(rootProject.file("scripts/experimental/local-agreement")) {
+        include("RollingLocalAgreement.kt", "ReversibleAgreementKey.kt")
+    }
+    into(layout.buildDirectory.dir("generated/rollingCaptionDiagnosis/java"))
+} else null
+
 // FN-74: explicit experimental profile; ordinary builds retain the stock dependency.
 // File dependencies bypass Gradle's Maven checksum metadata, so verify the exact
 // reviewed AAR here, before it can become a compiler/packager input. No fallback.
@@ -187,8 +196,20 @@ android {
     }
 
     sourceSets.getByName("androidTest").assets.directories.add("$projectDir/schemas")
+    if (rollingCaptionDiagnosis) {
+        sourceSets.getByName("androidTest").java.srcDirs(
+            "$projectDir/src/rollingCaptionDiagnostic/java",
+            layout.buildDirectory.dir("generated/rollingCaptionDiagnosis/java"),
+        )
+    }
     if (sherpaAsrSource) {
         sourceSets.getByName("main").assets.directories.add("$projectDir/src/sourceAsr/assets")
+    }
+}
+
+if (rollingCaptionSources != null) {
+    tasks.matching { it.name == "preDebugAndroidTestBuild" }.configureEach {
+        dependsOn(rollingCaptionSources)
     }
 }
 

@@ -75,6 +75,7 @@ class RollingCaptionRequestPlannerTest {
         val d = p.observe(h(2, 0, 6, "一。 二！後から"))
         assertEquals(listOf("一。", " 二！"), sentences(d).map { it.text })
         assertEquals(listOf(2, 5), sentences(d).map { it.rawEnd })
+        assertEquals(listOf(true, false), sentences(d).map { it.leftEdgeUnverified })
         assertTrue(d.requests.all { !it.finalCoverage })
     }
     @Test fun strictEligibilityUsesFirstAnyKindTokenAtOrAfterThreshold() {
