@@ -1,4 +1,4 @@
-name: Retained caption diagnosis runtime validation
+name: Retained caption diagnosis runtime validation (disabled)
 
 on:
   push:
@@ -16,10 +16,10 @@ concurrency:
 
 jobs:
   retained-caption-runtime:
-    # User approved this candidate on 2026-10-16; one first attempt only.
-    if: ${{ github.run_number == 1 && github.run_attempt == 1 }}
+    # Previous run-1 gate consumed. Retry preparation remains disabled until owner enables it.
+    if: ${{ github.run_number == 2 && github.run_attempt == 1 }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 150
     env:
       FN76_RESULTS: ${{ github.workspace }}/caption-runtime-results
       PYTHONDONTWRITEBYTECODE: '1'
@@ -42,9 +42,11 @@ jobs:
           from pathlib import Path
           record = {'github': {k: os.environ.get(k) for k in ['GITHUB_REPOSITORY','GITHUB_SHA','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT']},
                     'image': {k: os.environ.get(k) for k in ['ImageOS','ImageVersion']}, 'platform': platform.platform(),
-                    'scope': 'One retained APK pair; one API35 x86_64 AVD; phone/tablet-sized UI; one three-path diagnosis',
+                    'scope': 'One retained APK pair; one API35 x86_64 AVD; phone/tablet-sized UI; one three-path diagnosis; one fixed two-fixture 3s/6s comparison',
                     'emulator_memory_mib': 4096, 'emulator_cores': 2,
-                    'diagnosis_instrumentation_limit_seconds': 1620, 'ui_instrumentation_limit_seconds': 600,
+                    'diagnosis_instrumentation_limit_seconds': 1620, 'comparison_instrumentation_limit_seconds': 1185, 'comparison_hard_watchdog_seconds': 1200,
+                    'ui_instrumentation_limit_seconds': 600, 'comparison_window_ms': [3000, 6000],
+                    'comparison_rows_expected': {'mcdc': [16, 8], 'emoji': [38, 19]},
                     'reference_rows_expected': 4, 'raw_span_rows_expected': 4, 'production_rows_expected': 16,
                     'semantic_acceptance_passed': None, 'release_approved': False}
           (Path(os.environ['FN76_RESULTS'])/'host.json').write_text(json.dumps(record,indent=2)+'\n')
@@ -85,9 +87,9 @@ jobs:
           ldd "$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64" > "$FN76_RESULTS/emulator-libraries.txt"
           "$ANDROID_HOME/emulator/emulator" -version > "$FN76_RESULTS/emulator-version.txt" 2>&1
 
-      - name: Approved current-UID one-run KVM access step
-        # Exact current candidate approval: 2026-10-16 01:53 UTC; restore below.
-        if: ${{ github.run_number == 1 && github.run_attempt == 1 }}
+      - name: Disabled current-UID one-run KVM access step
+        # A new retained candidate/run must be enabled explicitly by the owner.
+        if: ${{ github.run_number == 2 && github.run_attempt == 1 }}
         run: |
           set -euo pipefail
           test -c /dev/kvm
@@ -98,8 +100,8 @@ jobs:
           test -r /dev/kvm && test -w /dev/kvm
           "$ANDROID_HOME/emulator/emulator" -accel-check > "$FN76_RESULTS/acceleration-check.txt" 2>&1
 
-      - name: Run phone/tablet-sized UI and one real three-path diagnosis
-        timeout-minutes: 80
+      - name: Run phone/tablet UI, one three-path diagnosis, and one fixed 3s/6s comparison
+        timeout-minutes: 110
         run: bash scripts/run_caption_runtime_sessions.sh run
 
       - name: Stop any remaining emulator and restore the original KVM ACL

@@ -79,3 +79,35 @@ fake translations. `evidence-collected` means structurally complete evidence,
 not accurate or usable captions. Semantic acceptance stays null until the actual
 reference, recognition, adjacent windows, and translations receive human review.
 The published human-corrected reference is not independently listened-to gold.
+
+## Disabled fixed 3s/6s extension (2026-10-16)
+
+The consumed run-1 gates are closed again. The next retained pair must come from
+successful ordinary CI that packages `fixed-window-comparison.json`,
+`generated/comparison-prepared.json`, and the full pinned `generated/emoji.s16le`.
+The existing run-1 APK lock is historical input, not an input for this extension;
+its APKs lack the new assets and will fail staging before SDK/KVM access. The
+owner must lock the new successful build's actual artifact and hashes.
+
+The runner installs that new pair once and runs phone UI, tablet-sized UI, the
+existing three-path diagnosis once, then
+`FixedCaptionWindowComparisonTest#compareThreeAndSixSecondWindows` once, with
+`fixedCaptionWindowComparison=true`, `captionDiagnosisNetwork=true`, and both
+retained APK hashes. Only the two existing fixed audio inputs and the 3000/6000 ms
+conditions are allowed: MCDC 16/8 rows, full 113.96-second Emoji 38/19 rows.
+No condition sweep, replacement model, old source ABBA, or product-window change.
+
+The comparison has an external 20-minute hard watchdog (1185 seconds to TERM,
+15 seconds to KILL), a bounded session allowing evidence collection afterward,
+and the existing always-run cleanup/ACL restoration. Its incremental report is
+pulled from `files/fixed-caption-window-comparison.json` along with session logs.
+Partial, skipped, repeated, or interrupted execution cannot pass collection.
+
+The runtime summary explicitly requests `--fixed-window-comparison`, adding both
+the single-test session result and the new collection result. It checks actual
+input/preparation/APK/source identities, all 81 ordered core windows, unchanged
+750 ms context, full coverage/EOF, actual ASR/MT call records, texts, and timing
+fields. Blank-source and failed-translation observations remain in coverage;
+collection never implies semantic, word-retention, or performance acceptance.
+The old helper's default summary mode remains available for historical run-1
+reports; it does not manufacture the new comparison result.

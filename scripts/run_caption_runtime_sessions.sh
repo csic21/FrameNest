@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Prepared only: workflow and current-UID ACL grant stay disabled until approval.
-# One retained pair, one KVM AVD, no rebuild, no TCG, one real diagnosis attempt.
+# One retained pair, one KVM AVD, no rebuild/TCG; each diagnostic class runs once.
 set -euo pipefail
 RESULTS="${FN76_RESULTS:?Set FN76_RESULTS to the absolute evidence directory}"
 INPUT="$RESULTS/input"
@@ -43,6 +43,8 @@ collect() {
   adb_short shell dumpsys meminfo com.framenest > "$dir/final-meminfo.txt" 2>&1 || true
   if [[ "$name" = diagnosis ]]; then
     adb_short exec-out run-as com.framenest cat files/caption-diagnosis.json > "$dir/caption-diagnosis.json" 2> "$dir/result-pull-error.txt" || true
+  elif [[ "$name" = comparison ]]; then
+    adb_short exec-out run-as com.framenest cat files/fixed-caption-window-comparison.json > "$dir/fixed-caption-window-comparison.json" 2> "$dir/result-pull-error.txt" || true
   else
     for width in 360 840; do
       adb_short exec-out run-as com.framenest cat "cache/fn67-listen-$width.png" > "$dir/controls-$width.png" 2> "$dir/controls-$width-error.txt" || true
@@ -92,7 +94,7 @@ session)
   test -s "$ACL"
   test -r /dev/kvm && test -w /dev/kvm
   name="${2:?Missing session name}"
-  [[ "$name" = phone || "$name" = tablet || "$name" = diagnosis ]]
+  [[ "$name" = phone || "$name" = tablet || "$name" = diagnosis || "$name" = comparison ]]
   dir="$RESULTS/$name"
   mkdir -p "$dir"
   trap 'status=$?; trap - EXIT; collect "$name"; force_stop_apps; exit "$status"' EXIT
@@ -100,19 +102,28 @@ session)
   trap 'exit 143' TERM
   set_viewport "$name" "$dir" > "$dir/viewport-change.txt" 2>&1
   adb_short logcat -c
-  if [[ "$name" != diagnosis ]]; then
+  if [[ "$name" = phone || "$name" = tablet ]]; then
     # Never label a screenshot from the earlier viewport as this session's UI.
     adb_short shell run-as com.framenest rm -f cache/fn67-listen-360.png cache/fn67-listen-840.png
   fi
-  if [[ "$name" = diagnosis ]]; then
+  if [[ "$name" = diagnosis || "$name" = comparison ]]; then
     # Fail closed on accidental retries within the same job/results directory.
-    (set -o noclobber; printf 'One attempt only.\n' > "$RESULTS/diagnosis-attempted.txt")
+    (set -o noclobber; printf 'One attempt only.\n' > "$RESULTS/$name-attempted.txt")
     APP_SHA=$(awk '$2 == "app.apk" {print $1}' "$INPUT/APK-SHA256SUMS")
     TEST_SHA=$(awk '$2 == "test.apk" {print $1}' "$INPUT/APK-SHA256SUMS")
     [[ "$APP_SHA" =~ ^[0-9a-f]{64}$ && "$TEST_SHA" =~ ^[0-9a-f]{64}$ ]]
-    timeout --signal=TERM --kill-after=15s 1620 adb -s "$SERIAL" shell am instrument -w -r \
-      -e class com.framenest.feature.listen_translate.CaptionDiagnosisTest \
-      -e captionDiagnosis true -e captionDiagnosisNetwork true \
+    if [[ "$name" = diagnosis ]]; then
+      test_class=CaptionDiagnosisTest
+      opt_in=captionDiagnosis
+      instrumentation_limit=1620
+    else
+      test_class=FixedCaptionWindowComparisonTest
+      opt_in=fixedCaptionWindowComparison
+      instrumentation_limit=1185 # Plus the 15-second kill grace: 20-minute hard bound.
+    fi
+    timeout --signal=TERM --kill-after=15s "$instrumentation_limit" adb -s "$SERIAL" shell am instrument -w -r \
+      -e class "com.framenest.feature.listen_translate.$test_class" \
+      -e "$opt_in" true -e captionDiagnosisNetwork true \
       -e expectedAppApkSha256 "$APP_SHA" -e expectedTestApkSha256 "$TEST_SHA" \
       com.framenest.test/androidx.test.runner.AndroidJUnitRunner 2>&1 | tee "$dir/instrumentation.txt"
   else
@@ -133,10 +144,11 @@ run)
   timeout --kill-after=5s 120 adb -s "$SERIAL" install "$INPUT/app.apk" | tee "$RESULTS/install-app.txt"
   timeout --kill-after=5s 120 adb -s "$SERIAL" install "$INPUT/test.apk" | tee "$RESULTS/install-test.txt"
   result=0
-  for name in phone tablet diagnosis; do
+  for name in phone tablet diagnosis comparison; do
     mkdir -p "$RESULTS/$name"
     limit=780
     [[ "$name" != diagnosis ]] || limit=1800
+    [[ "$name" != comparison ]] || limit=1500
     if timeout --signal=TERM --kill-after=60s "$limit" bash "$0" session "$name"; then
       printf '0\n' > "$RESULTS/$name/exit-code.txt"
     else
@@ -146,8 +158,8 @@ run)
       force_stop_apps
     fi
   done
-  python3 scripts/check_caption_runtime_results.py "$RESULTS" || result=1
+  python3 scripts/check_caption_runtime_results.py "$RESULTS" --fixed-window-comparison || result=1
   exit "$result"
   ;;
-*) echo 'Usage: run_caption_runtime_sessions.sh run|session phone|session tablet|session diagnosis|cleanup' >&2; exit 2 ;;
+*) echo 'Usage: run_caption_runtime_sessions.sh run|session phone|session tablet|session diagnosis|session comparison|cleanup' >&2; exit 2 ;;
 esac

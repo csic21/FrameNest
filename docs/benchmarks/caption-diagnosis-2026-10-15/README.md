@@ -134,3 +134,10 @@ KVM, permission or network setting is changed by preparation or this harness.
 - No actual Android inference/MT run, new KVM authorization, phone/tablet rendering,
   NAS test, independent listening, or semantic acceptance was performed here.
   The integration owner is responsible for real Android compile/CI/device execution.
+
+## Bounded 3s/6s follow-on
+
+[FIXED-WINDOW-COMPARISON.md](FIXED-WINDOW-COMPARISON.md) documents the separate,
+opt-in same-PCM comparison with full 113.960-second Emoji regression. It reuses
+this diagnostic's single model pack and MCDC PCM, leaves all production defaults
+unchanged, and records true final-window/EOF coverage without paced playback.

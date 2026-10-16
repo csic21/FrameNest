@@ -97,8 +97,10 @@ def check_session(root, name):
     directory = root / name
     require((directory / 'exit-code.txt').read_text().strip() == '0', 'Session shell failed')
     events = instrumentation((directory / 'instrumentation.txt').read_text())
-    if name == 'diagnosis':
-        require(events == [(PACKAGE + 'CaptionDiagnosisTest', 'compareReferenceRawSpanAndProductionWindows', 0)], 'Diagnosis was skipped, failed, or repeated')
+    if name in ('diagnosis', 'comparison'):
+        cls, method = ('CaptionDiagnosisTest', 'compareReferenceRawSpanAndProductionWindows') if name == 'diagnosis' else (
+            'FixedCaptionWindowComparisonTest', 'compareThreeAndSixSecondWindows')
+        require(events == [(PACKAGE + cls, method, 0)], 'Diagnosis/comparison was skipped, failed, or repeated')
         return {'status': 'passed', 'tests_passed': 1, 'tests_skipped': 0}
     counts, skipped = Counter(), []
     for cls, test, code in events:
@@ -178,11 +180,19 @@ def check_diagnosis(root):
             'scope': 'Completeness only. Retained real translations and failures require separate human review; no accuracy or speedup claim.'}
 
 
-def record(root):
-    result = {'schema_version': 1, 'status': 'failed', 'semantic_acceptance_passed': None, 'checks': {}}
-    for name in ('phone', 'tablet', 'diagnosis', 'three_path_evidence'):
+def record(root, include_comparison=False):
+    result = {'schema_version': 1, 'status': 'failed', 'semantic_acceptance_passed': None,
+              'fixed_window_comparison_requested': include_comparison, 'checks': {}}
+    names = ['phone', 'tablet', 'diagnosis', 'three_path_evidence']
+    if include_comparison:
+        names += ['comparison', 'fixed_window_evidence']
+    for name in names:
         try:
-            result['checks'][name] = check_diagnosis(root) if name == 'three_path_evidence' else check_session(root, name)
+            if name == 'fixed_window_evidence':
+                from check_fixed_caption_runtime_results import check_comparison
+                result['checks'][name] = check_comparison(root)
+            else:
+                result['checks'][name] = check_diagnosis(root) if name == 'three_path_evidence' else check_session(root, name)
         except Exception as error:
             result['checks'][name] = {'status': 'failed', 'failure_class': type(error).__name__, 'failure': str(error)}
     passed = all(check['status'] in {'passed', 'collected'} for check in result['checks'].values())
@@ -194,5 +204,6 @@ def record(root):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('results', type=Path)
+    parser.add_argument('--fixed-window-comparison', action='store_true', help='Require the new two-fixture 3s/6s session and evidence')
     args = parser.parse_args()
-    raise SystemExit(0 if record(args.results) else 1)
+    raise SystemExit(0 if record(args.results, args.fixed_window_comparison) else 1)

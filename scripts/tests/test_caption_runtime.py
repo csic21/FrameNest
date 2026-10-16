@@ -61,7 +61,28 @@ class RetainedCaptionPairTest(unittest.TestCase):
         self.destination = self.root / 'staged'
         self.archive = self.root / 'retained.zip'
         prefix = 'assets/caption-diagnosis/'
-        self.test_inputs = {prefix + name: (pair.ASSETS / name).read_bytes() for name in ('manifest.json', 'source-profile.json', 'reference.json')}
+        self.assets = self.root / 'assets'
+        self.assets.mkdir()
+        for name in ('manifest.json', 'source-profile.json', 'reference.json', 'fixed-window-comparison.json'):
+            (self.assets / name).write_bytes((pair.ASSETS / name).read_bytes())
+        self.comparison = json.loads((self.assets / 'fixed-window-comparison.json').read_bytes())
+        real_pcm = copy.deepcopy(self.comparison['emoji']['pcm'])
+        self.synthetic_pcm = b'\0' * 8
+        self.comparison['emoji']['pcm'].update(bytes=8, samples=4, sha256=pair.digest(self.synthetic_pcm))
+        (self.assets / 'fixed-window-comparison.json').write_text(json.dumps(self.comparison))
+        validate = pair.validate_comparison
+        def validate_synthetic_manifest(manifest):
+            # Exercise the real schema except the tiny synthetic archive PCM.
+            original = copy.deepcopy(manifest)
+            original['emoji']['pcm'] = real_pcm
+            validate(original)
+            return manifest
+        self.enterContext(patch.object(pair, 'validate_comparison', validate_synthetic_manifest))
+        self.enterContext(patch.object(pair, 'ASSETS', self.assets))
+        self.test_inputs = {prefix + name: (self.assets / name).read_bytes() for name in ('manifest.json', 'source-profile.json', 'reference.json', 'fixed-window-comparison.json')}
+        self.test_inputs[prefix + 'generated/emoji.s16le'] = self.synthetic_pcm
+        self.comparison_prepared = {'schema_version': 1, 'all_inputs_verified': True, 'emoji_pcm': self.comparison['emoji']['pcm'],
+                                    'emoji_duration_ms': 113960, 'window_ms': [3000, 6000], 'additional_model_files': 0}
         self.prepared = {'all_inputs_verified': True, 'manifest_sha256': pair.file_digest(pair.ASSETS / 'manifest.json'),
                          'source_profile_sha256': pair.file_digest(pair.ASSETS / 'source-profile.json'),
                          'reference_units': 4, 'duration_ms': 47720, 'semantic_acceptance_passed': None}
@@ -76,6 +97,11 @@ class RetainedCaptionPairTest(unittest.TestCase):
 
     def seal(self, mutate=None, extra=None):
         self.test_inputs['assets/caption-diagnosis/generated/prepared.json'] = json.dumps(self.prepared).encode()
+        self.comparison_prepared.update(
+            comparison_manifest_sha256=pair.file_digest(self.assets / 'fixed-window-comparison.json'),
+            diagnosis_manifest_sha256=pair.file_digest(self.assets / 'manifest.json'),
+            diagnosis_prepared_sha256=pair.digest(self.test_inputs['assets/caption-diagnosis/generated/prepared.json']))
+        self.test_inputs['assets/caption-diagnosis/generated/comparison-prepared.json'] = json.dumps(self.comparison_prepared).encode()
         members = {'app.apk': b'synthetic-app', 'test.apk': zipped(self.test_inputs)}
         self.record['apks'] = [{'path': path, 'artifact_name': name, 'bytes': len(members[name]), 'sha256': pair.digest(members[name])}
                                for name, path in pair.APK_PATHS.items()]
@@ -152,6 +178,19 @@ class RetainedCaptionPairTest(unittest.TestCase):
         self.prepared['semantic_acceptance_passed'] = True
         self.seal()
         with self.assertRaisesRegex(ValueError, 'preparation mismatch'):
+            self.stage()
+
+
+    def test_changed_emoji_pcm_or_incomplete_comparison_preparation_fails(self):
+        key = 'assets/caption-diagnosis/generated/emoji.s16le'
+        self.test_inputs[key] = b'x' * 8
+        self.seal()
+        with self.assertRaisesRegex(ValueError, 'Emoji PCM mismatch'):
+            self.stage()
+        self.test_inputs[key] = self.synthetic_pcm
+        self.comparison_prepared['additional_model_files'] = 1
+        self.seal()
+        with self.assertRaisesRegex(ValueError, 'fixed-window preparation mismatch'):
             self.stage()
 
 
@@ -380,10 +419,15 @@ class DisabledWorkflowTest(unittest.TestCase):
         source = shell.read_text()
         self.assertIn('-accel on', source)
         self.assertIn('setfacl --restore="$ACL"', source)
-        self.assertIn('for name in phone tablet diagnosis', source)
+        self.assertIn('for name in phone tablet diagnosis comparison', source)
+        self.assertIn('--fixed-window-comparison', source)
+        self.assertIn('files/fixed-caption-window-comparison.json', source)
         self.assertIn('set -o noclobber', source)
         self.assertIn('rm -f cache/fn67-listen-360.png cache/fn67-listen-840.png', source)
-        self.assertEqual(source.count('-e captionDiagnosis true'), 1)
+        self.assertEqual(source.count('opt_in=captionDiagnosis'), 1)
+        self.assertEqual(source.count('opt_in=fixedCaptionWindowComparison'), 1)
+        self.assertEqual(source.count('test_class=FixedCaptionWindowComparisonTest'), 1)
+        self.assertIn('$name-attempted.txt', source)
         for forbidden in ('./gradlew', 'chmod 666', 'chmod 777', '-accel off', '-accel tcg'):
             self.assertNotIn(forbidden, source)
 

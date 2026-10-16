@@ -12,6 +12,7 @@ import urllib.parse
 import urllib.request
 
 from check_source_asr_apk import SafeZip
+from fixed_caption_window_schema import validate_comparison
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_LOCK = ROOT / 'docs/benchmarks/caption-diagnosis-2026-10-15/runtime-input-lock.json'
@@ -49,6 +50,18 @@ def validate_lock(lock):
     require(lock['input_lock_is_execution_authorization'] is False, 'An input lock cannot authorize execution')
 
 
+def verify_comparison_preparation(prepared, comparison_bytes, diagnosis_bytes, diagnosis_prepared_bytes):
+    comparison = validate_comparison(json.loads(comparison_bytes))
+    require(prepared['schema_version'] == 1 and prepared['all_inputs_verified'] is True
+            and prepared['comparison_manifest_sha256'] == digest(comparison_bytes)
+            and prepared['diagnosis_manifest_sha256'] == digest(diagnosis_bytes)
+            and prepared['diagnosis_prepared_sha256'] == digest(diagnosis_prepared_bytes)
+            and prepared['emoji_pcm'] == comparison['emoji']['pcm'] and prepared['emoji_duration_ms'] == 113960
+            and prepared['window_ms'] == [3000, 6000] and prepared['additional_model_files'] == 0,
+            'Packaged fixed-window preparation mismatch')
+    return comparison
+
+
 def stage_pair(archive, destination, lock):
     validate_lock(lock)
     require(not destination.exists(), 'Refusing an existing staged pair')
@@ -81,18 +94,27 @@ def stage_pair(archive, destination, lock):
             # Check the retained harness metadata; Android verifies actual inputs/JNI again.
             with SafeZip(staging / 'test.apk') as test:
                 prefix = 'assets/caption-diagnosis/'
-                for name in ('manifest.json', 'source-profile.json', 'reference.json'):
+                for name in ('manifest.json', 'source-profile.json', 'reference.json', 'fixed-window-comparison.json'):
                     require(test.read(prefix + name) == (ASSETS / name).read_bytes(), 'Packaged diagnosis metadata mismatch: ' + name)
-                prepared = json.loads(test.read(prefix + 'generated/prepared.json'))
+                prepared_bytes = test.read(prefix + 'generated/prepared.json')
+                prepared = json.loads(prepared_bytes)
                 require(prepared['all_inputs_verified'] is True
                         and prepared['manifest_sha256'] == file_digest(ASSETS / 'manifest.json')
                         and prepared['source_profile_sha256'] == file_digest(ASSETS / 'source-profile.json')
                         and prepared['reference_units'] == 4 and prepared['duration_ms'] == 47720
                         and prepared['semantic_acceptance_passed'] is None, 'Packaged input preparation mismatch')
+                comparison_prepared = json.loads(test.read(prefix + 'generated/comparison-prepared.json'))
+                comparison = verify_comparison_preparation(
+                    comparison_prepared,
+                    test.read(prefix + 'fixed-window-comparison.json'), test.read(prefix + 'manifest.json'), prepared_bytes)
+                emoji = comparison['emoji']['pcm']
+                pcm = test.read(prefix + 'generated/' + emoji['file'])
+                require(len(pcm) == emoji['bytes'] and digest(pcm) == emoji['sha256'], 'Packaged full Emoji PCM mismatch')
             (staging / 'apk-pair.json').write_bytes(pair_bytes)
             (staging / 'APK-SHA256SUMS').write_text(f"{lock['app_apk_sha256']}  app.apk\n{lock['test_apk_sha256']}  test.apk\n")
             result = {'schema_version': 1, 'status': 'retained-pair-verified', 'lock': lock,
-                      'profile': expected, 'runtime_tested': False}
+                      'profile': expected, 'runtime_tested': False,
+                      'diagnosis_prepared_inputs': prepared, 'comparison_prepared_inputs': comparison_prepared}
             (staging / 'pair-verification.json').write_text(json.dumps(result, indent=2) + '\n')
             staging.rename(destination)
     return result

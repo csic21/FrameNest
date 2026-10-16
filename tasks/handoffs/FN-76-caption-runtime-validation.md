@@ -37,3 +37,24 @@
 - 本地旧run24/fn74证据没有找到完整`dumpsys display`；解析格式已对照AOSP
   `android-15.0.0_r1`的`LogicalDisplay.dumpLocked`及`DisplayInfo.toString`。
   首次授权运行仍须确认实际dump格式；无法识别时失败关闭，不猜测旋转或放行截图。
+
+### 2026-10-16 run-1实际输出只读兼容性复核
+
+- 使用原helper分别核验保留的phone/tablet `display.txt`与四张controls PNG：
+  display-0分别为1080×1920、1600×2560；四图均通过结构、解压与精确尺寸检查。
+- `check_diagnosis`对实际报告返回collected：4参考、4raw和16生产行齐全；参考/raw均returned，
+  生产均返回；报告SHA-256为`e9495ce4a3168616b1cfb7a24db67d1f099b47a51dc8cac4ebd3204b1ddecbe1`。
+- 原始/恢复ACL字节一致。此次复核未调用会写summary的`record`，未修改任何原始证据；
+  `validation-summary.json`仍为failed，真实UI测试失败保持不变。
+- 已消费的run-1门控在新一轮本地准备中恢复为false；新比较仍待新APK身份固定及负责人启用。
+
+### 固定3秒/6秒比较的禁用runtime扩展
+
+- 新增一次`FixedCaptionWindowComparisonTest`独立session；两音频、两固定条件，共81窗。
+  原三列诊断同新保留pair执行一次，手机/平板UI保持原定范围。
+- input helper核新增manifest、prepared哈希关联与完整Emoji PCM。旧run-1 APK缺新资产，
+  在SDK/KVM之前失败；必须由负责人锁定新普通CI产物，不复用旧pair冒充新比较。
+- 新checker核身份、连续网格、实际PCM/ASR/MT记录、完整coverage/EOF及计时字段；
+  不改变原文、译文或语义判定。命令20分钟硬watchdog，失败保留增量JSON与日志。
+- 40项caption Python测试通过；Bash语法、YAML/嵌入Python解析、diff检查通过。
+  依赖比较worker的新fixture/schema/test提交；两门保持false，无运行或上传。
