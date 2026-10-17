@@ -29,10 +29,10 @@ grep '^class ModelsNotReadyException' "$ROOT/app/src/main/java/com/framenest/fea
 P="$ROOT/app/src/main/java/com/framenest"
 FILES=("$OUT"/*.kt "$P/core/model/PlaybackIdentity.kt" "$P"/data/listen_translate/*.kt
  "$P/smb/SmbRandomAccess.kt" "$P/feature/listen_translate/audio/BlockCachingRandomAccess.kt")
-for name in ListenTranslateEngine RecordedListenTranslateEngine ListenTranslateSession ListenTranslateUiModels ListenTranslateWindows ListenCompletedIntervals ListenPrefetchPolicy ListenPipelineDiagnostics ListenStartupTiming; do
+for name in ListenTranslateEngine EmptyTranslationRecoveryEngine RecordedListenTranslateEngine ListenTranslateSession ListenTranslateUiModels ListenTranslateWindows ListenCompletedIntervals ListenPrefetchPolicy ListenPipelineDiagnostics ListenStartupTiming; do
  FILES+=("$P/feature/listen_translate/$name.kt")
 done
-TESTS=(ListenRecordedSessionTest ListenTranslateSessionTest ListenAdaptiveSessionTest ListenStartupSessionTest ListenTranslateProgressTest ListenCompletedIntervalsTest ListenPrefetchPolicyTest ListenTranslateWindowsTest ListenWindowRetryPolicyTest)
+TESTS=(EmptyTranslationRecoverySessionTest ListenRecordedSessionTest ListenTranslateSessionTest ListenAdaptiveSessionTest ListenStartupSessionTest ListenTranslateProgressTest ListenCompletedIntervalsTest ListenPrefetchPolicyTest ListenTranslateWindowsTest ListenWindowRetryPolicyTest)
 FILES+=("$ROOT/app/src/test/java/com/framenest/data/listen_translate/ListenTranslateRepositoryTest.kt")
 for name in "${TESTS[@]}"; do FILES+=("$ROOT/app/src/test/java/com/framenest/feature/listen_translate/$name.kt"); done
 java -cp "$K/*" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -no-stdlib -no-reflect -classpath "$CP" -d "$OUT/tests.jar" "${FILES[@]}"

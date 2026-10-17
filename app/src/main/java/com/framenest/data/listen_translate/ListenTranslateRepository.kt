@@ -285,6 +285,35 @@ class ListenTranslateRepository(
         ).map { list -> list.map { it.toModel() } }
     }
 
+    /** Only a separately validated two-baseline empty-MT replacement uses this path. */
+    suspend fun completeEmptyTranslationRecovery(
+        identity: PlaybackIdentity,
+        languages: ListenLanguagePair,
+        ownedStartMs: Long,
+        seamMs: Long,
+        processedThroughMs: Long,
+        cueStartMs: Long,
+        cueEndMs: Long,
+        textSrc: String,
+        textTgt: String,
+        durationMs: Long?,
+        lease: CacheLease? = null,
+        isCurrentGeneration: () -> Boolean = { true },
+    ): List<ListenTranslateCue>? = writeMutex.withLock {
+        currentCoroutineContext().ensureActive()
+        if (!isCurrentGeneration()) throw CancellationException("stale listen recovery commit")
+        checkLease(lease, identity, languages)
+        val path = identity.normalizedPath()
+        val lang = languages.normalized()
+        dao.replaceEmptyTranslationRecovery(
+            speech = cueEntity(identity, lang, path, cueStartMs, cueEndMs, textSrc, textTgt, 1),
+            coverage = cueEntity(identity, lang, path, ownedStartMs, processedThroughMs, "", "", 1),
+            seamMs = seamMs,
+            durationMs = durationMs,
+            updatedAtEpochMs = timeSource(),
+        )?.map { it.toModel() }
+    }
+
     suspend fun listCues(
         identity: PlaybackIdentity,
         languages: ListenLanguagePair,

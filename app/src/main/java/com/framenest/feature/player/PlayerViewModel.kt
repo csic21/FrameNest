@@ -646,6 +646,9 @@ class PlayerViewModel(
                         asrModelLabel = { asrSupport.modelLabel(sourceLang) },
                         mtModelLabel = { "mlkit-v1-$sourceLang-$targetLang" },
                         experimentalSilenceGate = experimentalSilenceGate,
+                        // Only the language pair covered by the real empty-MT recovery check.
+                        emptyTranslationRecoveryEnabled = sourceLang.equals("ja", ignoreCase = true) &&
+                            targetLang.equals("zh", ignoreCase = true),
                         onPcmReady = onPcmReady,
                     )
                 }

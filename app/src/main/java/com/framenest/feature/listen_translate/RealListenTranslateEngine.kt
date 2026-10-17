@@ -7,6 +7,7 @@ import com.framenest.feature.listen_translate.asr.ConservativeSpeechGate
 import com.framenest.feature.listen_translate.asr.isNearSilencePcm
 import com.framenest.feature.listen_translate.audio.ListenAudioSource
 import com.framenest.feature.listen_translate.mt.ListenMtEngine
+import com.framenest.feature.listen_translate.recorded.KuromojiJapaneseMorphology
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -34,10 +35,22 @@ class RealListenTranslateEngine(
     /** Unreleased experiment; preserve the fixed-window product default until validation. */
     private val experimentalJapaneseSegments: Boolean = false,
     private val knownMediaDurationMs: () -> Long = { 0L },
-) : OwnedListenTranslateEngine {
+    /** Failure-only opt-in; never changes a nonempty baseline translation. */
+    private val emptyTranslationRecoveryEnabled: Boolean = false,
+) : OwnedListenTranslateEngine, EmptyTranslationRecoveryEngine {
 
     private data class SourceKey(val start: Long, val end: Long, val language: String, val track: Int?)
-    private var cachedSource: Pair<SourceKey, ListenWindowResult>? = null
+    private val recoveryLock = Any()
+    // The failed unit and its one adjacent baseline source survive MT-only retries.
+    private val cachedSources = linkedMapOf<SourceKey, ListenWindowResult>()
+    private data class BaselineOutcome(val key: SourceKey, val targetLang: String, val result: ListenWindowResult)
+    private data class RecoveryKey(val source: SourceKey, val targetLang: String)
+    private var lastBaseline: BaselineOutcome? = null
+    // Never evict an attempted key and silently re-arm it. An unusually failure-heavy
+    // generation stops recovery at this bounded budget; ordinary MT retry still works.
+    private val attemptedRecoveries = mutableSetOf<RecoveryKey>()
+    @Volatile private var recoveryGeneration = 0L
+    private val recoveryMorphology by lazy { KuromojiJapaneseMorphology() }
 
     override val asrModelId: String
         get() = listenAsrCacheModelId(asrModelLabel(), experimentalSilenceGate) +
@@ -45,7 +58,21 @@ class RealListenTranslateEngine(
     override fun adaptiveMaxSpanMsFor(sourceLang: String): Long? =
         if (experimentalJapaneseSegments && sourceLang.equals("ja", ignoreCase = true))
             JapaneseOwnedPrefixPolicy.MAX_OWNED_MS else null
-    override val mtModelId: String get() = mtModelLabel()
+    override val mtModelId: String get() = mtModelLabel() +
+        if (emptyTranslationRecoveryEnabled && !experimentalJapaneseSegments) "|empty-ja-crossing-v1" else ""
+
+    override fun supportsEmptyTranslationRecovery(sourceLang: String, targetLang: String): Boolean =
+        emptyTranslationRecoveryEnabled && !experimentalJapaneseSegments &&
+            sourceLang.equals("ja", ignoreCase = true) && !sourceLang.equals(targetLang, ignoreCase = true)
+
+    override fun resetEmptyTranslationRecovery() {
+        synchronized(recoveryLock) {
+            recoveryGeneration++
+            cachedSources.clear()
+            lastBaseline = null
+            attemptedRecoveries.clear()
+        }
+    }
 
     override suspend fun processWindow(
         startMs: Long,
@@ -63,9 +90,17 @@ class RealListenTranslateEngine(
         targetLang: String,
         onSourceRecognized: suspend (ListenWindowResult) -> Unit,
     ): ListenWindowResult {
+        val generation = recoveryGeneration
+        val key = SourceKey(startMs, endMs, sourceLang.lowercase(), selectedAudioTrackOrdinal())
         val timer = ListenStageTimer(monotonicTimeMs)
         return try {
-            processMeasuredWindow(startMs, endMs, sourceLang, targetLang, timer, onSourceRecognized)
+            processMeasuredWindow(startMs, endMs, sourceLang, targetLang, timer, onSourceRecognized, generation).also {
+                ensureRecoveryGeneration(generation)
+                synchronized(recoveryLock) {
+                    checkRecoveryGeneration(generation)
+                    lastBaseline = BaselineOutcome(key, targetLang.lowercase(), it)
+                }
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: Throwable) {
@@ -80,6 +115,7 @@ class RealListenTranslateEngine(
         targetLang: String,
         timer: ListenStageTimer,
         onSourceRecognized: suspend (ListenWindowResult) -> Unit,
+        generation: Long,
     ): ListenWindowResult {
         val srcLang = sourceLang.lowercase()
         val tgtLang = targetLang.lowercase()
@@ -100,15 +136,19 @@ class RealListenTranslateEngine(
             },
             recognizeSource = { startTranslationPreparation ->
                 val key = SourceKey(startMs, endMs, srcLang, selectedAudioTrackOrdinal())
-                cachedSource?.takeIf { it.first == key }?.second
+                cachedSource(key, generation)
                     ?.copy(stageTimings = timer.timings)?.also { startTranslationPreparation() }
                     ?: recognizeWindow(startMs, endMs, srcLang, key.track, timer, startTranslationPreparation).also {
-                        currentCoroutineContext().ensureActive()
-                        if (it.textSrc.isNotBlank()) cachedSource = key to it
+                        ensureRecoveryGeneration(generation)
+                        cacheSource(key, it, generation)
                     }
             },
-            publishSource = onSourceRecognized,
+            publishSource = { source ->
+                ensureRecoveryGeneration(generation)
+                onSourceRecognized(source)
+            },
             translateSource = { text ->
+                ensureRecoveryGeneration(generation)
                 timer.measure(ListenPipelineStage.Translation) { mt.translate(text, srcLang, tgtLang) }
             },
             timings = { timer.timings },
@@ -119,6 +159,94 @@ class RealListenTranslateEngine(
                 }
             },
         )
+    }
+
+    override suspend fun recoverEmptyTranslation(
+        startMs: Long,
+        endMs: Long,
+        nextEndMs: Long,
+        sourceLang: String,
+        targetLang: String,
+        original: ListenWindowResult,
+    ): ListenEmptyTranslationRecovery? {
+        if (!supportsEmptyTranslationRecovery(sourceLang, targetLang) || original.textSrc.isBlank() ||
+            original.textTgt.isNotBlank() || original.retryableErrorMessage != null || original.blankReason != null
+        ) return null
+        if (startMs < 0L || startMs % 3_000L != 0L || endMs - startMs != 3_000L ||
+            nextEndMs <= endMs || nextEndMs - endMs > 3_000L || nextEndMs > Long.MAX_VALUE - CONTEXT_PADDING_MS
+        ) return null
+        val duration = knownMediaDurationMs().coerceAtLeast(0L)
+        if (duration > 0L && (endMs >= duration || nextEndMs > duration)) return null
+        val srcLang = sourceLang.lowercase()
+        val tgtLang = targetLang.lowercase()
+        val key = SourceKey(startMs, endMs, srcLang, selectedAudioTrackOrdinal())
+        val generation = recoveryGeneration
+        ensureRecoveryGeneration(generation)
+        synchronized(recoveryLock) {
+            checkRecoveryGeneration(generation)
+            // Only an actual successful empty MT result from this engine can trigger recovery.
+            if (lastBaseline != BaselineOutcome(key, tgtLang, original)) return null
+            val attempt = RecoveryKey(key, tgtLang)
+            if (attemptedRecoveries.size >= MAX_RECOVERY_ATTEMPTS || !attemptedRecoveries.add(attempt)) return null
+        }
+        val timer = ListenStageTimer(monotonicTimeMs)
+        return try {
+            val nextKey = SourceKey(endMs, nextEndMs, srcLang, key.track)
+            val next = cachedSource(nextKey, generation)?.copy(stageTimings = timer.timings)
+                ?: recognizeWindow(endMs, nextEndMs, srcLang, key.track, timer, {}).also {
+                    ensureRecoveryGeneration(generation)
+                    cacheSource(nextKey, it, generation)
+                }
+            ensureRecoveryGeneration(generation)
+            if (next.textSrc.isBlank() || next.blankReason != null || next.retryableErrorMessage != null) return null
+            val combined = original.textSrc + next.textSrc
+            // Offset analysis may omit whitespace; the MT/source bytes never do.
+            val words = withContext(Dispatchers.Default) { recoveryMorphology.analyze(combined) }
+            ensureRecoveryGeneration(generation)
+            require(words.all { it.rawStart >= 0 && it.rawStart < it.rawEnd && it.rawEnd <= combined.length })
+            require(words.zipWithNext().all { (a, b) -> a.rawEnd <= b.rawStart })
+            if (words.none { it.rawStart < original.textSrc.length && original.textSrc.length < it.rawEnd }) return null
+            val translated = timer.measure(ListenPipelineStage.Translation) { mt.translate(combined, srcLang, tgtLang) }
+            ensureRecoveryGeneration(generation)
+            if (translated.isBlank()) return null
+            ListenEmptyTranslationRecovery(next, ListenWindowResult(
+                textSrc = combined,
+                textTgt = translated,
+                cueStartMs = original.cueStartMs,
+                cueEndMs = next.cueEndMs,
+                processedThroughMs = nextEndMs,
+                stageTimings = addRecoveryTimings(original.stageTimings, timer.timings),
+            )).also { validateEmptyTranslationRecovery(startMs, endMs, nextEndMs, original, it) }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Throwable) {
+            // Keep the original durable source and leave both windows incomplete.
+            ensureRecoveryGeneration(generation)
+            null
+        }
+    }
+
+    private suspend fun ensureRecoveryGeneration(generation: Long) {
+        currentCoroutineContext().ensureActive()
+        synchronized(recoveryLock) { checkRecoveryGeneration(generation) }
+    }
+
+    private fun checkRecoveryGeneration(generation: Long) {
+        if (generation != recoveryGeneration) throw CancellationException("stale empty-translation recovery")
+    }
+
+    private fun cachedSource(key: SourceKey, generation: Long): ListenWindowResult? = synchronized(recoveryLock) {
+        checkRecoveryGeneration(generation)
+        cachedSources[key]
+    }
+
+    private fun cacheSource(key: SourceKey, source: ListenWindowResult, generation: Long) {
+        synchronized(recoveryLock) {
+            checkRecoveryGeneration(generation)
+            if (source.textSrc.isBlank()) return
+            cachedSources[key] = source
+            while (cachedSources.size > 2) cachedSources.remove(cachedSources.keys.first())
+        }
     }
 
     private suspend fun recognizeWindow(
@@ -281,7 +409,7 @@ class RealListenTranslateEngine(
     }
 
     override fun close() {
-        cachedSource = null
+        resetEmptyTranslationRecovery()
         audio.close()
         asr.close()
         mt.close()
@@ -290,7 +418,24 @@ class RealListenTranslateEngine(
     private companion object {
         const val CONTEXT_PADDING_MS = 750L
         const val MIN_CUE_DURATION_MS = 600L
+        const val MAX_RECOVERY_ATTEMPTS = 64
     }
+}
+
+private fun addRecoveryTimings(original: ListenStageTimings?, recovery: ListenStageTimings): ListenStageTimings {
+    val first = original ?: ListenStageTimings()
+    fun sum(a: Long?, b: Long?): Long? = if (a == null && b == null) null else (a ?: 0L) + (b ?: 0L)
+    return ListenStageTimings(
+        modelCheckMs = sum(first.modelCheckMs, recovery.modelCheckMs),
+        pcmReadMs = sum(first.pcmReadMs, recovery.pcmReadMs),
+        silenceGateMs = sum(first.silenceGateMs, recovery.silenceGateMs),
+        asrMs = sum(first.asrMs, recovery.asrMs),
+        translationMs = sum(first.translationMs, recovery.translationMs),
+        translationPreparationMs = first.translationPreparationMs,
+        remoteReads = sum(first.remoteReads?.toLong(), recovery.remoteReads?.toLong())?.toInt(),
+        remoteReadBytes = sum(first.remoteReadBytes, recovery.remoteReadBytes),
+        translationPreparationWaitMs = first.translationPreparationWaitMs,
+    )
 }
 
 internal fun listenPcmBlankReason(
