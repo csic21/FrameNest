@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Prepared only. New exact runtime/KVM approval is required before enabling the workflow.
-# One retained APK pair, one disposable API35 AVD, one explicitly selected test method.
+# One retained APK pair and API35 AVD: one real MT comparison plus four recovery Room tests.
 set -euo pipefail
 RESULTS="${FN77_RESULTS:?Set FN77_RESULTS to the absolute evidence directory}"
 [[ "$RESULTS" = /* ]] || { echo 'FN77_RESULTS must be absolute' >&2; exit 2; }
@@ -9,8 +9,8 @@ SERIAL=emulator-5556
 AVD_NAME=fn77-rolling-caption
 PID_FILE="$RESULTS/rolling-emulator.pid"
 ACL="$RESULTS/kvm-original.acl"
-TEST_SELECTION=com.framenest.feature.listen_translate.RollingCaptionTranslationDiagnosisTest#compareBoundedPairMtWithThreeSecondBaseline
-REPORT_NAME=bounded-pair-caption-diagnosis.json
+TEST_SELECTION=com.framenest.feature.listen_translate.RollingCaptionTranslationDiagnosisTest#compareEmptyRecoveryWithThreeSecondBaseline,com.framenest.data.listen_translate.ListenTranslateRoomUpsertTest#emptyRecovery_removesBothRevisionOneSourcesAndPreservesThirdWindow,com.framenest.data.listen_translate.ListenTranslateRoomUpsertTest#emptyRecovery_rechecksLateTranslatedOrCompletedNextWindowInsideTransaction,com.framenest.data.listen_translate.ListenTranslateRoomUpsertTest#emptyRecovery_sqlFailureRollsBackSourceCleanupSpeechCoverageAndProgress,com.framenest.data.listen_translate.ListenTranslateRoomUpsertTest#emptyRecovery_cancellationBeforeTransactionCommitRollsBackWholePair
+REPORT_NAME=empty-recovery-caption-diagnosis.json
 
 adb_short() { timeout --kill-after=5s 15 adb -s "$SERIAL" "$@"; }
 force_stop_apps() {
@@ -102,18 +102,20 @@ for line in text.splitlines():
         if code != 1:
             events.append((current.get('class'), current.get('test'), code))
         current = {}
-assert events == [('com.framenest.feature.listen_translate.RollingCaptionTranslationDiagnosisTest',
-                   'compareBoundedPairMtWithThreeSecondBaseline', 0)], 'Skipped, repeated, or unexpected test'
+expected = [('com.framenest.feature.listen_translate.RollingCaptionTranslationDiagnosisTest',
+                   'compareEmptyRecoveryWithThreeSecondBaseline', 0)] + [(
+    'com.framenest.data.listen_translate.ListenTranslateRoomUpsertTest', method, 0) for method in ['emptyRecovery_removesBothRevisionOneSourcesAndPreservesThirdWindow', 'emptyRecovery_rechecksLateTranslatedOrCompletedNextWindowInsideTransaction', 'emptyRecovery_sqlFailureRollsBackSourceCleanupSpeechCoverageAndProgress', 'emptyRecovery_cancellationBeforeTransactionCommitRollsBackWholePair']]
+assert sorted(events) == sorted(expected), 'Skipped, repeated, or unexpected test'
 assert re.search(r'^INSTRUMENTATION_CODE: -1$', text, re.MULTILINE), 'No successful runner completion'
 assert not re.search(r'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED', text), 'Runner failure'
-print(json.dumps({'status': 'one-test-passed', 'tests_passed': 1, 'tests_skipped': 0,
+print(json.dumps({'status': 'five-tests-passed', 'tests_passed': 5, 'tests_skipped': 0,
                   'semantic_accuracy_accepted': False, 'release_approved': False}, indent=2))
 PY
   local app_sha test_sha
   app_sha=$(awk '$2 == "app.apk" {print $1}' "$INPUT/APK-SHA256SUMS")
   test_sha=$(awk '$2 == "test.apk" {print $1}' "$INPUT/APK-SHA256SUMS")
   [[ "$app_sha" =~ ^[0-9a-f]{64}$ && "$test_sha" =~ ^[0-9a-f]{64}$ ]] || return 1
-  python3 scripts/check_bounded_pair_caption_results.py \
+  python3 scripts/check_empty_recovery_caption_results.py \
     --report "$RESULTS/diagnosis/$REPORT_NAME" \
     --expected-app-sha256 "$app_sha" --expected-test-sha256 "$test_sha" \
     | tee "$RESULTS/collection-summary.json"

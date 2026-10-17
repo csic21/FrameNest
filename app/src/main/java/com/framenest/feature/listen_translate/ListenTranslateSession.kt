@@ -336,6 +336,7 @@ class ListenTranslateSession(
 
     private fun stopPolling() {
         workGeneration++
+        (engine as? EmptyTranslationRecoveryEngine)?.resetEmptyTranslationRecovery()
         clearTemporaryRecordedTranslations()
         recordedRetryAtMs = 0L
         recordedFailures = 0
@@ -754,8 +755,13 @@ class ListenTranslateSession(
                 _ui.update { it.copy(diagnostics = diagnostics) }
             }
             var publishedSource: ListenWindowResult? = null
+            var recoveredResult: ListenWindowResult? = null
+            var recoveryCommitted = false
             fun processedEnd(result: ListenWindowResult): Long {
                 val actualEnd = result.processedThroughMs ?: endMs
+                // Only the separately validated, exact two-window replacement may extend
+                // a fixed request. Every ordinary source/final result keeps the old rule.
+                if (result === recoveredResult) return actualEnd
                 require(actualEnd > startMs && actualEnd <= endMs) {
                     "processedThroughMs must be inside the requested audio span"
                 }
@@ -772,6 +778,7 @@ class ListenTranslateSession(
                 return cueStart to cueEnd
             }
             fun validateSourceSpan(result: ListenWindowResult) {
+                if (result === recoveredResult) return
                 val actualEnd = processedEnd(result)
                 publishedSource?.let { source ->
                     require(processedEnd(source) == actualEnd && speechBounds(source) == speechBounds(result)) {
@@ -788,8 +795,24 @@ class ListenTranslateSession(
                 val (cueStart, cueEnd) = speechBounds(result)
                 val commitStartedAtMs = monotonicTimeMs()
                 val revision = if (adaptive && provisional) ListenCoverageRev.PROVISIONAL_SOURCE else 1
-                val cleanup = if (adaptive && !provisional) ListenProvisionalCleanup(startMs, processedEnd(result)) else null
-                val persistedSpeech = if (commitProgress) {
+                val cleanup = if (adaptive && !provisional) {
+                    ListenProvisionalCleanup(startMs, processedEnd(result))
+                } else null
+                val persistedSpeech = if (result === recoveredResult) {
+                    val rows = repository.completeEmptyTranslationRecovery(
+                        identity, langs, startMs, endMs, processedEnd(result), cueStart, cueEnd,
+                        result.textSrc, result.textTgt, lastDurationMs.takeIf { it > 0L }, windowLease,
+                        isCurrentGeneration = { isCurrent(generation) },
+                    ) ?: throw ListenWindowStageException("字幕缓存已更新，请稍后重试")
+                    ensureCurrent(generation)
+                    cachedCues = cachedCues.filterNot {
+                        it.startMs >= startMs && it.endMs <= processedEnd(result) &&
+                            it.textSrc.isNotBlank() && it.textTgt.isBlank()
+                    }
+                    for (row in rows) cachedCues = ListenCueCache.upsert(cachedCues, row)
+                    recoveryCommitted = true
+                    rows.first { it.textSrc.isNotBlank() }
+                } else if (commitProgress) {
                     repository.completeWindowCueForExistingJob(
                         identity, langs, cueStart, cueEnd, result.textSrc, result.textTgt,
                         rev = revision, coveredUntilMs = processedEnd(result),
@@ -851,7 +874,7 @@ class ListenTranslateSession(
                 )
             }
             try {
-                val result = windowEngine.processWindowWithProgress(
+                var result = windowEngine.processWindowWithProgress(
                     startMs = startMs,
                     endMs = endMs,
                     sourceLang = langs.sourceLang,
@@ -866,6 +889,34 @@ class ListenTranslateSession(
                     },
                 )
                 ensureCurrent(generation)
+                validateSourceSpan(result)
+                val recoveryEngine = windowEngine as? EmptyTranslationRecoveryEngine
+                if (!adaptive && windowMs == 3_000L && endMs - startMs == 3_000L &&
+                    result.textSrc.isNotBlank() && result.textTgt.isBlank() &&
+                    result.retryableErrorMessage == null && result.blankReason == null &&
+                    publishedSource?.textSrc == result.textSrc &&
+                    recoveryEngine?.supportsEmptyTranslationRecovery(langs.sourceLang, langs.targetLang) == true
+                ) {
+                    val nextEnd = (endMs + 3_000L.coerceAtMost(Long.MAX_VALUE - endMs)).let {
+                        if (lastDurationMs > 0L) minOf(it, lastDurationMs) else it
+                    }
+                    fun nextIsUncompleted(): Boolean = nextEnd > endMs &&
+                        completedIntervals().none { it.startMs < nextEnd && it.endMs > endMs } &&
+                        cachedCues.none { it.startMs < nextEnd && it.endMs > endMs && it.textTgt.isNotBlank() }
+                    if (nextIsUncompleted()) {
+                        val recovery = recoveryEngine.recoverEmptyTranslation(
+                            startMs, endMs, nextEnd, langs.sourceLang, langs.targetLang, result,
+                        )
+                        ensureCurrent(generation)
+                        if (recovery != null && nextIsUncompleted()) {
+                            validateEmptyTranslationRecovery(startMs, endMs, nextEnd, result, recovery)
+                            // Original speech stays untouched until the dedicated atomic
+                            // replacement commits speech, coverage and progress together.
+                            recoveredResult = recovery.result
+                            result = recovery.result
+                        }
+                    }
+                }
                 diagnostics = diagnostics.copy(stages = result.stageTimings ?: diagnostics.stages)
                 if (result.blankReason == ListenBlankReason.EmptyPcm) {
                     _ui.update { it.copy(lastBlankReason = ListenBlankReason.EmptyPcm) }
@@ -883,7 +934,8 @@ class ListenTranslateSession(
                 if (result.textSrc.isNotBlank() || result.textTgt.isNotBlank()) {
                     val (cueStart, cueEnd) = speechBounds(result)
                     speechCoversWindow = cueStart == startMs && cueEnd == actualEndMs
-                    progressCommittedWithCoverage = adaptive && completedSuccessfully && speechCoversWindow
+                    progressCommittedWithCoverage = (adaptive || result === recoveredResult) &&
+                        completedSuccessfully && speechCoversWindow
                     val source = publishedSource
                     if (adaptive || source == null || source.textSrc != result.textSrc ||
                         source.textTgt != result.textTgt || source.cueStartMs != result.cueStartMs ||
@@ -893,6 +945,7 @@ class ListenTranslateSession(
                         provisional = !completedSuccessfully,
                         commitProgress = progressCommittedWithCoverage,
                     )
+                    if (recoveryCommitted) progressCommittedWithCoverage = true
                 }
                 result.retryableErrorMessage?.let { message ->
                     throw ListenWindowStageException(message)
@@ -903,7 +956,7 @@ class ListenTranslateSession(
                     throw ListenWindowStageException("翻译未返回文本，请稍后重试")
                 }
                 val coverageStartedAtMs = monotonicTimeMs()
-                if (!speechCoversWindow) {
+                if (!speechCoversWindow && !recoveryCommitted) {
                     // Persist only the consumed span, excluding decoded read-ahead. Writing this
                     // after the speech cue means cancellation cannot hide completed text;
                     // coverage and progress themselves commit in one Room transaction.

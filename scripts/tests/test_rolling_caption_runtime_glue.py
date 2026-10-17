@@ -48,9 +48,13 @@ class RollingCaptionRuntimeGlueTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 require_single_run_gates(mutated)
 
-    def test_only_one_exact_class_method_and_two_explicit_opt_ins(self):
+    def test_exact_diagnostic_and_four_room_methods_with_two_explicit_opt_ins(self):
         self.assertIn('TEST_SELECTION=com.framenest.feature.listen_translate.'
-                      'RollingCaptionTranslationDiagnosisTest#compareBoundedPairMtWithThreeSecondBaseline', self.runner)
+                      'RollingCaptionTranslationDiagnosisTest#compareEmptyRecoveryWithThreeSecondBaseline', self.runner)
+        selection = re.search(r'^TEST_SELECTION=(.+)$', self.runner, re.MULTILINE).group(1).split(',')
+        self.assertEqual(5, len(selection))
+        self.assertEqual(5, len(set(selection)))
+        self.assertTrue(all('ListenTranslateRoomUpsertTest#emptyRecovery_' in x for x in selection[1:]))
         self.assertEqual(1, self.runner.count('shell am instrument -w -r'))
         self.assertIn('-e class "$TEST_SELECTION"', self.runner)
         self.assertIn('-e rollingCaptionDiagnosis true -e captionDiagnosisNetwork true', self.runner)
@@ -84,7 +88,7 @@ class RollingCaptionRuntimeGlueTest(unittest.TestCase):
         self.assertIn('-accel on', self.runner)
         self.assertNotIn('-accel off', self.runner)
         self.assertNotIn('FN76_RESULTS', self.workflow + self.runner)
-        self.assertIn('REPORT_NAME=bounded-pair-caption-diagnosis.json', self.runner)
+        self.assertIn('REPORT_NAME=empty-recovery-caption-diagnosis.json', self.runner)
         self.assertIn('cat "files/$REPORT_NAME"', self.runner)
 
     def test_watchdogs_bound_instrumentation_and_session_cleanup_to_35_minutes(self):
@@ -128,10 +132,10 @@ class RollingCaptionRuntimeGlueTest(unittest.TestCase):
         self.assertIn('path: rolling-caption-runtime-results/', evidence)
 
     def test_owner_result_checker_receives_exact_retained_hashes(self):
-        self.assertIn('python3 scripts/check_bounded_pair_caption_results.py', self.runner)
+        self.assertIn('python3 scripts/check_empty_recovery_caption_results.py', self.runner)
         self.assertIn('--report "$RESULTS/diagnosis/$REPORT_NAME"', self.runner)
         self.assertIn('--expected-app-sha256 "$app_sha" --expected-test-sha256 "$test_sha"', self.runner)
-        self.assertIn("'compareBoundedPairMtWithThreeSecondBaseline', 0)", self.runner)
+        self.assertIn("'compareEmptyRecoveryWithThreeSecondBaseline', 0)", self.runner)
         self.assertIn('instrumentation-summary.json" || return $?', self.runner)
 
 

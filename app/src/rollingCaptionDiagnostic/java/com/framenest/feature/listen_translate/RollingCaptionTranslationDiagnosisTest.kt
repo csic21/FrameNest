@@ -197,6 +197,143 @@ class RollingCaptionTranslationDiagnosisTest {
         Unit
     }
 
+    /** Actual baseline and actual opt-in engine run, never an ASR-source replay. */
+    @Test
+    fun compareEmptyRecoveryWithThreeSecondBaseline(): Unit = runBlocking<Unit> {
+        val arguments = InstrumentationRegistry.getArguments()
+        assumeTrue(arguments.getString("rollingCaptionDiagnosis") == "true")
+        require(arguments.getString("captionDiagnosisNetwork") == "true") { "Explicit ML Kit model-download opt-in required" }
+        withTimeout(30 * 60_000L) {
+            val instrumentation = InstrumentationRegistry.getInstrumentation()
+            val context = instrumentation.targetContext
+            val assets = instrumentation.context.assets
+            val file = File(context.filesDir, "empty-recovery-caption-diagnosis.json")
+            val report = JSONObject().put("schema_version", 1).put("status", "verifying_inputs")
+                .put("collection_complete", false).put("run_started_epoch_ms", System.currentTimeMillis())
+            fun save() = writeReport(file, report)
+            save()
+            assertTrue(BuildConfig.SHERPA_ASR_SOURCE)
+            assertFalse(BuildConfig.HY_MT_NATIVE)
+            assertEquals(SOURCE_AAR_SHA256, BuildConfig.SHERPA_AAR_SHA256)
+            assertEquals("1.13.8-asr-no-tts-sha256-$SOURCE_AAR_SHA256", BuildConfig.SHERPA_RUNTIME_IDENTITY)
+            assertEquals("1.13.8", BuildConfig.SHERPA_RUNTIME_VERSION)
+            assertEquals("1.13.8", VersionInfo.version.removePrefix("v"))
+            assertEquals(3_000L, ListenTranslateWindows.DEFAULT_WINDOW_MS)
+            val appApk = File(context.applicationInfo.sourceDir)
+            val appHash = sha256(appApk)
+            val testHash = sha256(File(instrumentation.context.applicationInfo.sourceDir))
+            for ((name, actual) in listOf("expectedAppApkSha256" to appHash, "expectedTestApkSha256" to testHash)) {
+                val expected = requireNotNull(arguments.getString(name)) { "Supply retained APK hash: $name" }
+                require(expected.matches(Regex("[0-9a-f]{64}")))
+                assertEquals("Installed APK must equal retained build", expected, actual)
+            }
+            val manifestBytes = assets.open("$ROOT/manifest.json").use { it.readBytes() }
+            val fixture = CaptionDiagnosisFixture(JSONObject(manifestBytes.toString(Charsets.UTF_8)))
+            val comparisonBytes = assets.open("$ROOT/fixed-window-comparison.json").use { it.readBytes() }
+            val comparison = FixedCaptionWindowFixture(JSONObject(comparisonBytes.toString(Charsets.UTF_8)))
+            val preparedBytes = assets.open("$ROOT/generated/prepared.json").use { it.readBytes() }
+            val prepared = JSONObject(preparedBytes.toString(Charsets.UTF_8))
+            val comparisonPrepared = jsonAsset(assets, "$ROOT/generated/comparison-prepared.json")
+            assertTrue(prepared.getBoolean("all_inputs_verified"))
+            assertTrue(comparisonPrepared.getBoolean("all_inputs_verified"))
+            assertEquals(sha256(manifestBytes), prepared.getString("manifest_sha256"))
+            assertEquals(sha256(manifestBytes), comparisonPrepared.getString("diagnosis_manifest_sha256"))
+            assertEquals(sha256(preparedBytes), comparisonPrepared.getString("diagnosis_prepared_sha256"))
+            assertEquals(sha256(comparisonBytes), comparisonPrepared.getString("comparison_manifest_sha256"))
+            val profileBytes = assets.open("$ROOT/source-profile.json").use { it.readBytes() }
+            assertEquals(sha256(profileBytes), prepared.getString("source_profile_sha256"))
+            val profile = verifySourceProfile(JSONObject(profileBytes.toString(Charsets.UTF_8)), appApk)
+            val referenceBytes = verifiedAsset(assets, fixture.json.getJSONObject("reference"))
+            val reference = JSONObject(referenceBytes.toString(Charsets.UTF_8))
+            verifyReference(fixture, reference)
+            val inputs = listOf(fixture.json to fixture.decodePcm(verifiedAsset(assets, fixture.json.getJSONObject("pcm"))),
+                comparison.emoji to decodePcm(verifiedAsset(assets, comparison.emoji.getJSONObject("pcm"))))
+            val modelDir = File(context.cacheDir, "caption-diagnosis-model").apply { mkdirs() }
+            val modelInputs = fixture.json.getJSONArray("models")
+            for (i in 0 until modelInputs.length()) copyVerifiedAsset(assets, modelInputs.getJSONObject(i), modelDir)
+            assertTrue(SherpaModelInstaller.verifyPack(modelDir))
+            val fixtureRows = JSONArray()
+            report.put("experiment", "empty_translation_recovery").put("status", "running")
+                .put("app_apk_sha256", appHash).put("test_apk_sha256", testHash)
+                .put("source_aar_sha256", BuildConfig.SHERPA_AAR_SHA256).put("runtime_identity", BuildConfig.SHERPA_RUNTIME_IDENTITY)
+                .put("native_version", VersionInfo.version).put("native_git_sha1", VersionInfo.gitSha1).put("native_git_date", VersionInfo.gitDate)
+                .put("verified_source_profile", profile).put("diagnosis_manifest_sha256", sha256(manifestBytes))
+                .put("comparison_manifest_sha256", sha256(comparisonBytes)).put("prepared_inputs", prepared)
+                .put("comparison_prepared_inputs", comparisonPrepared).put("reference_sha256", sha256(referenceBytes))
+                .put("reference_kind", reference.getString("reference_kind")).put("reference_is_verbatim_gold", false)
+                .put("reference_independently_listened", false).put("fixtures", fixtureRows)
+                .put("expected_fixture_count", 2).put("expected_baseline_window_count", 54)
+                .put("api", Build.VERSION.SDK_INT).put("abi", Build.SUPPORTED_ABIS.first())
+                .put("device_model", Build.MODEL).put("device_manufacturer", Build.MANUFACTURER)
+                .put("accuracy_accepted", false).put("hardware_performance_accepted", false)
+                .put("semantic_acceptance_passed", JSONObject.NULL).put("final_coverage_claimed", false)
+                .put("production_default_window_ms", ListenTranslateWindows.DEFAULT_WINDOW_MS)
+                .put("maximum_constituent_windows", 2).put("maximum_unit_window_span_ms", 6_000)
+                .put("scope", "Pinned in-memory PCM -> real source SenseVoice 1.13.8 -> real ML Kit ja/zh, with actual opt-in production empty-MT recovery. Direct normal processing stays 3s; only an actual successful empty MT may inspect one adjacent, uncompleted canonical window and only a typed successful recovery consumes both. No Room/session/renderer/NAS/OPPO measurement.")
+                .put("timing_scope", "MEASURED_CANDIDATE_PIPELINE_AFTER_SHARED_MODEL_PREPARATION_FULL_PCM_AVAILABLE")
+                .put("timing_limitations", "All PCM is decoded and held in memory before model preparation and timers. Wall time is measured separately for each baseline and candidate run, including actual inference, callbacks, observers and report checkpoints. Candidate time includes lazy morphology and recovery; never sum baseline ASR and replay MT. Audio/window horizons are prerequisites, not playback latency. Unequal observer/checkpoint work, shared warmed models and baseline-first order prevent an isolated speedup inference.")
+                .put("order_and_warm_state", "Verify both PCM fixtures and source APK; prepare shared ML Kit and production ASR once; run all 54 baseline windows with recovery explicitly disabled, then each actual candidate with recovery enabled. No reference MT controls, raw-native controls, pair replay, additional models or separate morphology warmup.")
+                .put("source_callback_scope", "Callback events are engine source-first publication, not rendering. Candidate normal callbacks retain their current 3s span; recovery has no source callback. Successful merged output is separately typed and witnessed by both canonical baseline sources.")
+            val mt = MlKitMtEngine(allowMeteredDownloads = true)
+            val productionAsr = SherpaAsrEngine()
+            save()
+            try {
+                var preparation = now(); mt.ensureModel("ja", "zh")
+                report.put("shared_mt_preparation_ms", elapsed(preparation))
+                preparation = now(); productionAsr.ensureModel(modelDir, "ja")
+                report.put("shared_production_asr_preparation_ms", elapsed(preparation))
+                save()
+                for ((identity, pcm) in inputs) {
+                    val duration = identity.getLong("duration_ms")
+                    assertEquals(duration * 16L, pcm.size.toLong())
+                    val row = JSONObject().put("fixture_id", identity.getString("id"))
+                        .put("duration_ms", duration).put("original_media_start_ms", identity.getLong("original_media_start_ms"))
+                        .put("pcm", identity.getJSONObject("pcm")).put("source_url", identity.getString("source_url"))
+                        .put("license", identity.getString("license")).put("license_url", identity.getString("license_url"))
+                        .put("attribution", identity.getString("attribution"))
+                        .put("reference_kind", if (identity === fixture.json) reference.getString("reference_kind") else identity.getString("reference_kind"))
+                    fixtureRows.put(row); save()
+                    baseline(pcm, duration, modelDir, productionAsr, mt, row, ::save)
+                    annotatePairBaseline(row)
+                    row.getJSONObject("production_3s").put("empty_translation_recovery_enabled", false)
+                    save()
+                }
+                val baselineWindowCount = (0 until fixtureRows.length()).sumOf {
+                    fixtureRows.getJSONObject(it).getJSONObject("production_3s").getJSONArray("rows").length()
+                }
+                val baselineAsrCalls = (0 until fixtureRows.length()).sumOf {
+                    val rows = fixtureRows.getJSONObject(it).getJSONObject("production_3s").getJSONArray("rows")
+                    (0 until rows.length()).sumOf { index -> rows.getJSONObject(index).getJSONArray("actual_asr_calls").length() }
+                }
+                report.put("baseline_window_count", baselineWindowCount).put("baseline_asr_call_count", baselineAsrCalls)
+                assertEquals(54, baselineWindowCount)
+                assertEquals(54, baselineAsrCalls)
+                for (i in inputs.indices) {
+                    EmptyRecoveryCaptionDiagnosticSupport.collect(inputs[i].second, modelDir, productionAsr, mt,
+                        fixtureRows.getJSONObject(i), ::save)
+                }
+                val candidates = (0 until fixtureRows.length()).map {
+                    fixtureRows.getJSONObject(it).getJSONObject("empty_translation_recovery")
+                }
+                report.put("candidate_asr_call_count", candidates.sumOf { it.getInt("asr_call_count") })
+                    .put("candidate_mt_call_count", candidates.sumOf { it.getInt("mt_call_count") })
+                    .put("candidate_recovered_pair_count", candidates.sumOf { it.getInt("recovered_pair_count") })
+                    .put("status", "collected").put("collection_complete", true)
+                    .put("collected_fixture_count", fixtureRows.length())
+                    .put("regression_checks_passed", candidates.all { it.getBoolean("regression_checks_passed") })
+                    .put("semantic_review_required", "Review actual sources, normal/merged translations, empty and failed outcomes and outer seams. Exact canonical bytes and baseline preservation do not prove accuracy, physical display readiness, full coverage or phone performance. This test does not certify Session/Room integration.")
+                save()
+                assertTrue("Inspect per-window regression_checks and mismatch details", report.getBoolean("regression_checks_passed"))
+            } catch (failure: Throwable) {
+                report.put("status", "failed").put("failure_class", failure.javaClass.name)
+                throw failure
+            } finally {
+                try { productionAsr.close() } finally { mt.close(); save() }
+            }
+        }
+        Unit
+    }
+
     /** Same-run ASR evidence replay: this does not measure a new end-to-end pipeline. */
     @Test
     fun compareBoundedPairMtWithThreeSecondBaseline(): Unit = runBlocking<Unit> {
@@ -481,7 +618,8 @@ class RollingCaptionTranslationDiagnosisTest {
         val mt = ObservedMt(actualMt)
         val engine = RealListenTranslateEngine(audio, asr, mt, PinnedModels(modelDir),
             asrModelLabel = { "${SherpaModelInstaller.MODEL_VERSION}|sherpa-${BuildConfig.SHERPA_RUNTIME_IDENTITY}" },
-            monotonicTimeMs = { SystemClock.elapsedRealtimeNanos() / 1_000_000L })
+            monotonicTimeMs = { SystemClock.elapsedRealtimeNanos() / 1_000_000L },
+            emptyTranslationRecoveryEnabled = false)
         val start = now()
         var through = 0L
         try {
