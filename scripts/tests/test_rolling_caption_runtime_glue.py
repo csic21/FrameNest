@@ -22,7 +22,7 @@ def require_single_run_gates(workflow):
     job = re.findall(r'^    if:\s*(.+)$', workflow, re.MULTILINE)
     grant = step(workflow, 'Approved current-UID one-run KVM access')
     grant_gate = re.findall(r'^        if:\s*(.+)$', grant, re.MULTILINE)
-    if job != ['${{ github.run_number == 4 && github.run_attempt == 1 }}'] or grant_gate != job:
+    if job != ['${{ github.run_number == 5 && github.run_attempt == 1 }}'] or grant_gate != job:
         raise ValueError('Both runtime and KVM gates must name the same approved run and first attempt')
 
 
@@ -41,9 +41,9 @@ class RollingCaptionRuntimeGlueTest(unittest.TestCase):
         self.assertIn("branches: ['experiment/FN-77-local-agreement']", self.workflow)
         self.assertNotRegex(self.workflow, re.compile(r'^  (pull_request|schedule):', re.MULTILINE))
         for mutated in (
-            self.workflow.replace('    if: ${{ github.run_number == 4 && github.run_attempt == 1 }}', '    if: ${{ true }}', 1),
-            self.workflow.replace('        if: ${{ github.run_number == 4 && github.run_attempt == 1 }}', '        if: ${{ true }}', 1),
-            self.workflow.replace('        if: ${{ github.run_number == 4 && github.run_attempt == 1 }}\n', '', 1),
+            self.workflow.replace('    if: ${{ github.run_number == 5 && github.run_attempt == 1 }}', '    if: ${{ true }}', 1),
+            self.workflow.replace('        if: ${{ github.run_number == 5 && github.run_attempt == 1 }}', '        if: ${{ true }}', 1),
+            self.workflow.replace('        if: ${{ github.run_number == 5 && github.run_attempt == 1 }}\n', '', 1),
         ):
             with self.assertRaises(ValueError):
                 require_single_run_gates(mutated)

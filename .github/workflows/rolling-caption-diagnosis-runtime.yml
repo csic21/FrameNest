@@ -18,7 +18,7 @@ jobs:
   retained-rolling-caption-runtime:
     # Approved 2026-10-16 for this retained pair, current UID only, exact ACL restoration.
     # One run/attempt gate; subsequent runs cannot grant access.
-    if: ${{ github.run_number == 4 && github.run_attempt == 1 }}
+    if: ${{ github.run_number == 5 && github.run_attempt == 1 }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -81,7 +81,7 @@ jobs:
 
       - name: Approved current-UID one-run KVM access
         # Current FN-77 approval only; no permanent or all-user permission change.
-        if: ${{ github.run_number == 4 && github.run_attempt == 1 }}
+        if: ${{ github.run_number == 5 && github.run_attempt == 1 }}
         timeout-minutes: 2
         run: |
           set -euo pipefail
