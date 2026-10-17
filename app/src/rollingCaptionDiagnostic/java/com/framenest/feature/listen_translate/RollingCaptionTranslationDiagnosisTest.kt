@@ -4,6 +4,7 @@ import android.os.Build
 import android.os.SystemClock
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.atilika.kuromoji.ipadic.Tokenizer
 import com.framenest.BuildConfig
 import com.framenest.experiment.localagreement.RollingLocalAgreement
 import com.framenest.feature.listen_translate.RollingCaptionDiagnosticSupport.ObservedAsr
@@ -27,6 +28,9 @@ import com.framenest.feature.listen_translate.RollingCaptionDiagnosticSupport.wr
 import com.framenest.feature.listen_translate.asr.SherpaAsrEngine
 import com.framenest.feature.listen_translate.asr.SherpaModelInstaller
 import com.framenest.feature.listen_translate.mt.MlKitMtEngine
+import com.framenest.feature.listen_translate.experimental.BaselineCue
+import com.framenest.feature.listen_translate.experimental.BaselinePairPlanner
+import com.framenest.feature.listen_translate.experimental.PairMorpheme
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
@@ -192,6 +196,279 @@ class RollingCaptionTranslationDiagnosisTest {
         }
         Unit
     }
+
+    /** Same-run ASR evidence replay: this does not measure a new end-to-end pipeline. */
+    @Test
+    fun compareBoundedPairMtWithThreeSecondBaseline(): Unit = runBlocking<Unit> {
+        val arguments = InstrumentationRegistry.getArguments()
+        assumeTrue(arguments.getString("rollingCaptionDiagnosis") == "true")
+        require(arguments.getString("captionDiagnosisNetwork") == "true") { "Explicit ML Kit model-download opt-in required" }
+        withTimeout(30 * 60_000L) {
+            val instrumentation = InstrumentationRegistry.getInstrumentation()
+            val context = instrumentation.targetContext
+            val assets = instrumentation.context.assets
+            val file = File(context.filesDir, "bounded-pair-caption-diagnosis.json")
+            val report = JSONObject().put("schema_version", 1).put("status", "verifying_inputs")
+                .put("collection_complete", false).put("run_started_epoch_ms", System.currentTimeMillis())
+            fun save() = writeReport(file, report)
+            save()
+            assertTrue(BuildConfig.SHERPA_ASR_SOURCE)
+            assertFalse(BuildConfig.HY_MT_NATIVE)
+            assertEquals(SOURCE_AAR_SHA256, BuildConfig.SHERPA_AAR_SHA256)
+            assertEquals("1.13.8-asr-no-tts-sha256-$SOURCE_AAR_SHA256", BuildConfig.SHERPA_RUNTIME_IDENTITY)
+            assertEquals("1.13.8", BuildConfig.SHERPA_RUNTIME_VERSION)
+            assertEquals("1.13.8", VersionInfo.version.removePrefix("v"))
+            assertEquals(3_000L, ListenTranslateWindows.DEFAULT_WINDOW_MS)
+            val appApk = File(context.applicationInfo.sourceDir)
+            val appHash = sha256(appApk)
+            val testHash = sha256(File(instrumentation.context.applicationInfo.sourceDir))
+            for ((name, actual) in listOf("expectedAppApkSha256" to appHash, "expectedTestApkSha256" to testHash)) {
+                val expected = requireNotNull(arguments.getString(name)) { "Supply retained APK hash: $name" }
+                require(expected.matches(Regex("[0-9a-f]{64}")))
+                assertEquals("Installed APK must equal retained build", expected, actual)
+            }
+            val manifestBytes = assets.open("$ROOT/manifest.json").use { it.readBytes() }
+            val fixture = CaptionDiagnosisFixture(JSONObject(manifestBytes.toString(Charsets.UTF_8)))
+            val comparisonBytes = assets.open("$ROOT/fixed-window-comparison.json").use { it.readBytes() }
+            val comparison = FixedCaptionWindowFixture(JSONObject(comparisonBytes.toString(Charsets.UTF_8)))
+            val preparedBytes = assets.open("$ROOT/generated/prepared.json").use { it.readBytes() }
+            val prepared = JSONObject(preparedBytes.toString(Charsets.UTF_8))
+            val comparisonPrepared = jsonAsset(assets, "$ROOT/generated/comparison-prepared.json")
+            assertTrue(prepared.getBoolean("all_inputs_verified"))
+            assertTrue(comparisonPrepared.getBoolean("all_inputs_verified"))
+            assertEquals(sha256(manifestBytes), prepared.getString("manifest_sha256"))
+            assertEquals(sha256(manifestBytes), comparisonPrepared.getString("diagnosis_manifest_sha256"))
+            assertEquals(sha256(preparedBytes), comparisonPrepared.getString("diagnosis_prepared_sha256"))
+            assertEquals(sha256(comparisonBytes), comparisonPrepared.getString("comparison_manifest_sha256"))
+            val profileBytes = assets.open("$ROOT/source-profile.json").use { it.readBytes() }
+            assertEquals(sha256(profileBytes), prepared.getString("source_profile_sha256"))
+            val profile = verifySourceProfile(JSONObject(profileBytes.toString(Charsets.UTF_8)), appApk)
+            val referenceBytes = verifiedAsset(assets, fixture.json.getJSONObject("reference"))
+            val reference = JSONObject(referenceBytes.toString(Charsets.UTF_8))
+            verifyReference(fixture, reference)
+            val inputs = listOf(fixture.json to fixture.decodePcm(verifiedAsset(assets, fixture.json.getJSONObject("pcm"))),
+                comparison.emoji to decodePcm(verifiedAsset(assets, comparison.emoji.getJSONObject("pcm"))))
+            val modelDir = File(context.cacheDir, "caption-diagnosis-model").apply { mkdirs() }
+            val modelInputs = fixture.json.getJSONArray("models")
+            for (i in 0 until modelInputs.length()) copyVerifiedAsset(assets, modelInputs.getJSONObject(i), modelDir)
+            assertTrue(SherpaModelInstaller.verifyPack(modelDir))
+            val fixtureRows = JSONArray()
+            report.put("experiment", "bounded_pair_mt").put("status", "running")
+                .put("app_apk_sha256", appHash).put("test_apk_sha256", testHash)
+                .put("source_aar_sha256", BuildConfig.SHERPA_AAR_SHA256).put("runtime_identity", BuildConfig.SHERPA_RUNTIME_IDENTITY)
+                .put("native_version", VersionInfo.version).put("native_git_sha1", VersionInfo.gitSha1).put("native_git_date", VersionInfo.gitDate)
+                .put("verified_source_profile", profile).put("diagnosis_manifest_sha256", sha256(manifestBytes))
+                .put("comparison_manifest_sha256", sha256(comparisonBytes)).put("prepared_inputs", prepared)
+                .put("comparison_prepared_inputs", comparisonPrepared).put("reference_sha256", sha256(referenceBytes))
+                .put("reference_kind", reference.getString("reference_kind")).put("reference_is_verbatim_gold", false)
+                .put("reference_independently_listened", false).put("fixtures", fixtureRows)
+                .put("expected_fixture_count", 2).put("expected_baseline_window_count", 54)
+                .put("api", Build.VERSION.SDK_INT).put("abi", Build.SUPPORTED_ABIS.first())
+                .put("device_model", Build.MODEL).put("device_manufacturer", Build.MANUFACTURER)
+                .put("accuracy_accepted", false).put("hardware_performance_accepted", false)
+                .put("semantic_acceptance_passed", JSONObject.NULL).put("final_coverage_claimed", false)
+                .put("production_default_window_ms", ListenTranslateWindows.DEFAULT_WINDOW_MS)
+                .put("maximum_constituent_windows", 2).put("maximum_unit_window_span_ms", 6_000)
+                .put("scope", "Exact pinned PCM -> unchanged production 3s SenseVoice/ML Kit baseline once. Replay its exact retained sources through greedy nonoverlapping Kuromoji seam-pair planning and real ML Kit. No candidate ASR, previews, source edits, deletion, deduplication, chains, renderer or production integration.")
+                .put("timing_scope", "MT_ISOLATION_REPLAY_NOT_END_TO_END")
+                .put("timing_limitations", "All PCM and baseline sources are available ahead. Baseline wall time is measured separately after shared preparation. Candidate replay wall time includes planning and MT, but excludes baseline ASR, audio acquisition and prior inference. Never add or reuse baseline duration as measured candidate end-to-end time. Required audio horizons include inspected lookahead rows and their padded PCM reads; these are prerequisites, not measured playback latency.")
+                .put("order_and_warm_state", "Prepare shared ML Kit and production ASR once; run all MCDC and Emoji baseline rows; construct one Kuromoji NORMAL tokenizer with separate timing; replay MCDC then Emoji using the same warmed ML Kit. No reference-text/raw-native controls, repeated ASR or cold/warm speedup inference.")
+                .put("morphology_analysis", "Kuromoji IPADIC 0.9.0 NORMAL, whitespace omitted only in analysis and mapped to original UTF-16 offsets. Every output source byte is preserved; known and unknown crossing morphemes are eligible.")
+            val mt = MlKitMtEngine(allowMeteredDownloads = true)
+            val productionAsr = SherpaAsrEngine()
+            save()
+            try {
+                var preparation = now(); mt.ensureModel("ja", "zh")
+                report.put("shared_mt_preparation_ms", elapsed(preparation))
+                preparation = now(); productionAsr.ensureModel(modelDir, "ja")
+                report.put("shared_production_asr_preparation_ms", elapsed(preparation))
+                save()
+                for ((identity, pcm) in inputs) {
+                    val duration = identity.getLong("duration_ms")
+                    assertEquals(duration * 16L, pcm.size.toLong())
+                    val row = JSONObject().put("fixture_id", identity.getString("id"))
+                        .put("duration_ms", duration).put("original_media_start_ms", identity.getLong("original_media_start_ms"))
+                        .put("pcm", identity.getJSONObject("pcm")).put("source_url", identity.getString("source_url"))
+                        .put("license", identity.getString("license")).put("license_url", identity.getString("license_url"))
+                        .put("attribution", identity.getString("attribution"))
+                        .put("reference_kind", if (identity === fixture.json) reference.getString("reference_kind") else identity.getString("reference_kind"))
+                    fixtureRows.put(row); save()
+                    baseline(pcm, duration, modelDir, productionAsr, mt, row, ::save)
+                    annotatePairBaseline(row)
+                    save()
+                }
+                val baselineWindowCount = (0 until fixtureRows.length()).sumOf {
+                    fixtureRows.getJSONObject(it).getJSONObject("production_3s").getJSONArray("rows").length()
+                }
+                val baselineAsrCalls = (0 until fixtureRows.length()).sumOf {
+                    val rows = fixtureRows.getJSONObject(it).getJSONObject("production_3s").getJSONArray("rows")
+                    (0 until rows.length()).sumOf { index -> rows.getJSONObject(index).getJSONArray("actual_asr_calls").length() }
+                }
+                report.put("baseline_window_count", baselineWindowCount).put("baseline_asr_call_count", baselineAsrCalls)
+                    .put("candidate_asr_call_count", 0)
+                assertEquals(54, baselineWindowCount)
+                assertEquals(54, baselineAsrCalls)
+                report.put("process_rss_before_tokenizer_kib", processRssKiB())
+                val tokenizerStart = now()
+                val tokenizer = Tokenizer()
+                report.put("tokenizer_construction_ms", elapsed(tokenizerStart))
+                    .put("process_rss_after_tokenizer_kib", processRssKiB())
+                    .put("memory_scope", "Best-effort /proc/self/status VmRSS snapshots in KiB for the entire process; no causal or peak allocation claim. Null means unavailable.")
+                val planner = BaselinePairPlanner { boundedPairMorphemes(tokenizer, it) }
+                save()
+                for (i in 0 until fixtureRows.length()) {
+                    boundedPairReplay(planner, mt, fixtureRows.getJSONObject(i), ::save)
+                }
+                report.put("status", "collected").put("collection_complete", true)
+                    .put("collected_fixture_count", fixtureRows.length())
+                    .put("semantic_review_required", "Review every actual baseline and candidate source/target, including empty and failed translations and remaining outer seams. Exact source conservation and complete collection do not establish semantic accuracy, bilingual display readiness or phone latency.")
+            } catch (failure: Throwable) {
+                report.put("status", "failed").put("failure_class", failure.javaClass.name)
+                throw failure
+            } finally {
+                try { productionAsr.close() } finally { mt.close(); save() }
+            }
+        }
+        Unit
+    }
+
+    private fun annotatePairBaseline(fixtureRow: JSONObject) {
+        val baseline = fixtureRow.getJSONObject("production_3s")
+        val rows = baseline.getJSONArray("rows")
+        var firstTarget: JSONObject? = null
+        var firstCall: JSONObject? = null
+        var calls = 0
+        var failedOrEmpty = 0
+        for (i in 0 until rows.length()) {
+            val row = rows.getJSONObject(i)
+            val horizon = row.getJSONObject("actual_pcm_read").getLong("actual_end_ms")
+            row.put("source_unit_id", i).put("required_window_horizon_ms", row.getLong("window_end_ms"))
+                .put("required_audio_horizon_ms", horizon)
+            val mtCalls = row.getJSONArray("actual_mt_calls")
+            calls += mtCalls.length()
+            for (j in 0 until mtCalls.length()) {
+                val call = mtCalls.getJSONObject(j)
+                if (call.getString("status") != "returned") failedOrEmpty++
+                if (firstCall == null) firstCall = JSONObject().put("source_unit_id", i)
+                    .put("actual_mt_call", JSONObject(call.toString())).put("required_audio_horizon_ms", horizon)
+                    .put("required_window_horizon_ms", row.getLong("window_end_ms"))
+            }
+            if (firstTarget == null && row.getString("text_tgt").isNotBlank()) {
+                firstTarget = JSONObject().put("source_unit_id", i).put("text_src", row.getString("text_src"))
+                    .put("text_tgt", row.getString("text_tgt")).put("observed_wall_ms", row.getDouble("target_ready_wall_ms"))
+                    .put("required_audio_horizon_ms", horizon).put("required_window_horizon_ms", row.getLong("window_end_ms"))
+            }
+        }
+        baseline.put("first_target", firstTarget ?: JSONObject.NULL).put("first_mt_call", firstCall ?: JSONObject.NULL)
+            .put("mt_attempt_count", calls).put("mt_failed_or_empty_count", failedOrEmpty)
+            .put("timing_scope", "MEASURED_BASELINE_PIPELINE_AFTER_SHARED_MODEL_PREPARATION_FULL_PCM_AVAILABLE")
+    }
+
+    private suspend fun boundedPairReplay(planner: BaselinePairPlanner, mt: MlKitMtEngine,
+        fixtureRow: JSONObject, save: () -> Unit) {
+        val baselineRows = fixtureRow.getJSONObject("production_3s").getJSONArray("rows")
+        val sources = (0 until baselineRows.length()).map { i ->
+            val row = baselineRows.getJSONObject(i)
+            BaselineCue(i, row.getLong("window_start_ms"), row.getLong("window_end_ms"),
+                if (row.isNull("cue_start_ms")) null else row.getLong("cue_start_ms"),
+                if (row.isNull("cue_end_ms")) null else row.getLong("cue_end_ms"), row.getString("text_src"))
+        }
+        val rows = JSONArray()
+        val report = JSONObject().put("status", "running").put("rows", rows)
+            .put("timing_scope", "MT_ISOLATION_REPLAY_NOT_END_TO_END").put("asr_call_count", 0)
+            .put("first_target", JSONObject.NULL).put("first_mt_call", JSONObject.NULL)
+        fixtureRow.put("bounded_pair_mt_replay", report); save()
+        val replayStart = now()
+        try {
+            val planStart = now()
+            val units = planner.plan(sources)
+            report.put("planner_wall_ms", elapsed(planStart))
+            val original = sources.joinToString("") { it.textSrc }
+            val candidate = units.joinToString("") { it.textSrc }
+            val originalBytes = original.toByteArray(Charsets.UTF_8)
+            val candidateBytes = candidate.toByteArray(Charsets.UTF_8)
+            val sameIds = units.flatMap { it.cues }.map { it.index } == sources.map { it.index }
+            report.put("source_conservation", JSONObject().put("exact_text_equal", original == candidate)
+                .put("exact_utf8_bytes_equal", originalBytes.contentEquals(candidateBytes))
+                .put("source_ids_exact_once", sameIds).put("baseline_utf8_bytes", originalBytes.size)
+                .put("candidate_utf8_bytes", candidateBytes.size).put("baseline_sha256", sha256(originalBytes))
+                .put("candidate_sha256", sha256(candidateBytes)))
+            assertEquals(original, candidate); assertTrue(originalBytes.contentEquals(candidateBytes)); assertTrue(sameIds)
+            var firstTarget: JSONObject? = null
+            var firstCall: JSONObject? = null
+            for ((index, unit) in units.withIndex()) {
+                assertTrue(unit.cues.size in 1..2)
+                assertTrue(unit.windowEndMs - unit.windowStartMs <= 6_000L)
+                val inspected = unit.inspectedCueIndices.map { baselineRows.getJSONObject(it) }
+                val requiredAudio = inspected.maxOf { it.getJSONObject("actual_pcm_read").getLong("actual_end_ms") }
+                val requiredWindow = inspected.maxOf { it.getLong("window_end_ms") }
+                assertEquals(requiredWindow, unit.requiredAudioHorizonMs)
+                val sourceReady = if (inspected.any { it.isNull("source_ready_wall_ms") }) null
+                    else inspected.maxOf { it.getDouble("source_ready_wall_ms") }
+                val row = JSONObject().put("unit_id", index).put("source_unit_ids", JSONArray(unit.cues.map { it.index }))
+                    .put("inspected_source_unit_ids", JSONArray(unit.inspectedCueIndices)).put("reason", unit.reason)
+                    .put("constituents", JSONArray(unit.cues.map { cue -> JSONObject()
+                        .put("source_unit_id", cue.index).put("text_src", cue.textSrc)
+                        .put("window_start_ms", cue.windowStartMs).put("window_end_ms", cue.windowEndMs)
+                        .put("cue_start_ms", cue.speechStartMs ?: JSONObject.NULL).put("cue_end_ms", cue.speechEndMs ?: JSONObject.NULL) }))
+                    .put("window_start_ms", unit.windowStartMs).put("window_end_ms", unit.windowEndMs)
+                    .put("source_start_ms", unit.speechStartMs ?: JSONObject.NULL).put("source_end_ms", unit.speechEndMs ?: JSONObject.NULL)
+                    .put("required_window_horizon_ms", requiredWindow).put("required_audio_horizon_ms", requiredAudio)
+                    .put("required_baseline_source_ready_wall_ms", sourceReady ?: JSONObject.NULL)
+                    .put("crossing_morpheme", pairMorphemeJson(unit.crossingMorpheme))
+                    .put("input_text", unit.textSrc).put("target_text", JSONObject.NULL).put("mt_ms", 0.0)
+                    .put("mt_start_replay_wall_ms", elapsed(replayStart)).put("mt_target_ready_replay_wall_ms", JSONObject.NULL)
+                rows.put(row); save()
+                translate(mt, unit.textSrc, row, save)
+                if (row.getString("mt_status") == "returned") {
+                    row.put("mt_target_ready_replay_wall_ms", elapsed(replayStart))
+                    if (firstTarget == null) firstTarget = JSONObject().put("unit_id", index)
+                        .put("source_unit_ids", row.getJSONArray("source_unit_ids"))
+                        .put("input_text", unit.textSrc).put("target_text", row.getString("target_text"))
+                        .put("observed_replay_wall_ms", row.getDouble("mt_target_ready_replay_wall_ms"))
+                        .put("required_audio_horizon_ms", requiredAudio).put("required_window_horizon_ms", requiredWindow)
+                }
+                if (firstCall == null && row.getString("mt_status") != "skipped_empty_source") {
+                    firstCall = JSONObject(row.toString())
+                }
+                report.put("first_target", firstTarget ?: JSONObject.NULL).put("first_mt_call", firstCall ?: JSONObject.NULL)
+                    .put("completed_unit_count", rows.length())
+                save()
+            }
+            report.put("wall_ms", elapsed(replayStart)).put("unit_count", units.size)
+                .put("pair_count", units.count { it.cues.size == 2 })
+                .put("mt_attempt_count", count(rows) { it.getString("mt_status") != "skipped_empty_source" })
+                .put("mt_failed_or_empty_count", count(rows) { it.getString("mt_status") in setOf("failed", "empty_target") })
+                .put("skipped_empty_source_count", count(rows) { it.getString("mt_status") == "skipped_empty_source" })
+                .put("mt_sum_ms", (0 until rows.length()).sumOf { rows.getJSONObject(it).getDouble("mt_ms") })
+            // Audit residual seams only after all replay timing samples; never repair or retranslate them.
+            val auditStart = now()
+            val remaining = JSONArray()
+            units.zipWithNext().forEachIndexed { index, (left, right) ->
+                val crossing = planner.crossing(left.textSrc, right.textSrc)
+                if (crossing != null) remaining.put(JSONObject().put("left_unit_id", index).put("right_unit_id", index + 1)
+                    .put("window_seam_ms", left.windowEndMs).put("crossing_morpheme", pairMorphemeJson(crossing)))
+            }
+            report.put("remaining_crossing_outer_seams", remaining).put("outer_seam_audit_ms", elapsed(auditStart))
+                .put("outer_seam_audit_excluded_from_replay_wall", true).put("status", "collected")
+            val retained = (0 until baselineRows.length()).joinToString("") { baselineRows.getJSONObject(it).getString("text_src") }
+            assertEquals("Candidate replay must not mutate baseline", original, retained)
+        } catch (failure: Throwable) {
+            report.put("status", "failed").put("failure_class", failure.javaClass.name)
+            throw failure
+        } finally { save() }
+    }
+
+    private fun pairMorphemeJson(morpheme: PairMorpheme?): Any = morpheme?.let {
+        JSONObject().put("raw_start_utf16", it.rawStart).put("raw_end_utf16", it.rawEnd)
+            .put("surface", it.surface).put("known", it.known)
+    } ?: JSONObject.NULL
+
+    private fun processRssKiB(): Any = runCatching {
+        File("/proc/self/status").useLines { lines ->
+            lines.firstOrNull { it.startsWith("VmRSS:") }?.split(Regex("\\s+"))?.getOrNull(1)?.toLongOrNull()
+        }
+    }.getOrNull() ?: JSONObject.NULL
 
     private suspend fun baseline(pcm: ShortArray, duration: Long, modelDir: File,
         actualAsr: SherpaAsrEngine, actualMt: MlKitMtEngine, fixtureRow: JSONObject, save: () -> Unit) {

@@ -16,6 +16,9 @@ val rollingCaptionSources = if (rollingCaptionDiagnosis) tasks.register<Sync>("p
     from(rootProject.file("scripts/experimental/local-agreement")) {
         include("RollingLocalAgreement.kt", "ReversibleAgreementKey.kt")
     }
+    from(rootProject.file("scripts/experimental/baseline-pair-planner")) {
+        include("BaselinePairPlanner.kt")
+    }
     into(layout.buildDirectory.dir("generated/rollingCaptionDiagnosis/java"))
 } else null
 

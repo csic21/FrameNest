@@ -50,7 +50,7 @@ class RollingCaptionRuntimeGlueTest(unittest.TestCase):
 
     def test_only_one_exact_class_method_and_two_explicit_opt_ins(self):
         self.assertIn('TEST_SELECTION=com.framenest.feature.listen_translate.'
-                      'RollingCaptionTranslationDiagnosisTest#compareRollingRequestsWithThreeSecondBaseline', self.runner)
+                      'RollingCaptionTranslationDiagnosisTest#compareBoundedPairMtWithThreeSecondBaseline', self.runner)
         self.assertEqual(1, self.runner.count('shell am instrument -w -r'))
         self.assertIn('-e class "$TEST_SELECTION"', self.runner)
         self.assertIn('-e rollingCaptionDiagnosis true -e captionDiagnosisNetwork true', self.runner)
@@ -84,7 +84,7 @@ class RollingCaptionRuntimeGlueTest(unittest.TestCase):
         self.assertIn('-accel on', self.runner)
         self.assertNotIn('-accel off', self.runner)
         self.assertNotIn('FN76_RESULTS', self.workflow + self.runner)
-        self.assertIn('REPORT_NAME=rolling-caption-translation-diagnosis.json', self.runner)
+        self.assertIn('REPORT_NAME=bounded-pair-caption-diagnosis.json', self.runner)
         self.assertIn('cat "files/$REPORT_NAME"', self.runner)
 
     def test_watchdogs_bound_instrumentation_and_session_cleanup_to_35_minutes(self):
@@ -128,10 +128,10 @@ class RollingCaptionRuntimeGlueTest(unittest.TestCase):
         self.assertIn('path: rolling-caption-runtime-results/', evidence)
 
     def test_owner_result_checker_receives_exact_retained_hashes(self):
-        self.assertIn('python3 scripts/check_rolling_caption_runtime_results.py', self.runner)
+        self.assertIn('python3 scripts/check_bounded_pair_caption_results.py', self.runner)
         self.assertIn('--report "$RESULTS/diagnosis/$REPORT_NAME"', self.runner)
         self.assertIn('--expected-app-sha256 "$app_sha" --expected-test-sha256 "$test_sha"', self.runner)
-        self.assertIn("'compareRollingRequestsWithThreeSecondBaseline', 0)", self.runner)
+        self.assertIn("'compareBoundedPairMtWithThreeSecondBaseline', 0)", self.runner)
         self.assertIn('instrumentation-summary.json" || return $?', self.runner)
 
 

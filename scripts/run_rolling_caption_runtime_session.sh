@@ -9,8 +9,8 @@ SERIAL=emulator-5556
 AVD_NAME=fn77-rolling-caption
 PID_FILE="$RESULTS/rolling-emulator.pid"
 ACL="$RESULTS/kvm-original.acl"
-TEST_SELECTION=com.framenest.feature.listen_translate.RollingCaptionTranslationDiagnosisTest#compareRollingRequestsWithThreeSecondBaseline
-REPORT_NAME=rolling-caption-translation-diagnosis.json
+TEST_SELECTION=com.framenest.feature.listen_translate.RollingCaptionTranslationDiagnosisTest#compareBoundedPairMtWithThreeSecondBaseline
+REPORT_NAME=bounded-pair-caption-diagnosis.json
 
 adb_short() { timeout --kill-after=5s 15 adb -s "$SERIAL" "$@"; }
 force_stop_apps() {
@@ -103,7 +103,7 @@ for line in text.splitlines():
             events.append((current.get('class'), current.get('test'), code))
         current = {}
 assert events == [('com.framenest.feature.listen_translate.RollingCaptionTranslationDiagnosisTest',
-                   'compareRollingRequestsWithThreeSecondBaseline', 0)], 'Skipped, repeated, or unexpected test'
+                   'compareBoundedPairMtWithThreeSecondBaseline', 0)], 'Skipped, repeated, or unexpected test'
 assert re.search(r'^INSTRUMENTATION_CODE: -1$', text, re.MULTILINE), 'No successful runner completion'
 assert not re.search(r'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED', text), 'Runner failure'
 print(json.dumps({'status': 'one-test-passed', 'tests_passed': 1, 'tests_skipped': 0,
@@ -113,7 +113,7 @@ PY
   app_sha=$(awk '$2 == "app.apk" {print $1}' "$INPUT/APK-SHA256SUMS")
   test_sha=$(awk '$2 == "test.apk" {print $1}' "$INPUT/APK-SHA256SUMS")
   [[ "$app_sha" =~ ^[0-9a-f]{64}$ && "$test_sha" =~ ^[0-9a-f]{64}$ ]] || return 1
-  python3 scripts/check_rolling_caption_runtime_results.py \
+  python3 scripts/check_bounded_pair_caption_results.py \
     --report "$RESULTS/diagnosis/$REPORT_NAME" \
     --expected-app-sha256 "$app_sha" --expected-test-sha256 "$test_sha" \
     | tee "$RESULTS/collection-summary.json"

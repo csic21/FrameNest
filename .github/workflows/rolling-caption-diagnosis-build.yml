@@ -7,6 +7,7 @@ on:
       - '.github/workflows/rolling-caption-diagnosis-build.yml'
       - 'app/**'
       - 'scripts/experimental/local-agreement/**'
+      - 'scripts/experimental/baseline-pair-planner/**'
       - 'scripts/prepare-caption-diagnosis.py'
       - 'scripts/tests/test_caption_diagnosis.py'
       - 'scripts/caption_diagnosis_schema.py'
@@ -90,7 +91,8 @@ jobs:
           from check_source_asr_apk import SafeZip, dex_classes
           required = {'Lcom/framenest/feature/listen_translate/RollingCaptionTranslationDiagnosisTest;',
                       'Lcom/framenest/feature/listen_translate/RollingCaptionRequestPlanner;',
-                      'Lcom/framenest/experiment/localagreement/RollingLocalAgreement;'}
+                      'Lcom/framenest/experiment/localagreement/RollingLocalAgreement;',
+                      'Lcom/framenest/feature/listen_translate/experimental/BaselinePairPlanner;'}
           with SafeZip(Path('app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk')) as apk:
               classes = set().union(*(dex_classes(apk.read(n)) for n in apk.entries if n.endswith('.dex')))
           assert required <= classes, f'Opt-in diagnostic classes absent from final DEX: {required - classes}'
