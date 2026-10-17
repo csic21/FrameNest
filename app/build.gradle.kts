@@ -82,8 +82,8 @@ android {
         applicationId = "com.framenest"
         minSdk = 26
         targetSdk = 36
-        versionCode = 22
-        versionName = "0.6.11-internal"
+        versionCode = 23
+        versionName = "0.6.12-internal"
         buildConfigField("boolean", "HY_MT_NATIVE", hyMtNative.toString())
         buildConfigField("boolean", "SHERPA_ASR_SOURCE", sherpaAsrSource.toString())
         // Upstream VersionInfo returns the plain version. Keep the artifact identity separate.

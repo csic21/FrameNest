@@ -7,6 +7,8 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 @Dao
 interface ListenTranslateDao {
@@ -309,5 +311,48 @@ interface ListenTranslateDao {
         if (cleanup == null) return
         deleteSupersededProvisionalCues(entity.serverId, entity.share, entity.path,
             entity.sourceLang, entity.targetLang, cleanup.ownedStartMs, cleanup.processedThroughMs)
+    }
+
+    /**
+     * Failure-recovery only: original-PTS speech, exact two-window coverage and
+     * progress become durable together. Recheck concurrent cache changes inside
+     * this transaction before replacing source-only rows, including legacy rev=1.
+     */
+    @Transaction
+    suspend fun replaceEmptyTranslationRecovery(
+        speech: ListenTranslateCueEntity,
+        coverage: ListenTranslateCueEntity,
+        seamMs: Long,
+        durationMs: Long?,
+        updatedAtEpochMs: Long,
+    ): List<ListenTranslateCueEntity>? {
+        require(coverage.startMs >= 0L && coverage.startMs % 3_000L == 0L)
+        require(seamMs - coverage.startMs == 3_000L && coverage.endMs > seamMs && coverage.endMs - seamMs <= 3_000L)
+        require(speech.startMs >= coverage.startMs && speech.startMs < seamMs &&
+            speech.endMs > seamMs && speech.endMs <= coverage.endMs)
+        require(speech.textSrc.isNotBlank() && speech.textTgt.isNotBlank() && speech.rev == 1)
+        require(coverage.textSrc.isEmpty() && coverage.textTgt.isEmpty() && coverage.rev == 1)
+        require(listOf(speech.serverId, speech.share, speech.path, speech.sourceLang, speech.targetLang) ==
+            listOf(coverage.serverId, coverage.share, coverage.path, coverage.sourceLang, coverage.targetLang))
+        val overlapping = listCues(speech.serverId, speech.share, speech.path, speech.sourceLang, speech.targetLang)
+            .filter { it.startMs < coverage.endMs && it.endMs > coverage.startMs }
+        if (overlapping.any { it.textTgt.isNotBlank() || it.textSrc.isBlank() ||
+                it.startMs < coverage.startMs || it.endMs > coverage.endMs }) return null
+        currentCoroutineContext().ensureActive()
+        if (updateJobProgress(speech.serverId, speech.share, speech.path, speech.sourceLang, speech.targetLang,
+                coverage.endMs, "Partial", null, durationMs, updatedAtEpochMs) != 1) return null
+        for (old in overlapping) {
+            deleteCuesAtRange(old.serverId, old.share, old.path, old.sourceLang, old.targetLang, old.startMs, old.endMs)
+        }
+        currentCoroutineContext().ensureActive()
+        val persistedSpeech = speech.copy(id = insertCue(speech.copy(id = 0L)))
+        val rows = if (speech.startMs == coverage.startMs && speech.endMs == coverage.endMs) {
+            listOf(persistedSpeech)
+        } else {
+            currentCoroutineContext().ensureActive()
+            listOf(persistedSpeech, coverage.copy(id = insertCue(coverage.copy(id = 0L))))
+        }
+        currentCoroutineContext().ensureActive()
+        return rows
     }
 }
